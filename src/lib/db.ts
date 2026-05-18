@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 
 export type Unit = 'mg' | 'mcg' | 'iu' | 'ml' | 'tablet' | 'capsule'
+export type TestosteroneEster = 'Enanthate' | 'Cypionate' | 'Propionate' | 'Undecanoate' | 'Custom'
 
 export type Compound = {
   id?: number
@@ -11,6 +12,9 @@ export type Compound = {
   concentration?: string
   schedule: string
   color: string
+  ester?: TestosteroneEster
+  halfLifeDays?: number
+  peakHours?: number
   archived?: boolean
 }
 

@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
+  AlertTriangle,
+  Brain,
   CalendarClock,
   Check,
   ChevronRight,
   Database,
   FileText,
   FlaskConical,
+  Gauge,
+  GitCompare,
   HeartPulse,
   Home,
   Lock,
@@ -15,31 +19,58 @@ import {
   Settings,
   ShieldCheck,
   Syringe,
+  TrendingDown,
   Trash2,
   UploadCloud,
 } from 'lucide-react'
 import {
   Area,
   AreaChart,
+  Bar,
   CartesianGrid,
+  ComposedChart,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { format, formatDistanceToNow, parseISO } from 'date-fns'
-import { db, seedIfEmpty, type Compound, type LabResult, type Unit } from './lib/db'
+import { format, parseISO } from 'date-fns'
+import {
+  db,
+  seedIfEmpty,
+  type Compound,
+  type InjectionLog,
+  type LabExam,
+  type LabResult,
+  type TestosteroneEster,
+  type Unit,
+  type VitalLog,
+} from './lib/db'
 import { extractMarkersFromText, extractPdfText, type ExtractedMarker } from './lib/pdf'
+import {
+  buildCorrelationInsights,
+  buildTestosteroneCurve,
+  buildWeightDoseSeries,
+  esterProfiles,
+  flagLatestResults,
+  inferEster,
+  labStatus,
+  latestResult,
+  markerHistory,
+  weightSummary,
+  type EnrichedResult,
+} from './lib/insights'
 import './index.css'
 
 type View = 'overview' | 'meds' | 'vitals' | 'labs' | 'timeline' | 'files' | 'settings'
 
 const navItems: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'overview', label: 'Overview', icon: Home },
-  { id: 'meds', label: 'Meds', icon: Syringe },
+  { id: 'meds', label: 'Protocols', icon: Syringe },
   { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
   { id: 'timeline', label: 'Timeline', icon: CalendarClock },
@@ -68,15 +99,18 @@ function App() {
   const files = useLiveQuery(() => db.files.orderBy('addedAt').reverse().toArray(), [], [])
 
   const latestBp = vitals[0]
-  const recentInjections = injections.slice(0, 6)
+  const recentInjections = injections.slice(0, 3)
+  const examMap = useMemo(() => new Map(exams.map((exam) => [exam.id, exam])), [exams])
+  const enrichedResults = useMemo(
+    () => results.map((result) => ({ ...result, exam: examMap.get(result.examId) })),
+    [examMap, results],
+  )
   const recentResults = useMemo(() => {
-    const examMap = new Map(exams.map((exam) => [exam.id, exam]))
-    return results
-      .map((result) => ({ ...result, exam: examMap.get(result.examId) }))
+    return enrichedResults
       .filter((result) => result.exam)
       .sort((a, b) => parseISO(b.exam!.collectedAt).getTime() - parseISO(a.exam!.collectedAt).getTime())
       .slice(0, 8)
-  }, [exams, results])
+  }, [enrichedResults])
 
   return (
     <div className="app-shell">
@@ -137,14 +171,16 @@ function App() {
             latestBp={latestBp}
             recentInjections={recentInjections}
             recentResults={recentResults}
+            injections={injections}
             vitals={vitals}
-            files={files}
+            exams={exams}
+            results={enrichedResults}
             onNavigate={setActiveView}
           />
         )}
         {activeView === 'meds' && <Meds compounds={compounds} injections={injections} />}
         {activeView === 'vitals' && <Vitals vitals={vitals} />}
-        {activeView === 'labs' && <Labs exams={exams} results={results} files={files} />}
+        {activeView === 'labs' && <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} />}
         {activeView === 'timeline' && (
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
         )}
@@ -174,19 +210,31 @@ function Overview({
   latestBp,
   recentInjections,
   recentResults,
+  injections,
   vitals,
-  files,
+  exams,
+  results,
   onNavigate,
 }: {
   compounds: Compound[]
   latestBp?: { systolic: number; diastolic: number; pulse?: number; measuredAt: string }
   recentInjections: Array<{ id?: number; compoundId: number; takenAt: string; dose?: number; unit: Unit; site?: string; rawDose?: string }>
   recentResults: Array<LabResult & { exam?: { collectedAt: string; name: string } }>
-  vitals: Array<{ systolic: number; diastolic: number; measuredAt: string }>
-  files: Array<{ name: string; status: string; addedAt: string }>
+  injections: InjectionLog[]
+  vitals: VitalLog[]
+  exams: LabExam[]
+  results: EnrichedResult[]
   onNavigate: (view: View) => void
 }) {
   const compoundMap = new Map(compounds.map((compound) => [compound.id, compound]))
+  const weightSeries = buildWeightDoseSeries(compounds, injections)
+  const weightStats = weightSummary(weightSeries)
+  const testosteroneCurve = buildTestosteroneCurve(compounds, injections)
+  const correlationInsights = buildCorrelationInsights(compounds, injections, vitals, results)
+  const labFlags = flagLatestResults(results)
+  const progesterone = latestResult(results, ['progesterone'])
+  const shbg = latestResult(results, ['sex hormone binding globulin', 'shbg'])
+  const latestExam = exams[0]
   const bpChart = [...vitals]
     .reverse()
     .slice(-8)
@@ -195,7 +243,8 @@ function Overview({
       systolic: vital.systolic,
       diastolic: vital.diastolic,
     }))
-  const pendingFiles = files.filter((file) => file.status === 'Needs review')
+  const latestWeight = weightStats.latest ? `${weightStats.latest.toFixed(1)} kg` : 'No weight'
+  const weightDelta = weightStats.delta !== undefined ? `${weightStats.delta.toFixed(1)} kg total` : 'Add weight to reta log'
 
   return (
     <div className="content-grid overview-grid">
@@ -217,7 +266,8 @@ function Overview({
             value={latestBp ? `${latestBp.systolic}/${latestBp.diastolic}` : 'No data'}
             detail={latestBp ? `${latestBp.pulse ?? '--'} bpm latest` : 'Add first reading'}
           />
-          <Metric label="PDF review" value={String(pendingFiles.length)} detail="Local imports pending" />
+          <Metric label="Weight" value={latestWeight} detail={weightDelta} />
+          <Metric label="Lab watch" value={String(labFlags.length)} detail={latestExam ? `Latest: ${format(parseISO(latestExam.collectedAt), 'MMM d')}` : 'No exams yet'} />
         </div>
       </section>
 
@@ -249,6 +299,50 @@ function Overview({
         </div>
       </section>
 
+      <section className="panel insight-panel full-panel">
+        <div className="panel-header">
+          <div>
+            <span className="section-label">Intelligence</span>
+            <h3>Pattern cards</h3>
+          </div>
+          <span className="safety-chip">Pattern, not diagnosis</span>
+        </div>
+        <div className="insight-grid">
+          <InsightCard
+            icon={TrendingDown}
+            title="Retatrutide response"
+            value={weightStats.delta !== undefined ? `${weightStats.delta.toFixed(1)} kg` : 'Need weight'}
+            detail={weightStats.percent !== undefined ? `${weightStats.percent.toFixed(1)}% from first logged weight` : 'Log weight with each dose to track response.'}
+          />
+          <InsightCard
+            icon={Gauge}
+            title={`${testosteroneCurve.ester} load`}
+            value={testosteroneCurve.activeNow ? `${testosteroneCurve.activeNow} mg est.` : 'No estimate'}
+            detail={testosteroneCurve.lastInjection ? `Last dose ${format(parseISO(testosteroneCurve.lastInjection.takenAt), 'MMM d, HH:mm')}` : 'Select a testosterone compound and ester.'}
+          />
+          <InsightCard
+            icon={AlertTriangle}
+            title="Progesterone"
+            value={progesterone ? labStatus(progesterone) : 'No data'}
+            detail={progesterone ? `${progesterone.rawValue} ${progesterone.unit ?? ''}; compare with SHBG ${shbg?.rawValue ?? '--'}` : 'Import hormone markers to analyze.'}
+          />
+          <InsightCard
+            icon={GitCompare}
+            title="Best next view"
+            value="Correlations"
+            detail="Cross-check timing between protocol changes, BP, weight, and lab shifts before drawing conclusions."
+          />
+        </div>
+      </section>
+
+      <section className="panel wide-panel">
+        <RetatrutideWeightChart compounds={compounds} injections={injections} />
+      </section>
+
+      <section className="panel chart-panel">
+        <TestosteroneCurvePanel compounds={compounds} injections={injections} compact />
+      </section>
+
       <section className="panel chart-panel">
         <div className="panel-header">
           <div>
@@ -272,6 +366,26 @@ function Overview({
       <section className="panel wide-panel">
         <div className="panel-header">
           <div>
+            <span className="section-label">Correlations</span>
+            <h3>What moved together</h3>
+          </div>
+          <span className="safety-chip">Correlation only</span>
+        </div>
+        <div className="correlation-grid">
+          {correlationInsights.map((insight) => (
+            <div className="correlation-card" key={insight.title}>
+              <span>{insight.title}</span>
+              <strong>{insight.value}</strong>
+              <small>{insight.strength}</small>
+              <p>{insight.detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel wide-panel">
+        <div className="panel-header">
+          <div>
             <span className="section-label">Labs</span>
             <h3>Recent biomarkers</h3>
           </div>
@@ -286,19 +400,19 @@ function Overview({
       <section className="panel import-panel">
         <div className="panel-header">
           <div>
-            <span className="section-label">PDFs</span>
-            <h3>Local import queue</h3>
+            <span className="section-label">Watch list</span>
+            <h3>Latest lab flags</h3>
           </div>
-          <UploadCloud size={20} />
+          <Brain size={20} />
         </div>
-        {pendingFiles.length > 0 ? (
+        {labFlags.length > 0 ? (
           <div className="stack-list">
-            {pendingFiles.slice(0, 3).map((file) => (
-              <div className="data-row" key={file.addedAt}>
-                <FileText size={17} />
+            {labFlags.map((result) => (
+              <div className="data-row" key={result.id}>
+                <AlertTriangle size={17} />
                 <div>
-                  <strong>{file.name}</strong>
-                  <span>{formatDistanceToNow(parseISO(file.addedAt), { addSuffix: true })}</span>
+                  <strong>{result.marker}</strong>
+                  <span>{labStatus(result)} · {result.rawValue} {result.unit ?? ''}</span>
                 </div>
               </div>
             ))}
@@ -306,12 +420,137 @@ function Overview({
         ) : (
           <div className="empty-state">
             <Database size={24} />
-            <strong>No files waiting.</strong>
-            <span>Upload a lab PDF and review extracted markers before saving.</span>
+            <strong>No latest flags.</strong>
+            <span>Current imported results have no range flags available.</span>
           </div>
         )}
       </section>
     </div>
+  )
+}
+
+function InsightCard({
+  icon: Icon,
+  title,
+  value,
+  detail,
+}: {
+  icon: typeof Home
+  title: string
+  value: string
+  detail: string
+}) {
+  return (
+    <div className="insight-card">
+      <div className="insight-icon">
+        <Icon size={17} />
+      </div>
+      <div>
+        <span>{title}</span>
+        <strong>{value}</strong>
+        <p>{detail}</p>
+      </div>
+    </div>
+  )
+}
+
+function RetatrutideWeightChart({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
+  const series = buildWeightDoseSeries(compounds, injections)
+  const stats = weightSummary(series)
+  const chartData = series.filter((point) => point.weight !== undefined || point.dose !== undefined).slice(-24)
+
+  return (
+    <>
+      <div className="panel-header">
+        <div>
+          <span className="section-label">Retatrutide</span>
+          <h3>Dose vs weight response</h3>
+        </div>
+        <div className="header-metrics">
+          <span>{stats.latest ? `${stats.latest.toFixed(1)} kg` : 'No weight'}</span>
+          <strong>{stats.delta !== undefined ? `${stats.delta.toFixed(1)} kg` : 'n/a'}</strong>
+        </div>
+      </div>
+      <ResponsiveContainer width="100%" height={280}>
+        <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -16 }}>
+          <CartesianGrid stroke="#eef1f2" vertical={false} />
+          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+          <YAxis yAxisId="weight" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+          <YAxis yAxisId="dose" orientation="right" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+          <Tooltip contentStyle={{ borderRadius: 8, borderColor: '#e7ecef' }} />
+          <Bar yAxisId="dose" dataKey="dose" name="Dose" fill="#dbeafe" radius={[4, 4, 0, 0]} />
+          <Line yAxisId="weight" type="monotone" dataKey="weight" name="Weight" stroke="#0f8f84" strokeWidth={3} dot={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+      <p className="panel-note">
+        Use this to spot response timing after dose changes. It is a trend view, not a dosing recommendation.
+      </p>
+    </>
+  )
+}
+
+function TestosteroneCurvePanel({
+  compounds,
+  injections,
+  compact = false,
+}: {
+  compounds: Compound[]
+  injections: InjectionLog[]
+  compact?: boolean
+}) {
+  const testosterone = compounds.find((compound) => compound.name.toLowerCase().includes('testosterone'))
+  const [esterChoice, setEsterChoice] = useState<TestosteroneEster | ''>('')
+  const ester = esterChoice || inferEster(testosterone)
+  const curve = buildTestosteroneCurve(compounds, injections, ester)
+  const profile = esterProfiles[ester]
+  const lastDoseDate = curve.lastInjection ? format(parseISO(curve.lastInjection.takenAt), 'MMM d') : undefined
+
+  async function updateEster(next: TestosteroneEster) {
+    setEsterChoice(next)
+    if (testosterone?.id) {
+      await db.compounds.update(testosterone.id, {
+        ester: next,
+        halfLifeDays: esterProfiles[next].halfLifeDays,
+        peakHours: esterProfiles[next].peakHours,
+      })
+    }
+  }
+
+  return (
+    <>
+      <div className="panel-header">
+        <div>
+          <span className="section-label">Testosterone model</span>
+          <h3>{compact ? 'Active curve' : 'Estimated active amount and peak/trough'}</h3>
+        </div>
+        <select className="mini-select" value={ester} onChange={(event) => updateEster(event.target.value as TestosteroneEster)}>
+          {(Object.keys(esterProfiles) as TestosteroneEster[]).map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </div>
+      <div className="protocol-summary">
+        <Metric label="Active now" value={curve.activeNow ? `${curve.activeNow} mg` : 'n/a'} detail="Estimated ester-weighted load" />
+        <Metric label="Half-life" value={`${profile.halfLifeDays}d`} detail={`Peak model ${profile.peakHours}h`} />
+      </div>
+      <ResponsiveContainer width="100%" height={compact ? 210 : 300}>
+        <AreaChart data={curve.points} margin={{ top: 12, right: 10, bottom: 0, left: -16 }}>
+          <defs>
+            <linearGradient id="testFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#2563eb" stopOpacity={0.24} />
+              <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="#eef1f2" vertical={false} />
+          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+          <YAxis tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+          <Tooltip contentStyle={{ borderRadius: 8, borderColor: '#e7ecef' }} />
+          {lastDoseDate && <ReferenceLine x={lastDoseDate} stroke="#94a3b8" strokeDasharray="4 4" />}
+          <Area type="monotone" dataKey="active" name="Estimated active mg" stroke="#2563eb" strokeWidth={3} fill="url(#testFill)" />
+        </AreaChart>
+      </ResponsiveContainer>
+      <p className="panel-note">{profile.note} The curve is useful for timing patterns around symptoms, BP, and labs.</p>
+    </>
   )
 }
 
@@ -320,7 +559,7 @@ function Meds({
   injections,
 }: {
   compounds: Compound[]
-  injections: Array<{ id?: number; compoundId: number; takenAt: string; dose?: number; unit: Unit; route: string; site?: string; notes?: string; rawDose?: string }>
+  injections: InjectionLog[]
 }) {
   const [compoundId, setCompoundId] = useState('')
   const [dose, setDose] = useState('')
@@ -438,6 +677,14 @@ function Meds({
             <Plus size={18} />
           </button>
         </div>
+      </section>
+
+      <section className="panel wide-panel">
+        <TestosteroneCurvePanel compounds={compounds} injections={injections} />
+      </section>
+
+      <section className="panel wide-panel">
+        <RetatrutideWeightChart compounds={compounds} injections={injections} />
       </section>
 
       <section className="panel wide-panel">
@@ -574,12 +821,18 @@ function Vitals({ vitals }: { vitals: Array<{ id?: number; measuredAt: string; s
 }
 
 function Labs({
+  compounds,
+  injections,
+  vitals,
   exams,
   results,
   files,
 }: {
-  exams: Array<{ id?: number; name: string; collectedAt: string; labName?: string }>
-  results: LabResult[]
+  compounds: Compound[]
+  injections: InjectionLog[]
+  vitals: VitalLog[]
+  exams: LabExam[]
+  results: EnrichedResult[]
   files: Array<{ id?: number; name: string; status: string; extractedText?: string }>
 }) {
   const [examName, setExamName] = useState('Blood panel')
@@ -587,6 +840,7 @@ function Labs({
   const [value, setValue] = useState('')
   const [unit, setUnit] = useState('ng/dL')
   const [selectedExamId, setSelectedExamId] = useState('')
+  const [selectedMarker, setSelectedMarker] = useState('Progesterone')
 
   const effectiveExamId = selectedExamId || String(exams[0]?.id ?? '')
 
@@ -611,8 +865,8 @@ function Labs({
     setValue('')
   }
 
-  const examMap = new Map(exams.map((exam) => [exam.id, exam]))
-  const enriched = results.map((result) => ({ ...result, exam: examMap.get(result.examId) }))
+  const markerOptions = Array.from(new Set(results.map((result) => result.marker))).sort((a, b) => a.localeCompare(b))
+  const effectiveMarker = markerOptions.includes(selectedMarker) ? selectedMarker : markerOptions[0] ?? ''
   const latestFile = files.find((file) => file.status === 'Needs review')
   const extracted = latestFile?.extractedText ? extractMarkersFromText(latestFile.extractedText) : []
 
@@ -718,15 +972,133 @@ function Labs({
       </section>
 
       <section className="panel wide-panel">
+        <MarkerDetail results={results} marker={effectiveMarker} onMarkerChange={setSelectedMarker} markerOptions={markerOptions} />
+      </section>
+
+      <section className="panel wide-panel">
+        <CorrelationExplorer compounds={compounds} injections={injections} vitals={vitals} results={results} />
+      </section>
+
+      <section className="panel wide-panel">
         <div className="panel-header">
           <div>
             <span className="section-label">Comparison</span>
             <h3>Biomarkers over time</h3>
           </div>
         </div>
-        <ResultsTable results={enriched} />
+        <ResultsTable results={results} />
       </section>
     </div>
+  )
+}
+
+function MarkerDetail({
+  results,
+  marker,
+  markerOptions,
+  onMarkerChange,
+}: {
+  results: EnrichedResult[]
+  marker: string
+  markerOptions: string[]
+  onMarkerChange: (marker: string) => void
+}) {
+  const history = markerHistory(results, marker)
+  const current = [...results]
+    .filter((result) => result.marker === marker && result.exam)
+    .sort((a, b) => parseISO(b.exam!.collectedAt).getTime() - parseISO(a.exam!.collectedAt).getTime())[0]
+  const previous = [...results]
+    .filter((result) => result.marker === marker && result.exam)
+    .sort((a, b) => parseISO(b.exam!.collectedAt).getTime() - parseISO(a.exam!.collectedAt).getTime())[1]
+  const related = relatedMarkersFor(marker)
+    .map((relatedMarker) => latestResult(results, [relatedMarker]))
+    .filter((result): result is EnrichedResult => Boolean(result))
+    .filter((result, index, rows) => rows.findIndex((row) => row.id === result.id) === index)
+  const delta = current?.value !== undefined && previous?.value !== undefined ? current.value - previous.value : undefined
+
+  return (
+    <>
+      <div className="panel-header">
+        <div>
+          <span className="section-label">Marker detail</span>
+          <h3>{marker || 'Select a marker'}</h3>
+        </div>
+        <select className="mini-select marker-select" value={marker} onChange={(event) => onMarkerChange(event.target.value)}>
+          {markerOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      </div>
+      <div className="marker-detail-grid">
+        <div className="marker-main">
+          <span className={`range-pill ${labStatus(current) === 'High' || labStatus(current) === 'Low' ? 'out' : 'ok'}`}>
+            {labStatus(current)}
+          </span>
+          <strong>{current ? `${current.rawValue} ${current.unit ?? ''}` : 'No value'}</strong>
+          <p>
+            {delta !== undefined
+              ? `${delta >= 0 ? '+' : ''}${delta.toFixed(2)} from previous result.`
+              : 'Not enough repeated values to calculate a trend.'}
+          </p>
+          <p className="panel-note">{markerExplanation(marker)}</p>
+        </div>
+        <div className="marker-chart">
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={history} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
+              <CartesianGrid stroke="#eef1f2" vertical={false} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+              <Tooltip contentStyle={{ borderRadius: 8, borderColor: '#e7ecef' }} />
+              <Line type="monotone" dataKey="value" stroke="#0f8f84" strokeWidth={3} dot />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+      <div className="relation-list">
+        {related.map((result) => (
+          <div className="relation-row" key={result.id}>
+            <span>{result.marker}</span>
+            <strong>{result.rawValue} {result.unit ?? ''}</strong>
+            <small>{labStatus(result)}</small>
+          </div>
+        ))}
+      </div>
+      <p className="panel-note">Apollo shows nearby signals so you can ask better questions. It does not decide cause.</p>
+    </>
+  )
+}
+
+function CorrelationExplorer({
+  compounds,
+  injections,
+  vitals,
+  results,
+}: {
+  compounds: Compound[]
+  injections: InjectionLog[]
+  vitals: VitalLog[]
+  results: EnrichedResult[]
+}) {
+  const insights = buildCorrelationInsights(compounds, injections, vitals, results)
+
+  return (
+    <>
+      <div className="panel-header">
+        <div>
+          <span className="section-label">Explorer</span>
+          <h3>Cross-signal correlations</h3>
+        </div>
+        <span className="safety-chip">Never causal by itself</span>
+      </div>
+      <div className="correlation-grid">
+        {insights.map((insight) => (
+          <div className="correlation-card" key={insight.title}>
+            <span>{insight.title}</span>
+            <strong>{insight.value}</strong>
+            <small>{insight.strength}</small>
+            <p>{insight.detail}</p>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -921,6 +1293,25 @@ function doseLabel(entry: { dose?: number; unit?: string; rawDose?: string }) {
   return 'Dose not set'
 }
 
+function relatedMarkersFor(marker: string) {
+  const key = marker.toLowerCase()
+  if (key.includes('progesterone')) return ['Testosterone', 'Oestradiol', 'Estradiol', 'Sex Hormone Binding Globulin', 'Prolactin']
+  if (key.includes('testosterone')) return ['Oestradiol', 'Estradiol', 'Sex Hormone Binding Globulin', 'Prolactin', 'Haematocrit']
+  if (key.includes('creatinine') || key.includes('egfr')) return ['Urea', 'Uric Acid', 'Sodium', 'Total Protein']
+  if (key.includes('cholesterol') || key.includes('triglycerides')) return ['HDL Cholesterol', 'LDL Cholesterol', 'Triglycerides', 'HbA1c', 'Glucose']
+  if (key.includes('haematocrit') || key.includes('hematocrit')) return ['Haemoglobin', 'Red blood cell count', 'Testosterone', 'Ferritin']
+  return ['Testosterone', 'Oestradiol', 'SHBG', 'Creatinine']
+}
+
+function markerExplanation(marker: string) {
+  const key = marker.toLowerCase()
+  if (key.includes('progesterone')) return 'Useful to review beside testosterone, estradiol/oestradiol, SHBG, and prolactin before assuming a cause.'
+  if (key.includes('testosterone')) return 'Review with ester timing, dose history, SHBG, estradiol/oestradiol, symptoms, and draw timing.'
+  if (key.includes('creatinine')) return 'Often shifts with hydration, muscle mass, training, supplements, and kidney filtration markers such as eGFR and urea.'
+  if (key.includes('blood') || key.includes('haematocrit') || key.includes('hematocrit')) return 'Review with testosterone load, hydration, blood pressure, iron status, and repeated trend.'
+  return 'Apollo compares this marker with nearby protocol, BP, weight, and related lab signals. Treat it as a question generator.'
+}
+
 function ResultsTable({ results }: { results: Array<LabResult & { exam?: { collectedAt: string; name: string } }> }) {
   return (
     <div className="table-wrap">
@@ -963,7 +1354,7 @@ function ResultsTable({ results }: { results: Array<LabResult & { exam?: { colle
 function titleFor(view: View) {
   const labels: Record<View, string> = {
     overview: 'Overview',
-    meds: 'Medication log',
+    meds: 'Protocols',
     vitals: 'Vitals',
     labs: 'Lab results',
     timeline: 'Timeline',

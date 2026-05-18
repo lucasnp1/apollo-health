@@ -214,6 +214,10 @@ h3 {
   grid-column: span 8;
 }
 
+.full-panel {
+  grid-column: 1 / -1;
+}
+
 .overview-grid .chart-panel,
 .overview-grid .schedule-panel,
 .overview-grid .import-panel,
@@ -290,7 +294,7 @@ h3 {
 
 .metrics-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
@@ -311,8 +315,152 @@ h3 {
 
 .metric strong {
   color: #101820;
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
+}
+
+.insight-grid,
+.correlation-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.correlation-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.insight-card,
+.correlation-card,
+.relation-row {
+  min-width: 0;
+  padding: 14px;
+  background: #fbfcfd;
+  border: 1px solid #edf1f3;
+  border-radius: 8px;
+}
+
+.insight-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.insight-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: #0f8f84;
+  background: #e9f6f4;
+  border-radius: 8px;
+}
+
+.insight-card span,
+.correlation-card span,
+.relation-row span,
+.header-metrics span {
+  display: block;
+  color: #667783;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.insight-card strong,
+.correlation-card strong,
+.relation-row strong,
+.header-metrics strong,
+.marker-main strong {
+  display: block;
+  color: #101820;
+  font-size: 20px;
+  line-height: 1.15;
+  margin-top: 3px;
+}
+
+.insight-card p,
+.correlation-card p,
+.marker-main p,
+.panel-note {
+  margin-top: 7px;
+  color: #667783;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.correlation-card small,
+.relation-row small {
+  display: inline-flex;
+  margin-top: 8px;
+  color: #0b3f3a;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.safety-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  color: #7a4c00;
+  background: #fff7e6;
+  border: 1px solid #f2dfb0;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.header-metrics {
+  text-align: right;
+}
+
+.protocol-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mini-select {
+  width: auto;
+  min-width: 138px;
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.marker-select {
+  max-width: min(420px, 48vw);
+}
+
+.marker-detail-grid {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+}
+
+.marker-main {
+  min-width: 0;
+}
+
+.marker-main > strong {
+  font-size: 28px;
+  margin-top: 12px;
+}
+
+.marker-chart {
+  min-width: 0;
+}
+
+.relation-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
 }
 
 .stack-list,
@@ -323,7 +471,7 @@ h3 {
 }
 
 .schedule-panel .stack-list {
-  max-height: 492px;
+  max-height: 250px;
   overflow: auto;
   padding-right: 4px;
 }
@@ -529,6 +677,7 @@ select:focus {
 
   .overview-grid .hero-panel,
   .wide-panel,
+  .full-panel,
   .overview-grid .chart-panel,
   .overview-grid .import-panel,
   .two-column > .panel {
@@ -590,8 +739,17 @@ select:focus {
 
   .content-grid,
   .metrics-row,
-  .form-grid {
+  .form-grid,
+  .insight-grid,
+  .correlation-grid,
+  .protocol-summary,
+  .marker-detail-grid,
+  .relation-list {
     grid-template-columns: 1fr;
+  }
+
+  .marker-select {
+    max-width: 100%;
   }
 
   .data-row {
