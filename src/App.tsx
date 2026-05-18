@@ -15,6 +15,8 @@ import {
   Home,
   Lock,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Settings,
   ShieldCheck,
@@ -83,6 +85,7 @@ const todayInput = () => new Date().toISOString().slice(0, 16)
 
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   useEffect(() => {
     void seedIfEmpty()
@@ -113,16 +116,26 @@ function App() {
   }, [enrichedResults])
 
   return (
-    <div className="app-shell">
+    <div className={sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
       <aside className="sidebar">
-        <div className="brand-row">
-          <div className="brand-mark">
-            <Activity size={18} />
+        <div className="sidebar-top">
+          <div className="brand-row">
+            <div className="brand-mark">
+              <Activity size={18} />
+            </div>
+            <div>
+              <strong>Apollo Health</strong>
+              <span>Local-first tracker</span>
+            </div>
           </div>
-          <div>
-            <strong>Apollo Health</strong>
-            <span>Local-first tracker</span>
-          </div>
+          <button
+            type="button"
+            className="icon-button sidebar-toggle"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
         </div>
 
         <nav className="nav-list" aria-label="Primary">
@@ -248,30 +261,45 @@ function Overview({
 
   return (
     <div className="content-grid overview-grid">
-      <section className="panel hero-panel">
-        <div className="panel-header">
+      <section className="panel summary-panel full-panel">
+        <div className="summary-header">
           <div>
             <span className="section-label">Today</span>
-            <h2>Keep the record clean.</h2>
+            <h2>Your health at a glance</h2>
           </div>
           <button type="button" className="primary-button" onClick={() => onNavigate('meds')}>
             <Plus size={17} />
             Add injection
           </button>
         </div>
-        <div className="metrics-row">
-          <Metric label="Compounds" value={String(compounds.length)} detail="Active protocols" />
-          <Metric
+        <div className="summary-grid">
+          <SummaryCard icon={Syringe} label="Protocols" value={String(compounds.length)} detail="Active compounds" />
+          <SummaryCard
+            icon={HeartPulse}
             label="Blood pressure"
             value={latestBp ? `${latestBp.systolic}/${latestBp.diastolic}` : 'No data'}
             detail={latestBp ? `${latestBp.pulse ?? '--'} bpm latest` : 'Add first reading'}
           />
-          <Metric label="Weight" value={latestWeight} detail={weightDelta} />
-          <Metric label="Lab watch" value={String(labFlags.length)} detail={latestExam ? `Latest: ${format(parseISO(latestExam.collectedAt), 'MMM d')}` : 'No exams yet'} />
+          <SummaryCard icon={TrendingDown} label="Weight" value={latestWeight} detail={weightDelta} tone="green" />
+          <SummaryCard
+            icon={FlaskConical}
+            label="Lab watch"
+            value={String(labFlags.length)}
+            detail={latestExam ? `Latest ${format(parseISO(latestExam.collectedAt), 'MMM d')}` : 'No exams yet'}
+            tone={labFlags.length ? 'amber' : 'green'}
+          />
         </div>
       </section>
 
-      <section className="panel schedule-panel">
+      <section className="panel dashboard-large">
+        <RetatrutideWeightChart compounds={compounds} injections={injections} />
+      </section>
+
+      <section className="panel dashboard-medium">
+        <TestosteroneCurvePanel compounds={compounds} injections={injections} compact />
+      </section>
+
+      <section className="panel dashboard-small">
         <div className="panel-header">
           <div>
             <span className="section-label">Schedule</span>
@@ -282,7 +310,7 @@ function Overview({
             <ChevronRight size={16} />
           </button>
         </div>
-        <div className="stack-list">
+        <div className="stack-list compact-list">
           {recentInjections.map((entry) => {
             const compound = compoundMap.get(entry.compoundId)
             return (
@@ -297,6 +325,55 @@ function Overview({
             )
           })}
         </div>
+      </section>
+
+      <section className="panel chart-panel">
+        <div className="panel-header">
+          <div>
+            <span className="section-label">Vitals</span>
+            <h3>Blood pressure trend</h3>
+          </div>
+          <button type="button" className="ghost-button" onClick={() => onNavigate('vitals')}>Log BP</button>
+        </div>
+        <ResponsiveContainer width="100%" height={210}>
+          <LineChart data={bpChart} margin={{ top: 14, right: 12, bottom: 0, left: -18 }}>
+            <CartesianGrid stroke="#eef1f2" vertical={false} />
+            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+            <Tooltip contentStyle={{ borderRadius: 8, borderColor: '#e7ecef' }} />
+            <Line type="monotone" dataKey="systolic" stroke="#0f8f84" strokeWidth={3} dot={false} />
+            <Line type="monotone" dataKey="diastolic" stroke="#94a3b8" strokeWidth={3} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </section>
+
+      <section className="panel import-panel">
+        <div className="panel-header">
+          <div>
+            <span className="section-label">Watch list</span>
+            <h3>Latest lab flags</h3>
+          </div>
+          <Brain size={20} />
+        </div>
+        {labFlags.length > 0 ? (
+          <div className="stack-list compact-list">
+            {labFlags.slice(0, 5).map((result) => (
+              <div className="data-row" key={result.id}>
+                <AlertTriangle size={17} />
+                <div>
+                  <strong>{result.marker}</strong>
+                  <span>{labStatus(result)} · {result.rawValue} {result.unit ?? ''}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state compact-empty">
+            <Database size={24} />
+            <strong>No latest flags.</strong>
+            <span>Current imported results have no range flags available.</span>
+          </div>
+        )}
       </section>
 
       <section className="panel insight-panel full-panel">
@@ -336,34 +413,6 @@ function Overview({
       </section>
 
       <section className="panel wide-panel">
-        <RetatrutideWeightChart compounds={compounds} injections={injections} />
-      </section>
-
-      <section className="panel chart-panel">
-        <TestosteroneCurvePanel compounds={compounds} injections={injections} compact />
-      </section>
-
-      <section className="panel chart-panel">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Vitals</span>
-            <h3>Blood pressure trend</h3>
-          </div>
-          <button type="button" className="ghost-button" onClick={() => onNavigate('vitals')}>Log BP</button>
-        </div>
-        <ResponsiveContainer width="100%" height={210}>
-          <LineChart data={bpChart} margin={{ top: 14, right: 12, bottom: 0, left: -18 }}>
-            <CartesianGrid stroke="#eef1f2" vertical={false} />
-            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
-            <Tooltip contentStyle={{ borderRadius: 8, borderColor: '#e7ecef' }} />
-            <Line type="monotone" dataKey="systolic" stroke="#0f8f84" strokeWidth={3} dot={false} />
-            <Line type="monotone" dataKey="diastolic" stroke="#94a3b8" strokeWidth={3} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </section>
-
-      <section className="panel wide-panel">
         <div className="panel-header">
           <div>
             <span className="section-label">Correlations</span>
@@ -396,35 +445,33 @@ function Overview({
         </div>
         <ResultsTable results={recentResults} />
       </section>
+    </div>
+  )
+}
 
-      <section className="panel import-panel">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Watch list</span>
-            <h3>Latest lab flags</h3>
-          </div>
-          <Brain size={20} />
-        </div>
-        {labFlags.length > 0 ? (
-          <div className="stack-list">
-            {labFlags.map((result) => (
-              <div className="data-row" key={result.id}>
-                <AlertTriangle size={17} />
-                <div>
-                  <strong>{result.marker}</strong>
-                  <span>{labStatus(result)} · {result.rawValue} {result.unit ?? ''}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <Database size={24} />
-            <strong>No latest flags.</strong>
-            <span>Current imported results have no range flags available.</span>
-          </div>
-        )}
-      </section>
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  tone = 'teal',
+}: {
+  icon: typeof Home
+  label: string
+  value: string
+  detail: string
+  tone?: 'teal' | 'green' | 'amber'
+}) {
+  return (
+    <div className="summary-card">
+      <div className={`summary-icon ${tone}`}>
+        <Icon size={18} />
+      </div>
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <p>{detail}</p>
+      </div>
     </div>
   )
 }
