@@ -1,4 +1,4 @@
-# Atlas Health
+# Apollo Health
 
 Local-first personal health tracker for medication/injection logs, blood pressure, lab exams, biomarkers, and exam PDFs.
 
@@ -9,6 +9,7 @@ Local-first personal health tracker for medication/injection logs, blood pressur
 - No analytics scripts.
 - Health data is stored in the browser with IndexedDB.
 - PDF text extraction runs locally in the browser before the user reviews and saves biomarkers.
+- Optional real-data seed files live in `public/local-seed/`, which is git-ignored so personal medical data stays local.
 
 This is a personal record and trend tool. It is not medical advice and does not diagnose, prescribe, or recommend dose changes.
 

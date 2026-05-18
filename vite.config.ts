@@ -9,8 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Atlas Health',
-        short_name: 'Atlas',
+        name: 'Apollo Health',
+        short_name: 'Apollo',
         description: 'A local-first medication, vitals, labs, and exam tracker.',
         theme_color: '#0f8f84',
         background_color: '#f7f9fa',

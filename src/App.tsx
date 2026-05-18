@@ -86,7 +86,7 @@ function App() {
             <Activity size={18} />
           </div>
           <div>
-            <strong>Atlas Health</strong>
+            <strong>Apollo Health</strong>
             <span>Local-first tracker</span>
           </div>
         </div>
@@ -180,7 +180,7 @@ function Overview({
 }: {
   compounds: Compound[]
   latestBp?: { systolic: number; diastolic: number; pulse?: number; measuredAt: string }
-  recentInjections: Array<{ id?: number; compoundId: number; takenAt: string; dose: number; unit: Unit; site?: string }>
+  recentInjections: Array<{ id?: number; compoundId: number; takenAt: string; dose?: number; unit: Unit; site?: string; rawDose?: string }>
   recentResults: Array<LabResult & { exam?: { collectedAt: string; name: string } }>
   vitals: Array<{ systolic: number; diastolic: number; measuredAt: string }>
   files: Array<{ name: string; status: string; addedAt: string }>
@@ -240,7 +240,7 @@ function Overview({
                 <span className="dot" style={{ background: compound?.color ?? '#0f8f84' }} />
                 <div>
                   <strong>{compound?.name ?? 'Unknown compound'}</strong>
-                  <span>{entry.dose} {entry.unit} · {entry.site || 'No site'}</span>
+                  <span>{doseLabel(entry)} · {entry.site || 'No site'}</span>
                 </div>
                 <time>{format(parseISO(entry.takenAt), 'MMM d')}</time>
               </div>
@@ -320,7 +320,7 @@ function Meds({
   injections,
 }: {
   compounds: Compound[]
-  injections: Array<{ id?: number; compoundId: number; takenAt: string; dose: number; unit: Unit; route: string; site?: string; notes?: string }>
+  injections: Array<{ id?: number; compoundId: number; takenAt: string; dose?: number; unit: Unit; route: string; site?: string; notes?: string; rawDose?: string }>
 }) {
   const [compoundId, setCompoundId] = useState('')
   const [dose, setDose] = useState('')
@@ -344,6 +344,7 @@ function Meds({
       unit,
       route: 'SubQ',
       site,
+      rawDose: `${effectiveDose} ${unit}`,
     })
   }
 
@@ -454,7 +455,7 @@ function Meds({
                 <span className="dot" style={{ background: compound?.color ?? '#0f8f84' }} />
                 <div>
                   <strong>{compound?.name ?? 'Unknown compound'}</strong>
-                  <span>{entry.dose} {entry.unit} · {entry.route} · {entry.site || 'No site'}</span>
+                  <span>{doseLabel(entry)} · {entry.route} · {entry.site || 'No site'}</span>
                 </div>
                 <time>{format(parseISO(entry.takenAt), 'MMM d, HH:mm')}</time>
                 <button type="button" className="icon-button danger" onClick={() => db.injections.delete(entry.id!)} aria-label="Delete injection">
@@ -604,6 +605,7 @@ function Labs({
       examId: Number(effectiveExamId),
       marker,
       value: Number(value),
+      rawValue: value,
       unit,
     })
     setValue('')
@@ -626,6 +628,7 @@ function Labs({
       examId,
       marker: item.marker,
       value: item.value,
+      rawValue: String(item.value),
       unit: item.unit,
     })))
     await db.files.update(latestFile.id, { status: 'Reviewed' })
@@ -797,7 +800,7 @@ function Timeline({
   files,
 }: {
   compounds: Compound[]
-  injections: Array<{ id?: number; compoundId: number; takenAt: string; dose: number; unit: Unit }>
+  injections: Array<{ id?: number; compoundId: number; takenAt: string; dose?: number; unit: Unit; rawDose?: string }>
   vitals: Array<{ id?: number; measuredAt: string; systolic: number; diastolic: number }>
   exams: Array<{ id?: number; collectedAt: string; name: string }>
   files: Array<{ id?: number; addedAt: string; name: string; status: string }>
@@ -809,7 +812,7 @@ function Timeline({
       date: entry.takenAt,
       icon: Syringe,
       title: compoundMap.get(entry.compoundId)?.name ?? 'Injection',
-      detail: `${entry.dose} ${entry.unit}`,
+      detail: doseLabel(entry),
     })),
     ...vitals.map((entry) => ({
       id: `v-${entry.id}`,
@@ -912,6 +915,12 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
   )
 }
 
+function doseLabel(entry: { dose?: number; unit?: string; rawDose?: string }) {
+  if (entry.rawDose) return entry.rawDose
+  if (entry.dose !== undefined) return `${entry.dose} ${entry.unit ?? ''}`.trim()
+  return 'Dose not set'
+}
+
 function ResultsTable({ results }: { results: Array<LabResult & { exam?: { collectedAt: string; name: string } }> }) {
   return (
     <div className="table-wrap">
@@ -926,16 +935,19 @@ function ResultsTable({ results }: { results: Array<LabResult & { exam?: { colle
         </thead>
         <tbody>
           {results.map((result) => {
-            const status = result.low !== undefined && result.high !== undefined
+            const status = result.status === 'Cancelled'
+              ? 'out'
+              : result.value !== undefined && result.low !== undefined && result.high !== undefined
               ? result.value < result.low || result.value > result.high
                 ? 'out'
                 : 'ok'
               : 'neutral'
+            const displayValue = `${result.rawValue ?? result.value ?? '--'}${result.unit ? ` ${result.unit}` : ''}`
             return (
               <tr key={result.id}>
                 <td>{result.marker}</td>
                 <td>
-                  <span className={`range-pill ${status}`}>{result.value} {result.unit}</span>
+                  <span className={`range-pill ${status}`}>{displayValue}</span>
                 </td>
                 <td>{result.low ?? '--'} - {result.high ?? '--'}</td>
                 <td>{result.exam ? format(parseISO(result.exam.collectedAt), 'MMM d, yyyy') : 'Manual'}</td>

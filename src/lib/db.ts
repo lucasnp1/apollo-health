@@ -18,11 +18,14 @@ export type InjectionLog = {
   id?: number
   compoundId: number
   takenAt: string
-  dose: number
+  dose?: number
   unit: Unit
   route: 'SubQ' | 'IM' | 'Oral' | 'Other'
   site?: string
   notes?: string
+  rawDose?: string
+  vialAmount?: string
+  weightKg?: number
 }
 
 export type VitalLog = {
@@ -31,6 +34,7 @@ export type VitalLog = {
   systolic: number
   diastolic: number
   pulse?: number
+  weightKg?: number
   notes?: string
 }
 
@@ -47,10 +51,14 @@ export type LabResult = {
   id?: number
   examId: number
   marker: string
-  value: number
-  unit: string
+  value?: number
+  rawValue: string
+  unit?: string
   low?: number
   high?: number
+  status?: string
+  notes?: string
+  source?: string
 }
 
 export type HealthFile = {
@@ -64,16 +72,32 @@ export type HealthFile = {
   blob?: Blob
 }
 
-export class AtlasDatabase extends Dexie {
+export type MetaRecord = {
+  key: string
+  value: string
+}
+
+type SeedData = {
+  seedVersion: string
+  compounds: Array<Omit<Compound, 'id'>>
+  injections: Array<Omit<InjectionLog, 'id' | 'compoundId'> & { compoundName: string }>
+  vitals: Array<Omit<VitalLog, 'id'>>
+  exams: Array<Omit<LabExam, 'id' | 'sourceFileId'> & { key: string; sourceFileName?: string }>
+  results: Array<Omit<LabResult, 'id' | 'examId'> & { examKey: string }>
+  files: Array<Omit<HealthFile, 'id' | 'blob'>>
+}
+
+export class ApolloDatabase extends Dexie {
   compounds!: Table<Compound, number>
   injections!: Table<InjectionLog, number>
   vitals!: Table<VitalLog, number>
   exams!: Table<LabExam, number>
   results!: Table<LabResult, number>
   files!: Table<HealthFile, number>
+  meta!: Table<MetaRecord, string>
 
   constructor() {
-    super('atlas-health-local')
+    super('apollo-health-local')
     this.version(1).stores({
       compounds: '++id, name, category, archived',
       injections: '++id, compoundId, takenAt',
@@ -82,10 +106,19 @@ export class AtlasDatabase extends Dexie {
       results: '++id, examId, marker',
       files: '++id, addedAt, status',
     })
+    this.version(2).stores({
+      compounds: '++id, name, category, archived',
+      injections: '++id, compoundId, takenAt',
+      vitals: '++id, measuredAt',
+      exams: '++id, collectedAt, sourceFileId',
+      results: '++id, examId, marker',
+      files: '++id, addedAt, status',
+      meta: '&key',
+    })
   }
 }
 
-export const db = new AtlasDatabase()
+export const db = new ApolloDatabase()
 
 let seedPromise: Promise<void> | undefined
 
@@ -96,102 +129,66 @@ export async function seedIfEmpty() {
 }
 
 async function seedDatabaseIfEmpty() {
-  const count = await db.compounds.count()
-  if (count > 0) return
+  const seed = await fetchLocalSeed()
+  if (!seed) return
 
-  const [testosteroneId, hcgId, ipaId] = await db.compounds.bulkAdd(
-    [
-      {
-        name: 'Testosterone Cypionate',
-        category: 'TRT',
-        defaultDose: 40,
-        unit: 'mg',
-        concentration: '200 mg/ml',
-        schedule: 'Mon / Wed / Fri',
-        color: '#0f8f84',
-      },
-      {
-        name: 'HCG',
-        category: 'Peptide',
-        defaultDose: 250,
-        unit: 'iu',
-        concentration: '5,000 iu vial',
-        schedule: 'Tue / Sat',
-        color: '#2563eb',
-      },
-      {
-        name: 'Ipamorelin',
-        category: 'Peptide',
-        defaultDose: 100,
-        unit: 'mcg',
-        schedule: 'Nightly',
-        color: '#8b5cf6',
-      },
-    ],
-    { allKeys: true },
-  )
+  const currentSeed = await db.meta.get('seedVersion')
+  if (currentSeed?.value === seed.seedVersion) return
 
-  await db.injections.bulkAdd([
-    {
-      compoundId: Number(testosteroneId),
-      takenAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
-      dose: 40,
-      unit: 'mg',
-      route: 'SubQ',
-      site: 'Left abdomen',
-      notes: 'No irritation.',
-    },
-    {
-      compoundId: Number(hcgId),
-      takenAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-      dose: 250,
-      unit: 'iu',
-      route: 'SubQ',
-      site: 'Right abdomen',
-    },
-    {
-      compoundId: Number(ipaId),
-      takenAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-      dose: 100,
-      unit: 'mcg',
-      route: 'SubQ',
-      site: 'Thigh',
-    },
-  ])
+  await db.transaction('rw', [db.compounds, db.injections, db.vitals, db.exams, db.results, db.files, db.meta], async () => {
+    await Promise.all([
+      db.compounds.clear(),
+      db.injections.clear(),
+      db.vitals.clear(),
+      db.exams.clear(),
+      db.results.clear(),
+      db.files.clear(),
+    ])
 
-  await db.vitals.bulkAdd([
-    {
-      measuredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
-      systolic: 128,
-      diastolic: 78,
-      pulse: 62,
-    },
-    {
-      measuredAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-      systolic: 124,
-      diastolic: 76,
-      pulse: 60,
-    },
-    {
-      measuredAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      systolic: 121,
-      diastolic: 74,
-      pulse: 58,
-    },
-  ])
+    await db.files.bulkAdd(seed.files)
 
-  const examId = await db.exams.add({
-    name: 'Baseline blood panel',
-    collectedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString(),
-    labName: 'Manual entry',
-    notes: 'Seed data. Replace with your own results.',
+    const compoundIdByName = new Map<string, number>()
+    for (const compound of seed.compounds) {
+      const id = await db.compounds.add(compound)
+      compoundIdByName.set(compound.name, id)
+    }
+
+    const injections = seed.injections
+      .map(({ compoundName, ...entry }) => {
+        const compoundId = compoundIdByName.get(compoundName)
+        return compoundId ? { ...entry, compoundId } : undefined
+      })
+      .filter((entry): entry is InjectionLog => Boolean(entry))
+    if (injections.length > 0) await db.injections.bulkAdd(injections)
+
+    if (seed.vitals.length > 0) await db.vitals.bulkAdd(seed.vitals)
+
+    const fileIdByName = new Map((await db.files.toArray()).map((file) => [file.name, file.id]))
+    const examIdByKey = new Map<string, number>()
+    for (const { key, sourceFileName, ...exam } of seed.exams) {
+      const sourceFileId = sourceFileName ? fileIdByName.get(sourceFileName) : undefined
+      const id = await db.exams.add({ ...exam, sourceFileId })
+      examIdByKey.set(key, id)
+    }
+
+    const results = seed.results
+      .map(({ examKey, ...result }) => {
+        const examId = examIdByKey.get(examKey)
+        return examId ? { ...result, examId } : undefined
+      })
+      .filter((result): result is LabResult => Boolean(result))
+    if (results.length > 0) await db.results.bulkAdd(results)
+
+    await db.meta.put({ key: 'seedVersion', value: seed.seedVersion })
   })
+}
 
-  await db.results.bulkAdd([
-    { examId, marker: 'Total Testosterone', value: 742, unit: 'ng/dL', low: 300, high: 900 },
-    { examId, marker: 'Free Testosterone', value: 22.4, unit: 'ng/dL', low: 8, high: 25 },
-    { examId, marker: 'Estradiol', value: 31, unit: 'pg/mL', low: 10, high: 40 },
-    { examId, marker: 'Hematocrit', value: 47.8, unit: '%', low: 40, high: 52 },
-    { examId, marker: 'PSA', value: 0.9, unit: 'ng/mL', low: 0, high: 4 },
-  ])
+async function fetchLocalSeed() {
+  try {
+    const response = await fetch('/local-seed/apollo-seed.json', { cache: 'no-store' })
+    if (!response.ok) return undefined
+    return (await response.json()) as SeedData
+  } catch {
+    return undefined
+  }
 }
