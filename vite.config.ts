@@ -8,6 +8,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        cleanupOutdatedCaches: true,
+        globPatterns: ['**/*.{css,html,js,json,mjs,svg,webmanifest}'],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        navigateFallbackDenylist: [/^\/local-seed\//],
+      },
       manifest: {
         name: 'Apollo Health',
         short_name: 'Apollo',
