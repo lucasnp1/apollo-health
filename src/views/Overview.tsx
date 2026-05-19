@@ -11,6 +11,7 @@ import {
   type EnrichedResult,
 } from '../lib/insights'
 import { nextDose, timeUntil, upcomingSchedule } from '../lib/schedule'
+import { logInjection, pickActiveVial } from '../lib/injections'
 import { Sparkline } from '../components/Sparkline'
 import { StatCard } from '../components/StatCard'
 import type { View } from '../app/views'
@@ -36,6 +37,7 @@ export function Overview({
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
   const weightGoal = goals.find((g) => g.kind === 'weight' && !g.achievedAt)
   const bpGoal = goals.find((g) => g.kind === 'bp' && !g.achievedAt)
+  const vials = useLiveQuery(() => db.vials.toArray(), [], [])
 
   const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id, c])), [compounds])
   const upcoming = upcomingSchedule(protocols, protocolDoses, new Date(), 7).slice(0, 5)
@@ -56,11 +58,13 @@ export function Overview({
     .map((p) => p.weight as number)
   const latestSymptom = symptoms[0]
 
+  const headVial = head ? pickActiveVial(vials, head.protocol.compoundId) : undefined
+
   async function logDoseAsTaken() {
     if (!head) return
     const compound = compoundMap.get(head.protocol.compoundId)
     if (!compound?.id) return
-    const injectionId = await db.injections.add({
+    const injectionId = await logInjection({
       compoundId: compound.id,
       takenAt: head.scheduledAt.toISOString(),
       dose: head.protocol.dose,
@@ -68,6 +72,7 @@ export function Overview({
       route: 'SubQ',
       site: 'Abdomen',
       rawDose: `${head.protocol.dose} ${head.protocol.unit}`,
+      vialId: headVial?.id,
     })
     await db.protocolDoses.add({
       protocolId: head.protocol.id!,
@@ -93,6 +98,7 @@ export function Overview({
               <span className="eta-big">{timeUntil(head.scheduledAt)}</span>
               <span className="up-next-meta">
                 {format(head.scheduledAt, 'EEE, MMM d · HH:mm')} · {head.protocol.notes ?? head.protocol.name}
+                {headVial ? ` · from ${headVial.label} (${headVial.remainingMl.toFixed(2)} mL left)` : ''}
               </span>
               <div className="up-next-actions">
                 <button type="button" className="primary-button" onClick={logDoseAsTaken}>Mark taken</button>

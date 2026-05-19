@@ -33,7 +33,8 @@ import {
   weightSummary,
 } from '../lib/insights'
 import { describeCadence } from '../lib/schedule'
-import { projectedEmptyDate, recentWeeklyMl, weeklyMlForProtocol } from '../lib/vials'
+import { mlFromDose, projectedEmptyDate, recentWeeklyMl, weeklyMlForProtocol } from '../lib/vials'
+import { deleteInjection, logInjection, pickActiveVial } from '../lib/injections'
 import { EmptyState } from '../components/EmptyState'
 
 const UNITS: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
@@ -68,11 +69,11 @@ export function Protocols({ compounds, injections }: { compounds: Compound[]; in
       </section>
 
       <section className="surface col-12">
-        <QuickLog compounds={compounds} />
+        <QuickLog compounds={compounds} vials={vials} />
       </section>
 
       <section className="surface col-12">
-        <RecentDoses injections={injections} compounds={compounds} />
+        <RecentDoses injections={injections} compounds={compounds} vials={vials} />
       </section>
     </div>
   )
@@ -417,8 +418,10 @@ function VialInventory({
               const empty = projectedEmptyDate(v, weekly)
               const pct = (v.remainingMl / Math.max(v.totalMl, 0.0001)) * 100
               const tone = pct < 15 ? 'empty' : pct < 35 ? 'low' : ''
+              const weeksLeft = weekly > 0 ? v.remainingMl / weekly : undefined
+              const stockTone = weeksLeft !== undefined && weeksLeft < 1 ? 'bad' : weeksLeft !== undefined && weeksLeft < 2 ? 'warn' : ''
               return (
-                <div className="row" key={v.id} style={{ gridTemplateColumns: '1fr auto', alignItems: 'start' }}>
+                <div className="row" key={v.id} style={{ gridTemplateColumns: '1fr auto auto', alignItems: 'start' }}>
                   <div style={{ display: 'grid', gap: 6 }}>
                     <strong>
                       {compound?.name ?? 'Compound'} · {v.label}
@@ -429,6 +432,9 @@ function VialInventory({
                     </span>
                     <div className={`vial-bar ${tone}`}><span style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>
                   </div>
+                  {weeksLeft !== undefined && (
+                    <span className={`chip ${stockTone}`}>{weeksLeft < 1 ? '<1w left' : `${weeksLeft.toFixed(1)}w left`}</span>
+                  )}
                   <button type="button" className="icon-button danger" onClick={() => db.vials.update(v.id!, { archived: true })} aria-label="Archive vial">
                     <Trash2 size={14} />
                   </button>
@@ -520,19 +526,34 @@ function SiteRotation({ injections }: { injections: InjectionLog[] }) {
 
 // --- Quick log ---
 
-function QuickLog({ compounds }: { compounds: Compound[] }) {
+function QuickLog({ compounds, vials }: { compounds: Compound[]; vials: Vial[] }) {
   const [compoundId, setCompoundId] = useState('')
   const [dose, setDose] = useState('')
   const [unit, setUnit] = useState<Unit>('mg')
   const [site, setSite] = useState('Glute L')
   const [takenAt, setTakenAt] = useState(() => new Date().toISOString().slice(0, 16))
+  const [vialId, setVialId] = useState<string>('')
 
   const effectiveId = compoundId || String(compounds[0]?.id ?? '')
+  const effectiveCompoundIdNum = Number(effectiveId)
+  const matchingVials = useMemo(
+    () => vials.filter((v) => v.compoundId === effectiveCompoundIdNum && !v.archived),
+    [vials, effectiveCompoundIdNum],
+  )
+  const activeVial = useMemo(() => pickActiveVial(vials, effectiveCompoundIdNum), [vials, effectiveCompoundIdNum])
+  const effectiveVial = matchingVials.find((v) => String(v.id) === vialId) ?? activeVial
+
+  // Live preview of mL that would be drawn
+  const previewMl = useMemo(() => {
+    if (!effectiveVial || !dose) return undefined
+    return mlFromDose(Number(dose), unit, effectiveVial.concentrationMgPerMl)
+  }, [effectiveVial, dose, unit])
+  const previewExceeds = previewMl !== undefined && effectiveVial && previewMl > effectiveVial.remainingMl
 
   async function save() {
     const compound = compounds.find((c) => String(c.id) === effectiveId)
     if (!compound?.id || !dose) return
-    await db.injections.add({
+    await logInjection({
       compoundId: compound.id,
       takenAt: new Date(takenAt).toISOString(),
       dose: Number(dose),
@@ -540,6 +561,7 @@ function QuickLog({ compounds }: { compounds: Compound[] }) {
       route: 'SubQ',
       site,
       rawDose: `${dose} ${unit}`,
+      vialId: effectiveVial?.id,
     })
     setDose('')
   }
@@ -583,14 +605,33 @@ function QuickLog({ compounds }: { compounds: Compound[] }) {
           Taken at
           <input type="datetime-local" value={takenAt} onChange={(e) => setTakenAt(e.target.value)} />
         </label>
+        <label>
+          Vial
+          <select value={vialId} onChange={(e) => setVialId(e.target.value)}>
+            <option value="">{activeVial ? `Auto · ${activeVial.label}` : 'None'}</option>
+            {matchingVials.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label} · {v.remainingMl.toFixed(2)}/{v.totalMl} mL{v.concentrationMgPerMl ? ` · ${v.concentrationMgPerMl} mg/mL` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="button" className="primary-button" onClick={save}><Plus size={15} /> Save</button>
+        {previewMl !== undefined && (
+          <p className="panel-note wide-field">
+            Will draw <strong style={{ color: previewExceeds ? 'var(--bad)' : 'var(--ink)' }}>{previewMl.toFixed(3)} mL</strong>
+            {' '}from <strong>{effectiveVial?.label}</strong>
+            {previewExceeds ? ' — vial does not have enough remaining; save will leave it at 0.' : '.'}
+          </p>
+        )}
       </div>
     </>
   )
 }
 
-function RecentDoses({ injections, compounds }: { injections: InjectionLog[]; compounds: Compound[] }) {
+function RecentDoses({ injections, compounds, vials }: { injections: InjectionLog[]; compounds: Compound[]; vials: Vial[] }) {
   const compoundMap = new Map(compounds.map((c) => [c.id, c]))
+  const vialMap = new Map(vials.map((v) => [v.id, v]))
   return (
     <>
       <div className="panel-header">
@@ -602,15 +643,20 @@ function RecentDoses({ injections, compounds }: { injections: InjectionLog[]; co
       <div className="stack">
         {injections.slice(0, 20).map((entry) => {
           const c = compoundMap.get(entry.compoundId)
+          const v = entry.vialId ? vialMap.get(entry.vialId) : undefined
           return (
             <div className="row" key={entry.id}>
               <span className="dot" style={{ background: c?.color ?? 'var(--accent)' }} />
               <div>
                 <strong>{c?.name ?? 'Unknown'}</strong>
-                <span className="sub">{entry.rawDose ?? `${entry.dose ?? ''} ${entry.unit}`} · {entry.route} · {entry.site || '—'}</span>
+                <span className="sub">
+                  {entry.rawDose ?? `${entry.dose ?? ''} ${entry.unit}`} · {entry.route} · {entry.site || '—'}
+                  {v ? ` · ${v.label}` : ''}
+                  {entry.vialAmount ? ` · ${entry.vialAmount}` : ''}
+                </span>
               </div>
               <time>{format(parseISO(entry.takenAt), 'MMM d HH:mm')}</time>
-              <button type="button" className="icon-button danger" onClick={() => db.injections.delete(entry.id!)} aria-label="Delete">
+              <button type="button" className="icon-button danger" onClick={() => deleteInjection(entry.id!)} aria-label="Delete">
                 <Trash2 size={14} />
               </button>
             </div>

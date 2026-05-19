@@ -1,5 +1,16 @@
 import { addDays } from 'date-fns'
-import type { InjectionLog, Protocol, Vial } from './db'
+import type { InjectionLog, Protocol, Unit, Vial } from './db'
+
+// Convert a dose in the user's unit to mL consumed from a vial with known mg/mL.
+// Returns undefined when conversion isn't well-defined for this unit.
+export function mlFromDose(dose: number, unit: Unit, concentrationMgPerMl?: number): number | undefined {
+  if (!Number.isFinite(dose) || dose <= 0) return undefined
+  if (unit === 'ml') return dose
+  if (!concentrationMgPerMl || concentrationMgPerMl <= 0) return undefined
+  if (unit === 'mg') return dose / concentrationMgPerMl
+  if (unit === 'mcg') return dose / 1000 / concentrationMgPerMl
+  return undefined
+}
 
 // Estimate mL consumed per week for a protocol, given concentration.
 export function weeklyMlForProtocol(protocol: Protocol, concentrationMgPerMl: number): number {
