@@ -30,6 +30,8 @@ export type InjectionLog = {
   rawDose?: string
   vialAmount?: string
   weightKg?: number
+  protocolDoseId?: number
+  vialId?: number
 }
 
 export type VitalLog = {
@@ -39,6 +41,8 @@ export type VitalLog = {
   diastolic: number
   pulse?: number
   weightKg?: number
+  waistCm?: number
+  bodyFatPct?: number
   notes?: string
 }
 
@@ -81,6 +85,83 @@ export type MetaRecord = {
   value: string
 }
 
+// --- v3: Protocols, vials, symptoms, targets, goals ---
+
+export type ProtocolCadence =
+  | { kind: 'everyNDays'; n: number; timeOfDay?: string }
+  | { kind: 'weekly'; daysOfWeek: number[]; timeOfDay?: string }
+  | { kind: 'daily'; timesOfDay: string[] }
+  | { kind: 'asNeeded' }
+
+export type Protocol = {
+  id?: number
+  name: string
+  compoundId: number
+  dose: number
+  unit: Unit
+  cadence: ProtocolCadence
+  startedAt: string
+  endsAt?: string
+  notes?: string
+  phase?: 'Blast' | 'Cruise' | 'PCT' | 'Bridge' | 'Trial' | 'Maintenance'
+  archived?: boolean
+}
+
+export type ProtocolDose = {
+  id?: number
+  protocolId: number
+  scheduledAt: string
+  status: 'pending' | 'done' | 'skipped' | 'missed'
+  injectionId?: number
+}
+
+export type Vial = {
+  id?: number
+  compoundId: number
+  label: string
+  totalMl: number
+  concentrationMgPerMl?: number
+  remainingMl: number
+  openedAt?: string
+  expiresAt?: string
+  costCents?: number
+  archived?: boolean
+}
+
+export type Symptom = {
+  id?: number
+  recordedAt: string
+  libido?: number
+  sleep?: number
+  mood?: number
+  energy?: number
+  waterRetention?: number
+  acne?: number
+  nippleSensitivity?: number
+  jointPain?: number
+  headache?: number
+  notes?: string
+}
+
+export type MarkerTarget = {
+  id?: number
+  marker: string
+  low?: number
+  high?: number
+  unit?: string
+  rationale?: string
+}
+
+export type Goal = {
+  id?: number
+  kind: 'weight' | 'marker' | 'bp'
+  label: string
+  target: number
+  marker?: string
+  startedAt: string
+  achievedAt?: string
+}
+
 type SeedData = {
   seedVersion: string
   compounds: Array<Omit<Compound, 'id'>>
@@ -99,6 +180,12 @@ export class ApolloDatabase extends Dexie {
   results!: Table<LabResult, number>
   files!: Table<HealthFile, number>
   meta!: Table<MetaRecord, string>
+  protocols!: Table<Protocol, number>
+  protocolDoses!: Table<ProtocolDose, number>
+  vials!: Table<Vial, number>
+  symptoms!: Table<Symptom, number>
+  markerTargets!: Table<MarkerTarget, number>
+  goals!: Table<Goal, number>
 
   constructor() {
     super('apollo-health-local')
@@ -118,6 +205,21 @@ export class ApolloDatabase extends Dexie {
       results: '++id, examId, marker',
       files: '++id, addedAt, status',
       meta: '&key',
+    })
+    this.version(3).stores({
+      compounds: '++id, name, category, archived',
+      injections: '++id, compoundId, takenAt, vialId',
+      vitals: '++id, measuredAt',
+      exams: '++id, collectedAt, sourceFileId',
+      results: '++id, examId, marker',
+      files: '++id, addedAt, status',
+      meta: '&key',
+      protocols: '++id, compoundId, archived, startedAt',
+      protocolDoses: '++id, protocolId, scheduledAt, status',
+      vials: '++id, compoundId, archived',
+      symptoms: '++id, recordedAt',
+      markerTargets: '++id, &marker',
+      goals: '++id, kind, achievedAt',
     })
   }
 }
@@ -139,52 +241,58 @@ async function seedDatabaseIfEmpty() {
   const currentSeed = await db.meta.get('seedVersion')
   if (currentSeed?.value === seed.seedVersion) return
 
-  await db.transaction('rw', [db.compounds, db.injections, db.vitals, db.exams, db.results, db.files, db.meta], async () => {
-    await Promise.all([
-      db.compounds.clear(),
-      db.injections.clear(),
-      db.vitals.clear(),
-      db.exams.clear(),
-      db.results.clear(),
-      db.files.clear(),
-    ])
+  await db.transaction(
+    'rw',
+    [db.compounds, db.injections, db.vitals, db.exams, db.results, db.files, db.meta],
+    async () => {
+      await Promise.all([
+        db.compounds.clear(),
+        db.injections.clear(),
+        db.vitals.clear(),
+        db.exams.clear(),
+        db.results.clear(),
+        db.files.clear(),
+      ])
 
-    await db.files.bulkAdd(seed.files)
+      await db.files.bulkAdd(seed.files)
 
-    const compoundIdByName = new Map<string, number>()
-    for (const compound of seed.compounds) {
-      const id = await db.compounds.add(compound)
-      compoundIdByName.set(compound.name, id)
-    }
+      const compoundIdByName = new Map<string, number>()
+      for (const compound of seed.compounds) {
+        const id = await db.compounds.add(compound)
+        compoundIdByName.set(compound.name, id)
+      }
 
-    const injections = seed.injections
-      .map(({ compoundName, ...entry }) => {
-        const compoundId = compoundIdByName.get(compoundName)
-        return compoundId ? { ...entry, compoundId } : undefined
-      })
-      .filter((entry): entry is InjectionLog => Boolean(entry))
-    if (injections.length > 0) await db.injections.bulkAdd(injections)
+      const injections = seed.injections
+        .map(({ compoundName, ...entry }) => {
+          const compoundId = compoundIdByName.get(compoundName)
+          return compoundId ? { ...entry, compoundId } : undefined
+        })
+        .filter((entry): entry is InjectionLog => Boolean(entry))
+      if (injections.length > 0) await db.injections.bulkAdd(injections)
 
-    if (seed.vitals.length > 0) await db.vitals.bulkAdd(seed.vitals)
+      if (seed.vitals.length > 0) await db.vitals.bulkAdd(seed.vitals)
 
-    const fileIdByName = new Map((await db.files.toArray()).map((file) => [file.name, file.id]))
-    const examIdByKey = new Map<string, number>()
-    for (const { key, sourceFileName, ...exam } of seed.exams) {
-      const sourceFileId = sourceFileName ? fileIdByName.get(sourceFileName) : undefined
-      const id = await db.exams.add({ ...exam, sourceFileId })
-      examIdByKey.set(key, id)
-    }
+      const fileIdByName = new Map(
+        (await db.files.toArray()).map((file) => [file.name, file.id]),
+      )
+      const examIdByKey = new Map<string, number>()
+      for (const { key, sourceFileName, ...exam } of seed.exams) {
+        const sourceFileId = sourceFileName ? fileIdByName.get(sourceFileName) : undefined
+        const id = await db.exams.add({ ...exam, sourceFileId })
+        examIdByKey.set(key, id)
+      }
 
-    const results = seed.results
-      .map(({ examKey, ...result }) => {
-        const examId = examIdByKey.get(examKey)
-        return examId ? { ...result, examId } : undefined
-      })
-      .filter((result): result is LabResult => Boolean(result))
-    if (results.length > 0) await db.results.bulkAdd(results)
+      const results = seed.results
+        .map(({ examKey, ...result }) => {
+          const examId = examIdByKey.get(examKey)
+          return examId ? { ...result, examId } : undefined
+        })
+        .filter((result): result is LabResult => Boolean(result))
+      if (results.length > 0) await db.results.bulkAdd(results)
 
-    await db.meta.put({ key: 'seedVersion', value: seed.seedVersion })
-  })
+      await db.meta.put({ key: 'seedVersion', value: seed.seedVersion })
+    },
+  )
 }
 
 async function fetchLocalSeed() {
