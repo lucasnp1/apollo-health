@@ -6,12 +6,14 @@ import {
   CartesianGrid,
   Line,
   ReferenceArea,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type VitalLog } from '../lib/db'
 import { TimeRangePicker } from '../components/TimeRangePicker'
 import { filterByRange, type TimeRange } from '../lib/timeRange'
@@ -20,6 +22,8 @@ import { EmptyState } from '../components/EmptyState'
 export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   const [range, setRange] = useState<TimeRange>('3M')
   const [form, setForm] = useState({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
+  const goals = useLiveQuery(() => db.goals.toArray(), [], [])
+  const bpGoal = goals.find((g) => g.kind === 'bp' && !g.achievedAt)
 
   const filtered = useMemo(
     () => filterByRange(vitals, range, (v) => parseISO(v.measuredAt)).slice().reverse(),
@@ -83,6 +87,19 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
               <span className="stat-value">{stats.pctElevated.toFixed(0)}%</span>
               <span className="stat-detail">In stage 1 / stage 2</span>
             </div>
+            {bpGoal && (
+              <div
+                className={`stat ${stats.meanSys <= bpGoal.target ? 'good' : stats.meanSys - bpGoal.target > 10 ? 'bad' : 'warn'}`}
+              >
+                <span className="stat-label">Goal SBP</span>
+                <span className="stat-value">{bpGoal.target}</span>
+                <span className="stat-detail">
+                  {stats.meanSys <= bpGoal.target
+                    ? 'Mean on target'
+                    : `Mean ${(stats.meanSys - bpGoal.target).toFixed(0)} over`}
+                </span>
+              </div>
+            )}
           </div>
         )}
         {chart.length > 0 ? (
@@ -105,6 +122,14 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
               <Area type="monotone" dataKey="systolic" stroke="#5eead4" strokeWidth={2.5} fill="url(#sysFill)" />
               <Line type="monotone" dataKey="diastolic" stroke="#98a2af" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="pulse" stroke="#c084fc" strokeWidth={1.5} dot={false} />
+              {bpGoal && (
+                <ReferenceLine
+                  y={bpGoal.target}
+                  stroke="#5eead4"
+                  strokeDasharray="4 4"
+                  label={{ value: `Goal ${bpGoal.target}`, position: 'insideTopRight', fill: '#5eead4', fontSize: 10 }}
+                />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         ) : (

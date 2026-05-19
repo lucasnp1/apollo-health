@@ -5,5 +5,6 @@ export type View =
   | 'labs'
   | 'timeline'
   | 'symptoms'
+  | 'targets'
   | 'files'
   | 'settings'

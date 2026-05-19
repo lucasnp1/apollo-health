@@ -13,6 +13,7 @@ import {
   Plus,
   Settings as SettingsIcon,
   Syringe,
+  Target,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -24,6 +25,7 @@ import { Protocols } from './views/Protocols'
 import { Vitals } from './views/Vitals'
 import { Labs } from './views/Labs'
 import { Symptoms } from './views/Symptoms'
+import { Targets } from './views/Targets'
 import { Timeline } from './views/Timeline'
 import { Files } from './views/Files'
 import { Settings } from './views/Settings'
@@ -35,6 +37,7 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
   { id: 'symptoms', label: 'Symptoms', icon: Brain },
+  { id: 'targets', label: 'Targets', icon: Target },
   { id: 'timeline', label: 'Timeline', icon: CalendarClock },
   { id: 'files', label: 'Files', icon: FileText },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
@@ -130,6 +133,7 @@ function App() {
           <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} />
         )}
         {activeView === 'symptoms' && <Symptoms />}
+        {activeView === 'targets' && <Targets />}
         {activeView === 'timeline' && (
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
         )}
@@ -161,6 +165,7 @@ function titleFor(view: View) {
     vitals: 'Vitals',
     labs: 'Labs',
     symptoms: 'Symptoms',
+    targets: 'Targets',
     timeline: 'Timeline',
     files: 'Files',
     settings: 'Settings',

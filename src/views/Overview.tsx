@@ -33,6 +33,9 @@ export function Overview({
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
   const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
   const symptoms = useLiveQuery(() => db.symptoms.orderBy('recordedAt').reverse().toArray(), [], [])
+  const goals = useLiveQuery(() => db.goals.toArray(), [], [])
+  const weightGoal = goals.find((g) => g.kind === 'weight' && !g.achievedAt)
+  const bpGoal = goals.find((g) => g.kind === 'bp' && !g.achievedAt)
 
   const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id, c])), [compounds])
   const upcoming = upcomingSchedule(protocols, protocolDoses, new Date(), 7).slice(0, 5)
@@ -142,20 +145,48 @@ export function Overview({
           <StatCard
             label="Blood pressure"
             value={latestBp ? `${latestBp.systolic}/${latestBp.diastolic}` : '—'}
-            detail={latestBp ? `${latestBp.pulse ?? '--'} bpm · ${format(parseISO(latestBp.measuredAt), 'MMM d')}` : 'No reading'}
+            detail={
+              bpGoal && latestBp
+                ? `Goal ${bpGoal.target} · ${latestBp.systolic - bpGoal.target > 0 ? `${latestBp.systolic - bpGoal.target} over` : 'on target'}`
+                : latestBp
+                ? `${latestBp.pulse ?? '--'} bpm · ${format(parseISO(latestBp.measuredAt), 'MMM d')}`
+                : 'No reading'
+            }
             spark={<Sparkline values={bpSpark} />}
-            tone={latestBp && latestBp.systolic >= 140 ? 'bad' : latestBp && latestBp.systolic >= 130 ? 'warn' : undefined}
+            tone={
+              bpGoal && latestBp
+                ? latestBp.systolic <= bpGoal.target
+                  ? 'good'
+                  : latestBp.systolic - bpGoal.target > 10
+                  ? 'bad'
+                  : 'warn'
+                : latestBp && latestBp.systolic >= 140
+                ? 'bad'
+                : latestBp && latestBp.systolic >= 130
+                ? 'warn'
+                : undefined
+            }
           />
           <StatCard
             label="Weight"
             value={weightStats.latest ? `${weightStats.latest.toFixed(1)} kg` : '—'}
             detail={
-              weightStats.delta !== undefined
+              weightGoal && weightStats.latest !== undefined
+                ? `Goal ${weightGoal.target} kg · ${(weightGoal.target - weightStats.latest >= 0 ? '+' : '')}${(weightGoal.target - weightStats.latest).toFixed(1)} kg to go`
+                : weightStats.delta !== undefined
                 ? `${weightStats.delta >= 0 ? '+' : ''}${weightStats.delta.toFixed(1)} kg · ${weightStats.percent?.toFixed(1)}%`
                 : 'Log weight with reta'
             }
             spark={<Sparkline values={weightSpark} />}
-            tone={weightStats.delta !== undefined && weightStats.delta < 0 ? 'good' : undefined}
+            tone={
+              weightGoal && weightStats.latest !== undefined
+                ? Math.abs(weightGoal.target - weightStats.latest) < 0.5
+                  ? 'good'
+                  : undefined
+                : weightStats.delta !== undefined && weightStats.delta < 0
+                ? 'good'
+                : undefined
+            }
           />
           <StatCard
             label="T-load (est.)"

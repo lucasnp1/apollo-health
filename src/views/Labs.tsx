@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { FileText, FlaskConical, Plus, UploadCloud } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { format, parseISO } from 'date-fns'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
 import { extractMarkersFromText, type ExtractedMarker } from '../lib/pdf'
 import { buildCorrelationInsights, markerHistory, type EnrichedResult } from '../lib/insights'
@@ -23,6 +24,7 @@ type Grouped = {
     high?: number
     previous?: number
     delta?: number
+    personal?: boolean
   }>
 }
 
@@ -41,6 +43,9 @@ export function Labs({
   results: EnrichedResult[]
   files: Array<{ id?: number; name: string; status: string; extractedText?: string }>
 }) {
+  const markerTargets = useLiveQuery(() => db.markerTargets.toArray(), [], [])
+  const targetByKey = useMemo(() => new Map(markerTargets.map((t) => [t.marker, t])), [markerTargets])
+
   // Build a per-marker history map so we can compute prior-value deltas.
   const historyByMarker = useMemo(() => {
     const map = new Map<string, EnrichedResult[]>()
@@ -63,25 +68,30 @@ export function Labs({
       .filter((r) => r.examId === latestExam.id)
       .map((r) => {
         const canon = canonicalize(r.marker)
+        const personal = canon ? targetByKey.get(canon.key) : undefined
         const hist = historyByMarker.get(r.marker.toLowerCase()) ?? []
         const idx = hist.findIndex((x) => x.id === r.id)
         const prev = idx > 0 ? hist[idx - 1] : undefined
         const delta = r.value !== undefined && prev?.value !== undefined ? r.value - prev.value : undefined
+        // Resolution order for range: personal target > lab-reported range > catalog optimal
+        const low = personal?.low ?? r.low ?? canon?.optimal?.low
+        const high = personal?.high ?? r.high ?? canon?.optimal?.high
         return {
           raw: r.marker,
           canonicalKey: canon?.key,
           label: canon?.label ?? r.marker,
           value: r.value,
           rawValue: r.rawValue,
-          unit: r.unit ?? canon?.unit,
-          low: r.low ?? canon?.optimal?.low,
-          high: r.high ?? canon?.optimal?.high,
+          unit: r.unit ?? canon?.unit ?? personal?.unit,
+          low,
+          high,
           previous: prev?.value,
           delta,
+          personal: Boolean(personal),
         }
       })
     return { examLabel: latestExam.name, examDate: parseISO(latestExam.collectedAt), rows }
-  }, [latestExam, results, historyByMarker])
+  }, [latestExam, results, historyByMarker, targetByKey])
 
   const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined)
   const selectedHistory = useMemo(() => {
@@ -148,6 +158,7 @@ export function Labs({
                 >
                   <div className="marker">
                     {row.label}
+                    {row.personal && <span className="chip" style={{ marginLeft: 6, height: 18, fontSize: 9, padding: '0 6px' }}>PERSONAL</span>}
                     <small>{row.raw !== row.label ? row.raw : row.unit ?? ''}</small>
                   </div>
                   <RangeBar value={row.value} previous={row.previous} low={row.low} high={row.high} />
