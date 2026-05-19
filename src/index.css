@@ -356,6 +356,31 @@ h3 {
   grid-column: span 4;
 }
 
+.protocols-grid .protocol-quick-add,
+.vitals-grid .vitals-quick-panel,
+.labs-layout .lab-entry-panel {
+  grid-column: span 4;
+}
+
+.protocols-grid .protocol-board-panel,
+.vitals-grid .vitals-chart-panel,
+.labs-layout .lab-side-column {
+  grid-column: span 8;
+}
+
+.labs-layout .lab-entry-panel {
+  grid-column: span 8;
+}
+
+.labs-layout .lab-side-column {
+  grid-column: span 4;
+}
+
+.protocols-grid > .wide-panel,
+.labs-layout > .wide-panel {
+  grid-column: 1 / -1;
+}
+
 .two-column .wide-panel,
 .timeline-panel {
   grid-column: 1 / -1;
@@ -627,6 +652,230 @@ h3 {
   margin-bottom: 12px;
 }
 
+.protocol-mix {
+  display: flex;
+  gap: 4px;
+  height: 10px;
+  padding: 2px;
+  margin-bottom: 14px;
+  background: #eef1f3;
+  border-radius: 999px;
+}
+
+.protocol-mix-segment {
+  min-width: 18px;
+  border-radius: 999px;
+}
+
+.protocol-mix-segment.steroids {
+  background: #2563eb;
+}
+
+.protocol-mix-segment.peptides {
+  background: #0f8f84;
+}
+
+.protocol-mix-segment.support {
+  background: #64748b;
+}
+
+.protocol-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.protocol-column {
+  min-width: 0;
+  padding: 12px;
+  background: #fbfcfd;
+  border: 1px solid #edf1f3;
+  border-radius: 8px;
+}
+
+.protocol-column-header,
+.protocol-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.protocol-column-header {
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.protocol-column-header strong,
+.protocol-card strong {
+  display: block;
+  color: #101820;
+  font-size: 13px;
+}
+
+.protocol-column-header span,
+.protocol-card span,
+.protocol-card small {
+  display: block;
+  color: #667783;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.protocol-column-header em {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: #0b3f3a;
+  background: #e9f6f4;
+  border-radius: 8px;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.protocol-card-list {
+  display: grid;
+  gap: 8px;
+}
+
+.protocol-card {
+  min-width: 0;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid #edf1f3;
+  border-radius: 8px;
+}
+
+.protocol-card > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.protocol-card small {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.protocol-inline-add {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.35fr) 82px 88px 120px minmax(120px, 1fr) 38px;
+  align-items: center;
+}
+
+.lab-side-column {
+  display: grid;
+  gap: 16px;
+}
+
+.lab-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lab-form-break {
+  grid-column: 1 / -1;
+  height: 1px;
+  margin: 2px 0;
+  background: #edf1f3;
+}
+
+.compact-panel {
+  padding: 14px;
+}
+
+.compact-panel .panel-header {
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.compact-panel h3 {
+  font-size: 15px;
+}
+
+.compact-marker-grid {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.compact-marker-grid .marker-main > strong {
+  font-size: 22px;
+}
+
+.compact-relations,
+.compact-correlation-grid {
+  grid-template-columns: 1fr;
+}
+
+.compact-relations {
+  gap: 8px;
+}
+
+.compact-relations .relation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.compact-relations .relation-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-relations .relation-row strong {
+  margin-top: 0;
+  font-size: 14px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.compact-relations .relation-row small {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
+
+.compact-correlation-grid {
+  gap: 8px;
+}
+
+.compact-correlation-grid .correlation-card {
+  padding: 12px;
+}
+
+.compact-correlation-grid .correlation-card p {
+  margin-top: 5px;
+}
+
+.chart-tooltip {
+  max-width: 260px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #e4e9ec;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+}
+
+.chart-tooltip strong,
+.chart-tooltip span {
+  display: block;
+}
+
+.chart-tooltip strong {
+  color: #101820;
+  font-size: 13px;
+}
+
+.chart-tooltip span,
+.chart-tooltip p {
+  margin-top: 4px;
+  color: #53636f;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .mini-select {
   width: auto;
   min-width: 138px;
@@ -664,6 +913,10 @@ h3 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin-top: 12px;
+}
+
+.relation-list.compact-relations {
+  grid-template-columns: 1fr;
 }
 
 .stack-list,
@@ -784,6 +1037,37 @@ td {
   color: #101820;
 }
 
+.files-coming-soon {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) minmax(280px, 420px);
+  align-items: center;
+  gap: 18px;
+  min-height: 260px;
+}
+
+.coming-soon-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  color: #0b3f3a;
+  background: #e9f6f4;
+  border-radius: 8px;
+}
+
+.files-coming-soon p {
+  max-width: 680px;
+  color: #667783;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.coming-soon-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -791,6 +1075,7 @@ td {
 }
 
 label {
+  min-width: 0;
   display: grid;
   gap: 6px;
   color: #53636f;
@@ -801,6 +1086,7 @@ label {
 input,
 select {
   width: 100%;
+  min-width: 0;
   min-height: 40px;
   padding: 0 12px;
   color: #101820;
@@ -895,7 +1181,13 @@ select:focus {
   .overview-grid .chart-panel,
   .overview-grid .schedule-panel,
   .overview-grid .import-panel,
-  .two-column > .panel {
+  .two-column > .panel,
+  .protocols-grid .protocol-quick-add,
+  .protocols-grid .protocol-board-panel,
+  .vitals-grid .vitals-quick-panel,
+  .vitals-grid .vitals-chart-panel,
+  .labs-layout .lab-entry-panel,
+  .labs-layout .lab-side-column {
     grid-column: 1 / -1;
   }
 
@@ -959,9 +1251,18 @@ select:focus {
   .insight-grid,
   .correlation-grid,
   .protocol-summary,
+  .protocol-board,
+  .protocol-inline-add,
+  .lab-form-grid,
   .marker-detail-grid,
-  .relation-list {
+  .relation-list,
+  .coming-soon-stats,
+  .files-coming-soon {
     grid-template-columns: 1fr;
+  }
+
+  .files-coming-soon {
+    align-items: start;
   }
 
   .marker-select {

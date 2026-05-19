@@ -46,6 +46,9 @@ export type LabExam = {
   id?: number
   name: string
   collectedAt: string
+  examType?: string
+  location?: string
+  company?: string
   labName?: string
   sourceFileId?: number
   notes?: string

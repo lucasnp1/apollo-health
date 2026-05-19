@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   Brain,
   CalendarClock,
-  Check,
   ChevronRight,
   Database,
   FileText,
@@ -54,7 +53,6 @@ import {
   type Unit,
   type VitalLog,
 } from './lib/db'
-import { extractMarkersFromText, extractPdfText, type ExtractedMarker } from './lib/pdf'
 import { wipeLocalDatabase } from './lib/lock'
 import { useLockState } from './lib/useLockState'
 import {
@@ -79,12 +77,38 @@ const navItems: Array<{ id: View; label: string; icon: typeof Home }> = [
   { id: 'meds', label: 'Protocols', icon: Syringe },
   { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
-  { id: 'timeline', label: 'Timeline', icon: CalendarClock },
+  { id: 'timeline', label: 'History', icon: CalendarClock },
   { id: 'files', label: 'Files', icon: FileText },
   { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
 const units: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
+const compoundCategories: Compound['category'][] = ['Peptide', 'TRT', 'Ancillary', 'Supplement', 'Other']
+const labExamTypes = ['Blood', 'GP', 'Urine', 'Imaging', 'Specialist', 'Other']
+const labUnits = [
+  'ng/dL',
+  'nmol/L',
+  'pmol/L',
+  'pg/mL',
+  'ng/mL',
+  'mcg/L',
+  'mg/L',
+  'g/L',
+  'mmol/L',
+  'umol/L',
+  'mIU/L',
+  'IU/L',
+  'U/L',
+  'kU/L',
+  '%',
+  'bpm',
+  'mmHg',
+  'kg',
+  'mL/min/1.73m2',
+  'ratio',
+  'other',
+]
+const injectionSites = ['Abdomen', 'Left abdomen', 'Right abdomen', 'Left thigh', 'Right thigh', 'Left glute', 'Right glute', 'Deltoid']
 const todayInput = () => new Date().toISOString().slice(0, 16)
 
 function App() {
@@ -208,7 +232,7 @@ function App() {
         )}
         {activeView === 'meds' && <Meds compounds={compounds} injections={injections} />}
         {activeView === 'vitals' && <Vitals vitals={vitals} />}
-        {activeView === 'labs' && <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} />}
+        {activeView === 'labs' && <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} />}
         {activeView === 'timeline' && (
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
         )}
@@ -719,25 +743,58 @@ function Meds({
   compounds: Compound[]
   injections: InjectionLog[]
 }) {
-  const [compoundId, setCompoundId] = useState('')
+  const [compoundName, setCompoundName] = useState('')
   const [dose, setDose] = useState('')
   const [unit, setUnit] = useState<Unit>('mg')
   const [site, setSite] = useState('Abdomen')
+  const [category, setCategory] = useState<Compound['category']>('Peptide')
   const [takenAt, setTakenAt] = useState(todayInput())
-  const [newCompound, setNewCompound] = useState({ name: '', dose: '', unit: 'mg' as Unit, schedule: '' })
+  const [newCompound, setNewCompound] = useState({
+    name: '',
+    dose: '',
+    unit: 'mg' as Unit,
+    schedule: '',
+    category: 'Peptide' as Compound['category'],
+  })
   const compoundMap = new Map(compounds.map((compound) => [compound.id, compound]))
-
-  const effectiveCompoundId = compoundId || String(compounds[0]?.id ?? '')
+  const selectedCompound = compounds.find((compound) => compound.name.toLowerCase() === compoundName.trim().toLowerCase())
+  const protocolGroups = [
+    {
+      title: 'Steroids',
+      detail: 'TRT and androgen compounds',
+      compounds: compounds.filter(isSteroidCompound),
+    },
+    {
+      title: 'Peptides',
+      detail: 'Metabolic and peptide protocols',
+      compounds: compounds.filter((compound) => compound.category === 'Peptide'),
+    },
+    {
+      title: 'Support',
+      detail: 'Ancillary, supplement, and other items',
+      compounds: compounds.filter((compound) => !isSteroidCompound(compound) && compound.category !== 'Peptide'),
+    },
+  ]
 
   async function addInjection() {
-    const selected = compounds.find((compound) => String(compound.id) === effectiveCompoundId)
-    const effectiveDose = dose || String(selected?.defaultDose ?? '')
-    if (!selected || !effectiveDose) return
+    const name = compoundName.trim()
+    const effectiveDose = dose || String(selectedCompound?.defaultDose ?? '')
+    if (!name || !effectiveDose) return
+
+    const numericDose = Number(effectiveDose)
+    const compoundId = selectedCompound?.id ?? await db.compounds.add({
+      name,
+      category,
+      defaultDose: Number.isFinite(numericDose) ? numericDose : 0,
+      unit,
+      schedule: 'As needed',
+      color: colorForCategory(category),
+    })
 
     await db.injections.add({
-      compoundId: selected.id!,
+      compoundId,
       takenAt: new Date(takenAt).toISOString(),
-      dose: Number(effectiveDose),
+      dose: Number.isFinite(numericDose) ? numericDose : undefined,
       unit,
       route: 'SubQ',
       site,
@@ -749,18 +806,18 @@ function Meds({
     if (!newCompound.name || !newCompound.dose) return
     await db.compounds.add({
       name: newCompound.name,
-      category: 'Other',
+      category: newCompound.category,
       defaultDose: Number(newCompound.dose),
       unit: newCompound.unit,
       schedule: newCompound.schedule || 'As needed',
-      color: '#0f8f84',
+      color: colorForCategory(newCompound.category),
     })
-    setNewCompound({ name: '', dose: '', unit: 'mg', schedule: '' })
+    setNewCompound({ name: '', dose: '', unit: 'mg', schedule: '', category: 'Peptide' })
   }
 
   return (
-    <div className="content-grid two-column">
-      <section className="panel">
+    <div className="content-grid protocols-grid">
+      <section className="panel protocol-quick-add">
         <div className="panel-header">
           <div>
             <span className="section-label">Quick add</span>
@@ -771,23 +828,36 @@ function Meds({
         <div className="form-grid">
           <label>
             Compound
-            <select value={effectiveCompoundId} onChange={(event) => {
-              const id = event.target.value
-              const selected = compounds.find((compound) => String(compound.id) === id)
-              setCompoundId(id)
-              if (selected) {
-                setDose(String(selected.defaultDose))
-                setUnit(selected.unit)
-              }
-            }}>
+            <input
+              list="compound-options"
+              placeholder="Compound name"
+              value={compoundName}
+              onChange={(event) => {
+                const nextName = event.target.value
+                const selected = compounds.find((compound) => compound.name.toLowerCase() === nextName.trim().toLowerCase())
+                setCompoundName(nextName)
+                if (selected) {
+                  setDose(String(selected.defaultDose))
+                  setUnit(selected.unit)
+                  setCategory(selected.category)
+                }
+              }}
+            />
+            <datalist id="compound-options">
               {compounds.map((compound) => (
-                <option value={compound.id} key={compound.id}>{compound.name}</option>
+                <option value={compound.name} key={compound.id} />
               ))}
+            </datalist>
+          </label>
+          <label>
+            Type
+            <select value={category} onChange={(event) => setCategory(event.target.value as Compound['category'])}>
+              {compoundCategories.map((option) => <option value={option} key={option}>{protocolTypeLabel(option)}</option>)}
             </select>
           </label>
           <label>
             Dose
-            <input placeholder={String(compounds.find((compound) => String(compound.id) === effectiveCompoundId)?.defaultDose ?? '')} value={dose} onChange={(event) => setDose(event.target.value)} inputMode="decimal" />
+            <input placeholder={String(selectedCompound?.defaultDose ?? '')} value={dose} onChange={(event) => setDose(event.target.value)} inputMode="decimal" />
           </label>
           <label>
             Unit
@@ -797,7 +867,10 @@ function Meds({
           </label>
           <label>
             Site
-            <input value={site} onChange={(event) => setSite(event.target.value)} />
+            <input list="injection-site-options" value={site} onChange={(event) => setSite(event.target.value)} />
+            <datalist id="injection-site-options">
+              {injectionSites.map((option) => <option value={option} key={option} />)}
+            </datalist>
           </label>
           <label className="wide-field">
             Taken at
@@ -810,27 +883,62 @@ function Meds({
         </div>
       </section>
 
-      <section className="panel">
+      <section className="panel protocol-board-panel">
         <div className="panel-header">
           <div>
             <span className="section-label">Protocol</span>
-            <h3>Compounds</h3>
+            <h3>Active compounds by type</h3>
           </div>
         </div>
-        <div className="stack-list">
-          {compounds.map((compound) => (
-            <div className="compound-card" key={compound.id}>
-              <span className="dot" style={{ background: compound.color }} />
-              <div>
-                <strong>{compound.name}</strong>
-                <span>{compound.defaultDose} {compound.unit} · {compound.schedule}</span>
+        <div className="protocol-mix" aria-label="Protocol mix">
+          {protocolGroups.map((group) => (
+            <span
+              key={group.title}
+              className={`protocol-mix-segment ${group.title.toLowerCase()}`}
+              style={{ flexGrow: Math.max(group.compounds.length, 1) }}
+              title={`${group.title}: ${group.compounds.length}`}
+            />
+          ))}
+        </div>
+        <div className="protocol-board">
+          {protocolGroups.map((group) => (
+            <div className="protocol-column" key={group.title}>
+              <div className="protocol-column-header">
+                <div>
+                  <strong>{group.title}</strong>
+                  <span>{group.detail}</span>
+                </div>
+                <em>{group.compounds.length}</em>
+              </div>
+              <div className="protocol-card-list">
+                {group.compounds.map((compound) => {
+                  const count = injections.filter((entry) => entry.compoundId === compound.id).length
+                  return (
+                    <div className="protocol-card" key={compound.id}>
+                      <span className="dot" style={{ background: compound.color }} />
+                      <div>
+                        <strong>{compound.name}</strong>
+                        <span>{compound.defaultDose} {compound.unit} · {compound.schedule}</span>
+                      </div>
+                      <small>{count} logs</small>
+                    </div>
+                  )
+                })}
+                {group.compounds.length === 0 && <p className="muted-copy">Nothing logged here yet.</p>}
               </div>
             </div>
           ))}
         </div>
-        <div className="inline-add">
+        <div className="inline-add protocol-inline-add">
           <input placeholder="New compound" value={newCompound.name} onChange={(event) => setNewCompound({ ...newCompound, name: event.target.value })} />
           <input placeholder="Dose" value={newCompound.dose} onChange={(event) => setNewCompound({ ...newCompound, dose: event.target.value })} />
+          <select value={newCompound.unit} onChange={(event) => setNewCompound({ ...newCompound, unit: event.target.value as Unit })}>
+            {units.map((unitOption) => <option key={unitOption}>{unitOption}</option>)}
+          </select>
+          <select value={newCompound.category} onChange={(event) => setNewCompound({ ...newCompound, category: event.target.value as Compound['category'] })}>
+            {compoundCategories.map((option) => <option value={option} key={option}>{protocolTypeLabel(option)}</option>)}
+          </select>
+          <input placeholder="Schedule" value={newCompound.schedule} onChange={(event) => setNewCompound({ ...newCompound, schedule: event.target.value })} />
           <button type="button" className="icon-button" onClick={addCompound} aria-label="Add compound">
             <Plus size={18} />
           </button>
@@ -875,12 +983,43 @@ function Meds({
   )
 }
 
+type VitalsChartPoint = {
+  date: string
+  measuredAt: string
+  systolic: number
+  diastolic: number
+  pulse?: number
+  notes?: string
+}
+
+function VitalsTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean
+  payload?: Array<{ payload: VitalsChartPoint }>
+}) {
+  if (!active || !payload?.[0]) return null
+  const point = payload[0].payload
+
+  return (
+    <div className="chart-tooltip">
+      <strong>{format(parseISO(point.measuredAt), 'MMM d, HH:mm')}</strong>
+      <span>{point.systolic}/{point.diastolic} mmHg{point.pulse ? ` · ${point.pulse} bpm` : ''}</span>
+      {point.notes && <p>{point.notes}</p>}
+    </div>
+  )
+}
+
 function Vitals({ vitals }: { vitals: Array<{ id?: number; measuredAt: string; systolic: number; diastolic: number; pulse?: number; notes?: string }> }) {
   const [form, setForm] = useState({ systolic: '', diastolic: '', pulse: '', measuredAt: todayInput(), notes: '' })
   const chart = [...vitals].reverse().map((vital) => ({
     date: format(parseISO(vital.measuredAt), 'MMM d'),
+    measuredAt: vital.measuredAt,
     systolic: vital.systolic,
     diastolic: vital.diastolic,
+    pulse: vital.pulse,
+    notes: vital.notes,
   }))
 
   async function addVital() {
@@ -896,33 +1035,8 @@ function Vitals({ vitals }: { vitals: Array<{ id?: number; measuredAt: string; s
   }
 
   return (
-    <div className="content-grid two-column">
-      <section className="panel chart-panel wide-panel">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Trend</span>
-            <h3>Blood pressure</h3>
-          </div>
-        </div>
-        <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={chart} margin={{ top: 16, right: 16, bottom: 0, left: -16 }}>
-            <defs>
-              <linearGradient id="bpFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0f8f84" stopOpacity={0.24} />
-                <stop offset="95%" stopColor="#0f8f84" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid stroke="#eef1f2" vertical={false} />
-            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
-            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
-            <Tooltip contentStyle={{ borderRadius: 8, borderColor: '#e7ecef' }} />
-            <Area type="monotone" dataKey="systolic" stroke="#0f8f84" strokeWidth={3} fill="url(#bpFill)" />
-            <Line type="monotone" dataKey="diastolic" stroke="#64748b" strokeWidth={3} dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </section>
-
-      <section className="panel">
+    <div className="content-grid vitals-grid">
+      <section className="panel vitals-quick-panel">
         <div className="panel-header">
           <div>
             <span className="section-label">Quick add</span>
@@ -942,7 +1056,7 @@ function Vitals({ vitals }: { vitals: Array<{ id?: number; measuredAt: string; s
             Pulse
             <input inputMode="numeric" value={form.pulse} onChange={(event) => setForm({ ...form, pulse: event.target.value })} />
           </label>
-          <label>
+          <label className="wide-field">
             Measured
             <input type="datetime-local" value={form.measuredAt} onChange={(event) => setForm({ ...form, measuredAt: event.target.value })} />
           </label>
@@ -957,22 +1071,29 @@ function Vitals({ vitals }: { vitals: Array<{ id?: number; measuredAt: string; s
         </div>
       </section>
 
-      <section className="panel wide-panel">
-        <div className="stack-list">
-          {vitals.map((vital) => (
-            <div className="data-row" key={vital.id}>
-              <HeartPulse size={18} />
-              <div>
-                <strong>{vital.systolic}/{vital.diastolic}</strong>
-                <span>{vital.pulse ? `${vital.pulse} bpm` : 'Pulse not set'} · {vital.notes || 'No notes'}</span>
-              </div>
-              <time>{format(parseISO(vital.measuredAt), 'MMM d, HH:mm')}</time>
-              <button type="button" className="icon-button danger" onClick={() => db.vitals.delete(vital.id!)} aria-label="Delete reading">
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
+      <section className="panel chart-panel vitals-chart-panel">
+        <div className="panel-header">
+          <div>
+            <span className="section-label">Trend BP</span>
+            <h3>Blood pressure</h3>
+          </div>
         </div>
+        <ResponsiveContainer width="100%" height={340}>
+          <AreaChart data={chart} margin={{ top: 16, right: 16, bottom: 0, left: -16 }}>
+            <defs>
+              <linearGradient id="bpFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#0f8f84" stopOpacity={0.24} />
+                <stop offset="95%" stopColor="#0f8f84" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="#eef1f2" vertical={false} />
+            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+            <YAxis tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
+            <Tooltip content={<VitalsTooltip />} />
+            <Area type="monotone" dataKey="systolic" stroke="#0f8f84" strokeWidth={3} fill="url(#bpFill)" />
+            <Line type="monotone" dataKey="diastolic" stroke="#64748b" strokeWidth={3} dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
       </section>
     </div>
   )
@@ -984,100 +1105,106 @@ function Labs({
   vitals,
   exams,
   results,
-  files,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
   vitals: VitalLog[]
   exams: LabExam[]
   results: EnrichedResult[]
-  files: Array<{ id?: number; name: string; status: string; extractedText?: string }>
 }) {
   const [examName, setExamName] = useState('Blood panel')
+  const [examType, setExamType] = useState('Blood')
+  const [examDate, setExamDate] = useState(todayInput())
+  const [location, setLocation] = useState('')
+  const [company, setCompany] = useState('')
   const [marker, setMarker] = useState('Total Testosterone')
   const [value, setValue] = useState('')
   const [unit, setUnit] = useState('ng/dL')
-  const [selectedExamId, setSelectedExamId] = useState('')
   const [selectedMarker, setSelectedMarker] = useState('Progesterone')
 
-  const effectiveExamId = selectedExamId || String(exams[0]?.id ?? '')
-
-  async function createExam() {
-    const id = await db.exams.add({
-      name: examName || 'Blood panel',
-      collectedAt: new Date().toISOString(),
-      labName: 'Manual entry',
-    })
-    setSelectedExamId(String(id))
-  }
-
   async function addResult() {
-    if (!effectiveExamId || !marker || !value) return
+    if (!marker.trim() || !value.trim()) return
+    const collectedAt = new Date(examDate).toISOString()
+    const cleanName = examName.trim() || `${examType} result`
+    const cleanCompany = company.trim()
+    const existingExam = exams.find((exam) => (
+      exam.name === cleanName
+      && exam.collectedAt === collectedAt
+      && (exam.labName ?? exam.company ?? '') === cleanCompany
+    ))
+    const examId = existingExam?.id ?? await db.exams.add({
+      name: cleanName,
+      collectedAt,
+      examType,
+      location: location.trim() || undefined,
+      company: cleanCompany || undefined,
+      labName: cleanCompany || undefined,
+      notes: location.trim() ? `Location: ${location.trim()}` : undefined,
+    })
+    const numericValue = Number(value.replaceAll(',', ''))
     await db.results.add({
-      examId: Number(effectiveExamId),
-      marker,
-      value: Number(value),
+      examId,
+      marker: marker.trim(),
+      value: Number.isFinite(numericValue) ? numericValue : undefined,
       rawValue: value,
       unit,
+      source: 'Manual entry',
     })
     setValue('')
   }
 
   const markerOptions = Array.from(new Set(results.map((result) => result.marker))).sort((a, b) => a.localeCompare(b))
   const effectiveMarker = markerOptions.includes(selectedMarker) ? selectedMarker : markerOptions[0] ?? ''
-  const latestFile = files.find((file) => file.status === 'Needs review')
-  const extracted = latestFile?.extractedText ? extractMarkersFromText(latestFile.extractedText) : []
-
-  async function saveExtractedMarkers(markers: ExtractedMarker[]) {
-    if (!latestFile?.id || markers.length === 0) return
-    const examId = await db.exams.add({
-      name: latestFile.name.replace(/\.pdf$/i, ''),
-      collectedAt: new Date().toISOString(),
-      labName: 'PDF import',
-      sourceFileId: latestFile.id,
-    })
-    await db.results.bulkAdd(markers.map((item) => ({
-      examId,
-      marker: item.marker,
-      value: item.value,
-      rawValue: String(item.value),
-      unit: item.unit,
-    })))
-    await db.files.update(latestFile.id, { status: 'Reviewed' })
-  }
 
   return (
-    <div className="content-grid two-column">
-      <section className="panel">
+    <div className="content-grid labs-layout">
+      <section className="panel lab-entry-panel">
         <div className="panel-header">
           <div>
             <span className="section-label">Manual</span>
             <h3>Add lab result</h3>
           </div>
         </div>
-        <div className="form-grid">
-          <label className="wide-field">
-            Exam
-            <select value={effectiveExamId} onChange={(event) => setSelectedExamId(event.target.value)}>
-              {exams.map((exam) => <option value={exam.id} key={exam.id}>{exam.name}</option>)}
-            </select>
-          </label>
-          <label className="wide-field">
-            New exam name
+        <div className="form-grid lab-form-grid">
+          <label>
+            Exam name
             <input value={examName} onChange={(event) => setExamName(event.target.value)} />
           </label>
-          <button type="button" className="ghost-button wide-field" onClick={createExam}>Create exam</button>
+          <label>
+            Type
+            <select value={examType} onChange={(event) => setExamType(event.target.value)}>
+              {labExamTypes.map((option) => <option key={option}>{option}</option>)}
+            </select>
+          </label>
+          <label>
+            Date of exam
+            <input type="datetime-local" value={examDate} onChange={(event) => setExamDate(event.target.value)} />
+          </label>
+          <label>
+            Location
+            <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Clinic, city, or room" />
+          </label>
+          <label>
+            Company
+            <input value={company} onChange={(event) => setCompany(event.target.value)} placeholder="Lab or provider" />
+          </label>
+          <span className="lab-form-break" />
           <label>
             Marker
-            <input value={marker} onChange={(event) => setMarker(event.target.value)} />
+            <input list="marker-options" value={marker} onChange={(event) => setMarker(event.target.value)} />
+            <datalist id="marker-options">
+              {markerOptions.map((option) => <option value={option} key={option} />)}
+            </datalist>
           </label>
           <label>
             Value
-            <input inputMode="decimal" value={value} onChange={(event) => setValue(event.target.value)} />
+            <input value={value} onChange={(event) => setValue(event.target.value)} />
           </label>
           <label>
             Unit
-            <input value={unit} onChange={(event) => setUnit(event.target.value)} />
+            <select value={unit} onChange={(event) => setUnit(event.target.value)}>
+              {labUnits.map((unitOption) => <option key={unitOption}>{unitOption}</option>)}
+            </select>
           </label>
           <button type="button" className="primary-button wide-field" onClick={addResult}>
             <Plus size={17} />
@@ -1086,56 +1213,14 @@ function Labs({
         </div>
       </section>
 
-      <section className="panel">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">PDF review</span>
-            <h3>Extracted markers</h3>
-          </div>
-        </div>
-        {latestFile ? (
-          <>
-            <p className="muted-copy">{latestFile.name}</p>
-            {extracted.length > 0 ? (
-              <div className="stack-list">
-                {extracted.map((item) => (
-                  <div className="data-row compact" key={item.marker}>
-                    <FlaskConical size={16} />
-                    <div>
-                      <strong>{item.marker}</strong>
-                      <span>{item.value} {item.unit || 'unit not detected'}</span>
-                    </div>
-                  </div>
-                ))}
-                <button type="button" className="primary-button" onClick={() => saveExtractedMarkers(extracted)}>
-                  <Check size={17} />
-                  Save reviewed markers
-                </button>
-              </div>
-            ) : (
-              <div className="empty-state">
-                <FileText size={24} />
-                <strong>No clear markers found.</strong>
-                <span>The text is stored locally. Add results manually from the PDF.</span>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="empty-state">
-            <UploadCloud size={24} />
-            <strong>No pending PDF.</strong>
-            <span>Upload a file in Files to run local text extraction.</span>
-          </div>
-        )}
-      </section>
-
-      <section className="panel wide-panel">
-        <MarkerDetail results={results} marker={effectiveMarker} onMarkerChange={setSelectedMarker} markerOptions={markerOptions} />
-      </section>
-
-      <section className="panel wide-panel">
-        <CorrelationExplorer compounds={compounds} injections={injections} vitals={vitals} results={results} />
-      </section>
+      <aside className="lab-side-column">
+        <section className="panel compact-panel">
+          <MarkerDetail results={results} marker={effectiveMarker} onMarkerChange={setSelectedMarker} markerOptions={markerOptions} compact />
+        </section>
+        <section className="panel compact-panel">
+          <CorrelationExplorer compounds={compounds} injections={injections} vitals={vitals} results={results} compact />
+        </section>
+      </aside>
 
       <section className="panel wide-panel">
         <div className="panel-header">
@@ -1155,11 +1240,13 @@ function MarkerDetail({
   marker,
   markerOptions,
   onMarkerChange,
+  compact = false,
 }: {
   results: EnrichedResult[]
   marker: string
   markerOptions: string[]
   onMarkerChange: (marker: string) => void
+  compact?: boolean
 }) {
   const history = markerHistory(results, marker)
   const current = [...results]
@@ -1181,11 +1268,11 @@ function MarkerDetail({
           <span className="section-label">Marker detail</span>
           <h3>{marker || 'Select a marker'}</h3>
         </div>
-        <select className="mini-select marker-select" value={marker} onChange={(event) => onMarkerChange(event.target.value)}>
+        <select className="mini-select marker-select" value={marker} disabled={markerOptions.length === 0} onChange={(event) => onMarkerChange(event.target.value)}>
           {markerOptions.map((option) => <option key={option} value={option}>{option}</option>)}
         </select>
       </div>
-      <div className="marker-detail-grid">
+      <div className={compact ? 'marker-detail-grid compact-marker-grid' : 'marker-detail-grid'}>
         <div className="marker-main">
           <span className={`range-pill ${labStatus(current) === 'High' || labStatus(current) === 'Low' ? 'out' : 'ok'}`}>
             {labStatus(current)}
@@ -1196,10 +1283,10 @@ function MarkerDetail({
               ? `${delta >= 0 ? '+' : ''}${delta.toFixed(2)} from previous result.`
               : 'Not enough repeated values to calculate a trend.'}
           </p>
-          <p className="panel-note">{markerExplanation(marker)}</p>
+          {!compact && <p className="panel-note">{markerExplanation(marker)}</p>}
         </div>
         <div className="marker-chart">
-          <ResponsiveContainer width="100%" height={180}>
+          <ResponsiveContainer width="100%" height={compact ? 132 : 180}>
             <LineChart data={history} margin={{ top: 8, right: 8, bottom: 0, left: -18 }}>
               <CartesianGrid stroke="#eef1f2" vertical={false} />
               <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#75808a', fontSize: 12 }} />
@@ -1210,7 +1297,7 @@ function MarkerDetail({
           </ResponsiveContainer>
         </div>
       </div>
-      <div className="relation-list">
+      <div className={compact ? 'relation-list compact-relations' : 'relation-list'}>
         {related.map((result) => (
           <div className="relation-row" key={result.id}>
             <span>{result.marker}</span>
@@ -1219,7 +1306,7 @@ function MarkerDetail({
           </div>
         ))}
       </div>
-      <p className="panel-note">Apollo shows nearby signals so you can ask better questions. It does not decide cause.</p>
+      {!compact && <p className="panel-note">Apollo shows nearby signals so you can ask better questions. It does not decide cause.</p>}
     </>
   )
 }
@@ -1229,25 +1316,28 @@ function CorrelationExplorer({
   injections,
   vitals,
   results,
+  compact = false,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
   vitals: VitalLog[]
   results: EnrichedResult[]
+  compact?: boolean
 }) {
   const insights = buildCorrelationInsights(compounds, injections, vitals, results)
+  const visibleInsights = compact ? insights.slice(0, 3) : insights
 
   return (
     <>
       <div className="panel-header">
         <div>
           <span className="section-label">Explorer</span>
-          <h3>Cross-signal correlations</h3>
+          <h3>{compact ? 'Signal summary' : 'Cross-signal correlations'}</h3>
         </div>
-        <span className="safety-chip">Never causal by itself</span>
+        {!compact && <span className="safety-chip">Never causal by itself</span>}
       </div>
-      <div className="correlation-grid">
-        {insights.map((insight) => (
+      <div className={compact ? 'correlation-grid compact-correlation-grid' : 'correlation-grid'}>
+        {visibleInsights.map((insight) => (
           <div className="correlation-card" key={insight.title}>
             <span>{insight.title}</span>
             <strong>{insight.value}</strong>
@@ -1261,61 +1351,23 @@ function CorrelationExplorer({
 }
 
 function Files({ files }: { files: Array<{ id?: number; name: string; type: string; size: number; addedAt: string; status: string; extractedText?: string }> }) {
-  const [busy, setBusy] = useState(false)
-
-  async function onFileUpload(fileList: FileList | null) {
-    const file = fileList?.[0]
-    if (!file) return
-    setBusy(true)
-    try {
-      const extractedText = file.type === 'application/pdf' ? await extractPdfText(file) : ''
-      await db.files.add({
-        name: file.name,
-        type: file.type || 'application/octet-stream',
-        size: file.size,
-        addedAt: new Date().toISOString(),
-        status: extractedText ? 'Needs review' : 'Stored',
-        extractedText,
-        blob: file,
-      })
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
-    <div className="content-grid two-column">
-      <section className="panel upload-panel">
-        <UploadCloud size={28} />
-        <h3>Upload exam PDF</h3>
-        <p>PDF text extraction runs in the browser. Nothing is uploaded to a server.</p>
-        <label className="file-drop">
-          <input type="file" accept="application/pdf,image/*" onChange={(event) => onFileUpload(event.target.files)} />
-          <span>{busy ? 'Reading locally...' : 'Choose file'}</span>
-        </label>
-      </section>
-
-      <section className="panel wide-panel">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Storage</span>
-            <h3>Local files</h3>
-          </div>
+    <div className="content-grid">
+      <section className="panel files-coming-soon full-panel">
+        <div className="coming-soon-icon">
+          <FileText size={28} />
         </div>
-        <div className="stack-list">
-          {files.map((file) => (
-            <div className="data-row" key={file.id}>
-              <FileText size={18} />
-              <div>
-                <strong>{file.name}</strong>
-                <span>{Math.round(file.size / 1024)} KB · {file.status}</span>
-              </div>
-              <time>{format(parseISO(file.addedAt), 'MMM d')}</time>
-              <button type="button" className="icon-button danger" onClick={() => db.files.delete(file.id!)} aria-label="Delete file">
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
+        <div>
+          <span className="section-label">Coming soon</span>
+          <h3>Files and automatic extraction</h3>
+          <p>
+            This page is parked until Apollo can reliably read lab PDFs, extract markers, and attach them to the right result.
+            For now, add lab results manually from the Labs page.
+          </p>
+        </div>
+        <div className="coming-soon-stats">
+          <Metric label="Stored locally" value={String(files.length)} detail="Existing browser files kept hidden from the workflow" />
+          <Metric label="Next step" value="PDF OCR" detail="Automatic marker extraction and review queue" />
         </div>
       </section>
     </div>
@@ -1372,7 +1424,7 @@ function Timeline({
       <div className="panel-header">
         <div>
           <span className="section-label">All activity</span>
-          <h3>Medical timeline</h3>
+          <h3>Health history</h3>
         </div>
       </div>
       <div className="timeline-list">
@@ -1523,6 +1575,24 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
   )
 }
 
+function isSteroidCompound(compound: Compound) {
+  const name = compound.name.toLowerCase()
+  return compound.category === 'TRT' || name.includes('testosterone') || name.includes('nandrolone') || name.includes('masteron')
+}
+
+function protocolTypeLabel(category: Compound['category']) {
+  if (category === 'TRT') return 'Steroid'
+  return category
+}
+
+function colorForCategory(category: Compound['category']) {
+  if (category === 'TRT') return '#2563eb'
+  if (category === 'Peptide') return '#0f8f84'
+  if (category === 'Ancillary') return '#a855f7'
+  if (category === 'Supplement') return '#16a34a'
+  return '#64748b'
+}
+
 function doseLabel(entry: { dose?: number; unit?: string; rawDose?: string }) {
   if (entry.rawDose) return entry.rawDose
   if (entry.dose !== undefined) return `${entry.dose} ${entry.unit ?? ''}`.trim()
@@ -1593,7 +1663,7 @@ function titleFor(view: View) {
     meds: 'Protocols',
     vitals: 'Vitals',
     labs: 'Lab results',
-    timeline: 'Timeline',
+    timeline: 'History',
     files: 'Files',
     settings: 'Settings',
   }
