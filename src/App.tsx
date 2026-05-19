@@ -53,6 +53,8 @@ import {
   type VitalLog,
 } from './lib/db'
 import { extractMarkersFromText, extractPdfText, type ExtractedMarker } from './lib/pdf'
+import { wipeLocalDatabase } from './lib/lock'
+import { useLockState } from './lib/useLockState'
 import {
   buildCorrelationInsights,
   buildTestosteroneCurve,
@@ -86,6 +88,7 @@ const todayInput = () => new Date().toISOString().slice(0, 16)
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const lockState = useLockState()
 
   useEffect(() => {
     void seedIfEmpty()
@@ -114,6 +117,10 @@ function App() {
       .sort((a, b) => parseISO(b.exam!.collectedAt).getTime() - parseISO(a.exam!.collectedAt).getTime())
       .slice(0, 8)
   }, [enrichedResults])
+
+  if (lockState.isLocked) {
+    return <LockScreen lockState={lockState} />
+  }
 
   return (
     <div className={sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
@@ -198,7 +205,7 @@ function App() {
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
         )}
         {activeView === 'files' && <Files files={files} />}
-        {activeView === 'settings' && <SettingsView />}
+        {activeView === 'settings' && <SettingsView lockState={lockState} />}
       </main>
 
       <nav className="mobile-tabs" aria-label="Mobile primary">
@@ -215,6 +222,102 @@ function App() {
         ))}
       </nav>
     </div>
+  )
+}
+
+function LockScreen({ lockState }: { lockState: ReturnType<typeof useLockState> }) {
+  const [passphrase, setPassphrase] = useState('')
+  const [confirmPassphrase, setConfirmPassphrase] = useState('')
+  const [busy, setBusy] = useState(false)
+  const isSetup = lockState.mode === 'setup'
+
+  async function submit() {
+    if (busy || lockState.mode === 'loading') return
+    if (isSetup && passphrase !== confirmPassphrase) return
+
+    setBusy(true)
+    try {
+      const ok = isSetup ? await lockState.setup(passphrase) : await lockState.unlock(passphrase)
+      if (ok) {
+        setPassphrase('')
+        setConfirmPassphrase('')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function resetLocalData() {
+    const confirmed = window.confirm('This permanently wipes Apollo data stored in this browser. Continue?')
+    if (!confirmed) return
+    await wipeLocalDatabase()
+    window.location.reload()
+  }
+
+  return (
+    <main className="lock-shell">
+      <section className="lock-panel">
+        <div className="brand-mark">
+          <Activity size={18} />
+        </div>
+        <div>
+          <p className="eyeline">{isSetup ? 'Secure this browser' : 'Apollo locked'}</p>
+          <h1>{isSetup ? 'Create your passphrase' : 'Enter passphrase'}</h1>
+        </div>
+        <p className="lock-copy">
+          {isSetup
+            ? 'This passphrase unlocks Apollo on this device. It cannot be recovered if you forget it.'
+            : 'Apollo locks after inactivity so local health records stay gated when the device is handed off.'}
+        </p>
+        <form
+          className="form-grid lock-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void submit()
+          }}
+        >
+          <input className="visually-hidden" autoComplete="username" value="apollo-local" readOnly />
+          <label className="wide-field">
+            Passphrase
+            <input
+              autoFocus
+              autoComplete={isSetup ? 'new-password' : 'current-password'}
+              type="password"
+              value={passphrase}
+              onChange={(event) => setPassphrase(event.target.value)}
+            />
+          </label>
+          {isSetup && (
+            <label className="wide-field">
+              Confirm passphrase
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassphrase}
+                onChange={(event) => setConfirmPassphrase(event.target.value)}
+              />
+            </label>
+          )}
+          {isSetup && passphrase !== confirmPassphrase && confirmPassphrase && (
+            <p className="form-error wide-field">Passphrases do not match.</p>
+          )}
+          {lockState.error && <p className="form-error wide-field">{lockState.error}</p>}
+          <button
+            type="submit"
+            className="primary-button wide-field"
+            disabled={busy || !passphrase || (isSetup && passphrase !== confirmPassphrase)}
+          >
+            <Lock size={17} />
+            {isSetup ? 'Save passphrase' : 'Unlock'}
+          </button>
+        </form>
+        {!isSetup && (
+          <button type="button" className="link-button" onClick={resetLocalData}>
+            Forgot passphrase? Wipe local data
+          </button>
+        )}
+      </section>
+    </main>
   )
 }
 
@@ -1282,7 +1385,7 @@ function Timeline({
   )
 }
 
-function SettingsView() {
+function SettingsView({ lockState }: { lockState: ReturnType<typeof useLockState> }) {
   return (
     <div className="content-grid two-column">
       <section className="panel">
@@ -1306,6 +1409,34 @@ function SettingsView() {
             <strong>No analytics added</strong>
             <span>There are no tracking scripts in this build.</span>
           </div>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <span className="section-label">Security</span>
+            <h3>Passphrase lock</h3>
+          </div>
+          <ShieldCheck size={20} />
+        </div>
+        <div className="settings-list">
+          <div>
+            <strong>Enabled on this browser</strong>
+            <span>Apollo asks for the passphrase on cold open and after inactivity.</span>
+          </div>
+          <label>
+            Idle timeout
+            <select value={lockState.idleMinutes} onChange={(event) => lockState.setIdleMinutes(Number(event.target.value))}>
+              <option value={1}>1 minute</option>
+              <option value={5}>5 minutes</option>
+              <option value={10}>10 minutes</option>
+              <option value={30}>30 minutes</option>
+            </select>
+          </label>
+          <button type="button" className="ghost-button" onClick={lockState.lock}>
+            <Lock size={17} />
+            Lock now
+          </button>
         </div>
       </section>
       <section className="panel">
