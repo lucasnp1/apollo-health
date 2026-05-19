@@ -43,6 +43,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { format, parseISO } from 'date-fns'
 import {
   db,
+  importBundledSeed,
+  recordCounts,
   seedIfEmpty,
   type Compound,
   type InjectionLog,
@@ -93,6 +95,12 @@ function App() {
   useEffect(() => {
     void seedIfEmpty()
   }, [])
+
+  useEffect(() => {
+    if (lockState.mode === 'unlocked') {
+      void seedIfEmpty()
+    }
+  }, [lockState.mode])
 
   const compounds = useLiveQuery(async () => {
     const rows = await db.compounds.toArray()
@@ -1386,6 +1394,33 @@ function Timeline({
 }
 
 function SettingsView({ lockState }: { lockState: ReturnType<typeof useLockState> }) {
+  const [importStatus, setImportStatus] = useState('')
+  const [importBusy, setImportBusy] = useState(false)
+  const [counts, setCounts] = useState({ compounds: 0, injections: 0, vitals: 0, exams: 0, results: 0, files: 0 })
+
+  useEffect(() => {
+    void recordCounts().then(setCounts)
+  }, [])
+
+  async function importSeedData(force = false) {
+    setImportBusy(true)
+    setImportStatus('')
+    try {
+      const result = await importBundledSeed(force)
+      const nextCounts = await recordCounts()
+      setCounts(nextCounts)
+      if (result.status === 'missing') {
+        setImportStatus('Bundled data file was not available in this deployment.')
+      } else if (result.status === 'skipped') {
+        setImportStatus('Bundled data is already imported on this browser.')
+      } else {
+        setImportStatus(`Imported ${nextCounts.injections} injections, ${nextCounts.vitals} vitals, and ${nextCounts.results} lab results.`)
+      }
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
   return (
     <div className="content-grid two-column">
       <section className="panel">
@@ -1409,6 +1444,29 @@ function SettingsView({ lockState }: { lockState: ReturnType<typeof useLockState
             <strong>No analytics added</strong>
             <span>There are no tracking scripts in this build.</span>
           </div>
+        </div>
+      </section>
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <span className="section-label">Data</span>
+            <h3>Bundled health data</h3>
+          </div>
+          <Database size={20} />
+        </div>
+        <div className="settings-list">
+          <div>
+            <strong>{counts.injections} injections · {counts.vitals} vitals · {counts.results} lab results</strong>
+            <span>Data is stored in this browser after Cloudflare login and Apollo unlock.</span>
+          </div>
+          <button type="button" className="primary-button" disabled={importBusy} onClick={() => importSeedData(false)}>
+            <UploadCloud size={17} />
+            Import bundled data
+          </button>
+          <button type="button" className="ghost-button" disabled={importBusy} onClick={() => importSeedData(true)}>
+            Replace with bundled data
+          </button>
+          {importStatus && <p className="panel-note">{importStatus}</p>}
         </div>
       </section>
       <section className="panel">

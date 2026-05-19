@@ -91,6 +91,19 @@ type SeedData = {
   files: Array<Omit<HealthFile, 'id' | 'blob'>>
 }
 
+export type SeedImportResult = {
+  status: 'imported' | 'skipped' | 'missing'
+  counts: {
+    compounds: number
+    injections: number
+    vitals: number
+    exams: number
+    results: number
+    files: number
+  }
+  seedVersion?: string
+}
+
 export class ApolloDatabase extends Dexie {
   compounds!: Table<Compound, number>
   injections!: Table<InjectionLog, number>
@@ -128,16 +141,20 @@ let seedPromise: Promise<void> | undefined
 
 export async function seedIfEmpty() {
   if (seedPromise) return seedPromise
-  seedPromise = seedDatabaseIfEmpty()
+  seedPromise = importBundledSeed(false).then(() => undefined).finally(() => {
+    seedPromise = undefined
+  })
   return seedPromise
 }
 
-async function seedDatabaseIfEmpty() {
+export async function importBundledSeed(force = false): Promise<SeedImportResult> {
   const seed = await fetchLocalSeed()
-  if (!seed) return
+  if (!seed) return { status: 'missing', counts: await recordCounts() }
 
   const currentSeed = await db.meta.get('seedVersion')
-  if (currentSeed?.value === seed.seedVersion) return
+  if (!force && currentSeed?.value === seed.seedVersion) {
+    return { status: 'skipped', counts: await recordCounts(), seedVersion: seed.seedVersion }
+  }
 
   await db.transaction('rw', [db.compounds, db.injections, db.vitals, db.exams, db.results, db.files, db.meta], async () => {
     await Promise.all([
@@ -185,6 +202,19 @@ async function seedDatabaseIfEmpty() {
 
     await db.meta.put({ key: 'seedVersion', value: seed.seedVersion })
   })
+
+  return {
+    status: 'imported',
+    counts: {
+      compounds: seed.compounds.length,
+      injections: seed.injections.length,
+      vitals: seed.vitals.length,
+      exams: seed.exams.length,
+      results: seed.results.length,
+      files: seed.files.length,
+    },
+    seedVersion: seed.seedVersion,
+  }
 }
 
 async function fetchLocalSeed() {
@@ -195,4 +225,17 @@ async function fetchLocalSeed() {
   } catch {
     return undefined
   }
+}
+
+export async function recordCounts() {
+  const [compounds, injections, vitals, exams, results, files] = await Promise.all([
+    db.compounds.count(),
+    db.injections.count(),
+    db.vitals.count(),
+    db.exams.count(),
+    db.results.count(),
+    db.files.count(),
+  ])
+
+  return { compounds, injections, vitals, exams, results, files }
 }
