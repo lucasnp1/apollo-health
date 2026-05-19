@@ -16,6 +16,7 @@ async function exportJson() {
     symptoms: await db.symptoms.toArray(),
     markerTargets: await db.markerTargets.toArray(),
     goals: await db.goals.toArray(),
+    bodyMetrics: await db.bodyMetrics.toArray(),
   }
   const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)

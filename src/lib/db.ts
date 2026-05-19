@@ -162,6 +162,21 @@ export type Goal = {
   achievedAt?: string
 }
 
+// Timestamped body measurements imported from Apple Health, wearables, or manual entry.
+// Each row may carry a subset of metrics; nulls are normal.
+export type BodyMetric = {
+  id?: number
+  measuredAt: string
+  source: 'apple_health' | 'manual' | 'capacitor_healthkit' | 'health_connect'
+  weightKg?: number
+  bodyFatPct?: number
+  waistCm?: number
+  restingHr?: number
+  hrvMs?: number
+  sleepHours?: number
+  externalKey?: string // dedupe key from source (e.g., HK UUID)
+}
+
 type SeedData = {
   seedVersion: string
   compounds: Array<Omit<Compound, 'id'>>
@@ -186,6 +201,7 @@ export class ApolloDatabase extends Dexie {
   symptoms!: Table<Symptom, number>
   markerTargets!: Table<MarkerTarget, number>
   goals!: Table<Goal, number>
+  bodyMetrics!: Table<BodyMetric, number>
 
   constructor() {
     super('apollo-health-local')
@@ -220,6 +236,22 @@ export class ApolloDatabase extends Dexie {
       symptoms: '++id, recordedAt',
       markerTargets: '++id, &marker',
       goals: '++id, kind, achievedAt',
+    })
+    this.version(4).stores({
+      compounds: '++id, name, category, archived',
+      injections: '++id, compoundId, takenAt, vialId',
+      vitals: '++id, measuredAt',
+      exams: '++id, collectedAt, sourceFileId',
+      results: '++id, examId, marker',
+      files: '++id, addedAt, status',
+      meta: '&key',
+      protocols: '++id, compoundId, archived, startedAt',
+      protocolDoses: '++id, protocolId, scheduledAt, status',
+      vials: '++id, compoundId, archived',
+      symptoms: '++id, recordedAt',
+      markerTargets: '++id, &marker',
+      goals: '++id, kind, achievedAt',
+      bodyMetrics: '++id, measuredAt, source, &externalKey',
     })
   }
 }
