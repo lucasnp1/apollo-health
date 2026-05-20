@@ -126,35 +126,33 @@ export function Overview({
         </div>
         {head ? (
           <div className="stack">
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: 10, alignItems: 'center', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '9px 12px' }}>
-              <span className="dot" style={{ background: headCompound?.color ?? 'var(--accent)', width: 9, height: 9 }} />
-              <div>
-                <strong style={{ fontSize: 13 }}>{headCompound?.name ?? 'Dose'}</strong>
-                <span className="sub">{head.protocol.dose} {head.protocol.unit} · {format(head.scheduledAt, 'EEE MMM d, HH:mm')}</span>
-              </div>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-ink)', background: 'var(--accent-soft)', padding: '2px 8px', borderRadius: 999, whiteSpace: 'nowrap' }}>
-                {timeUntil(head.scheduledAt)}
-              </span>
-              <button
-                type="button"
-                className="primary-button"
-                style={{ height: 28, fontSize: 11, padding: '0 10px', whiteSpace: 'nowrap' }}
-                onClick={() => onOpenQuickLog('injection', { compoundId: head.protocol.compoundId, dose: head.protocol.dose, unit: head.protocol.unit, protocolId: head.protocol.id, scheduledAt: head.scheduledAt.toISOString() })}
-              >
-                Mark taken
-              </button>
-            </div>
-            {upcoming.slice(1).map((item, idx) => {
-              const compound = compoundMap.get(item.protocol.compoundId)
+            {[{ item: head, compound: headCompound }, ...upcoming.slice(1).map((item) => ({ item, compound: compoundMap.get(item.protocol.compoundId) }))].map(({ item, compound }, idx) => {
+              const isNext = idx === 0
               return (
-                <div key={`${item.protocol.id}-${idx}`} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: 10, alignItems: 'center', padding: '5px 4px' }}>
-                  <span className="dot" style={{ background: compound?.color ?? 'var(--accent)', opacity: 0.55 }} />
+                <div className="row" key={`${item.protocol.id}-${idx}`}>
+                  <CalendarClock size={13} style={{ color: isNext ? 'var(--accent)' : 'var(--ink-mute)', flexShrink: 0 }} />
                   <div>
-                    <strong style={{ fontSize: 12 }}>{compound?.name ?? 'Compound'}</strong>
-                    <span className="sub">{item.protocol.dose} {item.protocol.unit}</span>
+                    <strong>{compound?.name ?? 'Compound'}</strong>
+                    <span className="sub">{item.protocol.dose} {item.protocol.unit} · {format(item.scheduledAt, 'EEE MMM d')}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--ink-mute)', whiteSpace: 'nowrap' }}>{timeUntil(item.scheduledAt)}</span>
-                  <time style={{ fontSize: 11, color: 'var(--ink-dim)', whiteSpace: 'nowrap' }}>{format(item.scheduledAt, 'MMM d')}</time>
+                  <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                    color: isNext ? 'var(--accent-ink)' : 'var(--ink-mute)',
+                    background: isNext ? 'var(--accent-soft)' : 'transparent',
+                    padding: isNext ? '2px 8px' : '2px 0',
+                    borderRadius: 999,
+                  }}>
+                    {timeUntil(item.scheduledAt)}
+                  </span>
+                  {isNext ? (
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      style={{ height: 26, fontSize: 11, padding: '0 8px', whiteSpace: 'nowrap' }}
+                      onClick={() => onOpenQuickLog('injection', { compoundId: item.protocol.compoundId, dose: item.protocol.dose, unit: item.protocol.unit, protocolId: item.protocol.id, scheduledAt: item.scheduledAt.toISOString() })}
+                    >
+                      Mark taken
+                    </button>
+                  ) : <span />}
                 </div>
               )
             })}

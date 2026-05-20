@@ -182,6 +182,26 @@ function Shell({
             <Plus size={13} /><span>Upload PDF</span>
           </button>
         </div>
+
+        <div className="sidebar-footer">
+          <SyncBanner syncing={sync.state === 'syncing'} />
+          {isAuthed ? (
+            <span className="sidebar-sync-pill" title={sync.lastError || ''}>
+              <span className={`sidebar-sync-dot ${sync.state === 'error' ? 'error' : 'ok'}`} />
+              <span className="sidebar-sync-label">
+                {sync.state === 'error' ? 'Sync error' : 'Synced'}
+                {sync.lastRunAt && sync.state === 'idle'
+                  ? ` · ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : ''}
+              </span>
+            </span>
+          ) : (
+            <span className="sidebar-sync-pill">
+              <Lock size={11} />
+              <span className="sidebar-sync-label">Local only</span>
+            </span>
+          )}
+        </div>
       </aside>
 
       <main className="main-panel">
@@ -204,17 +224,6 @@ function Shell({
             <button type="button" className="ghost-button" onClick={() => openQuickLog('injection')}>
               <Syringe size={12} /> Injection
             </button>
-            <SyncBanner syncing={sync.state === 'syncing'} />
-            {isAuthed ? (
-              <span className="privacy-pill" title={sync.lastError || ''}>
-                {sync.state === 'error' ? '⚠ Sync error' : '✓ Synced'}
-                {sync.lastRunAt && sync.state === 'idle'
-                  ? ` · ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                  : ''}
-              </span>
-            ) : (
-              <span className="privacy-pill"><Lock size={12} /> Local only</span>
-            )}
           </div>
         </header>
 
