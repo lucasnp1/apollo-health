@@ -121,14 +121,20 @@ function Shell({
   const injections = useLiveQuery(
     async () => {
       const all = (await db.injections.orderBy('takenAt').reverse().toArray()).filter((i) => !i.deletedAtSync)
-      // Deduplicate: same compound + same timestamp = sync-created phantom duplicate, keep first
+      // Deduplicate phantom sync duplicates: same compound + same dose + same minute bucket.
+      // Sync can create copies with slightly different sub-second timestamps (all show "01:00"
+      // in the UI). Keeping the one with the lowest Dexie id (oldest write).
       const seen = new Set<string>()
-      return all.filter((i) => {
-        const key = `${i.compoundId}|${i.takenAt}`
-        if (seen.has(key)) return false
-        seen.add(key)
-        return true
-      })
+      return all
+        .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))   // lowest id first so we keep the original
+        .filter((i) => {
+          const minuteBucket = Math.floor(Date.parse(i.takenAt) / 60_000)
+          const key = `${i.compoundId}|${i.dose ?? ''}|${minuteBucket}`
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        .sort((a, b) => b.takenAt.localeCompare(a.takenAt))   // restore newest-first order
     },
     [], [],
   )
