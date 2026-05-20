@@ -1,0 +1,10 @@
+export type View =
+  | 'overview'
+  | 'meds'
+  | 'vitals'
+  | 'labs'
+  | 'timeline'
+  | 'symptoms'
+  | 'targets'
+  | 'files'
+  | 'settings'
