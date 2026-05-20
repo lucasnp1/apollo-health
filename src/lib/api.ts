@@ -54,4 +54,4 @@ export const api = {
 
 export type AuthMe = { user: ApiUser | null }
 export type LoginPayload = { email: string; password: string }
-export type SignupPayload = { email: string; password: string; invite: string; displayName?: string }
+export type SignupPayload = { email: string; password: string; displayName?: string }

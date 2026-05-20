@@ -9,7 +9,6 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [invite, setInvite] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -25,7 +24,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
       if (mode === 'login') {
         await auth.login({ email, password })
       } else {
-        await auth.signup({ email, password, invite: invite.toUpperCase(), displayName: displayName || undefined })
+        await auth.signup({ email, password, displayName: displayName || undefined })
       }
     } finally {
       setBusy(false)
@@ -40,7 +39,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
           <div>
             <h1 style={{ margin: 0 }}>Apollo Health</h1>
             <p className="lock-copy" style={{ margin: '2px 0 0' }}>
-              {mode === 'login' ? 'Sign in to sync across devices.' : 'Create an account with your invite code.'}
+              {mode === 'login' ? 'Sign in to sync across devices.' : 'Create a free account.'}
             </p>
           </div>
         </div>
@@ -79,8 +78,6 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
               />
-              <label className="visually-hidden" htmlFor="invite">Invite code</label>
-              <input id="invite" type="text" placeholder="Invite code" autoCapitalize="characters" required value={invite} onChange={(e) => setInvite(e.target.value.toUpperCase())} />
               <label className="visually-hidden" htmlFor="display">Display name</label>
               <input id="display" type="text" placeholder="Display name (optional)" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
             </>
@@ -100,9 +97,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
         </button>
 
         <p className="lock-copy">
-          {mode === 'signup'
-            ? 'Need an invite? Ask a friend who already has access. Codes are issued by the account admin.'
-            : 'Data syncs to your account on Cloudflare. Encrypted in transit; encrypted at rest. No third parties.'}
+          {'Data syncs to your account on Cloudflare. Encrypted in transit; encrypted at rest. No third parties.'}
         </p>
       </div>
     </div>

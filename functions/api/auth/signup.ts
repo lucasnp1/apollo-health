@@ -4,7 +4,7 @@ import { ipHash, jsonError, jsonOk, sessionCookie, sessionTtlMs } from '../../_l
 import { wrap } from '../../_lib/handler'
 
 export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env }) => {
-  let body: { email?: string; password?: string; invite?: string; displayName?: string }
+  let body: { email?: string; password?: string; displayName?: string }
   try {
     body = await request.json()
   } catch {
@@ -13,21 +13,10 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
 
   const email = (body.email || '').trim().toLowerCase()
   const password = body.password || ''
-  const invite = (body.invite || '').trim().toUpperCase()
   const displayName = (body.displayName || '').trim() || null
 
   if (!email || !email.includes('@')) return jsonError('Valid email required', 400)
   if (password.length < 8) return jsonError('Password must be at least 8 characters', 400)
-  if (!invite) return jsonError('Invite code required', 400)
-
-  // Validate invite (unused, not expired)
-  const inviteRow = await env.DB
-    .prepare('SELECT code, used_by, expires_at FROM invite_codes WHERE code = ?')
-    .bind(invite)
-    .first<{ code: string; used_by: string | null; expires_at: number | null }>()
-  if (!inviteRow) return jsonError('Unknown invite code', 400)
-  if (inviteRow.used_by) return jsonError('Invite code already used', 400)
-  if (inviteRow.expires_at && inviteRow.expires_at < Date.now()) return jsonError('Invite code expired', 400)
 
   // Email uniqueness
   const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first()
@@ -54,12 +43,6 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
     .bind(userId, email, hash, serializeSalt(salt), 100000, isAdmin, displayName, now, now)
     .run()
 
-  // Burn the invite
-  await env.DB
-    .prepare('UPDATE invite_codes SET used_by = ?, used_at = ? WHERE code = ?')
-    .bind(userId, now, invite)
-    .run()
-
   // Create session
   const token = randomToken()
   const expiresAt = now + sessionTtlMs()
@@ -74,7 +57,7 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
 
   await env.DB
     .prepare('INSERT INTO audit_log (user_id, action, meta, ip_hash, at) VALUES (?, ?, ?, ?, ?)')
-    .bind(userId, 'signup', JSON.stringify({ invite }), iph, now)
+    .bind(userId, 'signup', JSON.stringify({}), iph, now)
     .run()
 
   return jsonOk(
