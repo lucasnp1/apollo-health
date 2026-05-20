@@ -1,8 +1,9 @@
 import type { PagesFunction, Env } from '../../_lib/types'
 import { derivePasswordHash, randomSalt, randomToken, serializeSalt, uuid } from '../../_lib/crypto'
 import { ipHash, jsonError, jsonOk, sessionCookie, sessionTtlMs } from '../../_lib/auth'
+import { wrap } from '../../_lib/handler'
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env }) => {
   let body: { email?: string; password?: string; invite?: string; displayName?: string }
   try {
     body = await request.json()
@@ -32,6 +33,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first()
   if (existing) return jsonError('Email already registered', 409)
 
+  // The very first user on a fresh database becomes admin automatically.
+  // Everyone after needs to be promoted by an existing admin.
+  const userCountRow = await env.DB
+    .prepare('SELECT COUNT(*) AS n FROM users')
+    .first<{ n: number }>()
+  const isAdmin = userCountRow && userCountRow.n === 0 ? 1 : 0
+
   // Create user
   const salt = randomSalt()
   const hash = await derivePasswordHash(password, salt)
@@ -43,7 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       `INSERT INTO users (id, email, password_hash, password_salt, iterations, is_admin, display_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(userId, email, hash, serializeSalt(salt), 210000, 0, displayName, now, now)
+    .bind(userId, email, hash, serializeSalt(salt), 100000, isAdmin, displayName, now, now)
     .run()
 
   // Burn the invite
@@ -70,7 +78,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     .run()
 
   return jsonOk(
-    { user: { id: userId, email, is_admin: 0, display_name: displayName } },
+    { user: { id: userId, email, is_admin: isAdmin, display_name: displayName } },
     { headers: { 'Set-Cookie': sessionCookie(token) } },
   )
-}
+})
