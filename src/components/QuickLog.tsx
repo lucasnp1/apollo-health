@@ -1,15 +1,15 @@
 // Quick-log modal — opens from sidebar buttons without navigating away.
 // Three tabs: Injection | Blood Pressure | Symptoms.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Brain, Droplet, HeartPulse, Plus, X } from 'lucide-react'
 import { db, type Compound, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { SiteCombobox } from './SiteCombobox'
+import { COMMON_SITES } from '../lib/sites'
 
 type Tab = 'injection' | 'bp' | 'symptoms'
-
-const SITES = ['Glute L', 'Glute R', 'Quad L', 'Quad R', 'Delt L', 'Delt R', 'Abdomen L', 'Abdomen R']
 
 const SLIDERS: Array<{ key: keyof Symptom; label: string }> = [
   { key: 'libido', label: 'Libido' },
@@ -102,9 +102,19 @@ export function QuickLog({
 
 function InjectionForm({ compounds, onSaved }: { compounds: Compound[]; onSaved: () => void }) {
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
+  const injections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().limit(30).toArray(), [], [])
+  const recentSites = useMemo(() => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const inj of injections ?? []) {
+      if (inj.site && !seen.has(inj.site)) { seen.add(inj.site); out.push(inj.site) }
+      if (out.length >= 6) break
+    }
+    return out
+  }, [injections])
   const [compoundId, setCompoundId] = useState<number | ''>(compounds[0]?.id ?? '')
   const [dose, setDose] = useState('')
-  const [site, setSite] = useState(SITES[0])
+  const [site, setSite] = useState(COMMON_SITES[0])
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const compound = compounds.find((c) => c.id === compoundId)
@@ -153,9 +163,7 @@ function InjectionForm({ compounds, onSaved }: { compounds: Compound[]; onSaved:
       </label>
       <label>
         Site
-        <select value={site} onChange={(e) => setSite(e.target.value)}>
-          {SITES.map((s) => <option key={s}>{s}</option>)}
-        </select>
+        <SiteCombobox value={site} onChange={setSite} recentSites={recentSites} />
       </label>
       <label className="wide-field">
         Notes (optional)
