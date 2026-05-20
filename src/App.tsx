@@ -22,6 +22,7 @@ import { db, seedIfEmpty } from './lib/db'
 import { useLockState } from './lib/useLockState'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
+import { InstallPrompt } from './components/InstallPrompt'
 import { LockScreen } from './components/LockScreen'
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
@@ -216,6 +217,7 @@ function Shell({
           </button>
         ))}
       </nav>
+      <InstallPrompt />
     </div>
   )
 }
