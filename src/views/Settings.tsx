@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Database, Download, LogOut, Lock as LockIcon, Mail, Plus, RefreshCw, Trash2, UserCircle } from 'lucide-react'
+import { AlertTriangle, Database, Download, LogOut, Mail, Plus, RefreshCw, Trash2, UserCircle } from 'lucide-react'
 import { db, importBundledSeed, recordCounts, type SeedImportResult } from '../lib/db'
 import { wipeLocalDatabase } from '../lib/lock'
 import { api } from '../lib/api'
-import type { useLockState } from '../lib/useLockState'
 import type { useAuth } from '../lib/useAuth'
 
-type LockStateBundle = ReturnType<typeof useLockState>
 type AuthBundle = ReturnType<typeof useAuth>
 
 async function exportJson() {
@@ -37,7 +35,7 @@ async function exportJson() {
   URL.revokeObjectURL(url)
 }
 
-export function Settings({ lockState, auth }: { lockState: LockStateBundle; auth: AuthBundle }) {
+export function Settings({ auth }: { auth: AuthBundle }) {
   const user = auth.state.status === 'authed' ? auth.state.user : null
   const isAdmin = user?.is_admin === 1
 
@@ -45,10 +43,6 @@ export function Settings({ lockState, auth }: { lockState: LockStateBundle; auth
     <div className="content-grid">
       <section className="surface col-6">
         <AccountSettings auth={auth} />
-      </section>
-
-      <section className="surface col-6">
-        <LockSettings lockState={lockState} />
       </section>
 
       {isAdmin && (
@@ -209,40 +203,6 @@ function InviteSettings() {
   )
 }
 
-function LockSettings({ lockState }: { lockState: LockStateBundle }) {
-  return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Security</span>
-          <h3>Passphrase lock</h3>
-        </div>
-        <LockIcon size={18} style={{ color: 'var(--ink-mute)' }} />
-      </div>
-      <p className="muted-copy">
-        Stored as a salted PBKDF2 hash in this browser. There is no recovery if you forget it — losing the passphrase
-        means wiping your local data and starting over.
-      </p>
-
-      <div className="form-grid">
-        <label>
-          Auto-lock after
-          <select
-            value={String(lockState.idleMinutes)}
-            onChange={(e) => { void lockState.setIdleMinutes(Number(e.target.value)) }}
-          >
-            {[1, 2, 5, 10, 15, 30, 60].map((n) => (
-              <option key={n} value={n}>{n} minute{n === 1 ? '' : 's'}</option>
-            ))}
-          </select>
-        </label>
-        <button type="button" className="ghost-button" onClick={() => lockState.lock()} style={{ alignSelf: 'flex-end' }}>
-          <LockIcon size={13} /> Lock now
-        </button>
-      </div>
-    </>
-  )
-}
 
 function BundledSeedSettings() {
   const [status, setStatus] = useState<SeedImportResult | undefined>(undefined)

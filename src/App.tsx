@@ -16,12 +16,11 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
-import { useLockState } from './lib/useLockState'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { InstallPrompt } from './components/InstallPrompt'
-import { LockScreen } from './components/LockScreen'
 import { QuickLog } from './components/QuickLog'
+import { SyncBanner } from './components/SyncBanner'
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
 import { Overview } from './views/Overview'
@@ -50,13 +49,12 @@ function App() {
   const [activeView, setActiveView] = useState<View>('overview')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const auth = useAuth()
-  const lockState = useLockState()
 
   useEffect(() => {
-    if (auth.state.status !== 'loading' && lockState.mode === 'unlocked') {
+    if (auth.state.status !== 'loading') {
       void seedIfEmpty()
     }
-  }, [auth.state.status, lockState.mode])
+  }, [auth.state.status])
 
   if (auth.state.status === 'loading') {
     return (
@@ -70,23 +68,17 @@ function App() {
     return <SignIn auth={auth} />
   }
 
-  if (lockState.isLocked) {
-    return <LockScreen lockState={lockState} />
-  }
-
   return (
     <Shell
       activeView={activeView}
       setActiveView={setActiveView}
       sidebarCollapsed={sidebarCollapsed}
       setSidebarCollapsed={setSidebarCollapsed}
-      lockState={lockState}
       auth={auth}
     />
   )
 }
 
-type LockStateBundle = ReturnType<typeof useLockState>
 type AuthBundle = ReturnType<typeof useAuth>
 
 function Shell({
@@ -94,14 +86,12 @@ function Shell({
   setActiveView,
   sidebarCollapsed,
   setSidebarCollapsed,
-  lockState,
   auth,
 }: {
   activeView: View
   setActiveView: (v: View) => void
   sidebarCollapsed: boolean
   setSidebarCollapsed: (fn: (prev: boolean) => boolean) => void
-  lockState: LockStateBundle
   auth: AuthBundle
 }) {
   const isAuthed = auth.state.status === 'authed'
@@ -190,9 +180,10 @@ function Shell({
             <h1>{titleFor(activeView)}</h1>
           </div>
           <div className="topbar-actions">
+            <SyncBanner syncing={sync.state === 'syncing'} />
             {isAuthed ? (
               <span className="privacy-pill" title={sync.lastError || ''}>
-                {sync.state === 'syncing' ? '⟳ Syncing…' : sync.state === 'error' ? '⚠ Sync error' : '✓ Synced'}
+                {sync.state === 'error' ? '⚠ Sync error' : '✓ Synced'}
                 {sync.lastRunAt && sync.state === 'idle'
                   ? ` · ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                   : ''}
@@ -224,7 +215,7 @@ function Shell({
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
         )}
         {activeView === 'files' && <Files files={files} />}
-        {activeView === 'settings' && <Settings lockState={lockState} auth={auth} />}
+        {activeView === 'settings' && <Settings auth={auth} />}
       </main>
 
       <nav className="mobile-tabs" aria-label="Mobile primary">
