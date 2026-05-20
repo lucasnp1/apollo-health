@@ -699,33 +699,71 @@ function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; inject
 
     if (usedCompounds.length === 0) return { chartData: [], traces: [] }
 
-    // For each compound, build its daily release curve
-    const traceData: { compound: Compound; pk: NonNullable<ReturnType<typeof findPKCompound>>; values: number[] }[] = []
+    // Group by resolved PK compound (compound + form key).
+    // Multiple user compounds that map to the same PK profile are MERGED into one
+    // trace — their injections are pooled and their release curves are summed.
+    // This prevents duplicate stat-cards/lines when the user has e.g. both a
+    // "Testosterone E" and an older "Test E" compound that both resolve to
+    // Testosterone Enanthate.
+    type MergeEntry = {
+      compound: Compound                           // first compound found (for display)
+      pk: NonNullable<ReturnType<typeof findPKCompound>>
+      compoundIds: number[]                        // all compound ids contributing
+      injList: Array<{ takenAt: string; dose: number }>
+    }
+    const pkKey = (pk: NonNullable<ReturnType<typeof findPKCompound>>) =>
+      `${pk.compound}|${pk.form}`
+    const mergedMap = new Map<string, MergeEntry>()
+
     for (const c of usedCompounds) {
       const pk = findPKCompound(c.name, c.ester ?? undefined)
       if (!pk) continue
-      // Include injections up to 5 half-lives before window start (they still contribute)
-      const lookback = pk.halfLifeDays * 5
-      const relevant = injections.filter(
-        (i) => i.compoundId === c.id && i.dose !== undefined && !i.deletedAtSync
-      ).map((i) => ({ takenAt: i.takenAt, dose: i.dose! }))
-      if (relevant.length === 0) continue
-
-      const values = buildDailyReleaseCurve(pk, relevant, startMs - lookback * 86_400_000, totalDays + Math.ceil(lookback))
-      // Slice to only the window we care about
-      const offset = Math.ceil(lookback)
-      traceData.push({ compound: c, pk, values: values.slice(offset, offset + totalDays) })
+      const key = pkKey(pk)
+      if (!mergedMap.has(key)) {
+        mergedMap.set(key, { compound: c, pk, compoundIds: [], injList: [] })
+      }
+      const entry = mergedMap.get(key)!
+      entry.compoundIds.push(c.id!)
+      const cInj = injections
+        .filter((i) => i.compoundId === c.id && i.dose !== undefined && !i.deletedAtSync)
+        .map((i) => ({ takenAt: i.takenAt, dose: i.dose! }))
+      entry.injList.push(...cInj)
     }
+
+    // Build a curve per merged group
+    const traceData: {
+      compound: Compound
+      pk: NonNullable<ReturnType<typeof findPKCompound>>
+      compoundIds: number[]
+      values: number[]
+    }[] = []
+
+    for (const { compound, pk, compoundIds, injList } of mergedMap.values()) {
+      if (injList.length === 0) continue
+      const lookback = pk.halfLifeDays * 5
+      const raw = buildDailyReleaseCurve(
+        pk, injList,
+        startMs - lookback * 86_400_000,
+        totalDays + Math.ceil(lookback),
+      )
+      const offset = Math.ceil(lookback)
+      traceData.push({ compound, pk, compoundIds, values: raw.slice(offset, offset + totalDays) })
+    }
+
+    // Assign stable chart-key using the PK compound label (e.g. "Testosterone · Enanthate")
+    // so that even if two user compounds merge, the key is unique and stable.
+    const traceKey = (t: (typeof traceData)[0]) =>
+      t.pk.form ? `${t.pk.compound} · ${t.pk.form}` : t.pk.compound
 
     // Merge into chart format
     const rows: Record<string, number | string>[] = []
     for (let d = 0; d < totalDays; d++) {
       const row: Record<string, number | string> = {
         date: format(new Date(startMs + d * 86_400_000), 'MMM d'),
-        dayOffset: d - windowDays, // negative = past, positive = future tail
+        dayOffset: d - windowDays,
       }
       for (const t of traceData) {
-        row[t.compound.name] = parseFloat((t.values[d] ?? 0).toFixed(2))
+        row[traceKey(t)] = parseFloat((t.values[d] ?? 0).toFixed(2))
       }
       rows.push(row)
     }
@@ -733,14 +771,14 @@ function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; inject
     return {
       chartData: rows,
       traces: traceData.map((t) => ({
-        name: t.compound.name,
+        name: traceKey(t),
         color: t.compound.color ?? '#0f766e',
         halfLifeDays: t.pk.halfLifeDays,
         activeDosePct: t.pk.activeDosePct,
         form: t.pk.form,
         activeNow: parseFloat((t.values[windowDays - 1] ?? 0).toFixed(1)),
         lastInj: injections
-          .filter((i) => i.compoundId === t.compound.id && !i.deletedAtSync)
+          .filter((i) => t.compoundIds.includes(i.compoundId) && !i.deletedAtSync)
           .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0],
       })),
     }
