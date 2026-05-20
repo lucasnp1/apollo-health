@@ -1,7 +1,10 @@
 // Password hashing + session token primitives.
 // Uses WebCrypto only — works inside the Workers runtime.
 
-const ITERATIONS = 210_000
+// Cloudflare Workers caps PBKDF2-SHA256 at 100,000 iterations. Each user's
+// iteration count is stored on the row so we can raise it later without
+// breaking older accounts.
+const ITERATIONS = 100_000
 const HASH = 'SHA-256'
 const KEY_BITS = 256
 const SALT_BYTES = 16

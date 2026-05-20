@@ -15,7 +15,7 @@ CREATE TABLE users (
   email         TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
-  iterations    INTEGER NOT NULL DEFAULT 210000,
+  iterations    INTEGER NOT NULL DEFAULT 100000,
   is_admin      INTEGER NOT NULL DEFAULT 0,
   display_name  TEXT,
   created_at    INTEGER NOT NULL,
