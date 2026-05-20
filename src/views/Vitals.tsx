@@ -106,7 +106,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
           </div>
         )}
         {chart.length > 0 ? (
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={chart} margin={{ top: 12, right: 12, bottom: 0, left: -12 }}>
               <defs>
                 <linearGradient id="sysFill" x1="0" y1="0" x2="0" y2="1">
@@ -140,8 +140,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         )}
       </section>
 
-      <BodyCompositionPanel metrics={bodyMetrics} range={range} />
-
+      {/* Log BP + Body Composition side-by-side */}
       <section className="surface col-5">
         <div className="panel-header">
           <div>
@@ -174,20 +173,23 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         </div>
       </section>
 
-      <section className="surface col-7">
+      <BodyCompositionPanel metrics={bodyMetrics} range={range} />
+
+      {/* History — compact, last 15 */}
+      <section className="surface col-12">
         <div className="panel-header">
           <div>
             <span className="section-label">History</span>
-            <h3>Recent</h3>
+            <h3>Recent readings</h3>
           </div>
         </div>
         <div className="stack">
-          {filtered.slice().reverse().slice(0, 20).map((v) => (
+          {filtered.slice().reverse().slice(0, 15).map((v) => (
             <div className="row" key={v.id}>
               <HeartPulse size={14} />
               <div>
                 <strong>{v.systolic}/{v.diastolic}</strong>
-                <span className="sub">{v.pulse ? `${v.pulse} bpm` : 'No pulse'} · {v.notes || 'No notes'}</span>
+                <span className="sub">{v.pulse ? `${v.pulse} bpm` : 'No pulse'}{v.notes ? ` · ${v.notes}` : ''}</span>
               </div>
               <time>{format(parseISO(v.measuredAt), 'MMM d HH:mm')}</time>
               <button type="button" className="icon-button danger" onClick={() => db.vitals.delete(v.id!)} aria-label="Delete reading">
@@ -228,7 +230,7 @@ function BodyCompositionPanel({ metrics, range }: { metrics: BodyMetric[]; range
 
   const empty = filtered.length === 0
   return (
-    <section className="surface col-12">
+    <section className="surface col-7">
       <div className="panel-header">
         <div>
           <span className="section-label">Body</span>

@@ -212,14 +212,14 @@ time,
   height: 100vh;
   height: 100svh;
   overflow-y: auto;
-  padding: var(--space-7);
-  padding-bottom: 96px;
+  padding: var(--space-5);
+  padding-bottom: 88px;
   scroll-behavior: smooth;
 }
 
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: var(--space-7);
+  margin-bottom: var(--space-4);
 }
 .topbar .eyeline {
   margin: 0 0 6px;
@@ -308,8 +308,8 @@ time,
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: var(--space-6);
-  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-3);
   min-width: 0;
   box-shadow: var(--shadow-sm);
 }
@@ -330,7 +330,7 @@ time,
 }
 
 .content-grid {
-  display: grid; gap: var(--space-5);
+  display: grid; gap: var(--space-3);
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-auto-flow: dense;
 }
@@ -431,12 +431,12 @@ time,
 
 .stat-grid {
   display: grid;
-  gap: var(--space-4);
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 .stat {
-  display: flex; flex-direction: column; gap: 6px;
-  padding: var(--space-5);
+  display: flex; flex-direction: column; gap: 4px;
+  padding: var(--space-3) var(--space-4);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -445,7 +445,7 @@ time,
 }
 .stat:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
 .stat-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -453,13 +453,12 @@ time,
 }
 .stat-value {
   font-family: var(--font-mono);
-  font-size: 28px;
+  font-size: 22px;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   color: var(--ink);
-  line-height: 1.1;
-  margin-top: 2px;
+  line-height: 1.15;
 }
 .stat-detail { font-size: 11px; color: var(--ink-dim); font-weight: 500; }
 .stat.good .stat-value { color: var(--good); }
@@ -544,10 +543,10 @@ time,
 }
 .range-bar-row {
   display: grid;
-  grid-template-columns: 200px 1fr 130px 90px;
-  gap: var(--space-4);
+  grid-template-columns: 180px 1fr 120px 80px;
+  gap: var(--space-3);
   align-items: center;
-  padding: 14px 0;
+  padding: 8px 0;
   border-top: 1px solid var(--line);
 }
 .range-bar-row:first-child { border-top: 0; }
@@ -579,10 +578,10 @@ time,
 }
 .stack > .row {
   background: var(--surface);
-  padding: 12px 14px;
+  padding: 9px 12px;
   display: grid;
   grid-template-columns: auto 1fr auto auto;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   border-bottom: 1px solid var(--line);
   transition: background 120ms;

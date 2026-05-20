@@ -177,7 +177,7 @@ function ProtocolLogCard({
       border: '1.5px solid',
       borderColor: done ? 'var(--good)' : (compound?.color ?? 'var(--line)'),
       borderRadius: 'var(--radius)',
-      padding: 16,
+      padding: 12,
       display: 'flex',
       flexDirection: 'column',
       gap: 12,
@@ -797,8 +797,8 @@ function TestosteroneCurvePanel({ compounds, injections }: { compounds: Compound
           <span className="stat-detail">{curve.lastInjection?.rawDose ?? ''}</span>
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={240}>
-        <AreaChart data={curve.points} margin={{ top: 10, right: 10, bottom: 0, left: -12 }}>
+      <ResponsiveContainer width="100%" height={180}>
+        <AreaChart data={curve.points} margin={{ top: 8, right: 10, bottom: 0, left: -12 }}>
           <defs>
             <linearGradient id="testFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#0f766e" stopOpacity={0.5} />

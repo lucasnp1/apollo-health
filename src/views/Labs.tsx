@@ -179,19 +179,19 @@ export function Labs({
         )}
       </section>
 
-      {/* ── Marker history chart ──────────────────────────────────────────── */}
+      {/* ── Marker history chart — full width, only when a marker is selected ── */}
       {selectedKey && (
-        <section className="surface col-7">
+        <section className="surface col-12">
           <div className="panel-header">
             <div>
               <span className="section-label">Trend</span>
               <h3>{metaForKey(selectedKey)?.label ?? selectedKey}</h3>
             </div>
-            <button type="button" className="ghost-button" onClick={() => setSelectedKey(undefined)}>Clear</button>
+            <button type="button" className="ghost-button" onClick={() => setSelectedKey(undefined)}>Close</button>
           </div>
           {selectedHistory.length > 1 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={selectedHistory} margin={{ top: 10, right: 10, bottom: 0, left: -12 }}>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={selectedHistory} margin={{ top: 8, right: 10, bottom: 0, left: -12 }}>
                 <CartesianGrid stroke="#e7e5e4" vertical={false} />
                 <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
                 <YAxis tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
@@ -200,16 +200,16 @@ export function Labs({
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <EmptyState icon={FlaskConical} title="Need more data points" detail="Add results from at least 2 panels to see a trend." />
+            <p className="panel-note">Add results from at least 2 panels to see a trend.</p>
           )}
-          {selectedKey && metaForKey(selectedKey)?.optimal?.note && (
-            <p className="panel-note" style={{ marginTop: 8 }}>{metaForKey(selectedKey)?.optimal?.note}</p>
+          {metaForKey(selectedKey)?.optimal?.note && (
+            <p className="panel-note">{metaForKey(selectedKey)?.optimal?.note}</p>
           )}
         </section>
       )}
 
-      {/* ── PDF import ────────────────────────────────────────────────────── */}
-      <section className={`surface ${selectedKey ? 'col-5' : 'col-7'}`}>
+      {/* ── PDF import + Manual add — always side-by-side ─────────────────── */}
+      <section className="surface col-6">
         <div className="panel-header">
           <div>
             <span className="section-label">PDF import</span>
@@ -219,7 +219,7 @@ export function Labs({
         {latestFile ? (
           extracted.length > 0 ? (
             <>
-              <p className="panel-note" style={{ marginBottom: 8 }}><FileText size={12} style={{ verticalAlign: -1 }} /> {latestFile.name}</p>
+              <p className="panel-note"><FileText size={12} style={{ verticalAlign: -1 }} /> {latestFile.name}</p>
               <div className="stack">
                 {extracted.map((m) => (
                   <div className="row" key={m.marker}>
@@ -231,7 +231,7 @@ export function Labs({
                   </div>
                 ))}
               </div>
-              <button type="button" className="primary-button" style={{ marginTop: 12, alignSelf: 'flex-start' }} onClick={() => saveExtracted(extracted)}>
+              <button type="button" className="primary-button" style={{ alignSelf: 'flex-start' }} onClick={() => saveExtracted(extracted)}>
                 Import {extracted.length} markers
               </button>
             </>
@@ -239,12 +239,11 @@ export function Labs({
             <EmptyState icon={FileText} title="Couldn't auto-detect markers" detail="The PDF text was extracted but no recognisable markers found. Add below manually." />
           )
         ) : (
-          <EmptyState icon={UploadCloud} title="No pending PDF" detail="Upload a PDF in Files → it gets parsed in your browser. Return here to import the results." />
+          <EmptyState icon={UploadCloud} title="No pending PDF" detail="Upload a PDF in Files — it gets parsed in your browser, then come back here to import." />
         )}
       </section>
 
-      {/* ── Manual add ────────────────────────────────────────────────────── */}
-      <section className="surface col-5">
+      <section className="surface col-6">
         <div className="panel-header">
           <div>
             <span className="section-label">Manual entry</span>
