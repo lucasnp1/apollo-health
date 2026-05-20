@@ -115,9 +115,8 @@ export function Protocols({
       {/* ── 3. CHARTS ─────────────────────────────────────────────────────── */}
       {injections.length > 0 && (
         <>
-          <section className="surface col-12">
-            <PKCurvePanel compounds={compounds} injections={injections} />
-          </section>
+          {/* PKCurvePanel renders its own <section> wrapper so an empty box never shows */}
+          <PKCurvePanel compounds={compounds} injections={injections} />
           <section className="surface col-7">
             <RetaChart compounds={compounds} injections={injections} />
           </section>
@@ -752,7 +751,7 @@ function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; inject
   if (traces.length === 0) return null
 
   return (
-    <>
+    <section className="surface col-12">
       <div className="panel-header">
         <div>
           <span className="section-label">Pharmacokinetics</span>
@@ -813,7 +812,7 @@ function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; inject
       <p className="panel-note">
         Release(t) = Dose × active% × e<sup>−t×λ</sup> × λ &nbsp;·&nbsp; λ = ln 2 / t½ &nbsp;·&nbsp; Source: Behre &amp; Nieschlag 1998
       </p>
-    </>
+    </section>
   )
 }
 

@@ -60,17 +60,59 @@ export const PK_COMPOUNDS: PKCompound[] = [
   { compound: 'Winstrol',               form: 'Oral',                 halfLifeDays: 0.33, activeDosePct: 100 },
 ]
 
-/** Find a PKCompound by name and optional ester/form. Falls back to name-only match. */
+/**
+ * Find a PKCompound by name and optional ester/form.
+ *
+ * Matching tiers (first match wins):
+ *   1. Exact compound name + exact form
+ *   2. Bidirectional substring on compound name (PK⊆user OR user⊆PK) + exact form
+ *   3. Bidirectional substring on compound name, best form match or first result
+ *   4. First-token prefix (≥3 chars) — catches "Test E", "Tren A", "Mast P" etc.
+ */
 export function findPKCompound(name: string, form?: string): PKCompound | undefined {
-  const normalized = name.trim()
-  if (form) {
-    const exact = PK_COMPOUNDS.find(
-      (c) => c.compound.toLowerCase() === normalized.toLowerCase() && c.form.toLowerCase() === form.toLowerCase()
-    )
-    if (exact) return exact
+  const norm = name.trim().toLowerCase()
+  const formNorm = form?.trim().toLowerCase()
+
+  /** True if user name and PK compound name share a meaningful substring relationship */
+  function nameMatches(pkName: string): boolean {
+    const pk = pkName.toLowerCase()
+    return pk === norm || pk.includes(norm) || norm.includes(pk)
   }
-  // Fuzzy: match by compound name containing the search term, pick first
-  return PK_COMPOUNDS.find((c) => c.compound.toLowerCase().includes(normalized.toLowerCase()))
+
+  // 1. Exact compound name + exact form
+  if (formNorm) {
+    const hit = PK_COMPOUNDS.find(
+      (c) => c.compound.toLowerCase() === norm && c.form.toLowerCase() === formNorm,
+    )
+    if (hit) return hit
+  }
+
+  // 2 & 3. Bidirectional name match — prefer the entry whose form matches
+  const nameHits = PK_COMPOUNDS.filter((c) => nameMatches(c.compound))
+  if (nameHits.length > 0) {
+    if (formNorm) {
+      const withForm = nameHits.find((c) => c.form.toLowerCase() === formNorm)
+      if (withForm) return withForm
+    }
+    return nameHits[0]
+  }
+
+  // 4. First-token prefix fallback (e.g. "Test" → "Testosterone", "Tren" → "Trenbolone")
+  const firstToken = norm.split(/[\s\-_]+/)[0]
+  if (firstToken && firstToken.length >= 3) {
+    const tokenHits = PK_COMPOUNDS.filter((c) =>
+      c.compound.toLowerCase().startsWith(firstToken),
+    )
+    if (tokenHits.length > 0) {
+      if (formNorm) {
+        const withForm = tokenHits.find((c) => c.form.toLowerCase() === formNorm)
+        if (withForm) return withForm
+      }
+      return tokenHits[0]
+    }
+  }
+
+  return undefined
 }
 
 /**
