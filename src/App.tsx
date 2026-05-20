@@ -20,7 +20,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { parseISO } from 'date-fns'
 import { db, seedIfEmpty } from './lib/db'
 import { useLockState } from './lib/useLockState'
+import { useAuth } from './lib/useAuth'
+import { useSync } from './lib/useSync'
 import { LockScreen } from './components/LockScreen'
+import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
 import { Overview } from './views/Overview'
 import { Protocols } from './views/Protocols'
@@ -48,22 +51,39 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const auth = useAuth()
   const lockState = useLockState()
 
   useEffect(() => {
-    if (lockState.mode === 'unlocked') {
+    if (auth.state.status !== 'loading' && lockState.mode === 'unlocked') {
       void seedIfEmpty()
     }
-  }, [lockState.mode])
+  }, [auth.state.status, lockState.mode])
 
+  // 1) Wait until we know if we have a server session
+  if (auth.state.status === 'loading') {
+    return (
+      <div className="lock-shell">
+        <div className="lock-panel"><p className="lock-copy">Loading…</p></div>
+      </div>
+    )
+  }
+
+  // 2) If guest, show sign-in/up. Sign-in pane has an explicit "continue without an account" link.
+  if (auth.state.status === 'guest') {
+    return <SignIn auth={auth} />
+  }
+
+  // 3) Authed: local lock can still be set up for an extra layer on shared devices.
   if (lockState.isLocked) {
     return <LockScreen lockState={lockState} />
   }
 
-  return <Shell activeView={activeView} setActiveView={setActiveView} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} lockState={lockState} />
+  return <Shell activeView={activeView} setActiveView={setActiveView} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} lockState={lockState} auth={auth} />
 }
 
 type LockStateBundle = ReturnType<typeof useLockState>
+type AuthBundle = ReturnType<typeof useAuth>
 
 function Shell({
   activeView,
@@ -71,15 +91,23 @@ function Shell({
   sidebarCollapsed,
   setSidebarCollapsed,
   lockState,
+  auth,
 }: {
   activeView: View
   setActiveView: (v: View) => void
   sidebarCollapsed: boolean
   setSidebarCollapsed: (fn: (prev: boolean) => boolean) => void
   lockState: LockStateBundle
+  auth: AuthBundle
 }) {
+  const isAuthed = auth.state.status === 'authed'
+  const sync = useSync(isAuthed)
+
   const compounds = useLiveQuery(async () => (await db.compounds.toArray()).filter((c) => !c.archived), [], [])
-  const injections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().toArray(), [], [])
+  const injections = useLiveQuery(
+    async () => (await db.injections.orderBy('takenAt').reverse().toArray()).filter((i) => !i.deletedAtSync),
+    [], [],
+  )
   const vitals = useLiveQuery(() => db.vitals.orderBy('measuredAt').reverse().toArray(), [], [])
   const exams = useLiveQuery(() => db.exams.orderBy('collectedAt').reverse().toArray(), [], [])
   const results = useLiveQuery(() => db.results.toArray(), [], [])
@@ -140,7 +168,14 @@ function Shell({
             <h1>{titleFor(activeView)}</h1>
           </div>
           <div className="topbar-actions">
-            <span className="privacy-pill"><Lock size={12} /> Local only</span>
+            {isAuthed ? (
+              <span className="privacy-pill" title={sync.lastError || ''}>
+                {sync.state === 'syncing' ? '⟳ Syncing…' : sync.state === 'error' ? '⚠ Sync error' : '✓ Synced'}
+                {sync.lastRunAt && sync.state === 'idle' ? ` · ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+              </span>
+            ) : (
+              <span className="privacy-pill"><Lock size={12} /> Local only</span>
+            )}
           </div>
         </header>
 
@@ -165,7 +200,7 @@ function Shell({
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
         )}
         {activeView === 'files' && <Files files={files} />}
-        {activeView === 'settings' && <Settings lockState={lockState} />}
+        {activeView === 'settings' && <Settings lockState={lockState} auth={auth} />}
       </main>
 
       <nav className="mobile-tabs" aria-label="Mobile primary">

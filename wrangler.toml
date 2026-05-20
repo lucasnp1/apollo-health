@@ -1,3 +1,12 @@
 name = "apollo-health"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-05-19"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare D1 binding used by Pages Functions in `functions/`
+[[d1_databases]]
+binding = "DB"
+database_name = "apollo-health-db"
+database_id = "acb22a10-426c-4467-80d2-3679a57850b8"
+
+# Environment overrides for preview deploys would go in [env.preview] if needed.

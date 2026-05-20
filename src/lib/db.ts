@@ -18,6 +18,17 @@ export type Compound = {
   archived?: boolean
 }
 
+export type SyncFields = {
+  // UUID assigned by the client on first save. Used as the row id on the server.
+  serverId?: string
+  // ms epoch — bumped on every local mutation.
+  updatedAt?: number
+  // ms epoch — soft-delete tombstone.
+  deletedAtSync?: number
+  // 1 = local changes not yet pushed to server.
+  dirty?: 0 | 1
+}
+
 export type InjectionLog = {
   id?: number
   compoundId: number
@@ -32,7 +43,7 @@ export type InjectionLog = {
   weightKg?: number
   protocolDoseId?: number
   vialId?: number
-}
+} & SyncFields
 
 export type VitalLog = {
   id?: number
@@ -268,6 +279,24 @@ export class ApolloDatabase extends Dexie {
       markerTargets: '++id, &marker',
       goals: '++id, kind, achievedAt',
       bodyMetrics: '++id, measuredAt, source, &externalKey',
+    })
+    // v5: per-row sync metadata indexes (serverId, dirty, updatedAt) so the
+    // background sync engine can find unsynced rows and upsert by server id.
+    this.version(5).stores({
+      compounds: '++id, name, category, archived, &serverId, dirty, updatedAt',
+      injections: '++id, compoundId, takenAt, vialId, &serverId, dirty, updatedAt',
+      vitals: '++id, measuredAt, &serverId, dirty, updatedAt',
+      exams: '++id, collectedAt, sourceFileId, &serverId, dirty, updatedAt',
+      results: '++id, examId, marker, &serverId, dirty, updatedAt',
+      files: '++id, addedAt, status, &serverId, dirty, updatedAt',
+      meta: '&key',
+      protocols: '++id, compoundId, archived, startedAt, &serverId, dirty, updatedAt',
+      protocolDoses: '++id, protocolId, scheduledAt, status, &serverId, dirty, updatedAt',
+      vials: '++id, compoundId, archived, &serverId, dirty, updatedAt',
+      symptoms: '++id, recordedAt, &serverId, dirty, updatedAt',
+      markerTargets: '++id, &marker, &serverId, dirty, updatedAt',
+      goals: '++id, kind, achievedAt, &serverId, dirty, updatedAt',
+      bodyMetrics: '++id, measuredAt, source, &externalKey, &serverId, dirty, updatedAt',
     })
   }
 }
