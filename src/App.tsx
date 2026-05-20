@@ -19,6 +19,8 @@ import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { parseISO } from 'date-fns'
 import { db, seedIfEmpty } from './lib/db'
+import { useLockState } from './lib/useLockState'
+import { LockScreen } from './components/LockScreen'
 import type { View } from './app/views'
 import { Overview } from './views/Overview'
 import { Protocols } from './views/Protocols'
@@ -46,11 +48,36 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const lockState = useLockState()
 
   useEffect(() => {
-    void seedIfEmpty()
-  }, [])
+    if (lockState.mode === 'unlocked') {
+      void seedIfEmpty()
+    }
+  }, [lockState.mode])
 
+  if (lockState.isLocked) {
+    return <LockScreen lockState={lockState} />
+  }
+
+  return <Shell activeView={activeView} setActiveView={setActiveView} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} lockState={lockState} />
+}
+
+type LockStateBundle = ReturnType<typeof useLockState>
+
+function Shell({
+  activeView,
+  setActiveView,
+  sidebarCollapsed,
+  setSidebarCollapsed,
+  lockState,
+}: {
+  activeView: View
+  setActiveView: (v: View) => void
+  sidebarCollapsed: boolean
+  setSidebarCollapsed: (fn: (prev: boolean) => boolean) => void
+  lockState: LockStateBundle
+}) {
   const compounds = useLiveQuery(async () => (await db.compounds.toArray()).filter((c) => !c.archived), [], [])
   const injections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().toArray(), [], [])
   const vitals = useLiveQuery(() => db.vitals.orderBy('measuredAt').reverse().toArray(), [], [])
@@ -138,7 +165,7 @@ function App() {
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
         )}
         {activeView === 'files' && <Files files={files} />}
-        {activeView === 'settings' && <Settings />}
+        {activeView === 'settings' && <Settings lockState={lockState} />}
       </main>
 
       <nav className="mobile-tabs" aria-label="Mobile primary">

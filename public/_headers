@@ -1,0 +1,17 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+/sw.js
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/registerSW.js
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/workbox-*.js
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+
+/local-seed/*
+  Cache-Control: no-store, no-cache, must-revalidate, max-age=0
