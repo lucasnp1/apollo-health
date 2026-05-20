@@ -795,14 +795,25 @@ select {
 @media (max-width: 760px) {
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { display: none; }
-  .main-panel { padding: var(--space-4); padding-bottom: 88px; }
-  h1 { font-size: 24px; }
+  .main-panel {
+    padding: var(--space-4);
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+  h1 { font-size: 22px; }
+
+  /* Hide the redundant "Personal health record" eyeline on mobile — the nav label is enough */
+  .topbar .eyeline { display: none; }
+
+  /* Tighter topbar on mobile */
+  .topbar { margin-bottom: var(--space-3); }
+
   .mobile-tabs {
     position: fixed; bottom: 0; left: 0; right: 0;
     display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
     background: var(--surface);
     border-top: 1px solid var(--line);
     padding: 8px 4px;
+    padding-bottom: max(8px, calc(env(safe-area-inset-bottom, 0px) + 4px));
     z-index: 5;
     box-shadow: 0 -4px 20px rgba(15,23,42,0.06);
   }
@@ -811,9 +822,33 @@ select {
     color: var(--ink-mute);
     font-size: 10px;
     font-weight: 600;
+    /* 44px minimum touch target */
+    min-height: 44px;
     padding: 6px 0;
+    justify-content: center;
   }
   .mobile-tab.active { color: var(--accent-ink); }
+
+  /* Bigger tap targets for icon buttons */
+  .icon-button { width: 40px; height: 40px; }
+
+  /* Taller touch targets for primary + ghost buttons */
+  .primary-button { height: 44px; }
+  .ghost-button   { height: 40px; }
+
+  /* Labs range bar: drop the delta column and compress marker to fit 375px */
+  .range-bar-row {
+    grid-template-columns: 130px 1fr 72px;
+  }
+  .range-bar-row .delta { display: none; }
+
+  /* Prevent sub-text from wrapping and blowing up row height */
+  .row span.sub {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 52vw;
+  }
 }
 
 /* ---------- Timeline ---------- */

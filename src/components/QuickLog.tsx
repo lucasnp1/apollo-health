@@ -81,7 +81,7 @@ export function QuickLog({
               <Droplet size={12} /> Injection
             </button>
             <button type="button" role="tab" className={tab === 'bp' ? 'active' : undefined} onClick={() => setTab('bp')}>
-              <HeartPulse size={12} /> Blood pressure
+              <HeartPulse size={12} /> BP
             </button>
             <button type="button" role="tab" className={tab === 'symptoms' ? 'active' : undefined} onClick={() => setTab('symptoms')}>
               <Brain size={12} /> Symptoms
