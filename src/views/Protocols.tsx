@@ -307,16 +307,16 @@ function TestosteroneCurvePanel({
         <AreaChart data={curve.points} margin={{ top: 10, right: 10, bottom: 0, left: -12 }}>
           <defs>
             <linearGradient id="testFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#5eead4" stopOpacity={0.5} />
-              <stop offset="100%" stopColor="#5eead4" stopOpacity={0} />
+              <stop offset="0%" stopColor="#0f766e" stopOpacity={0.5} />
+              <stop offset="100%" stopColor="#0f766e" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#1f242b" vertical={false} />
-          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-          <YAxis tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-          <Tooltip contentStyle={{ background: '#13171c', border: '1px solid #2a313a', borderRadius: 8, color: '#e6ebf1' }} />
-          {lastDoseDate && <ReferenceLine x={lastDoseDate} stroke="#6b7480" strokeDasharray="3 3" />}
-          <Area type="monotone" dataKey="active" stroke="#5eead4" strokeWidth={2} fill="url(#testFill)" />
+          <CartesianGrid stroke="#e7e5e4" vertical={false} />
+          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+          <YAxis tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+          <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e7e5e4', borderRadius: 10, color: '#0a0a0a', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} />
+          {lastDoseDate && <ReferenceLine x={lastDoseDate} stroke="#a8a29e" strokeDasharray="3 3" />}
+          <Area type="monotone" dataKey="active" stroke="#0f766e" strokeWidth={2} fill="url(#testFill)" />
         </AreaChart>
       </ResponsiveContainer>
       <p className="panel-note">{profile.note}</p>
@@ -348,13 +348,13 @@ function RetaChart({ compounds, injections }: { compounds: Compound[]; injection
       {chartData.length > 0 ? (
         <ResponsiveContainer width="100%" height={240}>
           <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -12 }}>
-            <CartesianGrid stroke="#1f242b" vertical={false} />
-            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-            <YAxis yAxisId="weight" tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-            <YAxis yAxisId="dose" orientation="right" tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-            <Tooltip contentStyle={{ background: '#13171c', border: '1px solid #2a313a', borderRadius: 8, color: '#e6ebf1' }} />
+            <CartesianGrid stroke="#e7e5e4" vertical={false} />
+            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+            <YAxis yAxisId="weight" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+            <YAxis yAxisId="dose" orientation="right" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+            <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e7e5e4', borderRadius: 10, color: '#0a0a0a', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} />
             <Bar yAxisId="dose" dataKey="dose" name="Dose" fill="#60a5fa" opacity={0.45} radius={[4, 4, 0, 0]} />
-            <Line yAxisId="weight" type="monotone" dataKey="weight" name="Weight" stroke="#5eead4" strokeWidth={2.5} dot={false} />
+            <Line yAxisId="weight" type="monotone" dataKey="weight" name="Weight" stroke="#0f766e" strokeWidth={2.5} dot={false} />
           </ComposedChart>
         </ResponsiveContainer>
       ) : (

@@ -4,7 +4,7 @@ export function Sparkline({
   width = 100,
   height = 32,
   stroke = 'var(--accent)',
-  fill = 'rgba(94,234,212,0.12)',
+  fill = 'rgba(15, 118, 110, 0.10)',
 }: {
   values: number[]
   width?: number

@@ -102,13 +102,13 @@ export function Symptoms() {
         {chart.length > 1 ? (
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={chart} margin={{ top: 10, right: 10, bottom: 0, left: -12 }}>
-              <CartesianGrid stroke="#1f242b" vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-              <YAxis domain={[0, 5]} tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#13171c', border: '1px solid #2a313a', borderRadius: 8, color: '#e6ebf1' }} />
+              <CartesianGrid stroke="#e7e5e4" vertical={false} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+              <YAxis domain={[0, 5]} tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e7e5e4', borderRadius: 10, color: '#0a0a0a', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} />
               <Line type="monotone" dataKey="libido" stroke="#c084fc" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="sleep" stroke="#60a5fa" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="mood" stroke="#5eead4" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="mood" stroke="#0f766e" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="energy" stroke="#f59e0b" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>

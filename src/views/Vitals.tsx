@@ -110,27 +110,27 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
             <AreaChart data={chart} margin={{ top: 12, right: 12, bottom: 0, left: -12 }}>
               <defs>
                 <linearGradient id="sysFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#5eead4" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#5eead4" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#0f766e" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#0f766e" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#1f242b" vertical={false} />
+              <CartesianGrid stroke="#e7e5e4" vertical={false} />
               {/* BP zone bands */}
               <ReferenceArea y1={140} y2={200} fill="rgba(239,68,68,0.08)" />
               <ReferenceArea y1={130} y2={140} fill="rgba(245,158,11,0.08)" />
               <ReferenceArea y1={120} y2={130} fill="rgba(245,158,11,0.04)" />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-              <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#13171c', border: '1px solid #2a313a', borderRadius: 8, color: '#e6ebf1' }} />
-              <Area type="monotone" dataKey="systolic" stroke="#5eead4" strokeWidth={2.5} fill="url(#sysFill)" />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+              <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e7e5e4', borderRadius: 10, color: '#0a0a0a', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} />
+              <Area type="monotone" dataKey="systolic" stroke="#0f766e" strokeWidth={2.5} fill="url(#sysFill)" />
               <Line type="monotone" dataKey="diastolic" stroke="#98a2af" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="pulse" stroke="#c084fc" strokeWidth={1.5} dot={false} />
               {bpGoal && (
                 <ReferenceLine
                   y={bpGoal.target}
-                  stroke="#5eead4"
+                  stroke="#0f766e"
                   strokeDasharray="4 4"
-                  label={{ value: `Goal ${bpGoal.target}`, position: 'insideTopRight', fill: '#5eead4', fontSize: 10 }}
+                  label={{ value: `Goal ${bpGoal.target}`, position: 'insideTopRight', fill: '#0f766e', fontSize: 10 }}
                 />
               )}
             </AreaChart>
