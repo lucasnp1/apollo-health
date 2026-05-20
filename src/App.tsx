@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
-  Brain,
   CalendarClock,
   FileText,
   FlaskConical,
@@ -13,24 +12,22 @@ import {
   Plus,
   Settings as SettingsIcon,
   Syringe,
-  Target,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { parseISO } from 'date-fns'
 import { db, seedIfEmpty } from './lib/db'
 import { useLockState } from './lib/useLockState'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { InstallPrompt } from './components/InstallPrompt'
 import { LockScreen } from './components/LockScreen'
+import { QuickLog } from './components/QuickLog'
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
 import { Overview } from './views/Overview'
 import { Protocols } from './views/Protocols'
 import { Vitals } from './views/Vitals'
 import { Labs } from './views/Labs'
-import { Symptoms } from './views/Symptoms'
 import { Targets } from './views/Targets'
 import { Timeline } from './views/Timeline'
 import { Files } from './views/Files'
@@ -42,12 +39,12 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: 'meds', label: 'Protocols', icon: Syringe },
   { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
-  { id: 'symptoms', label: 'Symptoms', icon: Brain },
-  { id: 'targets', label: 'Targets', icon: Target },
   { id: 'timeline', label: 'Timeline', icon: CalendarClock },
   { id: 'files', label: 'Files', icon: FileText },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
+
+type QuickLogTab = 'injection' | 'bp' | 'symptoms'
 
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
@@ -61,7 +58,6 @@ function App() {
     }
   }, [auth.state.status, lockState.mode])
 
-  // 1) Wait until we know if we have a server session
   if (auth.state.status === 'loading') {
     return (
       <div className="lock-shell">
@@ -70,17 +66,24 @@ function App() {
     )
   }
 
-  // 2) If guest, show sign-in/up. Sign-in pane has an explicit "continue without an account" link.
   if (auth.state.status === 'guest') {
     return <SignIn auth={auth} />
   }
 
-  // 3) Authed: local lock can still be set up for an extra layer on shared devices.
   if (lockState.isLocked) {
     return <LockScreen lockState={lockState} />
   }
 
-  return <Shell activeView={activeView} setActiveView={setActiveView} sidebarCollapsed={sidebarCollapsed} setSidebarCollapsed={setSidebarCollapsed} lockState={lockState} auth={auth} />
+  return (
+    <Shell
+      activeView={activeView}
+      setActiveView={setActiveView}
+      sidebarCollapsed={sidebarCollapsed}
+      setSidebarCollapsed={setSidebarCollapsed}
+      lockState={lockState}
+      auth={auth}
+    />
+  )
 }
 
 type LockStateBundle = ReturnType<typeof useLockState>
@@ -103,6 +106,14 @@ function Shell({
 }) {
   const isAuthed = auth.state.status === 'authed'
   const sync = useSync(isAuthed)
+
+  const [qlOpen, setQlOpen] = useState(false)
+  const [qlTab, setQlTab] = useState<QuickLogTab>('injection')
+
+  function openQuickLog(tab: QuickLogTab) {
+    setQlTab(tab)
+    setQlOpen(true)
+  }
 
   const compounds = useLiveQuery(async () => (await db.compounds.toArray()).filter((c) => !c.archived), [], [])
   const injections = useLiveQuery(
@@ -128,7 +139,7 @@ function Shell({
             <div className="brand-mark"><Activity size={16} /></div>
             <div>
               <strong>Apollo</strong>
-              <span>Health · local</span>
+              <span>Health</span>
             </div>
           </div>
           <button
@@ -140,6 +151,7 @@ function Shell({
             {sidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
           </button>
         </div>
+
         <nav className="nav-list" aria-label="Primary">
           {NAV.map((item) => (
             <button
@@ -153,12 +165,21 @@ function Shell({
             </button>
           ))}
         </nav>
+
         <div className="quick-actions">
           <strong>Quick log</strong>
-          <button type="button" onClick={() => setActiveView('meds')}><Plus size={13} /><span>Injection</span></button>
-          <button type="button" onClick={() => setActiveView('vitals')}><Plus size={13} /><span>Blood pressure</span></button>
-          <button type="button" onClick={() => setActiveView('symptoms')}><Plus size={13} /><span>Symptoms</span></button>
-          <button type="button" onClick={() => setActiveView('files')}><Plus size={13} /><span>Upload PDF</span></button>
+          <button type="button" onClick={() => openQuickLog('injection')}>
+            <Plus size={13} /><span>Injection</span>
+          </button>
+          <button type="button" onClick={() => openQuickLog('bp')}>
+            <Plus size={13} /><span>Blood pressure</span>
+          </button>
+          <button type="button" onClick={() => openQuickLog('symptoms')}>
+            <Plus size={13} /><span>Symptoms</span>
+          </button>
+          <button type="button" onClick={() => setActiveView('files')}>
+            <Plus size={13} /><span>Upload PDF</span>
+          </button>
         </div>
       </aside>
 
@@ -172,7 +193,9 @@ function Shell({
             {isAuthed ? (
               <span className="privacy-pill" title={sync.lastError || ''}>
                 {sync.state === 'syncing' ? '⟳ Syncing…' : sync.state === 'error' ? '⚠ Sync error' : '✓ Synced'}
-                {sync.lastRunAt && sync.state === 'idle' ? ` · ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                {sync.lastRunAt && sync.state === 'idle'
+                  ? ` · ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : ''}
               </span>
             ) : (
               <span className="privacy-pill"><Lock size={12} /> Local only</span>
@@ -195,7 +218,7 @@ function Shell({
         {activeView === 'labs' && (
           <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} />
         )}
-        {activeView === 'symptoms' && <Symptoms />}
+        {/* symptoms + targets: no nav page, code kept */}
         {activeView === 'targets' && <Targets />}
         {activeView === 'timeline' && (
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
@@ -217,6 +240,14 @@ function Shell({
           </button>
         ))}
       </nav>
+
+      <QuickLog
+        open={qlOpen}
+        initialTab={qlTab}
+        compounds={compounds ?? []}
+        onClose={() => setQlOpen(false)}
+      />
+
       <InstallPrompt />
     </div>
   )
@@ -236,8 +267,5 @@ function titleFor(view: View) {
   }
   return map[view]
 }
-
-// suppress unused import warning if parseISO becomes unused after refactor
-void parseISO
 
 export default App

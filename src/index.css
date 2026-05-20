@@ -928,3 +928,21 @@ select {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* ---------- Pill-tabs with icons ---------- */
+.pill-tabs button { display: inline-flex; align-items: center; gap: 5px; }
+
+/* ---------- Quick-log symptom grid in modal (2-col) ---------- */
+.symptom-grid {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+.symptom-cell { padding: var(--space-3); }
+
+/* ---------- Labs panel section header ---------- */
+.labs-panel-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 2px 0 8px;
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+}
+.labs-panel-header:first-child { border-top: 0; margin-top: 0; }
