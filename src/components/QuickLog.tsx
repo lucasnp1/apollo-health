@@ -69,13 +69,13 @@ export function QuickLog({
         background: 'var(--surface)',
         borderRadius: 'var(--radius-lg)',
         boxShadow: 'var(--shadow-lg)',
-        width: '100%', maxWidth: 460,
+        width: '100%', maxWidth: 540,
         maxHeight: '90dvh',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 24px 0' }}>
           <div className="pill-tabs" role="tablist">
             <button type="button" role="tab" className={tab === 'injection' ? 'active' : undefined} onClick={() => setTab('injection')}>
               <Droplet size={12} /> Injection
@@ -94,7 +94,7 @@ export function QuickLog({
         </div>
 
         {/* Body — scrollable */}
-        <div style={{ overflowY: 'auto', padding: '16px 20px 20px' }}>
+        <div style={{ overflowY: 'auto', padding: '20px 24px 28px' }}>
           {tab === 'injection' && <InjectionForm compounds={compounds} prefill={prefill} onSaved={onClose} />}
           {tab === 'bp' && <BPForm onSaved={onClose} />}
           {tab === 'symptoms' && <SymptomsForm onSaved={onClose} />}

@@ -119,7 +119,17 @@ function Shell({
 
   const compounds = useLiveQuery(async () => (await db.compounds.toArray()).filter((c) => !c.archived), [], [])
   const injections = useLiveQuery(
-    async () => (await db.injections.orderBy('takenAt').reverse().toArray()).filter((i) => !i.deletedAtSync),
+    async () => {
+      const all = (await db.injections.orderBy('takenAt').reverse().toArray()).filter((i) => !i.deletedAtSync)
+      // Deduplicate: same compound + same timestamp = sync-created phantom duplicate, keep first
+      const seen = new Set<string>()
+      return all.filter((i) => {
+        const key = `${i.compoundId}|${i.takenAt}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+    },
     [], [],
   )
   const vitals = useLiveQuery(() => db.vitals.orderBy('measuredAt').reverse().toArray(), [], [])

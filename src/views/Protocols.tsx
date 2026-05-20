@@ -27,6 +27,7 @@ import { deleteInjection, pickActiveVial } from '../lib/injections'
 import { findPKCompound, buildDailyReleaseCurve } from '../lib/pk'
 import { esterProfiles } from '../lib/insights'
 import { EmptyState } from '../components/EmptyState'
+import { SiteCombobox } from '../components/SiteCombobox'
 import { TimeRangePicker } from '../components/TimeRangePicker'
 import type { TimeRange } from '../lib/timeRange'
 
@@ -994,10 +995,21 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
   const [dose, setDose] = useState(String(entry.dose ?? ''))
   const [site, setSite] = useState(entry.site ?? '')
   const [notes, setNotes] = useState(entry.notes ?? '')
-  const [weightKg, setWeightKg] = useState(entry.weightKg !== undefined ? String(entry.weightKg) : '')
   const [takenAt, setTakenAt] = useState(entry.takenAt.slice(0, 16))
   const [busy, setBusy] = useState(false)
   const compound = compounds.find((c) => c.id === compoundId)
+
+  // Recent sites for the combobox
+  const recentInjections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().limit(30).toArray(), [], [])
+  const recentSites = useMemo(() => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const inj of recentInjections ?? []) {
+      if (inj.site && !seen.has(inj.site)) { seen.add(inj.site); out.push(inj.site) }
+      if (out.length >= 6) break
+    }
+    return out
+  }, [recentInjections])
 
   async function save() {
     setBusy(true)
@@ -1009,7 +1021,6 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
         unit: (compound?.unit ?? entry.unit) as InjectionLog['unit'],
         site: site || undefined,
         notes: notes || undefined,
-        weightKg: weightKg ? Number(weightKg) : undefined,
         takenAt: new Date(takenAt).toISOString(),
       })
       onClose()
@@ -1024,17 +1035,17 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
       onClick={onClose}
     >
       <div
-        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', width: '100%', maxWidth: 460, overflow: 'hidden' }}
+        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', width: '100%', maxWidth: 540, overflow: 'hidden' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 24px 0' }}>
           <div>
             <span className="section-label">Edit</span>
             <h3 style={{ margin: '2px 0 0' }}>Injection log</h3>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
         </div>
-        <div style={{ padding: '16px 20px 20px' }}>
+        <div style={{ padding: '20px 24px 28px' }}>
           <div className="form-grid">
             <label className="wide-field">
               Compound
@@ -1048,11 +1059,7 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
             </label>
             <label>
               Site
-              <input value={site} onChange={(e) => setSite(e.target.value)} placeholder="e.g. Ventrogluteal L" />
-            </label>
-            <label>
-              Weight (kg)
-              <input inputMode="decimal" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} placeholder="optional" />
+              <SiteCombobox value={site} onChange={setSite} recentSites={recentSites} />
             </label>
             <label className="wide-field">
               Date &amp; time

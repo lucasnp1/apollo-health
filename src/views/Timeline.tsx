@@ -1,15 +1,13 @@
 import { useMemo } from 'react'
-import { Brain, CalendarClock, FileText, FlaskConical, HeartPulse, Syringe } from 'lucide-react'
+import { Brain, FileText, FlaskConical, HeartPulse, Syringe } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
-import { upcomingSchedule } from '../lib/schedule'
 
 type TimelineEvent = {
   id: string
   date: Date
-  future: boolean
   icon: LucideIcon
   title: string
   detail: string
@@ -28,13 +26,12 @@ export function Timeline({
   exams: LabExam[]
   files: Array<{ id?: number; addedAt: string; name: string; status: string }>
 }) {
-  const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
-  const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
   const symptoms = useLiveQuery(() => db.symptoms.toArray(), [], [])
 
   const events = useMemo<TimelineEvent[]>(() => {
     const compoundMap = new Map(compounds.map((c) => [c.id, c]))
-    const past: TimelineEvent[] = [
+    const now = Date.now()
+    return [
       ...injections.map((i) => ({
         id: `i-${i.id}`,
         date: parseISO(i.takenAt),
@@ -76,16 +73,9 @@ export function Timeline({
         detail: `Mood ${s.mood ?? '—'} · Energy ${s.energy ?? '—'}`,
       })),
     ]
-    const future: TimelineEvent[] = upcomingSchedule(protocols, protocolDoses, new Date(), 30).map((item, idx) => ({
-      id: `up-${item.protocol.id}-${idx}`,
-      date: item.scheduledAt,
-      future: true,
-      icon: CalendarClock,
-      title: `${compoundMap.get(item.protocol.compoundId)?.name ?? 'Dose'} · scheduled`,
-      detail: `${item.protocol.dose} ${item.protocol.unit} · ${item.protocol.name}`,
-    }))
-    return [...future, ...past].sort((a, b) => b.date.getTime() - a.date.getTime())
-  }, [injections, vitals, exams, files, symptoms, protocols, protocolDoses, compounds])
+      .filter((e) => e.date.getTime() <= now)        // history only — no future events
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+  }, [injections, vitals, exams, files, symptoms, compounds])
 
   return (
     <section className="surface">
@@ -97,7 +87,7 @@ export function Timeline({
       </div>
       <div className="timeline-list">
         {events.map((e) => (
-          <div className={e.future ? 'timeline-item timeline-future' : 'timeline-item'} key={e.id}>
+          <div className="timeline-item" key={e.id}>
             <div className="timeline-icon">
               <e.icon size={14} />
             </div>
