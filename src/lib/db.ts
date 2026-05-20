@@ -92,7 +92,10 @@ export type HealthFile = {
   status: 'Stored' | 'Needs review' | 'Reviewed'
   extractedText?: string
   blob?: Blob
-}
+  // R2 key after upload. When set on a row pulled from another device,
+  // the client lazily fetches the blob on first open.
+  r2Key?: string
+} & SyncFields
 
 export type MetaRecord = {
   key: string

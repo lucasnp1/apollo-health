@@ -2,6 +2,34 @@
 
 export type Env = {
   DB: D1Database
+  FILES?: R2Bucket // optional until the bucket binding is configured.
+}
+
+// Minimal R2Bucket interface — avoids needing @cloudflare/workers-types here.
+export interface R2Bucket {
+  put(
+    key: string,
+    value: ArrayBuffer | ArrayBufferView | ReadableStream | Blob | string,
+    options?: { httpMetadata?: { contentType?: string } },
+  ): Promise<R2Object | null>
+  get(key: string): Promise<R2ObjectBody | null>
+  delete(keys: string | string[]): Promise<void>
+  head(key: string): Promise<R2Object | null>
+}
+
+export interface R2Object {
+  key: string
+  size: number
+  etag: string
+  httpEtag: string
+  uploaded: Date
+  httpMetadata?: { contentType?: string }
+}
+
+export interface R2ObjectBody extends R2Object {
+  body: ReadableStream
+  arrayBuffer(): Promise<ArrayBuffer>
+  blob(): Promise<Blob>
 }
 
 export type AuthedUser = {

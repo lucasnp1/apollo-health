@@ -1,15 +1,19 @@
 import { useState } from 'react'
-import { Activity, Check, FileText, Trash2, UploadCloud } from 'lucide-react'
+import { Activity, Check, CloudDownload, FileText, Trash2, UploadCloud } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { db } from '../lib/db'
 import { extractPdfText } from '../lib/pdf'
 import { commitHealthImport, parseAppleHealthXml, type HealthImportPreview } from '../lib/healthImport'
+import { ensureBlobAvailable } from '../lib/fileSync'
 import { EmptyState } from '../components/EmptyState'
+
+import type { HealthFile } from '../lib/db'
+type StoredFile = HealthFile
 
 export function Files({
   files,
 }: {
-  files: Array<{ id?: number; name: string; type: string; size: number; addedAt: string; status: string; extractedText?: string }>
+  files: Array<StoredFile>
 }) {
   const [busy, setBusy] = useState(false)
 
@@ -64,17 +68,7 @@ export function Files({
         {files.length > 0 ? (
           <div className="stack">
             {files.map((f) => (
-              <div className="row" key={f.id}>
-                <FileText size={14} />
-                <div>
-                  <strong>{f.name}</strong>
-                  <span className="sub">{Math.round(f.size / 1024)} KB · {f.status}</span>
-                </div>
-                <time>{format(parseISO(f.addedAt), 'MMM d')}</time>
-                <button type="button" className="icon-button danger" onClick={() => db.files.delete(f.id!)} aria-label="Delete file">
-                  <Trash2 size={14} />
-                </button>
-              </div>
+              <FileRow file={f} key={f.id} />
             ))}
           </div>
         ) : (
@@ -182,6 +176,66 @@ function Stat({ label, value }: { label: string; value: number }) {
     <div className="stat">
       <span className="stat-label">{label}</span>
       <span className="stat-value">{value.toLocaleString()}</span>
+    </div>
+  )
+}
+
+function FileRow({ file }: { file: StoredFile }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const hasLocal = Boolean(file.blob)
+  const hasRemote = Boolean(file.r2Key)
+  const canOpen = hasLocal || hasRemote
+
+  async function open() {
+    setError(null)
+    setBusy(true)
+    try {
+      const blob = hasLocal ? file.blob! : await ensureBlobAvailable(file)
+      if (!blob) {
+        setError('Blob unavailable')
+        return
+      }
+      const url = URL.createObjectURL(blob)
+      window.open(url, '_blank', 'noopener')
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Open failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function remove() {
+    if (!file.id) return
+    if (file.serverId) {
+      // Soft-delete so sync engine propagates the tombstone; physical row
+      // is removed after the push succeeds.
+      await db.files.update(file.id, { deletedAtSync: Date.now(), dirty: 1 })
+    } else {
+      await db.files.delete(file.id)
+    }
+  }
+
+  return (
+    <div className="row" style={{ gridTemplateColumns: 'auto 1fr auto auto auto' }}>
+      <FileText size={14} />
+      <div>
+        <strong>{file.name}</strong>
+        <span className="sub">
+          {Math.round(file.size / 1024)} KB · {file.status}
+          {!hasLocal && hasRemote ? ' · in cloud' : ''}
+          {hasLocal && !hasRemote ? ' · local only' : ''}
+          {error ? ` · ${error}` : ''}
+        </span>
+      </div>
+      <time>{format(parseISO(file.addedAt), 'MMM d')}</time>
+      <button type="button" className="ghost-button" disabled={!canOpen || busy} onClick={open}>
+        {busy ? '…' : hasLocal ? 'Open' : <><CloudDownload size={12} /> Fetch</>}
+      </button>
+      <button type="button" className="icon-button danger" onClick={remove} aria-label="Delete file">
+        <Trash2 size={14} />
+      </button>
     </div>
   )
 }

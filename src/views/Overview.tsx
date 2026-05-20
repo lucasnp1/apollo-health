@@ -14,6 +14,7 @@ import { nextDose, timeUntil, upcomingSchedule } from '../lib/schedule'
 import { logInjection, pickActiveVial } from '../lib/injections'
 import { Sparkline } from '../components/Sparkline'
 import { StatCard } from '../components/StatCard'
+import { SyncBanner } from '../components/SyncBanner'
 import type { View } from '../app/views'
 
 export function Overview({
@@ -84,6 +85,8 @@ export function Overview({
 
   return (
     <div className="content-grid">
+      <SyncBanner syncing={false} />
+
       {/* Up Next hero */}
       <section className="up-next col-12">
         <div className="up-next-main">

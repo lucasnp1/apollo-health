@@ -9,4 +9,12 @@ binding = "DB"
 database_name = "apollo-health-db"
 database_id = "acb22a10-426c-4467-80d2-3679a57850b8"
 
+# R2 bucket for file blobs (PDF lab reports, images). Uncomment after the
+# bucket has been created. The file endpoints (functions/api/files/*) gracefully
+# return 503 "File storage not configured" while this is commented out, so the
+# rest of the app keeps working.
+# [[r2_buckets]]
+# binding = "FILES"
+# bucket_name = "apollo-health-files"
+
 # Environment overrides for preview deploys would go in [env.preview] if needed.

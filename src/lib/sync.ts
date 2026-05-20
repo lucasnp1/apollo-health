@@ -10,6 +10,7 @@
 
 import { api } from './api'
 import { db } from './db'
+import { pushUnuploadedBlobs } from './fileSync'
 import { TABLES, type ForeignKey, type TableSpec } from './syncCatalog'
 
 type Direction = 'pull' | 'push' | 'both'
@@ -45,6 +46,17 @@ export async function syncAll(direction: Direction = 'both'): Promise<SyncSummar
       })
     }
   }
+
+  // After metadata rows have pushed, ship any pending file blobs to R2.
+  // Failures here don't block the rest of sync — they retry on the next tick.
+  if (direction !== 'pull') {
+    try {
+      await pushUnuploadedBlobs()
+    } catch {
+      /* best-effort */
+    }
+  }
+
   return out
 }
 
