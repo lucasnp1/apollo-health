@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react'
 import {
   Calendar, ChevronRight, Droplet, Pencil, Plus, Syringe, Trash2, X,
 } from 'lucide-react'
-import { differenceInHours, format, parseISO } from 'date-fns'
+import { differenceInHours, format, parseISO, subDays } from 'date-fns'
 import {
-  Area, AreaChart, Bar, CartesianGrid, ComposedChart,
-  Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, CartesianGrid, ComposedChart,
+  Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
@@ -19,15 +19,16 @@ import {
   type Vial,
 } from '../lib/db'
 import {
-  buildTestosteroneCurve,
   buildWeightDoseSeries,
-  esterProfiles,
-  inferEster,
   weightSummary,
 } from '../lib/insights'
 import { describeCadence } from '../lib/schedule'
 import { deleteInjection, pickActiveVial } from '../lib/injections'
+import { findPKCompound, buildDailyReleaseCurve } from '../lib/pk'
+import { esterProfiles } from '../lib/insights'
 import { EmptyState } from '../components/EmptyState'
+import { TimeRangePicker } from '../components/TimeRangePicker'
+import type { TimeRange } from '../lib/timeRange'
 
 const UNITS: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -114,14 +115,14 @@ export function Protocols({
       {/* ── 3. CHARTS ─────────────────────────────────────────────────────── */}
       {injections.length > 0 && (
         <>
-          <section className="surface col-7">
-            <TestosteroneCurvePanel compounds={compounds} injections={injections} />
-          </section>
-          <section className="surface col-5">
-            <SiteRotation injections={injections} recentSites={recentSites} />
+          <section className="surface col-12">
+            <PKCurvePanel compounds={compounds} injections={injections} />
           </section>
           <section className="surface col-7">
             <RetaChart compounds={compounds} injections={injections} />
+          </section>
+          <section className="surface col-5">
+            <SiteRotation injections={injections} recentSites={recentSites} />
           </section>
         </>
       )}
@@ -675,70 +676,143 @@ function SiteRotation({ injections, recentSites }: { injections: InjectionLog[];
 
 // ── Testosterone curve ─────────────────────────────────────────────────────
 
-function TestosteroneCurvePanel({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
-  const testosterone = compounds.find((c) => c.name.toLowerCase().includes('testosterone'))
-  const [esterChoice, setEsterChoice] = useState<TestosteroneEster | ''>('')
-  const ester = esterChoice || inferEster(testosterone)
-  const curve = buildTestosteroneCurve(compounds, injections, ester)
-  const profile = esterProfiles[ester]
-  const lastDoseDate = curve.lastInjection ? format(parseISO(curve.lastInjection.takenAt), 'MMM d') : undefined
+// ── Multi-compound PK curve chart ─────────────────────────────────────────
 
-  async function updateEster(next: TestosteroneEster) {
-    setEsterChoice(next)
-    if (testosterone?.id) {
-      await db.compounds.update(testosterone.id, {
-        ester: next, halfLifeDays: esterProfiles[next].halfLifeDays, peakHours: esterProfiles[next].peakHours,
-      })
+function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
+  const [range, setRange] = useState<TimeRange>('3M')
+
+  // Determine window: past N days + 30-day clearance tail
+  const windowDays = range === '1M' ? 30 : range === '3M' ? 90 : range === '6M' ? 180 : 365
+  const tailDays = 30
+  const totalDays = windowDays + tailDays
+  const startDate = useMemo(() => subDays(new Date(), windowDays), [windowDays])
+
+  // Group injections by compoundId — only those within a relevant lookback (5 half-lives before start)
+  const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id!, c])), [compounds])
+
+  // Build chart data: one row per day, one key per compound
+  const { chartData, traces } = useMemo(() => {
+    const startMs = startDate.getTime()
+
+    // Find unique compounds that have injection logs
+    const usedIds = [...new Set(injections.map((i) => i.compoundId))]
+    const usedCompounds = usedIds.map((id) => compoundMap.get(id)).filter(Boolean) as Compound[]
+
+    if (usedCompounds.length === 0) return { chartData: [], traces: [] }
+
+    // For each compound, build its daily release curve
+    const traceData: { compound: Compound; pk: NonNullable<ReturnType<typeof findPKCompound>>; values: number[] }[] = []
+    for (const c of usedCompounds) {
+      const pk = findPKCompound(c.name, c.ester ?? undefined)
+      if (!pk) continue
+      // Include injections up to 5 half-lives before window start (they still contribute)
+      const lookback = pk.halfLifeDays * 5
+      const relevant = injections.filter(
+        (i) => i.compoundId === c.id && i.dose !== undefined && !i.deletedAtSync
+      ).map((i) => ({ takenAt: i.takenAt, dose: i.dose! }))
+      if (relevant.length === 0) continue
+
+      const values = buildDailyReleaseCurve(pk, relevant, startMs - lookback * 86_400_000, totalDays + Math.ceil(lookback))
+      // Slice to only the window we care about
+      const offset = Math.ceil(lookback)
+      traceData.push({ compound: c, pk, values: values.slice(offset, offset + totalDays) })
     }
-  }
+
+    // Merge into chart format
+    const rows: Record<string, number | string>[] = []
+    for (let d = 0; d < totalDays; d++) {
+      const row: Record<string, number | string> = {
+        date: format(new Date(startMs + d * 86_400_000), 'MMM d'),
+        dayOffset: d - windowDays, // negative = past, positive = future tail
+      }
+      for (const t of traceData) {
+        row[t.compound.name] = parseFloat((t.values[d] ?? 0).toFixed(2))
+      }
+      rows.push(row)
+    }
+
+    return {
+      chartData: rows,
+      traces: traceData.map((t) => ({
+        name: t.compound.name,
+        color: t.compound.color ?? '#0f766e',
+        halfLifeDays: t.pk.halfLifeDays,
+        activeDosePct: t.pk.activeDosePct,
+        form: t.pk.form,
+        activeNow: parseFloat((t.values[windowDays - 1] ?? 0).toFixed(1)),
+        lastInj: injections
+          .filter((i) => i.compoundId === t.compound.id && !i.deletedAtSync)
+          .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0],
+      })),
+    }
+  }, [injections, compoundMap, startDate, windowDays, totalDays])
+
+  const todayLabel = format(new Date(), 'MMM d')
+
+  if (traces.length === 0) return null
 
   return (
     <>
       <div className="panel-header">
         <div>
           <span className="section-label">Pharmacokinetics</span>
-          <h3>Testosterone — estimated active load</h3>
+          <h3>Release rate — all compounds</h3>
         </div>
-        <select className="ghost-button" style={{ height: 30 }} value={ester} onChange={(e) => updateEster(e.target.value as TestosteroneEster)}>
-          {(Object.keys(esterProfiles) as TestosteroneEster[]).map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
+        <TimeRangePicker value={range} onChange={setRange} />
       </div>
-      <div className="stat-grid">
-        <div className="stat">
-          <span className="stat-label">Active now</span>
-          <span className="stat-value">{curve.activeNow ? `${curve.activeNow} mg` : '—'}</span>
-          <span className="stat-detail">{ester} model</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">Half-life</span>
-          <span className="stat-value">{profile.halfLifeDays}d</span>
-          <span className="stat-detail">Peak {profile.peakHours}h</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">Last dose</span>
-          <span className="stat-value">{lastDoseDate ?? '—'}</span>
-          <span className="stat-detail">{curve.lastInjection?.rawDose ?? ''}</span>
-        </div>
+
+      {/* Stats row — one card per active compound */}
+      <div className="stat-grid" style={{ marginBottom: 12 }}>
+        {traces.map((t) => (
+          <div className="stat" key={t.name} style={{ borderLeft: `3px solid ${t.color}`, paddingLeft: 10 }}>
+            <span className="stat-label">{t.name}{t.form ? ` · ${t.form}` : ''}</span>
+            <span className="stat-value" style={{ color: t.color }}>{t.activeNow > 0 ? `${t.activeNow} mg/d` : '—'}</span>
+            <span className="stat-detail">
+              t½ {t.halfLifeDays}d · {t.activeDosePct}% active
+              {t.lastInj ? ` · last ${format(parseISO(t.lastInj.takenAt), 'MMM d')}` : ''}
+            </span>
+          </div>
+        ))}
       </div>
-      <ResponsiveContainer width="100%" height={180}>
-        <AreaChart data={curve.points} margin={{ top: 8, right: 10, bottom: 0, left: -12 }}>
-          <defs>
-            <linearGradient id="testFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0f766e" stopOpacity={0.5} />
-              <stop offset="100%" stopColor="#0f766e" stopOpacity={0} />
-            </linearGradient>
-          </defs>
+
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={chartData} margin={{ top: 4, right: 10, bottom: 0, left: -12 }}>
           <CartesianGrid stroke="#e7e5e4" vertical={false} />
-          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
-          <YAxis tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
-          <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 10, fontSize: 12 }} />
-          {lastDoseDate && <ReferenceLine x={lastDoseDate} stroke="#a8a29e" strokeDasharray="3 3" />}
-          <Area type="monotone" dataKey="active" stroke="#0f766e" strokeWidth={2} fill="url(#testFill)" />
-        </AreaChart>
+          <XAxis
+            dataKey="date"
+            tickLine={false}
+            axisLine={false}
+            tick={{ fill: '#a8a29e', fontSize: 10 }}
+            interval={Math.floor(totalDays / 8)}
+          />
+          <YAxis tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 10 }} unit=" mg/d" width={56} />
+          <Tooltip
+            contentStyle={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 10, fontSize: 12 }}
+            formatter={(v: unknown, name: unknown) => [`${Number(v).toFixed(1)} mg/day`, String(name)]}
+          />
+          <ReferenceLine
+            x={todayLabel}
+            stroke="#94a3b8"
+            strokeDasharray="4 3"
+            label={{ value: 'Today', position: 'insideTopRight', fill: '#94a3b8', fontSize: 10 }}
+          />
+          {traces.map((t) => (
+            <Line
+              key={t.name}
+              type="monotone"
+              dataKey={t.name}
+              stroke={t.color}
+              strokeWidth={2}
+              dot={false}
+              isAnimationActive={false}
+            />
+          ))}
+        </LineChart>
       </ResponsiveContainer>
-      <p className="panel-note">{profile.note}</p>
+
+      <p className="panel-note">
+        Release(t) = Dose × active% × e<sup>−t×λ</sup> × λ &nbsp;·&nbsp; λ = ln 2 / t½ &nbsp;·&nbsp; Source: Behre &amp; Nieschlag 1998
+      </p>
     </>
   )
 }
