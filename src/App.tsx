@@ -10,6 +10,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Scale,
   Settings as SettingsIcon,
   Syringe,
 } from 'lucide-react'
@@ -43,7 +44,7 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
 
-type QuickLogTab = 'injection' | 'bp' | 'symptoms'
+type QuickLogTab = 'injection' | 'bp' | 'symptoms' | 'weight'
 
 export type QuickLogPrefill = {
   compoundId?: number
@@ -177,6 +178,9 @@ function Shell({
           </button>
           <button type="button" onClick={() => openQuickLog('symptoms')}>
             <Plus size={13} /><span>Symptoms</span>
+          </button>
+          <button type="button" onClick={() => openQuickLog('weight')}>
+            <Scale size={13} /><span>Weight</span>
           </button>
           <button type="button" onClick={() => setActiveView('files')}>
             <Plus size={13} /><span>Upload PDF</span>

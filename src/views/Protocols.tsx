@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  Calendar, ChevronRight, Droplet, Plus, Syringe, Trash2, X,
+  Calendar, ChevronRight, Droplet, Pencil, Plus, Syringe, Trash2, X,
 } from 'lucide-react'
 import { differenceInHours, format, parseISO } from 'date-fns'
 import {
@@ -26,7 +26,7 @@ import {
   weightSummary,
 } from '../lib/insights'
 import { describeCadence } from '../lib/schedule'
-import { pickActiveVial } from '../lib/injections'
+import { deleteInjection, pickActiveVial } from '../lib/injections'
 import { EmptyState } from '../components/EmptyState'
 
 const UNITS: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
@@ -785,9 +785,30 @@ function RetaChart({ compounds, injections }: { compounds: Compound[]; injection
 function RecentDoses({ injections, compounds, vials }: { injections: InjectionLog[]; compounds: Compound[]; vials: Vial[] }) {
   const compoundMap = new Map(compounds.map((c) => [c.id, c]))
   const vialMap = new Map(vials.map((v) => [v.id, v]))
+  const [confirmId, setConfirmId] = useState<number | null>(null)
+  const [editEntry, setEditEntry] = useState<InjectionLog | null>(null)
+
+  async function handleDelete(id: number) {
+    await deleteInjection(id)
+    setConfirmId(null)
+  }
 
   return (
     <>
+      {confirmId !== null && (
+        <ConfirmDialog
+          message="Delete this injection log? The vial volume will be restored."
+          onConfirm={() => handleDelete(confirmId)}
+          onCancel={() => setConfirmId(null)}
+        />
+      )}
+      {editEntry && (
+        <EditInjectionModal
+          entry={editEntry}
+          compounds={compounds}
+          onClose={() => setEditEntry(null)}
+        />
+      )}
       <div className="panel-header">
         <div>
           <span className="section-label">History</span>
@@ -796,11 +817,11 @@ function RecentDoses({ injections, compounds, vials }: { injections: InjectionLo
       </div>
       {injections.length > 0 ? (
         <div className="stack">
-          {injections.slice(0, 5).map((entry) => {
+          {injections.slice(0, 10).map((entry) => {
             const c = compoundMap.get(entry.compoundId)
             const v = entry.vialId ? vialMap.get(entry.vialId) : undefined
             return (
-              <div className="row" key={entry.id} style={{ gridTemplateColumns: 'auto 1fr auto' }}>
+              <div className="row" key={entry.id} style={{ gridTemplateColumns: 'auto 1fr auto auto auto' }}>
                 <span className="dot" style={{ background: c?.color ?? 'var(--accent)' }} />
                 <div>
                   <strong>{c?.name ?? 'Unknown'}</strong>
@@ -808,16 +829,134 @@ function RecentDoses({ injections, compounds, vials }: { injections: InjectionLo
                     {entry.rawDose ?? `${entry.dose ?? ''} ${entry.unit}`}
                     {entry.site ? ` · ${entry.site}` : ''}
                     {v ? ` · ${v.label}` : ''}
+                    {entry.weightKg !== undefined ? ` · ${entry.weightKg} kg` : ''}
+                    {entry.notes ? ` · ${entry.notes}` : ''}
                   </span>
                 </div>
                 <time>{format(parseISO(entry.takenAt), 'MMM d HH:mm')}</time>
+                <button type="button" className="icon-button" onClick={() => setEditEntry(entry)} aria-label="Edit">
+                  <Pencil size={13} />
+                </button>
+                <button type="button" className="icon-button danger" onClick={() => setConfirmId(entry.id!)} aria-label="Delete">
+                  <Trash2 size={13} />
+                </button>
               </div>
             )
           })}
         </div>
       ) : (
-        <EmptyState icon={Syringe} title="No injections logged" detail="Use the Log Now cards above or the Quick Log button in the sidebar." />
+        <EmptyState icon={Syringe} title="No injections logged" detail="Tap Log on a protocol row or use Quick Log in the sidebar." />
       )}
     </>
+  )
+}
+
+// ── Confirm dialog ─────────────────────────────────────────────────────────
+
+function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(10,10,10,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={onCancel}
+    >
+      <div
+        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', padding: '24px', maxWidth: 360, width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div>
+          <strong style={{ fontSize: 15, display: 'block', marginBottom: 6 }}>Are you sure?</strong>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-dim)' }}>{message}</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button type="button" className="ghost-button" onClick={onCancel}>Cancel</button>
+          <button type="button" className="primary-button" style={{ background: 'var(--bad)' }} onClick={onConfirm}>Delete</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Edit injection modal ───────────────────────────────────────────────────
+
+function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog; compounds: Compound[]; onClose: () => void }) {
+  const [compoundId, setCompoundId] = useState(entry.compoundId)
+  const [dose, setDose] = useState(String(entry.dose ?? ''))
+  const [site, setSite] = useState(entry.site ?? '')
+  const [notes, setNotes] = useState(entry.notes ?? '')
+  const [weightKg, setWeightKg] = useState(entry.weightKg !== undefined ? String(entry.weightKg) : '')
+  const [takenAt, setTakenAt] = useState(entry.takenAt.slice(0, 16))
+  const [busy, setBusy] = useState(false)
+  const compound = compounds.find((c) => c.id === compoundId)
+
+  async function save() {
+    setBusy(true)
+    try {
+      await db.injections.update(entry.id!, {
+        compoundId,
+        dose: dose ? Number(dose) : undefined,
+        rawDose: dose ? `${dose} ${compound?.unit ?? entry.unit}` : entry.rawDose,
+        unit: (compound?.unit ?? entry.unit) as InjectionLog['unit'],
+        site: site || undefined,
+        notes: notes || undefined,
+        weightKg: weightKg ? Number(weightKg) : undefined,
+        takenAt: new Date(takenAt).toISOString(),
+      })
+      onClose()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(10,10,10,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', width: '100%', maxWidth: 460, overflow: 'hidden' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 0' }}>
+          <div>
+            <span className="section-label">Edit</span>
+            <h3 style={{ margin: '2px 0 0' }}>Injection log</h3>
+          </div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
+        </div>
+        <div style={{ padding: '16px 20px 20px' }}>
+          <div className="form-grid">
+            <label className="wide-field">
+              Compound
+              <select value={compoundId} onChange={(e) => setCompoundId(Number(e.target.value))}>
+                {compounds.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Dose ({compound?.unit ?? entry.unit})
+              <input inputMode="decimal" value={dose} onChange={(e) => setDose(e.target.value)} />
+            </label>
+            <label>
+              Site
+              <input value={site} onChange={(e) => setSite(e.target.value)} placeholder="e.g. Ventrogluteal L" />
+            </label>
+            <label>
+              Weight (kg)
+              <input inputMode="decimal" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} placeholder="optional" />
+            </label>
+            <label className="wide-field">
+              Date &amp; time
+              <input type="datetime-local" value={takenAt} onChange={(e) => setTakenAt(e.target.value)} />
+            </label>
+            <label className="wide-field">
+              Notes
+              <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="optional" />
+            </label>
+            <button type="button" className="primary-button wide-field" onClick={save} disabled={busy}>
+              {busy ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

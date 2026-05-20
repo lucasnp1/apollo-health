@@ -2,15 +2,15 @@
 // Three tabs: Injection | Blood Pressure | Symptoms.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Brain, Droplet, HeartPulse, Plus, X } from 'lucide-react'
-import { db, type Compound, type Symptom, type Unit } from '../lib/db'
+import { Brain, Droplet, HeartPulse, Plus, Scale, X } from 'lucide-react'
+import { db, type BodyMetric, type Compound, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from './SiteCombobox'
 import { COMMON_SITES } from '../lib/sites'
 import type { QuickLogPrefill } from '../App'
 
-type Tab = 'injection' | 'bp' | 'symptoms'
+type Tab = 'injection' | 'bp' | 'symptoms' | 'weight'
 
 const SLIDERS: Array<{ key: keyof Symptom; label: string }> = [
   { key: 'libido', label: 'Libido' },
@@ -86,6 +86,9 @@ export function QuickLog({
             <button type="button" role="tab" className={tab === 'symptoms' ? 'active' : undefined} onClick={() => setTab('symptoms')}>
               <Brain size={12} /> Symptoms
             </button>
+            <button type="button" role="tab" className={tab === 'weight' ? 'active' : undefined} onClick={() => setTab('weight')}>
+              <Scale size={12} /> Weight
+            </button>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
         </div>
@@ -95,6 +98,7 @@ export function QuickLog({
           {tab === 'injection' && <InjectionForm compounds={compounds} prefill={prefill} onSaved={onClose} />}
           {tab === 'bp' && <BPForm onSaved={onClose} />}
           {tab === 'symptoms' && <SymptomsForm onSaved={onClose} />}
+          {tab === 'weight' && <WeightForm onSaved={onClose} />}
         </div>
       </div>
     </div>
@@ -252,6 +256,54 @@ function BPForm({ onSaved }: { onSaved: () => void }) {
       </label>
       <button type="button" className="primary-button wide-field" onClick={save} disabled={busy || !sys || !dia}>
         <Plus size={14} /> {busy ? 'Saving…' : 'Save reading'}
+      </button>
+    </div>
+  )
+}
+
+// ── Weight & body composition ──────────────────────────────────────────────
+
+function WeightForm({ onSaved }: { onSaved: () => void }) {
+  const [weight, setWeight] = useState('')
+  const [bodyFat, setBodyFat] = useState('')
+  const [waist, setWaist] = useState('')
+  const [busy, setBusy] = useState(false)
+  const canSave = !!(weight || bodyFat || waist)
+
+  async function save() {
+    if (!canSave) return
+    setBusy(true)
+    try {
+      const entry: Omit<BodyMetric, 'id'> = {
+        measuredAt: new Date().toISOString(),
+        source: 'manual',
+        weightKg: weight ? Number(weight) : undefined,
+        bodyFatPct: bodyFat ? Number(bodyFat) : undefined,
+        waistCm: waist ? Number(waist) : undefined,
+      }
+      await db.bodyMetrics.add(entry)
+      onSaved()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="form-grid">
+      <label>
+        Weight (kg)
+        <input inputMode="decimal" placeholder="82.5" value={weight} onChange={(e) => setWeight(e.target.value)} autoFocus />
+      </label>
+      <label>
+        Body fat (%)
+        <input inputMode="decimal" placeholder="18.5" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} />
+      </label>
+      <label className="wide-field">
+        Waist (cm)
+        <input inputMode="decimal" placeholder="86" value={waist} onChange={(e) => setWaist(e.target.value)} />
+      </label>
+      <button type="button" className="primary-button wide-field" onClick={save} disabled={busy || !canSave}>
+        <Plus size={14} /> {busy ? 'Saving…' : 'Save measurement'}
       </button>
     </div>
   )
