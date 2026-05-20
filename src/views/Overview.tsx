@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Activity, AlertTriangle, CalendarClock, ChevronRight, Droplet, FlaskConical, HeartPulse, Syringe } from 'lucide-react'
+import { AlertTriangle, CalendarClock, ChevronRight, Droplet, FlaskConical, HeartPulse, Syringe } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
@@ -11,10 +11,10 @@ import {
   type EnrichedResult,
 } from '../lib/insights'
 import { nextDose, timeUntil, upcomingSchedule } from '../lib/schedule'
-import { logInjection, pickActiveVial } from '../lib/injections'
 import { Sparkline } from '../components/Sparkline'
 import { StatCard } from '../components/StatCard'
 import type { View } from '../app/views'
+import type { QuickLogPrefill } from '../App'
 
 export function Overview({
   compounds,
@@ -23,6 +23,7 @@ export function Overview({
   exams,
   results,
   onNavigate,
+  onOpenQuickLog,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
@@ -30,6 +31,7 @@ export function Overview({
   exams: LabExam[]
   results: EnrichedResult[]
   onNavigate: (view: View) => void
+  onOpenQuickLog: (tab: 'injection', prefill?: QuickLogPrefill) => void
 }) {
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
   const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
@@ -37,8 +39,6 @@ export function Overview({
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
   const weightGoal = goals.find((g) => g.kind === 'weight' && !g.achievedAt)
   const bpGoal = goals.find((g) => g.kind === 'bp' && !g.achievedAt)
-  const vials = useLiveQuery(() => db.vials.toArray(), [], [])
-
   const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id, c])), [compounds])
   const upcoming = upcomingSchedule(protocols, protocolDoses, new Date(), 7).slice(0, 5)
   const head = nextDose(protocols, protocolDoses)
@@ -58,85 +58,98 @@ export function Overview({
     .map((p) => p.weight as number)
   const latestSymptom = symptoms[0]
 
-  const headVial = head ? pickActiveVial(vials, head.protocol.compoundId) : undefined
-
-  async function logDoseAsTaken() {
-    if (!head) return
-    const compound = compoundMap.get(head.protocol.compoundId)
-    if (!compound?.id) return
-    const injectionId = await logInjection({
-      compoundId: compound.id,
-      takenAt: head.scheduledAt.toISOString(),
-      dose: head.protocol.dose,
-      unit: head.protocol.unit,
-      route: 'SubQ',
-      site: 'Abdomen',
-      rawDose: `${head.protocol.dose} ${head.protocol.unit}`,
-      vialId: headVial?.id,
-    })
-    await db.protocolDoses.add({
-      protocolId: head.protocol.id!,
-      scheduledAt: head.scheduledAt.toISOString(),
-      status: 'done',
-      injectionId,
-    })
-  }
-
   return (
     <div className="content-grid">
-      {/* Up Next hero */}
-      <section className="up-next col-12">
-        <div className="up-next-main">
-          <span className="up-next-eyeline">Up next</span>
-          {head ? (
-            <>
-              <h2 className="up-next-title">
-                {headCompound?.name ?? 'Scheduled dose'} <span style={{ color: 'var(--ink-dim)', fontSize: 16, fontWeight: 400 }}>
-                  · {head.protocol.dose} {head.protocol.unit}
+      {/* ── Upcoming doses — compact schedule strip ── */}
+      <section className="surface col-12">
+        <div className="panel-header">
+          <div>
+            <span className="section-label">Schedule · next 7 days</span>
+            <h3>Upcoming doses</h3>
+          </div>
+          <button
+            type="button"
+            className="ghost-button"
+            style={{ minWidth: 130, height: 34 }}
+            onClick={() => onNavigate('meds')}
+          >
+            View protocols <ChevronRight size={14} />
+          </button>
+        </div>
+
+        {head ? (
+          <div className="stack">
+            {/* First / soonest dose — action row */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'auto 1fr auto auto',
+              gap: 12,
+              alignItems: 'center',
+              background: 'var(--surface-2)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '10px 14px',
+            }}>
+              <span className="dot" style={{ background: headCompound?.color ?? 'var(--accent)', width: 10, height: 10 }} />
+              <div>
+                <strong style={{ fontSize: 13 }}>{headCompound?.name ?? 'Scheduled dose'}</strong>
+                <span className="sub">
+                  {head.protocol.dose} {head.protocol.unit}
+                  {' · '}{head.protocol.notes ?? head.protocol.name}
+                  {' · '}{format(head.scheduledAt, 'EEE MMM d, HH:mm')}
                 </span>
-              </h2>
-              <span className="eta-big">{timeUntil(head.scheduledAt)}</span>
-              <span className="up-next-meta">
-                {format(head.scheduledAt, 'EEE, MMM d · HH:mm')} · {head.protocol.notes ?? head.protocol.name}
-                {headVial ? ` · from ${headVial.label} (${headVial.remainingMl.toFixed(2)} mL left)` : ''}
+              </div>
+              <span style={{
+                fontSize: 11, fontWeight: 600,
+                color: 'var(--accent-ink)',
+                background: 'var(--accent-soft)',
+                padding: '3px 9px', borderRadius: 999,
+                whiteSpace: 'nowrap',
+              }}>
+                {timeUntil(head.scheduledAt)}
               </span>
-              <div className="up-next-actions">
-                <button type="button" className="primary-button" onClick={logDoseAsTaken}>Mark taken</button>
-                <button type="button" className="ghost-button" onClick={() => onNavigate('meds')}>View protocol</button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 className="up-next-title">No scheduled doses</h2>
-              <span className="up-next-meta">Add a protocol in Protocols and the schedule will appear here.</span>
-              <div className="up-next-actions">
-                <button type="button" className="primary-button" onClick={() => onNavigate('meds')}>Build a protocol</button>
-              </div>
-            </>
-          )}
-        </div>
-        <div className="up-next-side">
-          {upcoming.slice(0, 5).map((item, idx) => {
-            const compound = compoundMap.get(item.protocol.compoundId)
-            return (
-              <div className="up-next-item" key={`${item.protocol.id}-${idx}`}>
-                <Activity size={14} style={{ color: compound?.color ?? 'var(--accent)' }} />
-                <div>
-                  <strong style={{ fontSize: 13 }}>{compound?.name ?? 'Compound'}</strong>
-                  <small>{item.protocol.dose} {item.protocol.unit} · {timeUntil(item.scheduledAt)}</small>
-                </div>
-                <time>{format(item.scheduledAt, 'MMM d HH:mm')}</time>
-              </div>
-            )
-          })}
-          {upcoming.length === 0 && (
-            <div className="empty" style={{ padding: 16 }}>
-              <CalendarClock size={18} />
-              <strong>No upcoming doses</strong>
-              <span>Define a protocol cadence to populate this list.</span>
+              <button
+                type="button"
+                className="primary-button"
+                style={{ height: 32, fontSize: 12, padding: '0 14px', whiteSpace: 'nowrap' }}
+                onClick={() => onOpenQuickLog('injection', {
+                  compoundId: head.protocol.compoundId,
+                  dose: head.protocol.dose,
+                  unit: head.protocol.unit,
+                  protocolId: head.protocol.id,
+                  scheduledAt: head.scheduledAt.toISOString(),
+                })}
+              >
+                Mark taken
+              </button>
             </div>
-          )}
-        </div>
+
+            {/* Remaining upcoming items */}
+            {upcoming.slice(1).map((item, idx) => {
+              const compound = compoundMap.get(item.protocol.compoundId)
+              return (
+                <div
+                  key={`${item.protocol.id}-${idx}`}
+                  style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: 12, alignItems: 'center', padding: '5px 4px' }}
+                >
+                  <span className="dot" style={{ background: compound?.color ?? 'var(--accent)', opacity: 0.6 }} />
+                  <div>
+                    <strong style={{ fontSize: 13 }}>{compound?.name ?? 'Compound'}</strong>
+                    <span className="sub">{item.protocol.dose} {item.protocol.unit}</span>
+                  </div>
+                  <span style={{ fontSize: 12, color: 'var(--ink-mute)', whiteSpace: 'nowrap' }}>{timeUntil(item.scheduledAt)}</span>
+                  <time style={{ fontSize: 12, color: 'var(--ink-dim)', whiteSpace: 'nowrap' }}>{format(item.scheduledAt, 'MMM d, HH:mm')}</time>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="empty">
+            <CalendarClock size={18} />
+            <strong>No scheduled doses</strong>
+            <span>Add a protocol in Protocols and the schedule will appear here.</span>
+            <button type="button" className="primary-button" onClick={() => onNavigate('meds')}>Build a protocol</button>
+          </div>
+        )}
       </section>
 
       {/* Status grid */}
@@ -303,7 +316,6 @@ function labStatusLabel(r: LabResult) {
   return 'Flag'
 }
 
-// re-exports avoided to keep this file self-contained.
-// Use of Droplet/HeartPulse retained for future tone variants.
+// Droplet / HeartPulse retained for future tone variants.
 void Droplet
 void HeartPulse

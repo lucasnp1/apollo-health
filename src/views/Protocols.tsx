@@ -27,7 +27,7 @@ import {
 } from '../lib/insights'
 import { describeCadence } from '../lib/schedule'
 import { mlFromDose } from '../lib/vials'
-import { deleteInjection, logInjection, pickActiveVial } from '../lib/injections'
+import { logInjection, pickActiveVial } from '../lib/injections'
 import { SiteCombobox } from '../components/SiteCombobox'
 import { EmptyState } from '../components/EmptyState'
 import { COMMON_SITES } from '../lib/sites'
@@ -840,7 +840,7 @@ function RetaChart({ compounds, injections }: { compounds: Compound[]; injection
           )}
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={240}>
+      <ResponsiveContainer width="100%" height={160}>
         <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -12 }}>
           <CartesianGrid stroke="#e7e5e4" vertical={false} />
           <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
@@ -871,11 +871,11 @@ function RecentDoses({ injections, compounds, vials }: { injections: InjectionLo
       </div>
       {injections.length > 0 ? (
         <div className="stack">
-          {injections.slice(0, 20).map((entry) => {
+          {injections.slice(0, 5).map((entry) => {
             const c = compoundMap.get(entry.compoundId)
             const v = entry.vialId ? vialMap.get(entry.vialId) : undefined
             return (
-              <div className="row" key={entry.id}>
+              <div className="row" key={entry.id} style={{ gridTemplateColumns: 'auto 1fr auto' }}>
                 <span className="dot" style={{ background: c?.color ?? 'var(--accent)' }} />
                 <div>
                   <strong>{c?.name ?? 'Unknown'}</strong>
@@ -886,9 +886,6 @@ function RecentDoses({ injections, compounds, vials }: { injections: InjectionLo
                   </span>
                 </div>
                 <time>{format(parseISO(entry.takenAt), 'MMM d HH:mm')}</time>
-                <button type="button" className="icon-button danger" onClick={() => deleteInjection(entry.id!)} aria-label="Delete">
-                  <Trash2 size={14} />
-                </button>
               </div>
             )
           })}

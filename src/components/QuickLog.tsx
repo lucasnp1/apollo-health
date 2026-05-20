@@ -8,6 +8,7 @@ import { logInjection, pickActiveVial } from '../lib/injections'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from './SiteCombobox'
 import { COMMON_SITES } from '../lib/sites'
+import type { QuickLogPrefill } from '../App'
 
 type Tab = 'injection' | 'bp' | 'symptoms'
 
@@ -26,11 +27,13 @@ const SLIDERS: Array<{ key: keyof Symptom; label: string }> = [
 export function QuickLog({
   open,
   initialTab,
+  prefill,
   compounds,
   onClose,
 }: {
   open: boolean
   initialTab: Tab
+  prefill?: QuickLogPrefill
   compounds: Compound[]
   onClose: () => void
 }) {
@@ -89,7 +92,7 @@ export function QuickLog({
 
         {/* Body — scrollable */}
         <div style={{ overflowY: 'auto', padding: '16px 20px 20px' }}>
-          {tab === 'injection' && <InjectionForm compounds={compounds} onSaved={onClose} />}
+          {tab === 'injection' && <InjectionForm compounds={compounds} prefill={prefill} onSaved={onClose} />}
           {tab === 'bp' && <BPForm onSaved={onClose} />}
           {tab === 'symptoms' && <SymptomsForm onSaved={onClose} />}
         </div>
@@ -100,7 +103,15 @@ export function QuickLog({
 
 // ── Injection ──────────────────────────────────────────────────────────────
 
-function InjectionForm({ compounds, onSaved }: { compounds: Compound[]; onSaved: () => void }) {
+function InjectionForm({
+  compounds,
+  prefill,
+  onSaved,
+}: {
+  compounds: Compound[]
+  prefill?: QuickLogPrefill
+  onSaved: () => void
+}) {
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
   const injections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().limit(30).toArray(), [], [])
   const recentSites = useMemo(() => {
@@ -112,12 +123,22 @@ function InjectionForm({ compounds, onSaved }: { compounds: Compound[]; onSaved:
     }
     return out
   }, [injections])
-  const [compoundId, setCompoundId] = useState<number | ''>(compounds[0]?.id ?? '')
-  const [dose, setDose] = useState('')
+
+  const [compoundId, setCompoundId] = useState<number | ''>(prefill?.compoundId ?? compounds[0]?.id ?? '')
+  const [dose, setDose] = useState(prefill?.dose !== undefined ? String(prefill.dose) : '')
   const [site, setSite] = useState(COMMON_SITES[0])
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const compound = compounds.find((c) => c.id === compoundId)
+
+  // Re-initialise when modal opens with a different prefill
+  useEffect(() => {
+    if (prefill?.compoundId !== undefined) setCompoundId(prefill.compoundId)
+    else if (compounds[0]?.id) setCompoundId(compounds[0].id)
+    setDose(prefill?.dose !== undefined ? String(prefill.dose) : '')
+    setNotes('')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.compoundId, prefill?.dose, prefill?.scheduledAt])
 
   useEffect(() => {
     if (compounds.length > 0 && compoundId === '') setCompoundId(compounds[0].id ?? '')
@@ -129,7 +150,7 @@ function InjectionForm({ compounds, onSaved }: { compounds: Compound[]; onSaved:
     try {
       const unit = compound.unit as Unit
       const activeVialId = vials ? pickActiveVial(vials, compound.id!)?.id : undefined
-      await logInjection({
+      const injectionId = await logInjection({
         compoundId: compound.id!,
         takenAt: new Date().toISOString(),
         dose: Number(dose),
@@ -139,6 +160,15 @@ function InjectionForm({ compounds, onSaved }: { compounds: Compound[]; onSaved:
         notes: notes || undefined,
         vialId: activeVialId,
       })
+      // If triggered from a scheduled protocol dose, mark it as done
+      if (prefill?.protocolId && prefill?.scheduledAt) {
+        await db.protocolDoses.add({
+          protocolId: prefill.protocolId,
+          scheduledAt: prefill.scheduledAt,
+          status: 'done',
+          injectionId,
+        })
+      }
       onSaved()
     } finally {
       setBusy(false)

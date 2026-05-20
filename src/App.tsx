@@ -45,6 +45,14 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
 
 type QuickLogTab = 'injection' | 'bp' | 'symptoms'
 
+export type QuickLogPrefill = {
+  compoundId?: number
+  dose?: number
+  unit?: string
+  protocolId?: number
+  scheduledAt?: string
+}
+
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -99,9 +107,11 @@ function Shell({
 
   const [qlOpen, setQlOpen] = useState(false)
   const [qlTab, setQlTab] = useState<QuickLogTab>('injection')
+  const [qlPrefill, setQlPrefill] = useState<QuickLogPrefill | undefined>(undefined)
 
-  function openQuickLog(tab: QuickLogTab) {
+  function openQuickLog(tab: QuickLogTab, prefill?: QuickLogPrefill) {
     setQlTab(tab)
+    setQlPrefill(prefill)
     setQlOpen(true)
   }
 
@@ -202,6 +212,7 @@ function Shell({
             exams={exams}
             results={enrichedResults}
             onNavigate={setActiveView}
+            onOpenQuickLog={openQuickLog}
           />
         )}
         {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} />}
@@ -235,8 +246,9 @@ function Shell({
       <QuickLog
         open={qlOpen}
         initialTab={qlTab}
+        prefill={qlPrefill}
         compounds={compounds ?? []}
-        onClose={() => setQlOpen(false)}
+        onClose={() => { setQlOpen(false); setQlPrefill(undefined) }}
       />
 
       <InstallPrompt />
