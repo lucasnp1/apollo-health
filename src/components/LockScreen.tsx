@@ -52,8 +52,8 @@ export function LockScreen({ lockState }: { lockState: LockStateLike }) {
   return (
     <div className="lock-shell">
       <div className="lock-panel">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="brand-mark"><Activity size={16} /></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="brand-mark" style={{ background: '#0f766e' }}><Activity size={16} /></div>
           <div>
             <h1 style={{ margin: 0 }}>Apollo Health</h1>
             <p className="lock-copy" style={{ margin: '2px 0 0' }}>

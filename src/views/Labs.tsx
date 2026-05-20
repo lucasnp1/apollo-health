@@ -188,11 +188,11 @@ export function Labs({
         {selectedHistory.length > 0 ? (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={selectedHistory} margin={{ top: 10, right: 10, bottom: 0, left: -12 }}>
-              <CartesianGrid stroke="#1f242b" vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#6b7480', fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#13171c', border: '1px solid #2a313a', borderRadius: 8, color: '#e6ebf1' }} />
-              <Line type="monotone" dataKey="value" stroke="#5eead4" strokeWidth={2.5} dot />
+              <CartesianGrid stroke="#e7e5e4" vertical={false} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+              <YAxis tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e7e5e4', borderRadius: 10, color: '#0a0a0a', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} />
+              <Line type="monotone" dataKey="value" stroke="#0f766e" strokeWidth={2.5} dot />
             </LineChart>
           </ResponsiveContainer>
         ) : (
