@@ -108,6 +108,7 @@ function Shell({
   const [qlOpen, setQlOpen] = useState(false)
   const [qlTab, setQlTab] = useState<QuickLogTab>('injection')
   const [qlPrefill, setQlPrefill] = useState<QuickLogPrefill | undefined>(undefined)
+  const [labAddOpen, setLabAddOpen] = useState(false)
 
   function openQuickLog(tab: QuickLogTab, prefill?: QuickLogPrefill) {
     setQlTab(tab)
@@ -190,6 +191,19 @@ function Shell({
             <h1>{titleFor(activeView)}</h1>
           </div>
           <div className="topbar-actions">
+            {/* Page-specific actions */}
+            {activeView === 'labs' && (
+              <button type="button" className="ghost-button" onClick={() => setLabAddOpen(true)}>
+                <Plus size={12} /> Add result
+              </button>
+            )}
+            {/* Global quick-log actions */}
+            <button type="button" className="ghost-button" onClick={() => openQuickLog('bp')}>
+              <HeartPulse size={12} /> BP
+            </button>
+            <button type="button" className="ghost-button" onClick={() => openQuickLog('injection')}>
+              <Syringe size={12} /> Injection
+            </button>
             <SyncBanner syncing={sync.state === 'syncing'} />
             {isAuthed ? (
               <span className="privacy-pill" title={sync.lastError || ''}>
@@ -215,10 +229,10 @@ function Shell({
             onOpenQuickLog={openQuickLog}
           />
         )}
-        {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} />}
+        {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} />}
         {activeView === 'vitals' && <Vitals vitals={vitals} />}
         {activeView === 'labs' && (
-          <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} />
+          <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} />
         )}
         {/* symptoms + targets: no nav page, code kept */}
         {activeView === 'targets' && <Targets />}

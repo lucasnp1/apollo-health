@@ -66,81 +66,8 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
 
   return (
     <div className="content-grid">
-      <section className="surface col-12">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Blood pressure</span>
-            <h3>Trend</h3>
-          </div>
-          <TimeRangePicker value={range} onChange={setRange} />
-        </div>
-        {stats && (
-          <div className="stat-grid">
-            <div className="stat">
-              <span className="stat-label">Mean SBP</span>
-              <span className="stat-value">{stats.meanSys.toFixed(0)}</span>
-              <span className="stat-detail">{stats.n} readings</span>
-            </div>
-            <div className="stat">
-              <span className="stat-label">Mean DBP</span>
-              <span className="stat-value">{stats.meanDia.toFixed(0)}</span>
-            </div>
-            <div className={`stat ${stats.pctElevated > 40 ? 'warn' : ''}`}>
-              <span className="stat-label">% ≥130 SBP</span>
-              <span className="stat-value">{stats.pctElevated.toFixed(0)}%</span>
-              <span className="stat-detail">In stage 1 / stage 2</span>
-            </div>
-            {bpGoal && (
-              <div
-                className={`stat ${stats.meanSys <= bpGoal.target ? 'good' : stats.meanSys - bpGoal.target > 10 ? 'bad' : 'warn'}`}
-              >
-                <span className="stat-label">Goal SBP</span>
-                <span className="stat-value">{bpGoal.target}</span>
-                <span className="stat-detail">
-                  {stats.meanSys <= bpGoal.target
-                    ? 'Mean on target'
-                    : `Mean ${(stats.meanSys - bpGoal.target).toFixed(0)} over`}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
-        {chart.length > 0 ? (
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={chart} margin={{ top: 12, right: 12, bottom: 0, left: -12 }}>
-              <defs>
-                <linearGradient id="sysFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0f766e" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#0f766e" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="#e7e5e4" vertical={false} />
-              {/* BP zone bands */}
-              <ReferenceArea y1={140} y2={200} fill="rgba(239,68,68,0.08)" />
-              <ReferenceArea y1={130} y2={140} fill="rgba(245,158,11,0.08)" />
-              <ReferenceArea y1={120} y2={130} fill="rgba(245,158,11,0.04)" />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
-              <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: '#ffffff', border: '1px solid #e7e5e4', borderRadius: 10, color: '#0a0a0a', boxShadow: '0 8px 24px rgba(15,23,42,0.08)' }} />
-              <Area type="monotone" dataKey="systolic" stroke="#0f766e" strokeWidth={2.5} fill="url(#sysFill)" />
-              <Line type="monotone" dataKey="diastolic" stroke="#98a2af" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="pulse" stroke="#c084fc" strokeWidth={1.5} dot={false} />
-              {bpGoal && (
-                <ReferenceLine
-                  y={bpGoal.target}
-                  stroke="#0f766e"
-                  strokeDasharray="4 4"
-                  label={{ value: `Goal ${bpGoal.target}`, position: 'insideTopRight', fill: '#0f766e', fontSize: 10 }}
-                />
-              )}
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <EmptyState icon={HeartPulse} title="No readings in this range" detail="Switch the time range or log a new reading." />
-        )}
-      </section>
 
-      {/* Log BP + Body Composition side-by-side */}
+      {/* ── Row 1: Log form (left) + BP chart (right) ── */}
       <section className="surface col-5">
         <div className="panel-header">
           <div>
@@ -173,32 +100,77 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         </div>
       </section>
 
-      <BodyCompositionPanel metrics={bodyMetrics} range={range} />
-
-      {/* History — compact, last 15 */}
-      <section className="surface col-12">
+      {/* BP trend + stats — col-7 sits beside the form */}
+      <section className="surface col-7">
         <div className="panel-header">
           <div>
-            <span className="section-label">History</span>
-            <h3>Recent readings</h3>
+            <span className="section-label">Blood pressure</span>
+            <h3>Trend
+              {stats && <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-dim)', marginLeft: 8 }}>
+                mean {stats.meanSys.toFixed(0)}/{stats.meanDia.toFixed(0)}
+                {bpGoal ? ` · goal ${bpGoal.target}` : ''}
+              </span>}
+            </h3>
           </div>
+          <TimeRangePicker value={range} onChange={setRange} />
         </div>
-        <div className="stack">
-          {filtered.slice().reverse().slice(0, 15).map((v) => (
-            <div className="row" key={v.id}>
-              <HeartPulse size={14} />
-              <div>
-                <strong>{v.systolic}/{v.diastolic}</strong>
-                <span className="sub">{v.pulse ? `${v.pulse} bpm` : 'No pulse'}{v.notes ? ` · ${v.notes}` : ''}</span>
-              </div>
-              <time>{format(parseISO(v.measuredAt), 'MMM d HH:mm')}</time>
-              <button type="button" className="icon-button danger" onClick={() => db.vitals.delete(v.id!)} aria-label="Delete reading">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
+        {chart.length > 0 ? (
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={chart} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+              <defs>
+                <linearGradient id="sysFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0f766e" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#0f766e" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="#e7e5e4" vertical={false} />
+              <ReferenceArea y1={140} y2={200} fill="rgba(239,68,68,0.08)" />
+              <ReferenceArea y1={130} y2={140} fill="rgba(245,158,11,0.08)" />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 10 }} />
+              <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 10 }} />
+              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 10, fontSize: 12 }} />
+              <Area type="monotone" dataKey="systolic" stroke="#0f766e" strokeWidth={2.5} fill="url(#sysFill)" />
+              <Line type="monotone" dataKey="diastolic" stroke="#98a2af" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="pulse" stroke="#c084fc" strokeWidth={1.5} dot={false} />
+              {bpGoal && (
+                <ReferenceLine y={bpGoal.target} stroke="#0f766e" strokeDasharray="4 4"
+                  label={{ value: `Goal ${bpGoal.target}`, position: 'insideTopRight', fill: '#0f766e', fontSize: 10 }} />
+              )}
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <EmptyState icon={HeartPulse} title="No readings in this range" detail="Log a reading on the left." />
+        )}
       </section>
+
+      {/* ── Row 2: Recent readings (col-6) + Body comp (col-6) ── */}
+      <section className="surface col-6">
+        <div className="panel-header">
+          <div><span className="section-label">History</span><h3>Recent readings</h3></div>
+        </div>
+        {filtered.length > 0 ? (
+          <div className="stack">
+            {filtered.slice().reverse().slice(0, 12).map((v) => (
+              <div className="row" key={v.id}>
+                <HeartPulse size={13} />
+                <div>
+                  <strong>{v.systolic}/{v.diastolic}</strong>
+                  <span className="sub">{v.pulse ? `${v.pulse} bpm` : 'No pulse'}{v.notes ? ` · ${v.notes}` : ''}</span>
+                </div>
+                <time>{format(parseISO(v.measuredAt), 'MMM d HH:mm')}</time>
+                <button type="button" className="icon-button danger" onClick={() => db.vitals.delete(v.id!)} aria-label="Delete">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon={HeartPulse} title="No readings yet" detail="Log your first reading above." />
+        )}
+      </section>
+
+      <BodyCompositionPanel metrics={bodyMetrics} range={range} />
+
     </div>
   )
 }
@@ -230,7 +202,7 @@ function BodyCompositionPanel({ metrics, range }: { metrics: BodyMetric[]; range
 
   const empty = filtered.length === 0
   return (
-    <section className="surface col-7">
+    <section className="surface col-6">
       <div className="panel-header">
         <div>
           <span className="section-label">Body</span>

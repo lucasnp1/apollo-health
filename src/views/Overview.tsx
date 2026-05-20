@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { AlertTriangle, CalendarClock, ChevronRight, Droplet, FlaskConical, HeartPulse, Syringe } from 'lucide-react'
+import { AlertTriangle, CalendarClock, ChevronRight, Droplet, FlaskConical, HeartPulse } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
@@ -60,105 +60,11 @@ export function Overview({
 
   return (
     <div className="content-grid">
-      {/* ── Upcoming doses — compact schedule strip ── */}
+
+      {/* ── 1. Status — always first ── */}
       <section className="surface col-12">
         <div className="panel-header">
-          <div>
-            <span className="section-label">Schedule · next 7 days</span>
-            <h3>Upcoming doses</h3>
-          </div>
-          <button
-            type="button"
-            className="ghost-button"
-            style={{ minWidth: 130, height: 34 }}
-            onClick={() => onNavigate('meds')}
-          >
-            View protocols <ChevronRight size={14} />
-          </button>
-        </div>
-
-        {head ? (
-          <div className="stack">
-            {/* First / soonest dose — action row */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'auto 1fr auto auto',
-              gap: 12,
-              alignItems: 'center',
-              background: 'var(--surface-2)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '10px 14px',
-            }}>
-              <span className="dot" style={{ background: headCompound?.color ?? 'var(--accent)', width: 10, height: 10 }} />
-              <div>
-                <strong style={{ fontSize: 13 }}>{headCompound?.name ?? 'Scheduled dose'}</strong>
-                <span className="sub">
-                  {head.protocol.dose} {head.protocol.unit}
-                  {' · '}{head.protocol.notes ?? head.protocol.name}
-                  {' · '}{format(head.scheduledAt, 'EEE MMM d, HH:mm')}
-                </span>
-              </div>
-              <span style={{
-                fontSize: 11, fontWeight: 600,
-                color: 'var(--accent-ink)',
-                background: 'var(--accent-soft)',
-                padding: '3px 9px', borderRadius: 999,
-                whiteSpace: 'nowrap',
-              }}>
-                {timeUntil(head.scheduledAt)}
-              </span>
-              <button
-                type="button"
-                className="primary-button"
-                style={{ height: 32, fontSize: 12, padding: '0 14px', whiteSpace: 'nowrap' }}
-                onClick={() => onOpenQuickLog('injection', {
-                  compoundId: head.protocol.compoundId,
-                  dose: head.protocol.dose,
-                  unit: head.protocol.unit,
-                  protocolId: head.protocol.id,
-                  scheduledAt: head.scheduledAt.toISOString(),
-                })}
-              >
-                Mark taken
-              </button>
-            </div>
-
-            {/* Remaining upcoming items */}
-            {upcoming.slice(1).map((item, idx) => {
-              const compound = compoundMap.get(item.protocol.compoundId)
-              return (
-                <div
-                  key={`${item.protocol.id}-${idx}`}
-                  style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: 12, alignItems: 'center', padding: '5px 4px' }}
-                >
-                  <span className="dot" style={{ background: compound?.color ?? 'var(--accent)', opacity: 0.6 }} />
-                  <div>
-                    <strong style={{ fontSize: 13 }}>{compound?.name ?? 'Compound'}</strong>
-                    <span className="sub">{item.protocol.dose} {item.protocol.unit}</span>
-                  </div>
-                  <span style={{ fontSize: 12, color: 'var(--ink-mute)', whiteSpace: 'nowrap' }}>{timeUntil(item.scheduledAt)}</span>
-                  <time style={{ fontSize: 12, color: 'var(--ink-dim)', whiteSpace: 'nowrap' }}>{format(item.scheduledAt, 'MMM d, HH:mm')}</time>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="empty">
-            <CalendarClock size={18} />
-            <strong>No scheduled doses</strong>
-            <span>Add a protocol in Protocols and the schedule will appear here.</span>
-            <button type="button" className="primary-button" onClick={() => onNavigate('meds')}>Build a protocol</button>
-          </div>
-        )}
-      </section>
-
-      {/* Status grid */}
-      <section className="surface col-12">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Now</span>
-            <h3>Status</h3>
-          </div>
+          <div><span className="section-label">Now</span><h3>Status</h3></div>
         </div>
         <div className="stat-grid">
           <StatCard
@@ -167,23 +73,13 @@ export function Overview({
             detail={
               bpGoal && latestBp
                 ? `Goal ${bpGoal.target} · ${latestBp.systolic - bpGoal.target > 0 ? `${latestBp.systolic - bpGoal.target} over` : 'on target'}`
-                : latestBp
-                ? `${latestBp.pulse ?? '--'} bpm · ${format(parseISO(latestBp.measuredAt), 'MMM d')}`
-                : 'No reading'
+                : latestBp ? `${latestBp.pulse ?? '--'} bpm · ${format(parseISO(latestBp.measuredAt), 'MMM d')}` : 'No reading'
             }
             spark={<Sparkline values={bpSpark} />}
             tone={
               bpGoal && latestBp
-                ? latestBp.systolic <= bpGoal.target
-                  ? 'good'
-                  : latestBp.systolic - bpGoal.target > 10
-                  ? 'bad'
-                  : 'warn'
-                : latestBp && latestBp.systolic >= 140
-                ? 'bad'
-                : latestBp && latestBp.systolic >= 130
-                ? 'warn'
-                : undefined
+                ? latestBp.systolic <= bpGoal.target ? 'good' : latestBp.systolic - bpGoal.target > 10 ? 'bad' : 'warn'
+                : latestBp && latestBp.systolic >= 140 ? 'bad' : latestBp && latestBp.systolic >= 130 ? 'warn' : undefined
             }
           />
           <StatCard
@@ -192,29 +88,19 @@ export function Overview({
             detail={
               weightGoal && weightStats.latest !== undefined
                 ? `Goal ${weightGoal.target} kg · ${(weightGoal.target - weightStats.latest >= 0 ? '+' : '')}${(weightGoal.target - weightStats.latest).toFixed(1)} kg to go`
-                : weightStats.delta !== undefined
-                ? `${weightStats.delta >= 0 ? '+' : ''}${weightStats.delta.toFixed(1)} kg · ${weightStats.percent?.toFixed(1)}%`
-                : 'Log weight with reta'
+                : weightStats.delta !== undefined ? `${weightStats.delta >= 0 ? '+' : ''}${weightStats.delta.toFixed(1)} kg · ${weightStats.percent?.toFixed(1)}%` : 'No weight data'
             }
             spark={<Sparkline values={weightSpark} />}
             tone={
               weightGoal && weightStats.latest !== undefined
-                ? Math.abs(weightGoal.target - weightStats.latest) < 0.5
-                  ? 'good'
-                  : undefined
-                : weightStats.delta !== undefined && weightStats.delta < 0
-                ? 'good'
-                : undefined
+                ? Math.abs(weightGoal.target - weightStats.latest) < 0.5 ? 'good' : undefined
+                : weightStats.delta !== undefined && weightStats.delta < 0 ? 'good' : undefined
             }
           />
           <StatCard
             label="T-load (est.)"
             value={tCurve.activeNow ? `${tCurve.activeNow} mg` : '—'}
-            detail={
-              tCurve.lastInjection
-                ? `Last ${format(parseISO(tCurve.lastInjection.takenAt), 'MMM d')} · ${tCurve.ester}`
-                : 'No testosterone log'
-            }
+            detail={tCurve.lastInjection ? `Last ${format(parseISO(tCurve.lastInjection.takenAt), 'MMM d')} · ${tCurve.ester}` : 'No testosterone log'}
           />
           <StatCard
             label="Lab flags"
@@ -224,23 +110,68 @@ export function Overview({
           />
           <StatCard
             label="Mood / energy"
-            value={
-              latestSymptom
-                ? `${latestSymptom.mood ?? '—'} / ${latestSymptom.energy ?? '—'}`
-                : '—'
-            }
-            detail={latestSymptom ? format(parseISO(latestSymptom.recordedAt), 'MMM d') : 'Log in Symptoms'}
+            value={latestSymptom ? `${latestSymptom.mood ?? '—'} / ${latestSymptom.energy ?? '—'}` : '—'}
+            detail={latestSymptom ? format(parseISO(latestSymptom.recordedAt), 'MMM d') : 'Log via quick log'}
           />
         </div>
       </section>
 
-      {/* Lab flags */}
+      {/* ── 2. Upcoming doses (col-6) + Lab flags (col-6) ── */}
       <section className="surface col-6">
         <div className="panel-header">
-          <div>
-            <span className="section-label">Watch list</span>
-            <h3>Latest lab flags</h3>
+          <div><span className="section-label">Schedule · next 7 days</span><h3>Upcoming doses</h3></div>
+          <button type="button" className="ghost-button" onClick={() => onNavigate('meds')}>
+            Protocols <ChevronRight size={14} />
+          </button>
+        </div>
+        {head ? (
+          <div className="stack">
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: 10, alignItems: 'center', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '9px 12px' }}>
+              <span className="dot" style={{ background: headCompound?.color ?? 'var(--accent)', width: 9, height: 9 }} />
+              <div>
+                <strong style={{ fontSize: 13 }}>{headCompound?.name ?? 'Dose'}</strong>
+                <span className="sub">{head.protocol.dose} {head.protocol.unit} · {format(head.scheduledAt, 'EEE MMM d, HH:mm')}</span>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-ink)', background: 'var(--accent-soft)', padding: '2px 8px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+                {timeUntil(head.scheduledAt)}
+              </span>
+              <button
+                type="button"
+                className="primary-button"
+                style={{ height: 28, fontSize: 11, padding: '0 10px', whiteSpace: 'nowrap' }}
+                onClick={() => onOpenQuickLog('injection', { compoundId: head.protocol.compoundId, dose: head.protocol.dose, unit: head.protocol.unit, protocolId: head.protocol.id, scheduledAt: head.scheduledAt.toISOString() })}
+              >
+                Mark taken
+              </button>
+            </div>
+            {upcoming.slice(1).map((item, idx) => {
+              const compound = compoundMap.get(item.protocol.compoundId)
+              return (
+                <div key={`${item.protocol.id}-${idx}`} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: 10, alignItems: 'center', padding: '5px 4px' }}>
+                  <span className="dot" style={{ background: compound?.color ?? 'var(--accent)', opacity: 0.55 }} />
+                  <div>
+                    <strong style={{ fontSize: 12 }}>{compound?.name ?? 'Compound'}</strong>
+                    <span className="sub">{item.protocol.dose} {item.protocol.unit}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--ink-mute)', whiteSpace: 'nowrap' }}>{timeUntil(item.scheduledAt)}</span>
+                  <time style={{ fontSize: 11, color: 'var(--ink-dim)', whiteSpace: 'nowrap' }}>{format(item.scheduledAt, 'MMM d')}</time>
+                </div>
+              )
+            })}
           </div>
+        ) : (
+          <div className="empty">
+            <CalendarClock size={16} />
+            <strong>No scheduled doses</strong>
+            <span>Add a protocol to populate this list.</span>
+            <button type="button" className="primary-button" onClick={() => onNavigate('meds')}>Set up protocols</button>
+          </div>
+        )}
+      </section>
+
+      <section className="surface col-6">
+        <div className="panel-header">
+          <div><span className="section-label">Watch list</span><h3>Lab flags</h3></div>
           <button type="button" className="ghost-button" onClick={() => onNavigate('labs')}>
             Labs <ChevronRight size={14} />
           </button>
@@ -249,7 +180,7 @@ export function Overview({
           <div className="stack">
             {labFlags.slice(0, 6).map((result) => (
               <div className="row" key={result.id}>
-                <AlertTriangle size={14} style={{ color: 'var(--warn)' }} />
+                <AlertTriangle size={13} style={{ color: 'var(--warn)' }} />
                 <div>
                   <strong>{result.marker}</strong>
                   <span className="sub">{result.rawValue} {result.unit ?? ''} · ref {result.low ?? '?'}–{result.high ?? '?'}</span>
@@ -261,49 +192,13 @@ export function Overview({
           </div>
         ) : (
           <div className="empty">
-            <FlaskConical size={18} />
+            <FlaskConical size={16} />
             <strong>No flags on latest panel</strong>
-            <span>Markers within ranges, or no reference data attached.</span>
+            <span>All markers within range, or no reference data yet.</span>
           </div>
         )}
       </section>
 
-      {/* Recent injections */}
-      <section className="surface col-6">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Last 7 days</span>
-            <h3>Recent injections</h3>
-          </div>
-          <button type="button" className="ghost-button" onClick={() => onNavigate('meds')}>
-            Protocols <ChevronRight size={14} />
-          </button>
-        </div>
-        {injections.length > 0 ? (
-          <div className="stack">
-            {injections.slice(0, 6).map((entry) => {
-              const compound = compoundMap.get(entry.compoundId)
-              return (
-                <div className="row" key={entry.id}>
-                  <span className="dot" style={{ background: compound?.color ?? 'var(--accent)' }} />
-                  <div>
-                    <strong>{compound?.name ?? 'Unknown'}</strong>
-                    <span className="sub">{entry.rawDose ?? `${entry.dose ?? ''} ${entry.unit}`} · {entry.site || '—'}</span>
-                  </div>
-                  <span />
-                  <time>{format(parseISO(entry.takenAt), 'MMM d HH:mm')}</time>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="empty">
-            <Syringe size={18} />
-            <strong>No injection history</strong>
-            <span>Mark an Up Next dose as taken, or log one manually under Protocols.</span>
-          </div>
-        )}
-      </section>
     </div>
   )
 }

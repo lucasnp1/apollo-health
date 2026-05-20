@@ -26,20 +26,26 @@ import {
   weightSummary,
 } from '../lib/insights'
 import { describeCadence } from '../lib/schedule'
-import { mlFromDose } from '../lib/vials'
-import { logInjection, pickActiveVial } from '../lib/injections'
-import { SiteCombobox } from '../components/SiteCombobox'
+import { pickActiveVial } from '../lib/injections'
 import { EmptyState } from '../components/EmptyState'
-import { COMMON_SITES } from '../lib/sites'
 
 const UNITS: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const COMPOUND_COLORS = ['#0f766e', '#6366f1', '#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6']
 const ESTER_OPTIONS: TestosteroneEster[] = ['Enanthate', 'Cypionate', 'Propionate', 'Undecanoate', 'Custom']
 
-export function Protocols({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
+export function Protocols({
+  compounds,
+  injections,
+  onOpenQuickLog,
+}: {
+  compounds: Compound[]
+  injections: InjectionLog[]
+  onOpenQuickLog: (tab: 'injection', prefill?: import('../App').QuickLogPrefill) => void
+}) {
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
+  const [showSetup, setShowSetup] = useState(false)
 
   const activeProtocols = (protocols ?? []).filter((p) => !p.archived)
 
@@ -60,38 +66,50 @@ export function Protocols({ compounds, injections }: { compounds: Compound[]; in
   return (
     <div className="content-grid">
 
-      {/* ── 1. LOG NOW — top of page, highest priority ──────────────────── */}
-      {activeProtocols.length > 0 && (
-        <section className="surface col-12">
-          <div className="panel-header">
-            <div>
-              <span className="section-label">Scheduled</span>
-              <h3>Log injection</h3>
-            </div>
+      {/* ── 1. ACTIVE PROTOCOLS + QUICK LOG ─────────────────────────────── */}
+      <section className="surface col-12">
+        <div className="panel-header">
+          <div>
+            <span className="section-label">Active</span>
+            <h3>My protocols</h3>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+          <button type="button" className="ghost-button" onClick={() => setShowSetup((v) => !v)}>
+            <Plus size={12} /> {showSetup ? 'Hide setup' : 'Add protocol'}
+          </button>
+        </div>
+        {activeProtocols.length > 0 ? (
+          <div className="stack">
             {activeProtocols.map((p) => (
-              <ProtocolLogCard
+              <ProtocolQuickRow
                 key={p.id}
                 protocol={p}
                 compounds={compounds}
                 vials={vials ?? []}
                 injections={injections}
-                recentSites={recentSites}
+                onLog={onOpenQuickLog}
               />
             ))}
           </div>
+        ) : (
+          <div className="empty">
+            <Syringe size={16} />
+            <strong>No protocols yet</strong>
+            <span>Click "Add protocol" to set up your first compound and schedule.</span>
+          </div>
+        )}
+      </section>
+
+      {/* ── 2. SETUP / ADD — shown only when toggled ─────────────────────── */}
+      {showSetup && (
+        <section className="surface col-7">
+          <SetupPanel compounds={compounds} />
         </section>
       )}
-
-      {/* ── 2. SETUP / ADD — compound + protocol + vials in one flow ─────── */}
-      <section className="surface col-7">
-        <SetupPanel compounds={compounds} />
-      </section>
-
-      <section className="surface col-5">
-        <ProtocolList protocols={activeProtocols} compounds={compounds} vials={vials ?? []} />
-      </section>
+      {showSetup && (
+        <section className="surface col-5">
+          <ProtocolManage protocols={activeProtocols} compounds={compounds} vials={vials ?? []} />
+        </section>
+      )}
 
       {/* ── 3. CHARTS ─────────────────────────────────────────────────────── */}
       {injections.length > 0 && (
@@ -117,153 +135,61 @@ export function Protocols({ compounds, injections }: { compounds: Compound[]; in
   )
 }
 
-// ── Protocol log card — the "quick log now" card per active protocol ────────
+// ── Compact protocol row — tap Log to open prefilled QuickLog modal ─────────
 
-function ProtocolLogCard({
+function ProtocolQuickRow({
   protocol,
   compounds,
   vials,
   injections,
-  recentSites,
+  onLog,
 }: {
   protocol: Protocol
   compounds: Compound[]
   vials: Vial[]
   injections: InjectionLog[]
-  recentSites: string[]
+  onLog: (tab: 'injection', prefill?: import('../App').QuickLogPrefill) => void
 }) {
   const compound = compounds.find((c) => c.id === protocol.compoundId)
   const activeVial = compound ? pickActiveVial(vials, compound.id!) : undefined
-  const matchingVials = vials.filter((v) => v.compoundId === protocol.compoundId && !v.archived)
-
-  // Last injection for this protocol
   const lastInj = injections.find((i) => i.compoundId === protocol.compoundId)
   const hoursSince = lastInj ? differenceInHours(new Date(), parseISO(lastInj.takenAt)) : undefined
 
-  const [site, setSite] = useState(recentSites[0] ?? COMMON_SITES[0])
-  const [vialId, setVialId] = useState<string>('')
-  const [dose, setDose] = useState(String(protocol.dose))
-  const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(false)
+  const lastLabel = hoursSince !== undefined
+    ? hoursSince < 1 ? 'Just now'
+    : hoursSince < 24 ? `${hoursSince}h ago`
+    : `${Math.round(hoursSince / 24)}d ago`
+    : 'Never'
 
-  const effectiveVial = matchingVials.find((v) => String(v.id) === vialId) ?? activeVial
-  const previewMl = effectiveVial?.concentrationMgPerMl
-    ? mlFromDose(Number(dose), protocol.unit, effectiveVial.concentrationMgPerMl)
-    : undefined
-
-  async function log() {
-    if (!compound?.id) return
-    setBusy(true)
-    try {
-      await logInjection({
-        compoundId: compound.id,
-        takenAt: new Date().toISOString(),
-        dose: Number(dose),
-        unit: protocol.unit,
-        route: 'SubQ',
-        site,
-        rawDose: `${dose} ${protocol.unit}`,
-        vialId: effectiveVial?.id,
-      })
-      setDone(true)
-      setTimeout(() => setDone(false), 3000)
-    } finally {
-      setBusy(false)
-    }
-  }
+  const vialPct = activeVial ? (activeVial.remainingMl / Math.max(activeVial.totalMl, 0.001)) * 100 : 100
+  const vialTone = vialPct < 15 ? 'var(--bad)' : vialPct < 35 ? 'var(--warn)' : 'var(--good)'
 
   return (
-    <div style={{
-      border: '1.5px solid',
-      borderColor: done ? 'var(--good)' : (compound?.color ?? 'var(--line)'),
-      borderRadius: 'var(--radius)',
-      padding: 12,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 12,
-      transition: 'border-color 300ms',
-      background: done ? 'var(--good-soft)' : 'var(--surface)',
-    }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="dot" style={{ background: compound?.color ?? 'var(--accent)', width: 10, height: 10 }} />
-            <strong style={{ fontSize: 14 }}>{protocol.name}</strong>
-          </div>
-          <span className="sub" style={{ marginTop: 2, display: 'block' }}>
-            {compound?.name} · {protocol.dose} {protocol.unit} · {describeCadence(protocol.cadence)}
-          </span>
-        </div>
-        <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--ink-dim)' }}>
-          {hoursSince !== undefined
-            ? hoursSince < 24
-              ? <span style={{ color: 'var(--warn)' }}>{hoursSince}h ago</span>
-              : `${Math.round(hoursSince / 24)}d ago`
-            : 'Never logged'}
-        </div>
+    <div className="row" style={{ gridTemplateColumns: 'auto 1fr auto auto auto auto' }}>
+      <span className="dot" style={{ background: compound?.color ?? 'var(--accent)', width: 10, height: 10 }} />
+      <div>
+        <strong style={{ fontSize: 13 }}>{protocol.name}</strong>
+        <span className="sub">{compound?.name} · {protocol.dose} {protocol.unit} · {describeCadence(protocol.cadence)}</span>
       </div>
-
-      {done ? (
-        <p style={{ color: 'var(--good)', fontWeight: 600, fontSize: 13, margin: 0 }}>✓ Logged successfully</p>
+      <span className="chip">{protocol.phase ?? 'Active'}</span>
+      <span style={{ fontSize: 11, color: hoursSince !== undefined && hoursSince < 24 ? 'var(--warn)' : 'var(--ink-mute)', whiteSpace: 'nowrap' }}>
+        {lastLabel}
+      </span>
+      {activeVial ? (
+        <span style={{ fontSize: 11, color: vialTone, whiteSpace: 'nowrap' }}>
+          <Droplet size={10} style={{ verticalAlign: -1 }} /> {activeVial.remainingMl.toFixed(1)} mL
+        </span>
       ) : (
-        <>
-          {/* Dose override */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-dim)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              DOSE ({protocol.unit})
-              <input
-                inputMode="decimal"
-                value={dose}
-                onChange={(e) => setDose(e.target.value)}
-                style={{ fontSize: 14, fontWeight: 600 }}
-              />
-            </label>
-            {matchingVials.length > 1 ? (
-              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-dim)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                VIAL
-                <select value={vialId} onChange={(e) => setVialId(e.target.value)} style={{ fontSize: 13 }}>
-                  <option value="">{activeVial ? `Auto · ${activeVial.label}` : 'None'}</option>
-                  {matchingVials.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label} · {v.remainingMl.toFixed(1)} mL
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : effectiveVial ? (
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-dim)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                VIAL
-                <span style={{ fontSize: 13, padding: '6px 0', color: 'var(--ink)' }}>
-                  {effectiveVial.label} · {effectiveVial.remainingMl.toFixed(1)} mL
-                </span>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Site */}
-          <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-dim)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            INJECTION SITE
-            <SiteCombobox value={site} onChange={setSite} recentSites={recentSites} />
-          </label>
-
-          {previewMl !== undefined && (
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--ink-dim)' }}>
-              Draw: <strong>{previewMl.toFixed(3)} mL</strong>
-            </p>
-          )}
-
-          <button
-            type="button"
-            className="primary-button"
-            style={{ background: compound?.color ?? undefined, alignSelf: 'stretch', justifyContent: 'center', height: 40, fontSize: 14 }}
-            onClick={log}
-            disabled={busy || !dose || !site}
-          >
-            <Syringe size={15} /> {busy ? 'Logging…' : 'Log now'}
-          </button>
-        </>
+        <span style={{ fontSize: 11, color: 'var(--ink-mute)' }}>No vial</span>
       )}
+      <button
+        type="button"
+        className="primary-button"
+        style={{ height: 28, fontSize: 11, padding: '0 12px', background: compound?.color ?? undefined, whiteSpace: 'nowrap' }}
+        onClick={() => onLog('injection', { compoundId: protocol.compoundId, dose: protocol.dose, unit: protocol.unit, protocolId: protocol.id })}
+      >
+        Log
+      </button>
     </div>
   )
 }
@@ -579,9 +505,9 @@ function SetupPanel({ compounds }: { compounds: Compound[] }) {
   )
 }
 
-// ── Active protocol list with per-protocol vial pills ─────────────────────
+// ── Protocol management — archive + vials ──────────────────────────────────
 
-function ProtocolList({
+function ProtocolManage({
   protocols,
   compounds,
   vials,
@@ -597,10 +523,9 @@ function ProtocolList({
     <>
       <div className="panel-header">
         <div>
-          <span className="section-label">Active</span>
-          <h3>My protocols</h3>
+          <span className="section-label">Manage</span>
+          <h3>Archive &amp; vials</h3>
         </div>
-        <span className="chip">{protocols.length}</span>
       </div>
       {protocols.length > 0 ? (
         <div className="stack">

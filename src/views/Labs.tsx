@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, FileText, FlaskConical, Plus, UploadCloud } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, FileText, FlaskConical, Plus } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -32,7 +32,8 @@ export function Labs({
   exams,
   results,
   files,
-  // unused but kept for prop compat with App.tsx
+  addOpen,
+  onAddClose,
   compounds: _c,
   injections: _i,
   vitals: _v,
@@ -43,6 +44,8 @@ export function Labs({
   exams: LabExam[]
   results: EnrichedResult[]
   files: Array<{ id?: number; name: string; status: string; extractedText?: string }>
+  addOpen?: boolean
+  onAddClose?: () => void
 }) {
   const markerTargets = useLiveQuery(() => db.markerTargets.toArray(), [], [])
   const targetByKey = useMemo(() => new Map((markerTargets ?? []).map((t) => [t.marker, t])), [markerTargets])
@@ -98,6 +101,12 @@ export function Labs({
   }, [latestExam, results, historyByMarker, targetByKey])
 
   const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined)
+  const [showAddForm, setShowAddForm] = useState(false)
+
+  // Topbar "Add result" button triggers this
+  useEffect(() => {
+    if (addOpen) { setShowAddForm(true); onAddClose?.() }
+  }, [addOpen, onAddClose])
   const selectedHistory = useMemo(() => {
     if (!selectedKey) return []
     const matches = results.filter((r) => canonicalize(r.marker)?.key === selectedKey)
@@ -208,70 +217,52 @@ export function Labs({
         </section>
       )}
 
-      {/* ── PDF import + Manual add — always side-by-side ─────────────────── */}
-      <section className="surface col-6">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">PDF import</span>
-            <h3>Extracted markers</h3>
+      {/* ── PDF pending banner — only when there's something to import ── */}
+      {latestFile && extracted.length > 0 && (
+        <section className="surface col-12" style={{ background: 'var(--accent-soft)', borderColor: 'rgba(15,118,110,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <FileText size={14} style={{ color: 'var(--accent-ink)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <strong style={{ fontSize: 13, color: 'var(--accent-ink)' }}>PDF ready to import</strong>
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--accent-ink)', opacity: 0.8 }}>{latestFile.name} · {extracted.length} markers detected</span>
+            </div>
+            <button type="button" className="primary-button" style={{ background: 'var(--accent)', height: 30, fontSize: 12 }} onClick={() => saveExtracted(extracted)}>
+              Import {extracted.length} markers
+            </button>
           </div>
-        </div>
-        {latestFile ? (
-          extracted.length > 0 ? (
-            <>
-              <p className="panel-note"><FileText size={12} style={{ verticalAlign: -1 }} /> {latestFile.name}</p>
-              <div className="stack">
-                {extracted.map((m) => (
-                  <div className="row" key={m.marker}>
-                    <FlaskConical size={14} />
-                    <div>
-                      <strong>{m.marker}</strong>
-                      <span className="sub">{m.value} {m.unit || ''}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button type="button" className="primary-button" style={{ alignSelf: 'flex-start' }} onClick={() => saveExtracted(extracted)}>
-                Import {extracted.length} markers
-              </button>
-            </>
-          ) : (
-            <EmptyState icon={FileText} title="Couldn't auto-detect markers" detail="The PDF text was extracted but no recognisable markers found. Add below manually." />
-          )
-        ) : (
-          <EmptyState icon={UploadCloud} title="No pending PDF" detail="Upload a PDF in Files — it gets parsed in your browser, then come back here to import." />
-        )}
-      </section>
+        </section>
+      )}
 
-      <section className="surface col-6">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Manual entry</span>
-            <h3>Add result</h3>
+      {/* ── Manual add form — shown only when triggered from topbar ── */}
+      {showAddForm && (
+        <section className="surface col-6">
+          <div className="panel-header">
+            <div><span className="section-label">Manual entry</span><h3>Add result</h3></div>
+            <button type="button" className="ghost-button" onClick={() => setShowAddForm(false)}>Close</button>
           </div>
-        </div>
-        <div className="form-grid">
-          <label className="wide-field">
-            Exam name
-            <input value={examName} onChange={(e) => setExamName(e.target.value)} />
-          </label>
-          <label>
-            Marker
-            <input value={marker} onChange={(e) => setMarker(e.target.value)} />
-          </label>
-          <label>
-            Value
-            <input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
-          </label>
-          <label>
-            Unit
-            <input value={unit} onChange={(e) => setUnit(e.target.value)} />
-          </label>
-          <button type="button" className="primary-button wide-field" onClick={addManual} disabled={!value}>
-            <Plus size={14} /> Save marker
-          </button>
-        </div>
-      </section>
+          <div className="form-grid">
+            <label className="wide-field">
+              Exam name
+              <input value={examName} onChange={(e) => setExamName(e.target.value)} />
+            </label>
+            <label>
+              Marker
+              <input value={marker} onChange={(e) => setMarker(e.target.value)} />
+            </label>
+            <label>
+              Value
+              <input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
+            </label>
+            <label>
+              Unit
+              <input value={unit} onChange={(e) => setUnit(e.target.value)} />
+            </label>
+            <button type="button" className="primary-button wide-field" onClick={async () => { await addManual(); setShowAddForm(false) }} disabled={!value}>
+              <Plus size={14} /> Save marker
+            </button>
+          </div>
+        </section>
+      )}
 
     </div>
   )
@@ -290,7 +281,7 @@ function PanelSection({
   onSelectKey: (key: string | undefined) => void
   selectedKey?: string
 }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const outCount = rows.filter((r) => {
     if (r.value === undefined) return false
     return (r.high !== undefined && r.value > r.high) || (r.low !== undefined && r.value < r.low)
