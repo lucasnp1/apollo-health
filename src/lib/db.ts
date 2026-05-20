@@ -303,6 +303,55 @@ export class ApolloDatabase extends Dexie {
 
 export const db = new ApolloDatabase()
 
+// --- Auto-stamping hooks --------------------------------------------------
+// Every syncable table gets `creating` and `updating` hooks so the sync engine
+// can find new/changed rows without each save site remembering to set them.
+//   creating: stamp serverId (UUID), updatedAt = now, dirty = 1
+//   updating: bump updatedAt + dirty = 1 ONLY IF the change touches a non-sync
+//             column. This lets the sync engine clear `dirty: 0` after a push
+//             without immediately re-marking the row dirty.
+const SYNC_TABLES = [
+  'compounds',
+  'injections',
+  'vitals',
+  'exams',
+  'results',
+  'files',
+  'protocols',
+  'protocolDoses',
+  'vials',
+  'symptoms',
+  'markerTargets',
+  'goals',
+  'bodyMetrics',
+] as const
+
+const SYNC_ONLY_FIELDS = new Set(['serverId', 'updatedAt', 'deletedAtSync', 'dirty'])
+
+type AnyRow = Record<string, unknown>
+
+for (const name of SYNC_TABLES) {
+  const table = (db as unknown as Record<string, { hook: (event: string, fn: (...args: unknown[]) => unknown) => void }>)[name]
+  if (!table) continue
+  table.hook('creating', (...args: unknown[]) => {
+    // signature: (primKey, obj, trans) — we mutate obj in place.
+    const obj = args[1] as AnyRow
+    if (obj.serverId == null) obj.serverId = crypto.randomUUID()
+    if (obj.updatedAt == null) obj.updatedAt = Date.now()
+    if (obj.dirty == null) obj.dirty = 1
+    return undefined
+  })
+  table.hook('updating', (...args: unknown[]) => {
+    // signature: (mods, primKey, obj, trans). Return a new mods to override.
+    const mods = (args[0] as AnyRow) || {}
+    const keys = Object.keys(mods)
+    if (keys.length === 0) return undefined
+    const onlySync = keys.every((k) => SYNC_ONLY_FIELDS.has(k))
+    if (onlySync) return undefined
+    return { ...mods, updatedAt: Date.now(), dirty: 1 }
+  })
+}
+
 let seedPromise: Promise<void> | undefined
 
 export async function seedIfEmpty() {
