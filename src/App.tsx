@@ -225,14 +225,27 @@ function Shell({
                 <Plus size={12} /> Add result
               </button>
             )}
+            {/* "Create protocol" hidden on mobile — accessible from the empty-state button */}
             {activeView === 'meds' && (
-              <button type="button" className="primary-button" onClick={() => setProtocolWizardOpen(true)}>
+              <button type="button" className="primary-button hide-mobile" onClick={() => setProtocolWizardOpen(true)}>
                 <Plus size={13} /> Create protocol
               </button>
             )}
             <button type="button" className="primary-button" onClick={() => openQuickLog('injection')}>
               <Plus size={13} /> Add
             </button>
+            {/* Settings gear — mobile only, since Settings tab is #6 and hidden in bottom nav */}
+            {activeView !== 'settings' && (
+              <button
+                type="button"
+                className="icon-button show-mobile-only"
+                onClick={() => setActiveView('settings')}
+                aria-label="Settings"
+                style={{ color: 'var(--ink-mute)' }}
+              >
+                <SettingsIcon size={16} />
+              </button>
+            )}
           </div>
         </header>
 

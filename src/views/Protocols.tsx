@@ -123,22 +123,24 @@ function ProtocolQuickRow({
   const vialTone = vialPct < 15 ? 'var(--bad)' : vialPct < 35 ? 'var(--warn)' : 'var(--good)'
 
   return (
-    <div className="row" style={{ gridTemplateColumns: 'auto 1fr auto auto auto auto' }}>
+    <div className="row protocol-quick-row">
       <span className="dot" style={{ background: compound?.color ?? 'var(--accent)', width: 10, height: 10 }} />
       <div>
         <strong style={{ fontSize: 13 }}>{protocol.name}</strong>
         <span className="sub">{compound?.name} · {protocol.dose} {protocol.unit} · {describeCadence(protocol.cadence)}</span>
       </div>
-      <span className="chip">{protocol.phase ?? 'Active'}</span>
+      {/* hide-mobile: phase chip hidden on narrow screens */}
+      <span className="chip hide-mobile">{protocol.phase ?? 'Active'}</span>
       <span style={{ fontSize: 11, color: hoursSince !== undefined && hoursSince < 24 ? 'var(--warn)' : 'var(--ink-mute)', whiteSpace: 'nowrap' }}>
         {lastLabel}
       </span>
+      {/* hide-mobile: vial mL hidden on narrow screens */}
       {activeVial ? (
-        <span style={{ fontSize: 11, color: vialTone, whiteSpace: 'nowrap' }}>
+        <span className="hide-mobile" style={{ fontSize: 11, color: vialTone, whiteSpace: 'nowrap' }}>
           <Droplet size={10} style={{ verticalAlign: -1 }} /> {activeVial.remainingMl.toFixed(1)} mL
         </span>
       ) : (
-        <span style={{ fontSize: 11, color: 'var(--ink-mute)' }}>No vial</span>
+        <span className="hide-mobile" style={{ fontSize: 11, color: 'var(--ink-mute)' }}>No vial</span>
       )}
       <button
         type="button"

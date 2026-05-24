@@ -627,6 +627,12 @@ time,
 .row span.sub { color: var(--ink-mute); font-size: 11px; display: block; margin-top: 1px; font-weight: 500; }
 .row time { color: var(--ink-dim); font-size: 11px; font-family: var(--font-mono); font-weight: 500; }
 
+/* Protocol quick row: 6-col on desktop (dot + name + chip + last + vial + log) */
+.protocol-quick-row { grid-template-columns: auto 1fr auto auto auto auto; }
+
+/* Mobile-only utility: hidden by default, shown only in the mobile breakpoint */
+.show-mobile-only { display: none; }
+
 .dot { width: 9px; height: 9px; border-radius: 999px; display: inline-block; }
 
 /* ---------- Forms ---------- */
@@ -895,6 +901,20 @@ select {
     text-overflow: ellipsis;
     max-width: 52vw;
   }
+
+  /* Fix #3: stat-grid — force 3 equal columns so cards never wrap asymmetrically */
+  .stat-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* Fix #4: Utility to hide/show elements by breakpoint */
+  .hide-mobile { display: none !important; }
+  .show-mobile-only { display: inline-flex !important; }
+
+  /* Fix #2: Protocol quick-row on mobile — 4 cols, phase chip + vial indicator hidden */
+  .protocol-quick-row { grid-template-columns: auto 1fr auto auto !important; }
+  .protocol-quick-row .hide-mobile { display: none !important; }
+
+  /* Fix #5: Site rotation — adaptive columns so long names never overflow */
+  .body-diagram { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
 }
 
 /* ---------- Timeline ---------- */
