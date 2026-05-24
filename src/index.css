@@ -382,10 +382,11 @@ time,
 }
 
 .panel-header {
-  display: flex; align-items: flex-start; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   gap: var(--space-3);
 }
-.panel-header h3 { margin: 0; }
+.panel-header > div { min-width: 0; flex: 1; }
+.panel-header h3 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .section-label {
   display: block;
   font-size: 10px;
@@ -647,7 +648,9 @@ time,
   background: var(--surface);
   padding: 9px 12px;
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  /* minmax(0,1fr) lets the name column shrink below min-content so action
+     buttons on the right never get pushed off-screen on narrow viewports   */
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: 10px;
   align-items: center;
   border-bottom: 1px solid var(--line);
@@ -655,12 +658,12 @@ time,
 }
 .stack > .row:last-child { border-bottom: 0; }
 .stack > .row:hover { background: var(--surface-2); }
-.row strong { font-size: 13px; font-weight: 600; display: block; color: var(--ink); }
-.row span.sub { color: var(--ink-mute); font-size: 11px; display: block; margin-top: 1px; font-weight: 500; }
-.row time { color: var(--ink-dim); font-size: 11px; font-family: var(--font-mono); font-weight: 500; }
+.row strong { font-size: 13px; font-weight: 600; display: block; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row span.sub { color: var(--ink-mute); font-size: 11px; display: block; margin-top: 1px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row time { color: var(--ink-dim); font-size: 11px; font-family: var(--font-mono); font-weight: 500; white-space: nowrap; flex-shrink: 0; }
 
 /* Protocol quick row: 7-col on desktop (dot + name + chip + last + vial + edit + log) */
-.protocol-quick-row { grid-template-columns: auto 1fr auto auto auto auto auto; }
+.protocol-quick-row { grid-template-columns: auto minmax(0, 1fr) auto auto auto auto auto; }
 
 /* Mobile-only utility: hidden by default, shown only in the mobile breakpoint */
 .show-mobile-only { display: none; }
@@ -913,12 +916,20 @@ select {
     border-radius: 10px;
   }
 
-  /* Bigger tap targets for icon buttons */
+  /* Bigger tap targets for standalone icon buttons (panels, forms, topbar) */
   .icon-button { width: 40px; height: 40px; }
 
-  /* Taller touch targets for primary + ghost buttons */
+  /* Inside compact list rows, keep icon buttons at base size so they don't
+     crowd out content or push buttons off-screen on narrow phones          */
+  .stack .icon-button { width: 32px; height: 32px; }
+
+  /* Taller touch targets for primary + ghost buttons in panels/forms */
   .primary-button { height: 44px; }
   .ghost-button   { height: 40px; }
+
+  /* Inside rows, buttons must stay compact */
+  .stack .primary-button { height: 32px; }
+  .stack .ghost-button   { height: 32px; }
 
   /* Labs range bar: drop the delta column and compress marker to fit 375px */
   .range-bar-row {
@@ -941,9 +952,11 @@ select {
   .hide-mobile { display: none !important; }
   .show-mobile-only { display: inline-flex !important; }
 
-  /* Fix #2: Protocol quick-row on mobile — 4 cols, phase chip + vial indicator hidden */
-  .protocol-quick-row { grid-template-columns: auto 1fr auto auto !important; }
+  /* Fix #2: Protocol quick-row on mobile — 3 visible cols: dot + name + Log */
+  .protocol-quick-row { grid-template-columns: auto minmax(0, 1fr) auto !important; }
   .protocol-quick-row .hide-mobile { display: none !important; }
+  /* Hide the last-logged time on mobile too — just show name and Log button */
+  .protocol-quick-row .last-logged { display: none !important; }
 
   /* Fix #5: Site rotation — adaptive columns so long names never overflow */
   .body-diagram { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }

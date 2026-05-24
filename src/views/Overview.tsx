@@ -228,7 +228,7 @@ export function Overview({
               return (
                 <div className="row" key={inj.id}>
                   <Syringe size={13} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <strong>{compound?.name ?? 'Injection'}</strong>
                     <span className="sub">
                       {inj.dose} {inj.unit}
@@ -236,7 +236,7 @@ export function Overview({
                       {inj.weightKg ? ` · ${inj.weightKg} kg` : ''}
                     </span>
                   </div>
-                  <time style={{ fontSize: 11, color: 'var(--ink-mute)', whiteSpace: 'nowrap' }}>
+                  <time style={{ fontSize: 11, color: 'var(--ink-mute)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                     {formatDistanceToNow(parseISO(inj.takenAt), { addSuffix: true })}
                   </time>
                   <span />
@@ -268,11 +268,11 @@ export function Overview({
               return (
                 <div className="row" key={`${item.protocol.id}-${idx}`}>
                   <CalendarClock size={13} style={{ color: isNext ? 'var(--accent)' : 'var(--ink-mute)', flexShrink: 0 }} />
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <strong>{c?.name ?? 'Compound'}</strong>
                     <span className="sub">{item.protocol.dose} {item.protocol.unit} · {format(item.scheduledAt, 'EEE MMM d')}</span>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+                  <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
                     color: isNext ? 'var(--accent-ink)' : 'var(--ink-mute)',
                     background: isNext ? 'var(--accent-soft)' : 'transparent',
                     padding: isNext ? '2px 8px' : '2px 0',
@@ -284,7 +284,7 @@ export function Overview({
                     <button
                       type="button"
                       className="ghost-button"
-                      style={{ height: 26, fontSize: 11, padding: '0 8px', whiteSpace: 'nowrap' }}
+                      style={{ height: 26, fontSize: 11, padding: '0 8px', whiteSpace: 'nowrap', flexShrink: 0 }}
                       onClick={() => onOpenQuickLog('injection', { compoundId: item.protocol.compoundId, dose: item.protocol.dose, unit: item.protocol.unit, protocolId: item.protocol.id, scheduledAt: item.scheduledAt.toISOString() })}
                     >
                       Mark taken

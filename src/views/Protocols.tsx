@@ -137,7 +137,8 @@ function ProtocolQuickRow({
       </div>
       {/* hide-mobile: phase chip hidden on narrow screens */}
       <span className="chip hide-mobile">{protocol.phase ?? 'Active'}</span>
-      <span style={{ fontSize: 11, color: hoursSince !== undefined && hoursSince < 24 ? 'var(--warn)' : 'var(--ink-mute)', whiteSpace: 'nowrap' }}>
+      {/* last-logged: also hidden on mobile via CSS (.protocol-quick-row .last-logged) */}
+      <span className="last-logged" style={{ fontSize: 11, color: hoursSince !== undefined && hoursSince < 24 ? 'var(--warn)' : 'var(--ink-mute)', whiteSpace: 'nowrap' }}>
         {lastLabel}
       </span>
       {/* hide-mobile: vial mL hidden on narrow screens */}
@@ -565,9 +566,9 @@ function RecentDoses({ injections, compounds, vials }: { injections: InjectionLo
             const c = compoundMap.get(entry.compoundId)
             const v = entry.vialId ? vialMap.get(entry.vialId) : undefined
             return (
-              <div className="row" key={entry.id} style={{ gridTemplateColumns: 'auto 1fr auto auto auto' }}>
+              <div className="row" key={entry.id} style={{ gridTemplateColumns: 'auto minmax(0,1fr) auto auto auto' }}>
                 <span className="dot" style={{ background: c?.color ?? 'var(--accent)' }} />
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <strong>{c?.name ?? 'Unknown'}</strong>
                   <span className="sub">
                     {entry.rawDose ?? `${entry.dose ?? ''} ${entry.unit}`}
