@@ -50,8 +50,15 @@ export function Labs({
     [exams],
   )
 
-  // Show up to 5 most recent exams as columns
-  const examColumns = sortedExams.slice(0, 5)
+  // Show up to 5 most recent exams as columns — deduplicate by id to prevent same-exam repeated columns
+  const examColumns = useMemo(() => {
+    const seen = new Set<number>()
+    return sortedExams.filter((e) => {
+      if (e.id === undefined || seen.has(e.id)) return false
+      seen.add(e.id)
+      return true
+    }).slice(0, 5)
+  }, [sortedExams])
 
 
   // Build the comparison table: unique markers × exam columns

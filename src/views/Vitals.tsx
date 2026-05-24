@@ -140,14 +140,14 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         )}
       </section>
 
-      {/* ── Row 2: Recent readings (col-6) + Body comp (col-6) ── */}
-      <section className="surface col-6">
+      {/* ── Row 2: Recent readings (full width) ── */}
+      <section className="surface col-12">
         <div className="panel-header">
           <div><span className="section-label">History</span><h3>Recent readings</h3></div>
         </div>
         {filtered.length > 0 ? (
           <div className="stack">
-            {filtered.slice().reverse().slice(0, 12).map((v) => (
+            {filtered.slice().reverse().slice(0, 20).map((v) => (
               <div className="row" key={v.id}>
                 <HeartPulse size={13} />
                 <div>

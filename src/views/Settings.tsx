@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, Database, Download, LogOut, Mail, Plus, RefreshCw, Trash2, UserCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, Database, Download, LogOut, RefreshCw, Trash2, UserCircle } from 'lucide-react'
 import { db, importBundledSeed, recordCounts, type SeedImportResult } from '../lib/db'
 import { wipeLocalDatabase } from '../lib/lock'
-import { api } from '../lib/api'
 import type { useAuth } from '../lib/useAuth'
 
 type AuthBundle = ReturnType<typeof useAuth>
@@ -36,20 +35,11 @@ async function exportJson() {
 }
 
 export function Settings({ auth }: { auth: AuthBundle }) {
-  const user = auth.state.status === 'authed' ? auth.state.user : null
-  const isAdmin = user?.is_admin === 1
-
   return (
     <div className="content-grid">
       <section className="surface col-6">
         <AccountSettings auth={auth} />
       </section>
-
-      {isAdmin && (
-        <section className="surface col-12">
-          <InviteSettings />
-        </section>
-      )}
 
       <section className="surface col-6">
         <BundledSeedSettings />
@@ -85,7 +75,6 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
         <>
           <p className="muted-copy">
             Signed in as <strong>{user.display_name || user.email}</strong>.
-            {user.is_admin === 1 ? ' Admin — you can issue invite codes below.' : ''}
           </p>
           <button type="button" className="ghost-button" onClick={() => auth.logout()} style={{ alignSelf: 'flex-start' }}>
             <LogOut size={14} /> Sign out
@@ -99,114 +88,6 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
     </>
   )
 }
-
-function InviteSettings() {
-  const [invites, setInvites] = useState<Array<{ code: string; used_by: string | null; used_at: number | null; expires_at: number | null; note: string | null; created_at: number }>>([])
-  const [busy, setBusy] = useState(false)
-  const [note, setNote] = useState('')
-  const [expiresInDays, setExpiresInDays] = useState('30')
-  const [generated, setGenerated] = useState<string[]>([])
-
-  const refresh = useCallback(async () => {
-    try {
-      const res = await api.get<{ invites: typeof invites }>('/api/invites')
-      setInvites(res.invites)
-    } catch {
-      /* admin-only */
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      try {
-        const res = await api.get<{ invites: typeof invites }>('/api/invites')
-        if (!cancelled) setInvites(res.invites)
-      } catch {
-        /* admin-only */
-      }
-    })()
-    return () => { cancelled = true }
-  }, [])
-
-  async function create() {
-    setBusy(true)
-    try {
-      const res = await api.post<{ codes: string[] }>('/api/invites', {
-        note: note || undefined,
-        expiresInDays: Number(expiresInDays) || 0,
-        count: 1,
-      })
-      setGenerated((prev) => [...res.codes, ...prev])
-      setNote('')
-      await refresh()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function revoke(code: string) {
-    await api.delete(`/api/invites?code=${encodeURIComponent(code)}`)
-    await refresh()
-  }
-
-  return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Admin</span>
-          <h3>Invite codes</h3>
-        </div>
-        <Mail size={18} style={{ color: 'var(--ink-mute)' }} />
-      </div>
-      <p className="muted-copy">Share an invite code with a friend so they can create an account.</p>
-
-      <div className="form-grid">
-        <label className="wide-field">
-          Note (optional)
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Who is this for?" />
-        </label>
-        <label>
-          Expires in (days, 0 = never)
-          <input inputMode="numeric" value={expiresInDays} onChange={(e) => setExpiresInDays(e.target.value)} />
-        </label>
-        <button type="button" className="primary-button" onClick={create} disabled={busy}>
-          <Plus size={14} /> Generate code
-        </button>
-      </div>
-
-      {generated.length > 0 && (
-        <p className="panel-note" style={{ color: 'var(--good)' }}>
-          New: <strong>{generated.join(', ')}</strong> — copy now, won't be highlighted again.
-        </p>
-      )}
-
-      <div className="stack">
-        {invites.length === 0 && <div className="empty" style={{ padding: 18 }}><strong>No codes yet</strong></div>}
-        {invites.map((row) => (
-          <div className="row" key={row.code}>
-            <Mail size={14} />
-            <div>
-              <strong style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.06em' }}>{row.code}</strong>
-              <span className="sub">
-                {row.used_by ? `Used` : 'Unused'}
-                {row.expires_at ? ` · expires ${new Date(row.expires_at).toLocaleDateString()}` : ''}
-                {row.note ? ` · ${row.note}` : ''}
-              </span>
-            </div>
-            <span />
-            {!row.used_by && (
-              <button type="button" className="icon-button danger" aria-label="Revoke invite" onClick={() => revoke(row.code)}>
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </>
-  )
-}
-
 
 function BundledSeedSettings() {
   const [status, setStatus] = useState<SeedImportResult | undefined>(undefined)

@@ -3,6 +3,7 @@ import { AlertTriangle, CalendarClock, ChevronRight, Droplet, HeartPulse, Syring
 import { formatDistanceToNow, format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
+import { SiteRotation } from '../components/SiteRotation'
 import {
   buildWeightDoseSeries,
   flagLatestResults,
@@ -34,7 +35,6 @@ export function Overview({
 }) {
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
   const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
-  const symptoms = useLiveQuery(() => db.symptoms.orderBy('recordedAt').reverse().toArray(), [], [])
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
   const weightGoal = goals.find((g) => g.kind === 'weight' && !g.achievedAt)
   const bpGoal = goals.find((g) => g.kind === 'bp' && !g.achievedAt)
@@ -48,7 +48,6 @@ export function Overview({
   const labFlags = flagLatestResults(results)
   const latestExam = exams[0]
   const latestBp = vitals[0]
-  const latestSymptom = symptoms[0]
 
   const bpSpark = vitals.slice(0, 14).reverse().map((v) => v.systolic)
   const weightSpark = weightSeries.filter((p) => p.weight !== undefined).slice(-14).map((p) => p.weight as number)
@@ -105,11 +104,6 @@ export function Overview({
                 ? Math.abs(weightGoal.target - weightStats.latest) < 0.5 ? 'good' : undefined
                 : weightStats.delta !== undefined && weightStats.delta < 0 ? 'good' : undefined
             }
-          />
-          <StatCard
-            label="Mood / energy"
-            value={latestSymptom ? `${latestSymptom.mood ?? '—'} / ${latestSymptom.energy ?? '—'}` : '—'}
-            detail={latestSymptom ? format(parseISO(latestSymptom.recordedAt), 'MMM d') : 'Log via injection or BP'}
           />
           <StatCard
             label="Lab flags"
@@ -211,7 +205,14 @@ export function Overview({
         )}
       </section>
 
-      {/* ── 4. Lab flags ── */}
+      {/* ── 4. Site rotation heatmap ── */}
+      {injections.length > 0 && (
+        <section className="surface col-12">
+          <SiteRotation injections={injections} recentSites={[]} />
+        </section>
+      )}
+
+      {/* ── 5. Lab flags ── */}
       {labFlags.length > 0 && (
         <section className="surface col-12">
           <div className="panel-header">

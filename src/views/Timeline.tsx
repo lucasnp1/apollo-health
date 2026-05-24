@@ -31,6 +31,14 @@ export function Timeline({
   const events = useMemo<TimelineEvent[]>(() => {
     const compoundMap = new Map(compounds.map((c) => [c.id, c]))
     const now = Date.now()
+
+    // Deduplicate files by name — keep the most-recently-added entry per filename
+    const dedupedFiles = files.reduce((acc, f) => {
+      const existing = acc.get(f.name)
+      if (!existing || f.addedAt > existing.addedAt) acc.set(f.name, f)
+      return acc
+    }, new Map<string, typeof files[number]>())
+
     return [
       ...injections.map((i) => ({
         id: `i-${i.id}`,
@@ -56,8 +64,8 @@ export function Timeline({
         title: e.name,
         detail: 'Lab exam',
       })),
-      ...files.map((f) => ({
-        id: `f-${f.id}`,
+      ...[...dedupedFiles.values()].map((f) => ({
+        id: `f-${f.id ?? f.name}-${f.addedAt}`,
         date: parseISO(f.addedAt),
         future: false,
         icon: FileText,
