@@ -28,7 +28,6 @@ import { deleteInjection, pickActiveVial } from '../lib/injections'
 import { findPKCompound, buildDailyReleaseCurve } from '../lib/pk'
 import { EmptyState } from '../components/EmptyState'
 import { SiteCombobox } from '../components/SiteCombobox'
-import { SiteRotation } from '../components/SiteRotation'
 import { TimeRangePicker } from '../components/TimeRangePicker'
 import type { TimeRange } from '../lib/timeRange'
 
@@ -51,20 +50,6 @@ export function Protocols({
   const [showSetup, setShowSetup] = useState(false)
 
   const activeProtocols = (protocols ?? []).filter((p) => !p.archived)
-
-  // Recent sites from history for combobox suggestions
-  const recentSites = useMemo(() => {
-    const seen = new Set<string>()
-    const out: string[] = []
-    for (const inj of injections) {
-      if (inj.site && !seen.has(inj.site)) {
-        seen.add(inj.site)
-        out.push(inj.site)
-        if (out.length >= 8) break
-      }
-    }
-    return out
-  }, [injections])
 
   return (
     <div className="content-grid">
@@ -114,14 +99,8 @@ export function Protocols({
         </section>
       )}
 
-      {/* ── 3. SITE ROTATION + HISTORY ─────────────────────────────────── */}
-      {injections.length > 0 && (
-        <section className="surface col-7">
-          <SiteRotation injections={injections} recentSites={recentSites} />
-        </section>
-      )}
-
-      <section className={injections.length > 0 ? 'surface col-5' : 'surface col-12'}>
+      {/* ── 3. RECENT DOSES ─────────────────────────────────────────────── */}
+      <section className="surface col-12">
         <RecentDoses injections={injections} compounds={compounds} vials={vials ?? []} />
       </section>
 
@@ -513,66 +492,91 @@ function ProtocolManage({
   const compoundMap = new Map(compounds.map((c) => [c.id, c]))
   const [showAddVial, setShowAddVial] = useState<number | null>(null) // protocolId
 
+  if (protocols.length === 0) {
+    return (
+      <>
+        <div className="panel-header">
+          <div><span className="section-label">Manage</span><h3>Vials</h3></div>
+        </div>
+        <EmptyState icon={Calendar} title="No protocols yet" detail="Use the setup panel to add your first compound + protocol." />
+      </>
+    )
+  }
+
   return (
     <>
       <div className="panel-header">
-        <div>
-          <span className="section-label">Manage</span>
-          <h3>Archive &amp; vials</h3>
-        </div>
+        <div><span className="section-label">Manage</span><h3>Vials &amp; archive</h3></div>
       </div>
-      {protocols.length > 0 ? (
-        <div className="stack">
-          {protocols.map((p) => {
-            const c = compoundMap.get(p.compoundId)
-            const protVials = vials.filter((v) => v.compoundId === p.compoundId && !v.archived)
-            return (
-              <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 12, borderBottom: '1px solid var(--line)' }}>
-                <div className="row" style={{ gridTemplateColumns: 'auto 1fr auto auto', borderBottom: 0, paddingBottom: 0 }}>
-                  <span className="dot" style={{ background: c?.color ?? 'var(--accent)' }} />
-                  <div>
-                    <strong>{p.name}</strong>
-                    <span className="sub">{c?.name ?? '?'} · {p.dose} {p.unit} · {describeCadence(p.cadence)}</span>
-                  </div>
-                  <span className="chip">{p.phase ?? 'Maintenance'}</span>
-                  <button type="button" className="icon-button danger" onClick={() => db.protocols.update(p.id!, { archived: true })} aria-label="Archive">
-                    <Trash2 size={14} />
-                  </button>
+      <div className="stack">
+        {protocols.map((p) => {
+          const c = compoundMap.get(p.compoundId)
+          const protVials = vials.filter((v) => v.compoundId === p.compoundId && !v.archived)
+          return (
+            <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Protocol row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="dot" style={{ background: c?.color ?? 'var(--accent)', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <strong style={{ fontSize: 13 }}>{p.name}</strong>
+                  <span className="sub">{c?.name ?? '?'} · {p.dose} {p.unit} · {describeCadence(p.cadence)}</span>
                 </div>
-                {/* Vials for this protocol */}
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingLeft: 24 }}>
-                  {protVials.map((v) => {
-                    const pct = (v.remainingMl / Math.max(v.totalMl, 0.001)) * 100
-                    const tone = pct < 15 ? 'bad' : pct < 35 ? 'warn' : 'good'
-                    return (
-                      <div key={v.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '4px 8px', borderRadius: 'var(--radius-sm)',
-                        background: 'var(--surface-2)', border: '1px solid var(--line)', fontSize: 12,
-                      }}>
-                        <Droplet size={11} style={{ color: `var(--${tone})` }} />
-                        <span>{v.label}</span>
-                        <span style={{ color: 'var(--ink-dim)' }}>{v.remainingMl.toFixed(1)}/{v.totalMl} mL</span>
-                        <button type="button" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--ink-mute)', lineHeight: 1 }}
-                          onClick={() => db.vials.update(v.id!, { archived: true })}><X size={11} /></button>
-                      </div>
-                    )
-                  })}
-                  {showAddVial === p.id ? (
-                    <AddVialInline compoundId={p.compoundId} onDone={() => setShowAddVial(null)} />
-                  ) : (
-                    <button type="button" className="ghost-button" style={{ height: 28, fontSize: 11 }} onClick={() => setShowAddVial(p.id!)}>
-                      <Plus size={11} /> Add vial
-                    </button>
-                  )}
-                </div>
+                {p.phase && <span className="chip" style={{ flexShrink: 0 }}>{p.phase}</span>}
+                <button
+                  type="button"
+                  className="ghost-button"
+                  style={{ height: 28, fontSize: 11, flexShrink: 0 }}
+                  onClick={() => db.protocols.update(p.id!, { archived: true })}
+                >
+                  Archive
+                </button>
               </div>
-            )
-          })}
-        </div>
-      ) : (
-        <EmptyState icon={Calendar} title="No protocols yet" detail="Use the setup panel to add your first compound + protocol." />
-      )}
+              {/* Vials */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 20 }}>
+                {protVials.map((v) => {
+                  const pct = (v.remainingMl / Math.max(v.totalMl, 0.001)) * 100
+                  const tone = pct < 15 ? 'bad' : pct < 35 ? 'warn' : 'good'
+                  return (
+                    <div key={v.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+                      background: 'var(--surface-2)', border: '1px solid var(--line)',
+                    }}>
+                      <Droplet size={12} style={{ color: `var(--${tone})`, flexShrink: 0 }} />
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{v.label}</span>
+                      <span style={{ fontSize: 12, color: 'var(--ink-dim)' }}>{v.remainingMl.toFixed(1)} / {v.totalMl} mL</span>
+                      {/* progress bar */}
+                      <div style={{ width: 48, height: 4, borderRadius: 2, background: 'var(--line)', flexShrink: 0, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: `var(--${tone})`, borderRadius: 2 }} />
+                      </div>
+                      <button
+                        type="button"
+                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--ink-mute)', lineHeight: 1, flexShrink: 0 }}
+                        onClick={() => db.vials.update(v.id!, { archived: true })}
+                        aria-label="Remove vial"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )
+                })}
+                {showAddVial === p.id ? (
+                  <AddVialInline compoundId={p.compoundId} onDone={() => setShowAddVial(null)} />
+                ) : (
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    style={{ height: 30, fontSize: 12, alignSelf: 'flex-start' }}
+                    onClick={() => setShowAddVial(p.id!)}
+                  >
+                    <Plus size={11} /> Add vial
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </>
   )
 }
