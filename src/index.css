@@ -627,8 +627,8 @@ time,
 .row span.sub { color: var(--ink-mute); font-size: 11px; display: block; margin-top: 1px; font-weight: 500; }
 .row time { color: var(--ink-dim); font-size: 11px; font-family: var(--font-mono); font-weight: 500; }
 
-/* Protocol quick row: 6-col on desktop (dot + name + chip + last + vial + log) */
-.protocol-quick-row { grid-template-columns: auto 1fr auto auto auto auto; }
+/* Protocol quick row: 7-col on desktop (dot + name + chip + last + vial + edit + log) */
+.protocol-quick-row { grid-template-columns: auto 1fr auto auto auto auto auto; }
 
 /* Mobile-only utility: hidden by default, shown only in the mobile breakpoint */
 .show-mobile-only { display: none; }

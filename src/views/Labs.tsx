@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, Edit2, FileText, FlaskConical, Plus, Trash2, Upload, X } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { format, parseISO } from 'date-fns'
@@ -128,12 +128,18 @@ export function Labs({
 
   async function saveTarget(key: string, unit?: string) {
     if (!key) return
-    await db.markerTargets.put({
+    const data = {
       marker: key,
       low: targetLow ? Number(targetLow) : undefined,
       high: targetHigh ? Number(targetHigh) : undefined,
       unit,
-    })
+    }
+    const existing = targetByKey.get(key)
+    if (existing?.id) {
+      await db.markerTargets.update(existing.id, data)
+    } else {
+      await db.markerTargets.add(data)
+    }
     setEditingTargetKey(null)
     setTargetLow('')
     setTargetHigh('')
@@ -312,9 +318,9 @@ export function Labs({
                     return out ? n + 1 : n
                   }, 0)
                   return (
-                    <>
+                    <Fragment key={panel}>
                       {/* Panel header row */}
-                      <tr key={`panel-${panel}`} style={{ cursor: 'pointer' }} onClick={() => togglePanel(panel)}>
+                      <tr style={{ cursor: 'pointer' }} onClick={() => togglePanel(panel)}>
                         <td colSpan={examColumns.length + 1} style={{ padding: '12px 0 4px', borderTop: '2px solid var(--line)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             {collapsed ? <ChevronRight size={12} style={{ color: 'var(--ink-mute)' }} /> : <ChevronDown size={12} style={{ color: 'var(--ink-mute)' }} />}
@@ -338,9 +344,8 @@ export function Labs({
                           (latestVal.low !== undefined && latestVal.value < latestVal.low)
                         )
                         return (
-                          <>
+                          <Fragment key={row.marker}>
                             <tr
-                              key={row.marker}
                               className={isSelected ? 'selected' : undefined}
                               onClick={() => row.key && setSelectedKey(isSelected ? undefined : row.key)}
                               style={{ cursor: row.key ? 'pointer' : 'default' }}
@@ -393,7 +398,7 @@ export function Labs({
                                           className="icon-button danger"
                                           style={{ width: 18, height: 18, opacity: 0, transition: 'opacity 0.15s' }}
                                           title="Delete this result"
-                                          onClick={(e) => { e.stopPropagation(); db.results.delete(cell.resultId!) }}
+                                          onClick={(e) => { e.stopPropagation(); void db.results.delete(cell.resultId!) }}
                                           aria-label="Delete result"
                                           onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
                                           onMouseOut={(e) => (e.currentTarget.style.opacity = '0')}
@@ -408,7 +413,7 @@ export function Labs({
                             </tr>
                             {/* Inline target edit row */}
                             {isEditingTarget && (
-                              <tr key={`${row.marker}-target-edit`} onClick={(e) => e.stopPropagation()}>
+                              <tr onClick={(e) => e.stopPropagation()}>
                                 <td colSpan={examColumns.length + 1} style={{ padding: '8px 0', background: 'var(--accent-soft)' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '0 4px' }}>
                                     <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-ink)' }}>Personal range for {row.marker}:</span>
@@ -440,7 +445,7 @@ export function Labs({
                                     </button>
                                     {hasPersonalTarget && (
                                       <button type="button" className="ghost-button" style={{ height: 26, fontSize: 11, color: 'var(--bad)' }}
-                                        onClick={(e) => { e.stopPropagation(); db.markerTargets.where('marker').equals(row.key!).delete(); setEditingTargetKey(null) }}>
+                                        onClick={(e) => { e.stopPropagation(); void db.markerTargets.where('marker').equals(row.key!).delete(); setEditingTargetKey(null) }}>
                                         Remove custom
                                       </button>
                                     )}
@@ -451,10 +456,10 @@ export function Labs({
                                 </td>
                               </tr>
                             )}
-                          </>
+                          </Fragment>
                         )
                       })}
-                    </>
+                    </Fragment>
                   )
                 })}
               </tbody>
