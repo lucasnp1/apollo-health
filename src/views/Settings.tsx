@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Database, Download, LogOut, RefreshCw, Trash2, UserCircle } from 'lucide-react'
-import { db, importBundledSeed, recordCounts, type SeedImportResult } from '../lib/db'
+import { AlertTriangle, Download, LogOut, Trash2, UserCircle, X } from 'lucide-react'
+import { db } from '../lib/db'
 import { wipeLocalDatabase } from '../lib/lock'
 import type { useAuth } from '../lib/useAuth'
 
@@ -42,15 +42,7 @@ export function Settings({ auth }: { auth: AuthBundle }) {
       </section>
 
       <section className="surface col-6">
-        <BundledSeedSettings />
-      </section>
-
-      <section className="surface col-6">
         <BackupSettings />
-      </section>
-
-      <section className="surface col-6">
-        <DeduplicateSettings />
       </section>
 
       <section className="surface col-12">
@@ -89,69 +81,6 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
   )
 }
 
-function BundledSeedSettings() {
-  const [status, setStatus] = useState<SeedImportResult | undefined>(undefined)
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    void recordCounts().then((counts) => setStatus({ status: 'skipped', counts }))
-  }, [])
-
-  async function refresh(force = false) {
-    setBusy(true)
-    try {
-      const result = await importBundledSeed(force)
-      setStatus(result)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Bundled data</span>
-          <h3>Local seed import</h3>
-        </div>
-      </div>
-      <p className="muted-copy">
-        If a seed file ships with this build, this re-runs the bundled import. Useful to refresh sample data on a
-        new device. Re-importing replaces existing seeded records.
-      </p>
-      {status && (
-        <div className="stack">
-          <div className="row">
-            <Database size={14} />
-            <div>
-              <strong>Current totals</strong>
-              <span className="sub">
-                {status.counts.compounds} compounds · {status.counts.injections} injections · {status.counts.vitals} vitals · {status.counts.exams} exams · {status.counts.results} results · {status.counts.files} files
-              </span>
-            </div>
-            <span /><span />
-          </div>
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" className="primary-button" disabled={busy} onClick={() => refresh(false)}>
-          <RefreshCw size={13} /> Apply if newer
-        </button>
-        <button type="button" className="ghost-button" disabled={busy} onClick={() => refresh(true)}>
-          Force re-import
-        </button>
-      </div>
-      {status?.status === 'missing' && <p className="panel-note">No seed file is bundled with this build.</p>}
-      {status?.status === 'skipped' && status.seedVersion && (
-        <p className="panel-note">Already on seed version <code>{status.seedVersion}</code>.</p>
-      )}
-      {status?.status === 'imported' && (
-        <p className="panel-note" style={{ color: 'var(--good)' }}>Imported seed {status.seedVersion}.</p>
-      )}
-    </>
-  )
-}
-
 function BackupSettings() {
   return (
     <>
@@ -163,7 +92,7 @@ function BackupSettings() {
       </div>
       <p className="muted-copy">
         Plain JSON dump of every table. Useful before clearing site data, switching browsers, or handing data
-        to a doctor. Encrypted export is planned.
+        to a doctor.
       </p>
       <button type="button" className="primary-button" onClick={exportJson}>
         <Download size={14} /> Download JSON
@@ -172,83 +101,15 @@ function BackupSettings() {
   )
 }
 
-function DeduplicateSettings() {
-  const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<{ removed: number } | null>(null)
-
-  async function deduplicate() {
-    setBusy(true)
-    setResult(null)
-    try {
-      const all = await db.injections.toArray()
-      const seen = new Map<string, number>() // key → lowest id to keep
-      const toDelete: number[] = []
-
-      for (const inj of all.filter((i) => !i.deletedAtSync)) {
-        const minuteBucket = Math.floor(Date.parse(inj.takenAt) / 60_000)
-        const key = `${inj.compoundId}|${inj.dose ?? ''}|${minuteBucket}`
-        const existing = seen.get(key)
-        if (existing === undefined) {
-          seen.set(key, inj.id!)
-        } else {
-          // Keep the lower id (older write), mark the other for deletion
-          if (inj.id! < existing) {
-            toDelete.push(existing)
-            seen.set(key, inj.id!)
-          } else {
-            toDelete.push(inj.id!)
-          }
-        }
-      }
-
-      // Soft-delete duplicates (tombstone so they sync-delete from server too)
-      for (const id of toDelete) {
-        await db.injections.update(id, {
-          deletedAtSync: Date.now(),
-          dirty: 1,
-          updatedAt: Date.now(),
-        })
-      }
-
-      setResult({ removed: toDelete.length })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Data quality</span>
-          <h3>Remove duplicate logs</h3>
-        </div>
-        <Database size={18} style={{ color: 'var(--ink-mute)' }} />
-      </div>
-      <p className="muted-copy">
-        The sync engine can create phantom duplicate injection records when the same entry
-        is downloaded multiple times. This permanently removes duplicates (same compound,
-        same dose, within the same minute) keeping the oldest record.
-      </p>
-      <button type="button" className="ghost-button" disabled={busy} onClick={deduplicate}>
-        <RefreshCw size={14} /> {busy ? 'Scanning…' : 'Find & remove duplicates'}
-      </button>
-      {result && (
-        <p className="panel-note" style={{ color: result.removed > 0 ? 'var(--good)' : undefined }}>
-          {result.removed > 0
-            ? `Removed ${result.removed} duplicate record${result.removed > 1 ? 's' : ''}. Data will sync-clean on next push.`
-            : 'No duplicates found — data looks clean.'}
-        </p>
-      )}
-    </>
-  )
-}
-
 function DangerSettings() {
-  const [confirming, setConfirming] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
   const [busy, setBusy] = useState(false)
+
+  const confirmed = confirmText.trim().toUpperCase() === 'RESET'
 
   async function wipe() {
+    if (!confirmed) return
     setBusy(true)
     try {
       await wipeLocalDatabase()
@@ -257,6 +118,19 @@ function DangerSettings() {
       setBusy(false)
     }
   }
+
+  function closeModal() {
+    setModalOpen(false)
+    setConfirmText('')
+  }
+
+  // Close on Escape
+  useEffect(() => {
+    if (!modalOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [modalOpen])
 
   return (
     <>
@@ -268,23 +142,84 @@ function DangerSettings() {
         <AlertTriangle size={18} style={{ color: 'var(--bad)' }} />
       </div>
       <p className="muted-copy">
-        Wipes every local table — compounds, injections, vitals, labs, files, protocols, vials, symptoms, targets,
-        body metrics, and your passphrase. Cannot be undone. The seed will be re-applied on next load if one is
-        bundled.
+        Wipes every local table — compounds, injections, vitals, labs, files, protocols, vials, symptoms,
+        targets, body metrics, and your passphrase. <strong>Cannot be undone.</strong>
       </p>
-      {confirming ? (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="primary-button" style={{ background: 'var(--bad)', color: '#fff' }} disabled={busy} onClick={wipe}>
-            <Trash2 size={14} /> Yes, wipe everything
-          </button>
-          <button type="button" className="ghost-button" disabled={busy} onClick={() => setConfirming(false)}>
-            Cancel
-          </button>
+      <button
+        type="button"
+        className="ghost-button"
+        style={{ alignSelf: 'flex-start', color: 'var(--bad)', borderColor: 'var(--bad-soft)' }}
+        onClick={() => setModalOpen(true)}
+      >
+        <Trash2 size={14} /> Wipe local data…
+      </button>
+
+      {/* Confirmation modal */}
+      {modalOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 60,
+            background: 'rgba(10,10,10,0.55)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 24,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
+          role="dialog"
+          aria-modal
+        >
+          <div style={{
+            background: 'var(--surface)',
+            borderRadius: 'var(--radius-lg)',
+            boxShadow: 'var(--shadow-lg)',
+            width: '100%', maxWidth: 420,
+            padding: 28,
+            display: 'flex', flexDirection: 'column', gap: 16,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <AlertTriangle size={20} style={{ color: 'var(--bad)', flexShrink: 0 }} />
+                <h3 style={{ margin: 0, fontSize: 16 }}>Wipe all local data?</h3>
+              </div>
+              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cancel"><X size={14} /></button>
+            </div>
+
+            <p style={{ fontSize: 13, color: 'var(--ink-dim)', margin: 0, lineHeight: 1.6 }}>
+              This will permanently delete every injection, vital, lab result, protocol, compound, file, and
+              symptom stored on this device. <strong style={{ color: 'var(--bad)' }}>There is no undo.</strong>
+              {' '}If you are synced, your data remains on the server.
+            </p>
+
+            <label style={{ fontSize: 13, fontWeight: 600 }}>
+              Type <code style={{ background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 4 }}>RESET</code> to confirm
+              <input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="RESET"
+                autoFocus
+                style={{ marginTop: 6, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }}
+              />
+            </label>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" className="ghost-button" onClick={closeModal} disabled={busy}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                style={{
+                  background: confirmed ? 'var(--bad)' : 'var(--line)',
+                  color: confirmed ? '#fff' : 'var(--ink-mute)',
+                  cursor: confirmed ? 'pointer' : 'not-allowed',
+                }}
+                onClick={wipe}
+                disabled={!confirmed || busy}
+              >
+                <Trash2 size={14} /> {busy ? 'Wiping…' : 'Wipe everything'}
+              </button>
+            </div>
+          </div>
         </div>
-      ) : (
-        <button type="button" className="ghost-button" onClick={() => setConfirming(true)}>
-          <Trash2 size={14} /> Wipe local data
-        </button>
       )}
     </>
   )

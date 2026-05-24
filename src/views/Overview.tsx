@@ -65,8 +65,8 @@ export function Overview({
   return (
     <div className="content-grid">
 
-      {/* ── 1. Status stat cards ── */}
-      <section className="surface col-12">
+      {/* ── 1. Status stat cards + site rotation ── */}
+      <section className="surface col-8">
         <div className="panel-header">
           <div><span className="section-label">Now</span><h3>Status</h3></div>
         </div>
@@ -112,6 +112,11 @@ export function Overview({
             tone={labFlags.length ? 'warn' : undefined}
           />
         </div>
+      </section>
+
+      {/* ── 1b. Site rotation — same row as status ── */}
+      <section className="surface col-4">
+        <SiteRotation injections={injections} recentSites={[]} />
       </section>
 
       {/* ── 2. Recent doses — prominent on mobile ── */}
@@ -205,14 +210,7 @@ export function Overview({
         )}
       </section>
 
-      {/* ── 4. Site rotation heatmap ── */}
-      {injections.length > 0 && (
-        <section className="surface col-12">
-          <SiteRotation injections={injections} recentSites={[]} />
-        </section>
-      )}
-
-      {/* ── 5. Lab flags ── */}
+      {/* ── 4. Lab flags ── */}
       {labFlags.length > 0 && (
         <section className="surface col-12">
           <div className="panel-header">
