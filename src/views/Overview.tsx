@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { AlertTriangle, CalendarClock, ChevronRight, Droplet, HeartPulse, Syringe } from 'lucide-react'
+import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, Circle, Droplet, FlaskConical, HeartPulse, Plus, Syringe } from 'lucide-react'
 import { formatDistanceToNow, format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
@@ -24,6 +24,7 @@ export function Overview({
   results,
   onNavigate,
   onOpenQuickLog,
+  onOpenWizard,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
@@ -32,6 +33,7 @@ export function Overview({
   results: EnrichedResult[]
   onNavigate: (view: View) => void
   onOpenQuickLog: (tab: 'injection', prefill?: QuickLogPrefill) => void
+  onOpenWizard: () => void
 }) {
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
   const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
@@ -49,6 +51,18 @@ export function Overview({
   const latestExam = exams[0]
   const latestBp = vitals[0]
 
+  // HCT alert — hematocrit > 52% is a safety flag for TRT users
+  const hctResult = results.find((r) => {
+    const m = r.marker?.toLowerCase()
+    return (m?.includes('hematocrit') || m === 'hct' || m === 'haematocrit') && r.value !== undefined && r.value > 52
+  })
+
+  // Onboarding checklist — show until user has all 3 basics set up
+  const hasProtocol = compounds.length > 0
+  const hasInjection = injections.length > 0
+  const hasLabs = exams.length > 0
+  const showOnboarding = !hasProtocol || !hasInjection || !hasLabs
+
   const bpSpark = vitals.slice(0, 14).reverse().map((v) => v.systolic)
   const weightSpark = weightSeries.filter((p) => p.weight !== undefined).slice(-14).map((p) => p.weight as number)
 
@@ -64,6 +78,81 @@ export function Overview({
 
   return (
     <div className="content-grid">
+
+      {/* ── Onboarding checklist ── */}
+      {showOnboarding && (
+        <section className="surface col-12" style={{ borderLeft: '3px solid var(--accent)' }}>
+          <div className="panel-header">
+            <div><span className="section-label">Getting started</span><h3>Set up your health record</h3></div>
+          </div>
+          <div className="stack" style={{ gap: 10 }}>
+            <div className="row" style={{ alignItems: 'center' }}>
+              {hasProtocol
+                ? <CheckCircle2 size={16} style={{ color: 'var(--good)', flexShrink: 0 }} />
+                : <Circle size={16} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />}
+              <div style={{ flex: 1 }}>
+                <strong style={{ color: hasProtocol ? 'var(--ink-mute)' : undefined, textDecoration: hasProtocol ? 'line-through' : undefined }}>
+                  Create your first protocol
+                </strong>
+                <span className="sub">Set up your compound, dose schedule, and vial.</span>
+              </div>
+              {!hasProtocol && (
+                <button type="button" className="primary-button" style={{ fontSize: 12, height: 30, padding: '0 12px' }} onClick={onOpenWizard}>
+                  <Plus size={12} /> Create
+                </button>
+              )}
+            </div>
+            <div className="row" style={{ alignItems: 'center' }}>
+              {hasInjection
+                ? <CheckCircle2 size={16} style={{ color: 'var(--good)', flexShrink: 0 }} />
+                : <Circle size={16} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />}
+              <div style={{ flex: 1 }}>
+                <strong style={{ color: hasInjection ? 'var(--ink-mute)' : undefined, textDecoration: hasInjection ? 'line-through' : undefined }}>
+                  Log your first injection
+                </strong>
+                <span className="sub">Record your dose, site, and how you feel.</span>
+              </div>
+              {!hasInjection && (
+                <button type="button" className="primary-button" style={{ fontSize: 12, height: 30, padding: '0 12px' }} onClick={() => onOpenQuickLog('injection')}>
+                  <Plus size={12} /> Log
+                </button>
+              )}
+            </div>
+            <div className="row" style={{ alignItems: 'center' }}>
+              {hasLabs
+                ? <CheckCircle2 size={16} style={{ color: 'var(--good)', flexShrink: 0 }} />
+                : <Circle size={16} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />}
+              <div style={{ flex: 1 }}>
+                <strong style={{ color: hasLabs ? 'var(--ink-mute)' : undefined, textDecoration: hasLabs ? 'line-through' : undefined }}>
+                  Add your latest bloodwork
+                </strong>
+                <span className="sub">Upload a PDF or enter markers manually.</span>
+              </div>
+              {!hasLabs && (
+                <button type="button" className="ghost-button" style={{ fontSize: 12, height: 30, padding: '0 12px', whiteSpace: 'nowrap' }} onClick={() => onNavigate('labs')}>
+                  <FlaskConical size={12} /> Go to Labs
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── HCT alert ── */}
+      {hctResult && (
+        <section className="surface col-12" style={{ borderLeft: '3px solid var(--bad, #e53e3e)', background: 'var(--bad-soft, #fff5f5)' }}>
+          <div className="row" style={{ alignItems: 'center', padding: '4px 0' }}>
+            <AlertTriangle size={16} style={{ color: 'var(--bad, #e53e3e)', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <strong style={{ color: 'var(--bad, #e53e3e)' }}>Hematocrit {hctResult.rawValue}% — above 52%</strong>
+              <span className="sub">Elevated hematocrit increases blood viscosity. Consider donating blood and consulting your physician.</span>
+            </div>
+            <button type="button" className="ghost-button" style={{ fontSize: 12, whiteSpace: 'nowrap' }} onClick={() => onNavigate('labs')}>
+              View labs <ChevronRight size={13} />
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* ── 1. Status stat cards + site rotation ── */}
       <section className="surface col-8">
@@ -247,6 +336,6 @@ function labStatusLabel(r: LabResult) {
   return 'Flag'
 }
 
-// Suppress unused icon warnings
+// Suppress unused icon warnings (imported for potential future use)
 void Droplet
 void HeartPulse

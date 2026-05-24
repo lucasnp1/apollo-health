@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { HeartPulse, Plus, Trash2 } from 'lucide-react'
+import { Edit2, HeartPulse, Plus, Scale, Target, Trash2, X } from 'lucide-react'
 import {
   Area,
   AreaChart,
@@ -22,8 +22,13 @@ import { EmptyState } from '../components/EmptyState'
 export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   const [range, setRange] = useState<TimeRange>('3M')
   const [form, setForm] = useState({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
+  const [weightForm, setWeightForm] = useState({ weightKg: '', measuredAt: new Date().toISOString().slice(0, 16) })
+  const [goalEditKind, setGoalEditKind] = useState<'weight' | 'bp' | null>(null)
+  const [goalForm, setGoalForm] = useState({ target: '', label: '' })
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
+  const bodyMetrics = useLiveQuery(() => db.bodyMetrics.orderBy('measuredAt').reverse().limit(50).toArray(), [], [])
   const bpGoal = goals.find((g) => g.kind === 'bp' && !g.achievedAt)
+  const weightGoalRow = goals.find((g) => g.kind === 'weight' && !g.achievedAt)
 
   const filtered = useMemo(
     () => filterByRange(vitals, range, (v) => parseISO(v.measuredAt)).slice().reverse(),
@@ -59,6 +64,31 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
       notes: form.notes,
     })
     setForm({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
+  }
+
+  async function addWeight() {
+    if (!weightForm.weightKg) return
+    await db.bodyMetrics.add({
+      measuredAt: new Date(weightForm.measuredAt).toISOString(),
+      source: 'manual',
+      weightKg: Number(weightForm.weightKg),
+    })
+    setWeightForm({ weightKg: '', measuredAt: new Date().toISOString().slice(0, 16) })
+  }
+
+  async function saveGoal() {
+    if (!goalEditKind || !goalForm.target) return
+    // Soft-delete existing active goal of same kind
+    const existing = goals.find((g) => g.kind === goalEditKind && !g.achievedAt)
+    if (existing?.id) await db.goals.update(existing.id, { achievedAt: new Date().toISOString() })
+    await db.goals.add({
+      kind: goalEditKind,
+      label: goalForm.label || (goalEditKind === 'weight' ? 'Target weight' : 'BP target'),
+      target: Number(goalForm.target),
+      startedAt: new Date().toISOString(),
+    })
+    setGoalEditKind(null)
+    setGoalForm({ target: '', label: '' })
   }
 
   return (
@@ -166,6 +196,116 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         )}
       </section>
 
+      {/* ── Row 3: Weight logging ── */}
+      <section className="surface col-5">
+        <div className="panel-header">
+          <div><span className="section-label">Body weight</span><h3>Log weight</h3></div>
+        </div>
+        <div className="form-grid">
+          <label>
+            Weight (kg)
+            <input inputMode="decimal" placeholder="e.g. 82.5" value={weightForm.weightKg} onChange={(e) => setWeightForm({ ...weightForm, weightKg: e.target.value })} />
+          </label>
+          <label>
+            Measured at
+            <input type="datetime-local" value={weightForm.measuredAt} onChange={(e) => setWeightForm({ ...weightForm, measuredAt: e.target.value })} />
+          </label>
+          <button type="button" className="primary-button wide-field" onClick={addWeight} disabled={!weightForm.weightKg}>
+            <Scale size={14} /> Save weight
+          </button>
+        </div>
+      </section>
+
+      {/* Weight history */}
+      <section className="surface col-7">
+        <div className="panel-header">
+          <div><span className="section-label">History</span><h3>Weight log</h3></div>
+        </div>
+        {(bodyMetrics?.filter((m) => m.weightKg !== undefined).length ?? 0) > 0 ? (
+          <div className="stack">
+            {bodyMetrics?.filter((m) => m.weightKg !== undefined).slice(0, 15).map((m) => (
+              <div className="row" key={m.id}>
+                <Scale size={13} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <strong>{m.weightKg?.toFixed(1)} kg</strong>
+                  <span className="sub">{m.source === 'manual' ? 'Manual entry' : m.source}</span>
+                </div>
+                <time>{format(parseISO(m.measuredAt), 'MMM d HH:mm')}</time>
+                <button type="button" className="icon-button danger" onClick={() => db.bodyMetrics.delete(m.id!)} aria-label="Delete">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon={Scale} title="No weight logs" detail="Log your weight on the left." />
+        )}
+      </section>
+
+      {/* ── Row 4: Goals ── */}
+      <section className="surface col-12">
+        <div className="panel-header">
+          <div><span className="section-label">Targets</span><h3>Goals</h3></div>
+        </div>
+
+        {goalEditKind && (
+          <div className="form-grid" style={{ marginBottom: 16, padding: '12px 0', borderBottom: '1px solid var(--line)' }}>
+            <label>
+              {goalEditKind === 'weight' ? 'Target weight (kg)' : 'Target systolic (mmHg)'}
+              <input inputMode="decimal" placeholder={goalEditKind === 'weight' ? '80' : '120'}
+                value={goalForm.target} onChange={(e) => setGoalForm({ ...goalForm, target: e.target.value })} autoFocus />
+            </label>
+            <label>
+              Label (optional)
+              <input placeholder={goalEditKind === 'weight' ? 'e.g. Bulk target' : 'e.g. Keep BP low'}
+                value={goalForm.label} onChange={(e) => setGoalForm({ ...goalForm, label: e.target.value })} />
+            </label>
+            <div className="wide-field" style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="primary-button" onClick={saveGoal} disabled={!goalForm.target}>Save goal</button>
+              <button type="button" className="ghost-button" onClick={() => setGoalEditKind(null)}><X size={13} /> Cancel</button>
+            </div>
+          </div>
+        )}
+
+        <div className="stack">
+          {/* BP goal */}
+          <div className="row" style={{ alignItems: 'center' }}>
+            <Target size={14} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <strong>Blood pressure</strong>
+              <span className="sub">{bpGoal ? `Target: ${bpGoal.target} mmHg systolic` : 'No target set'}</span>
+            </div>
+            <button type="button" className="ghost-button" style={{ fontSize: 12 }}
+              onClick={() => { setGoalEditKind('bp'); setGoalForm({ target: bpGoal ? String(bpGoal.target) : '', label: bpGoal?.label ?? '' }) }}>
+              <Edit2 size={12} /> {bpGoal ? 'Edit' : 'Set target'}
+            </button>
+            {bpGoal && (
+              <button type="button" className="icon-button danger" aria-label="Remove goal"
+                onClick={() => db.goals.update(bpGoal.id!, { achievedAt: new Date().toISOString() })}>
+                <Trash2 size={13} />
+              </button>
+            )}
+          </div>
+          {/* Weight goal */}
+          <div className="row" style={{ alignItems: 'center' }}>
+            <Scale size={14} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <strong>Body weight</strong>
+              <span className="sub">{weightGoalRow ? `Target: ${weightGoalRow.target} kg` : 'No target set'}</span>
+            </div>
+            <button type="button" className="ghost-button" style={{ fontSize: 12 }}
+              onClick={() => { setGoalEditKind('weight'); setGoalForm({ target: weightGoalRow ? String(weightGoalRow.target) : '', label: weightGoalRow?.label ?? '' }) }}>
+              <Edit2 size={12} /> {weightGoalRow ? 'Edit' : 'Set target'}
+            </button>
+            {weightGoalRow && (
+              <button type="button" className="icon-button danger" aria-label="Remove goal"
+                onClick={() => db.goals.update(weightGoalRow.id!, { achievedAt: new Date().toISOString() })}>
+                <Trash2 size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
     </div>
   )

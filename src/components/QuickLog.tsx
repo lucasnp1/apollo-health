@@ -229,6 +229,7 @@ function InjectionForm({
 
   const [compoundId, setCompoundId] = useState<number | ''>(prefill?.compoundId ?? compounds[0]?.id ?? '')
   const [dose, setDose] = useState(prefill?.dose !== undefined ? String(prefill.dose) : '')
+  const [route, setRoute] = useState<'IM' | 'SubQ' | 'Oral' | 'Other'>('IM')
   const [site, setSite] = useState(COMMON_SITES[0])
   const [weightKg, setWeightKg] = useState('')
   const [notes, setNotes] = useState('')
@@ -263,7 +264,7 @@ function InjectionForm({
         takenAt: new Date().toISOString(),
         dose: Number(dose),
         unit,
-        route: 'SubQ',
+        route,
         site,
         notes: notes || undefined,
         vialId: activeVialId,
@@ -306,6 +307,14 @@ function InjectionForm({
       <label>
         Dose ({compound?.unit ?? 'mg'})
         <input inputMode="decimal" placeholder={String(compound?.defaultDose ?? '')} value={dose} onChange={(e) => setDose(e.target.value)} />
+      </label>
+      <label className="wide-field">
+        Route
+        <div className="pill-tabs" role="group" style={{ marginTop: 6 }}>
+          {(['IM', 'SubQ', 'Oral', 'Other'] as const).map((r) => (
+            <button key={r} type="button" role="radio" aria-checked={route === r} className={route === r ? 'active' : undefined} onClick={() => setRoute(r)}>{r}</button>
+          ))}
+        </div>
       </label>
       <label>
         Site

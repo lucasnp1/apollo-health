@@ -32,11 +32,13 @@ export function Protocols({
   injections,
   onOpenQuickLog,
   onOpenWizard,
+  onEditProtocol,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
   onOpenQuickLog: (tab: 'injection', prefill?: import('../App').QuickLogPrefill) => void
   onOpenWizard: () => void
+  onEditProtocol: (p: Protocol & { id: number }) => void
 }) {
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
@@ -64,6 +66,7 @@ export function Protocols({
                 vials={vials ?? []}
                 injections={injections}
                 onLog={onOpenQuickLog}
+                onEdit={p.id !== undefined ? () => onEditProtocol(p as Protocol & { id: number }) : undefined}
               />
             ))}
           </div>
@@ -101,12 +104,14 @@ function ProtocolQuickRow({
   vials,
   injections,
   onLog,
+  onEdit,
 }: {
   protocol: Protocol
   compounds: Compound[]
   vials: Vial[]
   injections: InjectionLog[]
   onLog: (tab: 'injection', prefill?: import('../App').QuickLogPrefill) => void
+  onEdit?: () => void
 }) {
   const compound = compounds.find((c) => c.id === protocol.compoundId)
   const activeVial = compound ? pickActiveVial(vials, compound.id!) : undefined
@@ -141,6 +146,18 @@ function ProtocolQuickRow({
         </span>
       ) : (
         <span className="hide-mobile" style={{ fontSize: 11, color: 'var(--ink-mute)' }}>No vial</span>
+      )}
+      {onEdit && (
+        <button
+          type="button"
+          className="icon-button hide-mobile"
+          style={{ width: 28, height: 28 }}
+          onClick={onEdit}
+          aria-label="Edit protocol"
+          title="Edit protocol"
+        >
+          <Pencil size={13} />
+        </button>
       )}
       <button
         type="button"

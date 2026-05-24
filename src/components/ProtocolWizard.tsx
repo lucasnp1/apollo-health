@@ -16,11 +16,14 @@ export function ProtocolWizard({
   open,
   onClose,
   compounds,
+  editProtocol,
 }: {
   open: boolean
   onClose: () => void
   compounds: Compound[]
+  editProtocol?: Protocol & { id: number }
 }) {
+  const isEditMode = editProtocol !== undefined
   const [step, setStep] = useState<Step>('compound')
   const [showAddCompound, setShowAddCompound] = useState(false)
 
@@ -53,15 +56,35 @@ export function ProtocolWizard({
   // Reset when opening
   useEffect(() => {
     if (open) {
-      setStep('compound')
-      setShowAddCompound(compounds.length === 0)
-      setSavedCompoundId(null)
-      setSavedProtocolCompoundId(null)
-      setCName(''); setCDefaultDose('')
-      setPCompoundId(''); setPName(''); setPDose('')
-      setVLabel('Vial #1'); setVTotalMl(''); setVConc('')
+      if (editProtocol) {
+        // Edit mode: pre-fill from existing protocol
+        setStep('protocol')
+        setShowAddCompound(false)
+        setPCompoundId(String(editProtocol.compoundId))
+        setPName(editProtocol.name)
+        setPDose(String(editProtocol.dose))
+        setPUnit(editProtocol.unit)
+        setPPhase(editProtocol.phase ?? 'Maintenance')
+        const cad = editProtocol.cadence
+        setPKind(cad.kind)
+        if (cad.kind === 'everyNDays') setPN(String(cad.n))
+        if (cad.kind === 'weekly') setPDow(cad.daysOfWeek)
+        if (cad.kind === 'everyNDays' || cad.kind === 'weekly') setPTime(cad.timeOfDay ?? '09:00')
+        if (cad.kind === 'daily') setPTime(cad.timesOfDay?.[0] ?? '09:00')
+        setSavedCompoundId(null)
+        setSavedProtocolCompoundId(null)
+      } else {
+        setStep('compound')
+        setShowAddCompound(compounds.length === 0)
+        setSavedCompoundId(null)
+        setSavedProtocolCompoundId(null)
+        setCName(''); setCDefaultDose('')
+        setPCompoundId(''); setPName(''); setPDose('')
+        setVLabel('Vial #1'); setVTotalMl(''); setVConc('')
+      }
     }
-  }, [open, compounds.length])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editProtocol?.id, compounds.length])
 
   // Escape key
   useEffect(() => {
@@ -111,18 +134,23 @@ export function ProtocolWizard({
     else if (pKind === 'weekly') cadence = { kind: pKind, daysOfWeek: pDow, timeOfDay: pTime }
     else if (pKind === 'daily') cadence = { kind: pKind, timesOfDay: [pTime] }
     else cadence = { kind: 'asNeeded' }
-    await db.protocols.add({
+    const data = {
       name: pName || `${compounds.find((c) => c.id === cid)?.name ?? ''} protocol`,
       compoundId: cid,
       dose: Number(pDose),
       unit: pUnit,
       cadence,
-      startedAt: new Date().toISOString(),
       phase: pPhase,
-    })
-    setSavedProtocolCompoundId(cid)
-    setStep('vial')
-    setPName(''); setPDose('')
+    }
+    if (isEditMode && editProtocol.id) {
+      await db.protocols.update(editProtocol.id, data)
+      onClose()
+    } else {
+      await db.protocols.add({ ...data, startedAt: new Date().toISOString() })
+      setSavedProtocolCompoundId(cid)
+      setStep('vial')
+      setPName(''); setPDose('')
+    }
   }
 
   async function saveVial() {
@@ -163,12 +191,14 @@ export function ProtocolWizard({
         {/* Header */}
         <div style={{ padding: '22px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <span className="section-label">New protocol</span>
+            <span className="section-label">{isEditMode ? 'Edit protocol' : 'New protocol'}</span>
             <h3 style={{ margin: 0 }}>
               {STEP_LABELS[step]}
-              <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-dim)', marginLeft: 8 }}>
-                Step {stepIndex + 1} of 3
-              </span>
+              {!isEditMode && (
+                <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-dim)', marginLeft: 8 }}>
+                  Step {stepIndex + 1} of 3
+                </span>
+              )}
             </h3>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
@@ -337,11 +367,13 @@ export function ProtocolWizard({
                 </label>
               )}
               <div style={{ display: 'flex', gap: 8 }} className="wide-field">
-                <button type="button" className="ghost-button" onClick={() => setStep('compound')}>
-                  ← Back
-                </button>
+                {!isEditMode && (
+                  <button type="button" className="ghost-button" onClick={() => setStep('compound')}>
+                    ← Back
+                  </button>
+                )}
                 <button type="button" className="primary-button" onClick={saveProtocol} disabled={!pDose || !effectivePCompoundId} style={{ flex: 1, justifyContent: 'center' }}>
-                  Save &amp; next <ChevronRight size={14} />
+                  {isEditMode ? 'Save changes' : (<>Save &amp; next <ChevronRight size={14} /></>)}
                 </button>
               </div>
             </div>

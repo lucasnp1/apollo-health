@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
+  Brain,
   CalendarClock,
   FlaskConical,
   HeartPulse,
@@ -29,6 +30,7 @@ import { Vitals } from './views/Vitals'
 import { Labs } from './views/Labs'
 import { Targets } from './views/Targets'
 import { Timeline } from './views/Timeline'
+import { Symptoms } from './views/Symptoms'
 import { Settings } from './views/Settings'
 import './index.css'
 
@@ -37,6 +39,7 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: 'meds', label: 'Protocols', icon: Syringe },
   { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
+  { id: 'symptoms', label: 'Symptoms', icon: Brain },
   { id: 'timeline', label: 'Timeline', icon: CalendarClock },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
@@ -108,6 +111,7 @@ function Shell({
   const [qlPrefill, setQlPrefill] = useState<QuickLogPrefill | undefined>(undefined)
   const [labAddOpen, setLabAddOpen] = useState(false)
   const [protocolWizardOpen, setProtocolWizardOpen] = useState(false)
+  const [editingProtocol, setEditingProtocol] = useState<(import('./lib/db').Protocol & { id: number }) | undefined>(undefined)
 
   function openQuickLog(tab: QuickLogTab, prefill?: QuickLogPrefill) {
     setQlTab(tab)
@@ -258,14 +262,16 @@ function Shell({
             results={enrichedResults}
             onNavigate={setActiveView}
             onOpenQuickLog={openQuickLog}
+            onOpenWizard={() => setProtocolWizardOpen(true)}
           />
         )}
-        {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} onOpenWizard={() => setProtocolWizardOpen(true)} />}
+        {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} onOpenWizard={() => setProtocolWizardOpen(true)} onEditProtocol={(p) => { setEditingProtocol(p); setProtocolWizardOpen(true) }} />}
         {activeView === 'vitals' && <Vitals vitals={vitals} />}
         {activeView === 'labs' && (
           <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} />
         )}
-        {/* symptoms + targets: no nav page, code kept */}
+        {activeView === 'symptoms' && <Symptoms />}
+        {/* targets: no nav page, code kept */}
         {activeView === 'targets' && <Targets />}
         {activeView === 'timeline' && (
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
@@ -297,8 +303,9 @@ function Shell({
 
       <ProtocolWizard
         open={protocolWizardOpen}
-        onClose={() => setProtocolWizardOpen(false)}
+        onClose={() => { setProtocolWizardOpen(false); setEditingProtocol(undefined) }}
         compounds={compounds ?? []}
+        editProtocol={editingProtocol}
       />
 
       <InstallPrompt />

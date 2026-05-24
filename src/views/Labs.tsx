@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, FileText, FlaskConical, Plus, Upload } from 'lucide-react'
+import { ChevronDown, ChevronRight, Edit2, FileText, FlaskConical, Plus, Trash2, Upload, X } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -17,7 +17,7 @@ type MarkerRow = {
   panel: LabPanel
   // Values across exams, newest first.
   // undefined = this exam didn't include this marker.
-  values: Array<{ value?: number; rawValue: string; unit?: string; low?: number; high?: number } | undefined>
+  values: Array<{ resultId?: number; value?: number; rawValue: string; unit?: string; low?: number; high?: number } | undefined>
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ export function Labs({
         if (!r) return undefined
         const low = personal?.low ?? r.low ?? canon?.optimal?.low
         const high = personal?.high ?? r.high ?? canon?.optimal?.high
-        return { value: r.value, rawValue: r.rawValue, unit: r.unit ?? canon?.unit ?? personal?.unit, low, high }
+        return { resultId: r.id, value: r.value, rawValue: r.rawValue, unit: r.unit ?? canon?.unit ?? personal?.unit, low, high }
       })
 
       const row: MarkerRow = {
@@ -122,6 +122,29 @@ export function Labs({
   const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined)
   const [showAddForm, setShowAddForm] = useState(false)
   const [collapsedPanels, setCollapsedPanels] = useState<Set<LabPanel>>(new Set())
+  const [editingTargetKey, setEditingTargetKey] = useState<string | null>(null)
+  const [targetLow, setTargetLow] = useState('')
+  const [targetHigh, setTargetHigh] = useState('')
+
+  async function saveTarget(key: string, unit?: string) {
+    if (!key) return
+    await db.markerTargets.put({
+      marker: key,
+      low: targetLow ? Number(targetLow) : undefined,
+      high: targetHigh ? Number(targetHigh) : undefined,
+      unit,
+    })
+    setEditingTargetKey(null)
+    setTargetLow('')
+    setTargetHigh('')
+  }
+
+  function openTargetEdit(key: string) {
+    const existing = targetByKey.get(key)
+    setTargetLow(existing?.low !== undefined ? String(existing.low) : '')
+    setTargetHigh(existing?.high !== undefined ? String(existing.high) : '')
+    setEditingTargetKey(key)
+  }
 
   useEffect(() => {
     if (addOpen) { setShowAddForm(true); onAddClose?.() }
@@ -308,47 +331,127 @@ export function Labs({
                       {!collapsed && rows.map((row) => {
                         const latestVal = row.values[0]
                         const isSelected = row.key === selectedKey
+                        const isEditingTarget = row.key === editingTargetKey
+                        const hasPersonalTarget = row.key && targetByKey.has(row.key)
                         const isOut = latestVal?.value !== undefined && (
                           (latestVal.high !== undefined && latestVal.value > latestVal.high) ||
                           (latestVal.low !== undefined && latestVal.value < latestVal.low)
                         )
                         return (
-                          <tr
-                            key={row.marker}
-                            className={isSelected ? 'selected' : undefined}
-                            onClick={() => row.key && setSelectedKey(isSelected ? undefined : row.key)}
-                            style={{ cursor: row.key ? 'pointer' : 'default' }}
-                          >
-                            <td>
-                              <span style={{ fontSize: 13, fontWeight: 600, color: isOut ? 'var(--bad)' : 'var(--ink)' }}>
-                                {row.marker}
-                              </span>
-                            </td>
-                            {row.values.map((cell, ci) => {
-                              if (!cell) return <td key={ci} style={{ color: 'var(--ink-mute)', textAlign: 'right', fontSize: 12 }}>—</td>
-                              const out = cell.value !== undefined && (
-                                (cell.high !== undefined && cell.value > cell.high) ||
-                                (cell.low !== undefined && cell.value < cell.low)
-                              )
-                              // Delta: compare with next column (older exam)
-                              const nextCell = row.values[ci + 1]
-                              const delta = cell.value !== undefined && nextCell?.value !== undefined
-                                ? cell.value - nextCell.value
-                                : undefined
-                              return (
-                                <td key={ci} style={{ textAlign: 'right' }}>
-                                  <div className={`labs-val-cell${out ? ' out' : ''}`} style={{ justifyContent: 'flex-end' }}>
-                                    <span>{cell.rawValue}{cell.unit ? ` ${cell.unit}` : ''}</span>
-                                    {ci === 0 && delta !== undefined && Math.abs(delta) > 0.05 && (
-                                      <span className={`labs-delta ${delta > 0 ? 'up' : 'down'}`}>
-                                        {delta > 0 ? '↑' : '↓'}
-                                      </span>
+                          <>
+                            <tr
+                              key={row.marker}
+                              className={isSelected ? 'selected' : undefined}
+                              onClick={() => row.key && setSelectedKey(isSelected ? undefined : row.key)}
+                              style={{ cursor: row.key ? 'pointer' : 'default' }}
+                            >
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 600, color: isOut ? 'var(--bad)' : 'var(--ink)' }}>
+                                    {row.marker}
+                                  </span>
+                                  {hasPersonalTarget && (
+                                    <span style={{ fontSize: 10, color: 'var(--accent-ink)', background: 'var(--accent-soft)', borderRadius: 4, padding: '1px 5px' }}>custom</span>
+                                  )}
+                                  {row.key && (
+                                    <button
+                                      type="button"
+                                      className="icon-button"
+                                      style={{ width: 20, height: 20, opacity: 0.5, marginLeft: 'auto' }}
+                                      title="Set personal reference range"
+                                      onClick={(e) => { e.stopPropagation(); openTargetEdit(row.key!) }}
+                                      aria-label="Set target range"
+                                    >
+                                      <Edit2 size={11} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              {row.values.map((cell, ci) => {
+                                if (!cell) return <td key={ci} style={{ color: 'var(--ink-mute)', textAlign: 'right', fontSize: 12 }}>—</td>
+                                const out = cell.value !== undefined && (
+                                  (cell.high !== undefined && cell.value > cell.high) ||
+                                  (cell.low !== undefined && cell.value < cell.low)
+                                )
+                                // Delta: compare with next column (older exam)
+                                const nextCell = row.values[ci + 1]
+                                const delta = cell.value !== undefined && nextCell?.value !== undefined
+                                  ? cell.value - nextCell.value
+                                  : undefined
+                                return (
+                                  <td key={ci} style={{ textAlign: 'right' }}>
+                                    <div className={`labs-val-cell${out ? ' out' : ''}`} style={{ justifyContent: 'flex-end', gap: 4 }}>
+                                      <span>{cell.rawValue}{cell.unit ? ` ${cell.unit}` : ''}</span>
+                                      {ci === 0 && delta !== undefined && Math.abs(delta) > 0.05 && (
+                                        <span className={`labs-delta ${delta > 0 ? 'up' : 'down'}`}>
+                                          {delta > 0 ? '↑' : '↓'}
+                                        </span>
+                                      )}
+                                      {cell.resultId !== undefined && (
+                                        <button
+                                          type="button"
+                                          className="icon-button danger"
+                                          style={{ width: 18, height: 18, opacity: 0, transition: 'opacity 0.15s' }}
+                                          title="Delete this result"
+                                          onClick={(e) => { e.stopPropagation(); db.results.delete(cell.resultId!) }}
+                                          aria-label="Delete result"
+                                          onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
+                                          onMouseOut={(e) => (e.currentTarget.style.opacity = '0')}
+                                        >
+                                          <Trash2 size={10} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                            {/* Inline target edit row */}
+                            {isEditingTarget && (
+                              <tr key={`${row.marker}-target-edit`} onClick={(e) => e.stopPropagation()}>
+                                <td colSpan={examColumns.length + 1} style={{ padding: '8px 0', background: 'var(--accent-soft)' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '0 4px' }}>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-ink)' }}>Personal range for {row.marker}:</span>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                                      Low
+                                      <input
+                                        inputMode="decimal"
+                                        placeholder="e.g. 700"
+                                        value={targetLow}
+                                        onChange={(e) => setTargetLow(e.target.value)}
+                                        style={{ width: 80, fontSize: 12 }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                                      High
+                                      <input
+                                        inputMode="decimal"
+                                        placeholder="e.g. 1000"
+                                        value={targetHigh}
+                                        onChange={(e) => setTargetHigh(e.target.value)}
+                                        style={{ width: 80, fontSize: 12 }}
+                                        onClick={(e) => e.stopPropagation()}
+                                      />
+                                    </label>
+                                    <button type="button" className="primary-button" style={{ height: 26, fontSize: 11, padding: '0 10px' }}
+                                      onClick={(e) => { e.stopPropagation(); void saveTarget(row.key!, latestVal?.unit) }}>
+                                      Save
+                                    </button>
+                                    {hasPersonalTarget && (
+                                      <button type="button" className="ghost-button" style={{ height: 26, fontSize: 11, color: 'var(--bad)' }}
+                                        onClick={(e) => { e.stopPropagation(); db.markerTargets.where('marker').equals(row.key!).delete(); setEditingTargetKey(null) }}>
+                                        Remove custom
+                                      </button>
                                     )}
+                                    <button type="button" className="icon-button" onClick={(e) => { e.stopPropagation(); setEditingTargetKey(null) }}>
+                                      <X size={13} />
+                                    </button>
                                   </div>
                                 </td>
-                              )
-                            })}
-                          </tr>
+                              </tr>
+                            )}
+                          </>
                         )
                       })}
                     </>
