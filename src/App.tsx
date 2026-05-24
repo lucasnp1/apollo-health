@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   CalendarClock,
-  FileText,
   FlaskConical,
   HeartPulse,
   Home,
@@ -20,6 +19,7 @@ import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { InstallPrompt } from './components/InstallPrompt'
 import { QuickLog } from './components/QuickLog'
+import { ProtocolWizard } from './components/ProtocolWizard'
 import { SyncBanner } from './components/SyncBanner'
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
@@ -29,7 +29,6 @@ import { Vitals } from './views/Vitals'
 import { Labs } from './views/Labs'
 import { Targets } from './views/Targets'
 import { Timeline } from './views/Timeline'
-import { Files } from './views/Files'
 import { Settings } from './views/Settings'
 import './index.css'
 
@@ -38,9 +37,8 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: 'meds', label: 'Protocols', icon: Syringe },
   { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
-  { id: 'settings', label: 'Settings', icon: SettingsIcon },
   { id: 'timeline', label: 'Timeline', icon: CalendarClock },
-  { id: 'files', label: 'Files', icon: FileText },
+  { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
 
 type QuickLogTab = 'injection' | 'bp'
@@ -109,6 +107,7 @@ function Shell({
   const [qlTab, setQlTab] = useState<QuickLogTab>('injection')
   const [qlPrefill, setQlPrefill] = useState<QuickLogPrefill | undefined>(undefined)
   const [labAddOpen, setLabAddOpen] = useState(false)
+  const [protocolWizardOpen, setProtocolWizardOpen] = useState(false)
 
   function openQuickLog(tab: QuickLogTab, prefill?: QuickLogPrefill) {
     setQlTab(tab)
@@ -191,9 +190,6 @@ function Shell({
           <button type="button" onClick={() => openQuickLog('bp')}>
             <Plus size={13} /><span>Blood pressure</span>
           </button>
-          <button type="button" onClick={() => setActiveView('files')}>
-            <Plus size={13} /><span>Upload PDF</span>
-          </button>
         </div>
 
         <div className="sidebar-footer">
@@ -229,6 +225,11 @@ function Shell({
                 <Plus size={12} /> Add result
               </button>
             )}
+            {activeView === 'meds' && (
+              <button type="button" className="primary-button" onClick={() => setProtocolWizardOpen(true)}>
+                <Plus size={13} /> Create protocol
+              </button>
+            )}
             <button type="button" className="primary-button" onClick={() => openQuickLog('injection')}>
               <Plus size={13} /> Add
             </button>
@@ -246,7 +247,7 @@ function Shell({
             onOpenQuickLog={openQuickLog}
           />
         )}
-        {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} />}
+        {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} onOpenWizard={() => setProtocolWizardOpen(true)} />}
         {activeView === 'vitals' && <Vitals vitals={vitals} />}
         {activeView === 'labs' && (
           <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} />
@@ -256,7 +257,6 @@ function Shell({
         {activeView === 'timeline' && (
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
         )}
-        {activeView === 'files' && <Files files={files} />}
         {activeView === 'settings' && <Settings auth={auth} />}
       </main>
 
@@ -280,6 +280,12 @@ function Shell({
         prefill={qlPrefill}
         compounds={compounds ?? []}
         onClose={() => { setQlOpen(false); setQlPrefill(undefined) }}
+      />
+
+      <ProtocolWizard
+        open={protocolWizardOpen}
+        onClose={() => setProtocolWizardOpen(false)}
+        compounds={compounds ?? []}
       />
 
       <InstallPrompt />

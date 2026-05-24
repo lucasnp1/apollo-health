@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, FileText, FlaskConical, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, FlaskConical, Plus, Upload } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
-import { extractMarkersFromText, type ExtractedMarker } from '../lib/pdf'
+import { extractMarkersFromText, extractPdfText, type ExtractedMarker } from '../lib/pdf'
 import { markerHistory, type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
 import { EmptyState } from '../components/EmptyState'
@@ -134,6 +134,23 @@ export function Labs({
     return markerHistory(matches.map((m) => ({ ...m })), matches[0].marker)
   }, [results, selectedKey])
 
+  // PDF upload → feeds into the pending banner automatically
+  async function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const extractedText = await extractPdfText(file)
+    await db.files.add({
+      name: file.name,
+      type: file.type || 'application/pdf',
+      size: file.size,
+      addedAt: new Date().toISOString(),
+      status: extractedText ? 'Needs review' : 'Stored',
+      extractedText,
+      blob: file,
+    })
+    e.target.value = ''
+  }
+
   // Manual add
   const [examName, setExamName] = useState('Blood panel')
   const [marker, setMarker] = useState('Total Testosterone')
@@ -228,9 +245,15 @@ export function Labs({
             <span className="section-label">All exams</span>
             <h3>Marker comparison</h3>
           </div>
-          <button type="button" className="ghost-button" onClick={() => setShowAddForm((v) => !v)}>
-            <Plus size={12} /> Add result
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <label className="ghost-button" style={{ cursor: 'pointer' }}>
+              <input type="file" accept="application/pdf" hidden onChange={handlePdfUpload} />
+              <Upload size={12} /> Upload PDF
+            </label>
+            <button type="button" className="ghost-button" onClick={() => setShowAddForm((v) => !v)}>
+              <Plus size={12} /> Add result
+            </button>
+          </div>
         </div>
 
         {!hasData ? (

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
-  Calendar, ChevronRight, Droplet, Pencil, Plus, Syringe, Trash2, X,
+  Calendar, Droplet, Pencil, Plus, Syringe, Trash2, X,
 } from 'lucide-react'
 import { differenceInHours, format, parseISO, subDays } from 'date-fns'
 import {
@@ -13,14 +13,10 @@ import {
   type Compound,
   type InjectionLog,
   type Protocol,
-  type ProtocolCadence,
-  type TestosteroneEster,
-  type Unit,
   type Vial,
 } from '../lib/db'
 import {
   buildWeightDoseSeries,
-  esterProfiles,
   weightSummary,
 } from '../lib/insights'
 import { describeCadence } from '../lib/schedule'
@@ -31,39 +27,32 @@ import { SiteCombobox } from '../components/SiteCombobox'
 import { TimeRangePicker } from '../components/TimeRangePicker'
 import type { TimeRange } from '../lib/timeRange'
 
-const UNITS: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
-const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const COMPOUND_COLORS = ['#0f766e', '#6366f1', '#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6']
-const ESTER_OPTIONS: TestosteroneEster[] = ['Enanthate', 'Cypionate', 'Propionate', 'Undecanoate', 'Custom']
-
 export function Protocols({
   compounds,
   injections,
   onOpenQuickLog,
+  onOpenWizard,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
   onOpenQuickLog: (tab: 'injection', prefill?: import('../App').QuickLogPrefill) => void
+  onOpenWizard: () => void
 }) {
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
-  const [showSetup, setShowSetup] = useState(false)
 
   const activeProtocols = (protocols ?? []).filter((p) => !p.archived)
 
   return (
     <div className="content-grid">
 
-      {/* ── 1. ACTIVE PROTOCOLS + QUICK LOG ─────────────────────────────── */}
+      {/* ── 1. ACTIVE PROTOCOLS ──────────────────────────────────────────── */}
       <section className="surface col-12">
         <div className="panel-header">
           <div>
             <span className="section-label">Active</span>
             <h3>My protocols</h3>
           </div>
-          <button type="button" className="ghost-button" onClick={() => setShowSetup((v) => !v)}>
-            <Plus size={12} /> {showSetup ? 'Hide setup' : 'Add protocol'}
-          </button>
         </div>
         {activeProtocols.length > 0 ? (
           <div className="stack">
@@ -82,26 +71,22 @@ export function Protocols({
           <div className="empty">
             <Syringe size={16} />
             <strong>No protocols yet</strong>
-            <span>Click "Add protocol" to set up your first compound and schedule.</span>
+            <span>Tap "Create protocol" to set up your first compound and schedule.</span>
+            <button type="button" className="primary-button" onClick={onOpenWizard}>
+              <Plus size={14} /> Create protocol
+            </button>
           </div>
         )}
       </section>
 
-      {/* ── 2. SETUP / ADD — shown only when toggled ─────────────────────── */}
-      {showSetup && (
-        <section className="surface col-7">
-          <SetupPanel compounds={compounds} />
-        </section>
-      )}
-      {showSetup && (
-        <section className="surface col-5">
-          <ProtocolManage protocols={activeProtocols} compounds={compounds} vials={vials ?? []} />
-        </section>
-      )}
-
-      {/* ── 3. RECENT DOSES ─────────────────────────────────────────────── */}
+      {/* ── 2. RECENT DOSES ─────────────────────────────────────────────── */}
       <section className="surface col-12">
         <RecentDoses injections={injections} compounds={compounds} vials={vials ?? []} />
+      </section>
+
+      {/* ── 3. VIALS & ARCHIVE ──────────────────────────────────────────── */}
+      <section className="surface col-12">
+        <ProtocolManage protocols={activeProtocols} compounds={compounds} vials={vials ?? []} />
       </section>
 
     </div>
@@ -164,317 +149,6 @@ function ProtocolQuickRow({
         Log
       </button>
     </div>
-  )
-}
-
-// ── Setup panel — compound + protocol + vial in one form ──────────────────
-
-type SetupStep = 'compound' | 'protocol' | 'vial'
-
-function SetupPanel({ compounds }: { compounds: Compound[] }) {
-  const [step, setStep] = useState<SetupStep>('compound')
-  const [showAddCompound, setShowAddCompound] = useState(false)
-
-  // Compound fields
-  const [cName, setCName] = useState('')
-  const [cCategory, setCCategory] = useState<Compound['category']>('TRT')
-  const [cUnit, setCUnit] = useState<Unit>('mg')
-  const [cColor, setCColor] = useState(COMPOUND_COLORS[0])
-  const [cEster, setCEster] = useState<TestosteroneEster>('Enanthate')
-  const [cDefaultDose, setCDefaultDose] = useState('')
-
-  // Protocol fields
-  const [pCompoundId, setPCompoundId] = useState<string>('')
-  const [pName, setPName] = useState('')
-  const [pDose, setPDose] = useState('')
-  const [pUnit, setPUnit] = useState<Unit>('mg')
-  const [pKind, setPKind] = useState<ProtocolCadence['kind']>('everyNDays')
-  const [pN, setPN] = useState('3.5')
-  const [pDow, setPDow] = useState<number[]>([1, 4])
-  const [pTime, setPTime] = useState('09:00')
-  const [pPhase, setPPhase] = useState<Protocol['phase']>('Maintenance')
-  const [savedCompoundId, setSavedCompoundId] = useState<number | null>(null)
-
-  // Vial fields
-  const [vLabel, setVLabel] = useState('Vial #1')
-  const [vTotalMl, setVTotalMl] = useState('')
-  const [vConc, setVConc] = useState('')
-  const [savedProtocolCompoundId, setSavedProtocolCompoundId] = useState<number | null>(null)
-
-  const isTRT = cCategory === 'TRT' || (
-    compounds.find((c) => c.id === Number(pCompoundId))?.category === 'TRT'
-  )
-
-  async function saveCompound() {
-    if (!cName) return
-    const id = await db.compounds.add({
-      name: cName,
-      category: cCategory,
-      defaultDose: Number(cDefaultDose) || 100,
-      unit: cUnit,
-      color: cColor,
-      schedule: '',
-      ester: isTRT ? cEster : undefined,
-      halfLifeDays: isTRT ? esterProfiles[cEster]?.halfLifeDays : undefined,
-      peakHours: isTRT ? esterProfiles[cEster]?.peakHours : undefined,
-    })
-    setSavedCompoundId(id)
-    setPCompoundId(String(id))
-    setPDose(cDefaultDose)
-    setPUnit(cUnit)
-    setPName(`${cName} protocol`)
-    setStep('protocol')
-    setShowAddCompound(false)
-    // reset form
-    setCName(''); setCDefaultDose('')
-  }
-
-  async function saveProtocol() {
-    const cid = Number(pCompoundId) || savedCompoundId
-    if (!cid || !pDose) return
-    let cadence: ProtocolCadence
-    if (pKind === 'everyNDays') cadence = { kind: pKind, n: Number(pN) || 1, timeOfDay: pTime }
-    else if (pKind === 'weekly') cadence = { kind: pKind, daysOfWeek: pDow, timeOfDay: pTime }
-    else if (pKind === 'daily') cadence = { kind: pKind, timesOfDay: [pTime] }
-    else cadence = { kind: 'asNeeded' }
-
-    await db.protocols.add({
-      name: pName || `${compounds.find((c) => c.id === cid)?.name ?? ''} protocol`,
-      compoundId: cid,
-      dose: Number(pDose),
-      unit: pUnit,
-      cadence,
-      startedAt: new Date().toISOString(),
-      phase: pPhase,
-    })
-    setSavedProtocolCompoundId(cid)
-    setStep('vial')
-    setPName(''); setPDose('')
-  }
-
-  async function saveVial() {
-    const cid = Number(pCompoundId) || savedCompoundId || savedProtocolCompoundId
-    if (!cid || !vTotalMl) return
-    await db.vials.add({
-      compoundId: cid,
-      label: vLabel || 'Vial #1',
-      totalMl: Number(vTotalMl),
-      remainingMl: Number(vTotalMl),
-      concentrationMgPerMl: Number(vConc) || undefined,
-      openedAt: new Date().toISOString(),
-    })
-    setVLabel('Vial #1'); setVTotalMl(''); setVConc('')
-    setStep('compound')
-  }
-
-  const effectivePCompoundId = pCompoundId || (savedCompoundId ? String(savedCompoundId) : '')
-
-  return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Setup</span>
-          <h3>Add compound, protocol &amp; vial</h3>
-        </div>
-      </div>
-
-      {/* Step indicator */}
-      <div className="pill-tabs" style={{ alignSelf: 'flex-start', marginBottom: 16 }}>
-        {(['compound', 'protocol', 'vial'] as SetupStep[]).map((s, i) => (
-          <button
-            key={s}
-            type="button"
-            role="tab"
-            className={step === s ? 'active' : undefined}
-            onClick={() => setStep(s)}
-            style={{ gap: 4 }}
-          >
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 16, height: 16, borderRadius: '50%',
-              background: step === s ? 'var(--accent)' : 'var(--line)',
-              color: step === s ? '#fff' : 'var(--ink-mute)',
-              fontSize: 10, fontWeight: 700, flexShrink: 0,
-            }}>{i + 1}</span>
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {/* Step 1: Compound */}
-      {step === 'compound' && (
-        <div className="form-grid">
-          {!showAddCompound && compounds.length > 0 ? (
-            <>
-              <p className="panel-note wide-field">
-                You have {compounds.length} compound{compounds.length !== 1 ? 's' : ''} set up.
-                Add a new one, or skip to <button type="button" className="link-button" style={{ display: 'inline' }} onClick={() => setStep('protocol')}>Protocol</button>.
-              </p>
-              <button type="button" className="primary-button wide-field" onClick={() => setShowAddCompound(true)}>
-                <Plus size={14} /> Add new compound
-              </button>
-            </>
-          ) : (
-            <>
-              <label className="wide-field">
-                Name
-                <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Testosterone Enanthate" autoFocus />
-              </label>
-              <label>
-                Category
-                <select value={cCategory} onChange={(e) => setCCategory(e.target.value as Compound['category'])}>
-                  {['TRT', 'Peptide', 'Ancillary', 'Supplement', 'Other'].map((c) => <option key={c}>{c}</option>)}
-                </select>
-              </label>
-              <label>
-                Default dose
-                <input inputMode="decimal" value={cDefaultDose} onChange={(e) => setCDefaultDose(e.target.value)} placeholder="100" />
-              </label>
-              <label>
-                Unit
-                <select value={cUnit} onChange={(e) => setCUnit(e.target.value as Unit)}>
-                  {UNITS.map((u) => <option key={u}>{u}</option>)}
-                </select>
-              </label>
-              {cCategory === 'TRT' && (
-                <label className="wide-field">
-                  Ester
-                  <select value={cEster} onChange={(e) => setCEster(e.target.value as TestosteroneEster)}>
-                    {ESTER_OPTIONS.map((e) => <option key={e}>{e}</option>)}
-                  </select>
-                </label>
-              )}
-              <label className="wide-field">
-                Color
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                  {COMPOUND_COLORS.map((col) => (
-                    <button
-                      key={col}
-                      type="button"
-                      onClick={() => setCColor(col)}
-                      style={{
-                        width: 24, height: 24, borderRadius: '50%', background: col, border: 'none',
-                        outline: cColor === col ? `2px solid ${col}` : 'none',
-                        outlineOffset: 2, cursor: 'pointer',
-                      }}
-                    />
-                  ))}
-                </div>
-              </label>
-              <div style={{ display: 'flex', gap: 8 }} className="wide-field">
-                <button type="button" className="primary-button" onClick={saveCompound} disabled={!cName} style={{ flex: 1, justifyContent: 'center' }}>
-                  Save &amp; next <ChevronRight size={14} />
-                </button>
-                {compounds.length > 0 && (
-                  <button type="button" className="ghost-button" onClick={() => { setShowAddCompound(false); setStep('protocol') }}>
-                    <X size={13} /> Cancel
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Step 2: Protocol */}
-      {step === 'protocol' && (
-        <div className="form-grid">
-          <label>
-            Compound
-            <select value={effectivePCompoundId} onChange={(e) => {
-              setPCompoundId(e.target.value)
-              const c = compounds.find((x) => String(x.id) === e.target.value)
-              if (c) { setPDose(String(c.defaultDose)); setPUnit(c.unit) }
-            }}>
-              {compounds.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </label>
-          <label>
-            Protocol name
-            <input value={pName} onChange={(e) => setPName(e.target.value)} placeholder="TestE cruise" />
-          </label>
-          <label>
-            Dose
-            <input inputMode="decimal" value={pDose} onChange={(e) => setPDose(e.target.value)} />
-          </label>
-          <label>
-            Unit
-            <select value={pUnit} onChange={(e) => setPUnit(e.target.value as Unit)}>
-              {UNITS.map((u) => <option key={u}>{u}</option>)}
-            </select>
-          </label>
-          <label>
-            Phase
-            <select value={pPhase} onChange={(e) => setPPhase(e.target.value as Protocol['phase'])}>
-              {['Blast', 'Cruise', 'Maintenance', 'PCT', 'Bridge', 'Trial'].map((p) => <option key={p}>{p}</option>)}
-            </select>
-          </label>
-          <label className="wide-field">
-            Cadence
-            <select value={pKind} onChange={(e) => setPKind(e.target.value as ProtocolCadence['kind'])}>
-              <option value="everyNDays">Every N days</option>
-              <option value="weekly">Days of week</option>
-              <option value="daily">Daily at fixed time</option>
-              <option value="asNeeded">As needed</option>
-            </select>
-          </label>
-          {pKind === 'everyNDays' && (
-            <label>
-              Every N days
-              <input inputMode="decimal" value={pN} onChange={(e) => setPN(e.target.value)} />
-            </label>
-          )}
-          {pKind === 'weekly' && (
-            <label className="wide-field">
-              Days of week
-              <div className="chip-row" style={{ marginTop: 4 }}>
-                {DOW.map((d, i) => (
-                  <button type="button" key={d} className={pDow.includes(i) ? 'chip active' : 'chip'}
-                    onClick={() => setPDow((cur) => cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i].sort())}
-                  >{d}</button>
-                ))}
-              </div>
-            </label>
-          )}
-          {pKind !== 'asNeeded' && (
-            <label>
-              Time
-              <input type="time" value={pTime} onChange={(e) => setPTime(e.target.value)} />
-            </label>
-          )}
-          <button type="button" className="primary-button wide-field" onClick={saveProtocol} disabled={!pDose || !effectivePCompoundId} style={{ justifyContent: 'center' }}>
-            Save &amp; add vial <ChevronRight size={14} />
-          </button>
-        </div>
-      )}
-
-      {/* Step 3: Vial */}
-      {step === 'vial' && (
-        <div className="form-grid">
-          <p className="panel-note wide-field">Protocol saved. Add a vial to track volume and get run-out estimates. You can add more vials later.</p>
-          <label>
-            Label
-            <input value={vLabel} onChange={(e) => setVLabel(e.target.value)} placeholder="Vial #1" />
-          </label>
-          <label>
-            Total mL
-            <input inputMode="decimal" value={vTotalMl} onChange={(e) => setVTotalMl(e.target.value)} placeholder="10" />
-          </label>
-          <label>
-            Concentration (mg/mL)
-            <input inputMode="decimal" value={vConc} onChange={(e) => setVConc(e.target.value)} placeholder="200" />
-          </label>
-          <div style={{ display: 'flex', gap: 8 }} className="wide-field">
-            <button type="button" className="primary-button" onClick={saveVial} disabled={!vTotalMl} style={{ flex: 1, justifyContent: 'center' }}>
-              <Plus size={14} /> Save vial
-            </button>
-            <button type="button" className="ghost-button" onClick={() => setStep('compound')}>
-              Skip
-            </button>
-          </div>
-        </div>
-      )}
-    </>
   )
 }
 
