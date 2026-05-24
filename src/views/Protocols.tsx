@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTheme } from '../lib/useTheme'
 import {
   Calendar, Droplet, Pencil, Plus, Syringe, Trash2, X,
 } from 'lucide-react'
@@ -308,6 +309,7 @@ function AddVialInline({ compoundId, onDone }: { compoundId: number; onDone: () 
 // ── Multi-compound PK curve chart ─────────────────────────────────────────
 
 function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
+  const { chart: colors } = useTheme()
   const [range, setRange] = useState<TimeRange>('3M')
 
   // Determine window: past N days + 30-day clearance tail
@@ -444,17 +446,17 @@ function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; inject
 
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={chartData} margin={{ top: 4, right: 10, bottom: 0, left: -12 }}>
-          <CartesianGrid stroke="#e7e5e4" vertical={false} />
+          <CartesianGrid stroke={colors.grid} vertical={false} />
           <XAxis
             dataKey="date"
             tickLine={false}
             axisLine={false}
-            tick={{ fill: '#a8a29e', fontSize: 10 }}
+            tick={{ fill: colors.tick, fontSize: 10 }}
             interval={Math.floor(totalDays / 8)}
           />
           <YAxis tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 10 }} unit=" mg/d" width={56} />
           <Tooltip
-            contentStyle={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 10, fontSize: 12 }}
+            contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }}
             formatter={(v: unknown, name: unknown) => [`${Number(v).toFixed(1)} mg/day`, String(name)]}
           />
           <ReferenceLine
@@ -487,6 +489,7 @@ function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; inject
 // ── Weight / dose chart ────────────────────────────────────────────────────
 
 function RetaChart({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
+  const { chart: colors } = useTheme()
   const series = buildWeightDoseSeries(compounds, injections)
   const stats = weightSummary(series)
   const chartData = series.filter((p) => p.weight !== undefined || p.dose !== undefined).slice(-24)
@@ -508,10 +511,10 @@ function RetaChart({ compounds, injections }: { compounds: Compound[]; injection
       </div>
       <ResponsiveContainer width="100%" height={160}>
         <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -12 }}>
-          <CartesianGrid stroke="#e7e5e4" vertical={false} />
-          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
-          <YAxis yAxisId="weight" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
-          <YAxis yAxisId="dose" orientation="right" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
+          <CartesianGrid stroke={colors.grid} vertical={false} />
+          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
+          <YAxis yAxisId="weight" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
+          <YAxis yAxisId="dose" orientation="right" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
           <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 10, fontSize: 12 }} />
           <Bar yAxisId="dose" dataKey="dose" fill="#60a5fa" opacity={0.45} radius={[4, 4, 0, 0]} />
           <Line yAxisId="weight" type="monotone" dataKey="weight" stroke="#0f766e" strokeWidth={2.5} dot={false} />

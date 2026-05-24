@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useTheme } from '../lib/useTheme'
 import { ChevronDown, ChevronRight, Edit2, FileText, FlaskConical, Plus, Trash2, Upload, X } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { format, parseISO } from 'date-fns'
@@ -41,6 +42,7 @@ export function Labs({
   addOpen?: boolean
   onAddClose?: () => void
 }) {
+  const { chart: colors } = useTheme()
   const markerTargets = useLiveQuery(() => db.markerTargets.toArray(), [], [])
   const targetByKey = useMemo(() => new Map((markerTargets ?? []).map((t) => [t.marker, t])), [markerTargets])
 
@@ -251,10 +253,10 @@ export function Labs({
           {selectedHistory.length > 1 ? (
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={selectedHistory} margin={{ top: 8, right: 10, bottom: 0, left: -12 }}>
-                <CartesianGrid stroke="#e7e5e4" vertical={false} />
-                <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 10, fontSize: 12 }} />
+                <CartesianGrid stroke={colors.grid} vertical={false} />
+                <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
+                <Tooltip contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }} />
                 <Line type="monotone" dataKey="value" stroke="#0f766e" strokeWidth={2.5} dot />
               </LineChart>
             </ResponsiveContainer>

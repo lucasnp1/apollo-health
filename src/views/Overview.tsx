@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, Circle, Droplet, FlaskConical, HeartPulse, Plus, Syringe } from 'lucide-react'
+import { PKOverviewCard } from '../components/PKOverviewCard'
 import { formatDistanceToNow, format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
@@ -34,8 +35,9 @@ export function Overview({
   onNavigate: (view: View) => void
   onOpenQuickLog: (tab: 'injection', prefill?: QuickLogPrefill) => void
   onOpenWizard: () => void
-}) {
-  const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
+})
+ {
+  const protocols = useLiveQuery(() => db.protocols.filter((p) => !p.archived).toArray(), [], [])
   const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
   const weightGoal = goals.find((g) => g.kind === 'weight' && !g.achievedAt)
@@ -207,6 +209,9 @@ export function Overview({
       <section className="surface col-4">
         <SiteRotation injections={injections} recentSites={[]} />
       </section>
+
+      {/* ── 1c. Personalized PK curve ── */}
+      <PKOverviewCard compounds={compounds} injections={injections} protocols={protocols} />
 
       {/* ── 2. Recent doses — prominent on mobile ── */}
       <section className="surface col-6">

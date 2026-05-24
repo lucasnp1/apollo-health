@@ -18,6 +18,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
+import { useInjectionReminders } from './lib/useInjectionReminders'
 import { InstallPrompt } from './components/InstallPrompt'
 import { QuickLog } from './components/QuickLog'
 import { ProtocolWizard } from './components/ProtocolWizard'
@@ -143,6 +144,11 @@ function Shell({
   const vitals = useLiveQuery(() => db.vitals.orderBy('measuredAt').reverse().toArray(), [], [])
   const exams = useLiveQuery(() => db.exams.orderBy('collectedAt').reverse().toArray(), [], [])
   const results = useLiveQuery(() => db.results.toArray(), [], [])
+  const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
+  const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
+
+  // Injection reminders — fires notifications before upcoming doses
+  useInjectionReminders(protocols, protocolDoses, compounds ?? [])
   const files = useLiveQuery(() => db.files.orderBy('addedAt').reverse().toArray(), [], [])
 
   const examMap = useMemo(() => new Map(exams.map((e) => [e.id, e])), [exams])
@@ -276,7 +282,16 @@ function Shell({
         {activeView === 'timeline' && (
           <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
         )}
-        {activeView === 'settings' && <Settings auth={auth} />}
+        {activeView === 'settings' && (
+          <Settings
+            auth={auth}
+            compounds={compounds}
+            injections={injections}
+            vitals={vitals}
+            exams={exams}
+            protocols={protocols}
+          />
+        )}
       </main>
 
       <nav className="mobile-tabs" aria-label="Mobile primary">

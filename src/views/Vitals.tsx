@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Edit2, HeartPulse, Plus, Scale, Target, Trash2, X } from 'lucide-react'
+import { useTheme } from '../lib/useTheme'
 import {
   Area,
   AreaChart,
@@ -20,6 +21,7 @@ import { filterByRange, type TimeRange } from '../lib/timeRange'
 import { EmptyState } from '../components/EmptyState'
 
 export function Vitals({ vitals }: { vitals: VitalLog[] }) {
+  const { chart: colors } = useTheme()
   const [range, setRange] = useState<TimeRange>('3M')
   const [form, setForm] = useState({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
   const [weightForm, setWeightForm] = useState({ weightKg: '', measuredAt: new Date().toISOString().slice(0, 16) })
@@ -150,12 +152,12 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
                   <stop offset="100%" stopColor="#0f766e" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="#e7e5e4" vertical={false} />
+              <CartesianGrid stroke={colors.grid} vertical={false} />
               <ReferenceArea y1={140} y2={200} fill="rgba(239,68,68,0.08)" />
               <ReferenceArea y1={130} y2={140} fill="rgba(245,158,11,0.08)" />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 10 }} />
-              <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 10, fontSize: 12 }} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
+              <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
+              <Tooltip contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }} />
               <Area type="monotone" dataKey="systolic" stroke="#0f766e" strokeWidth={2.5} fill="url(#sysFill)" />
               <Line type="monotone" dataKey="diastolic" stroke="#98a2af" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="pulse" stroke="#c084fc" strokeWidth={1.5} dot={false} />

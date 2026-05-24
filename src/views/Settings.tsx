@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Download, LogOut, Trash2, UserCircle, X } from 'lucide-react'
+import { AlertTriangle, Bell, BellOff, Download, LogOut, Moon, Printer, Sun, Trash2, UserCircle, X } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { db } from '../lib/db'
 import { wipeLocalDatabase } from '../lib/lock'
+import { useTheme } from '../lib/useTheme'
+import { describeCadence } from '../lib/schedule'
 import type { useAuth } from '../lib/useAuth'
+import type { Compound, InjectionLog, LabExam, Protocol, VitalLog } from '../lib/db'
 
 type AuthBundle = ReturnType<typeof useAuth>
 
@@ -34,7 +38,21 @@ async function exportJson() {
   URL.revokeObjectURL(url)
 }
 
-export function Settings({ auth }: { auth: AuthBundle }) {
+export function Settings({
+  auth,
+  compounds,
+  injections,
+  vitals,
+  exams,
+  protocols,
+}: {
+  auth: AuthBundle
+  compounds?: Compound[]
+  injections?: InjectionLog[]
+  vitals?: VitalLog[]
+  exams?: LabExam[]
+  protocols?: Protocol[]
+}) {
   return (
     <div className="content-grid">
       <section className="surface col-6">
@@ -42,7 +60,21 @@ export function Settings({ auth }: { auth: AuthBundle }) {
       </section>
 
       <section className="surface col-6">
-        <BackupSettings />
+        <AppearanceSettings />
+      </section>
+
+      <section className="surface col-6">
+        <NotificationSettings />
+      </section>
+
+      <section className="surface col-6">
+        <BackupSettings
+          compounds={compounds}
+          injections={injections}
+          vitals={vitals}
+          exams={exams}
+          protocols={protocols}
+        />
       </section>
 
       <section className="surface col-12">
@@ -81,23 +113,266 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
   )
 }
 
-function BackupSettings() {
+function AppearanceSettings() {
+  const { theme, toggle } = useTheme()
+  const isDark = theme === 'dark'
+  return (
+    <>
+      <div className="panel-header">
+        <div><span className="section-label">Display</span><h3>Appearance</h3></div>
+        {isDark ? <Moon size={16} style={{ color: 'var(--accent-ink)' }} /> : <Sun size={16} style={{ color: 'var(--warn)' }} />}
+      </div>
+      <p className="muted-copy">Switch between light and dark theme. Your preference is saved locally.</p>
+      <button
+        type="button"
+        className="ghost-button"
+        style={{ alignSelf: 'flex-start' }}
+        onClick={toggle}
+      >
+        {isDark ? <><Sun size={14} /> Switch to light mode</> : <><Moon size={14} /> Switch to dark mode</>}
+      </button>
+    </>
+  )
+}
+
+function NotificationSettings() {
+  const [permission, setPermission] = useState<NotificationPermission>('default')
+  const [enabled, setEnabled] = useState(() => localStorage.getItem('apollo-notif') === '1')
+
+  useEffect(() => {
+    if ('Notification' in window) setPermission(Notification.permission)
+  }, [])
+
+  async function requestPermission() {
+    if (!('Notification' in window)) return
+    const result = await Notification.requestPermission()
+    setPermission(result)
+    if (result === 'granted') {
+      localStorage.setItem('apollo-notif', '1')
+      setEnabled(true)
+    }
+  }
+
+  function toggle() {
+    const next = !enabled
+    setEnabled(next)
+    localStorage.setItem('apollo-notif', next ? '1' : '0')
+  }
+
+  const blocked = permission === 'denied'
+
+  return (
+    <>
+      <div className="panel-header">
+        <div><span className="section-label">Alerts</span><h3>Notifications</h3></div>
+        {enabled && !blocked ? <Bell size={16} style={{ color: 'var(--accent)' }} /> : <BellOff size={16} style={{ color: 'var(--ink-mute)' }} />}
+      </div>
+      {blocked ? (
+        <p className="muted-copy" style={{ color: 'var(--warn)' }}>
+          Notifications are blocked in your browser settings. To re-enable, open your browser's site permissions for this page.
+        </p>
+      ) : permission === 'granted' ? (
+        <>
+          <p className="muted-copy">
+            {enabled ? "You'll receive a notification before each scheduled injection." : 'Notifications are disabled. Enable to get injection reminders.'}
+          </p>
+          <button type="button" className="ghost-button" style={{ alignSelf: 'flex-start' }} onClick={toggle}>
+            {enabled ? <><BellOff size={14} /> Disable reminders</> : <><Bell size={14} /> Enable reminders</>}
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="muted-copy">
+            Allow Apollo to send you a notification when your next injection is due — even if the tab is in the background.
+          </p>
+          <button type="button" className="primary-button" style={{ alignSelf: 'flex-start' }} onClick={requestPermission}>
+            <Bell size={14} /> Allow notifications
+          </button>
+        </>
+      )}
+    </>
+  )
+}
+
+function BackupSettings({
+  compounds,
+  injections,
+  vitals,
+  exams,
+  protocols,
+}: {
+  compounds?: Compound[]
+  injections?: InjectionLog[]
+  vitals?: VitalLog[]
+  exams?: LabExam[]
+  protocols?: Protocol[]
+}) {
+  function printReport() {
+    window.print()
+  }
+
   return (
     <>
       <div className="panel-header">
         <div>
-          <span className="section-label">Backup</span>
-          <h3>JSON export</h3>
+          <span className="section-label">Backup &amp; export</span>
+          <h3>Data export</h3>
         </div>
       </div>
       <p className="muted-copy">
-        Plain JSON dump of every table. Useful before clearing site data, switching browsers, or handing data
-        to a doctor.
+        Download a full JSON backup, or print a clinical summary to share with your doctor.
       </p>
-      <button type="button" className="primary-button" onClick={exportJson}>
-        <Download size={14} /> Download JSON
-      </button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="primary-button" onClick={exportJson}>
+          <Download size={14} /> Download JSON
+        </button>
+        <button type="button" className="ghost-button" onClick={printReport}>
+          <Printer size={14} /> Print report
+        </button>
+      </div>
+      {/* Hidden print-only report — rendered in DOM, visible only when printing */}
+      <PrintReport compounds={compounds} injections={injections} vitals={vitals} exams={exams} protocols={protocols} />
     </>
+  )
+}
+
+// ─── Print-only clinical summary ───────────────────────────────────────────
+
+function PrintReport({
+  compounds,
+  injections,
+  vitals,
+  exams,
+  protocols,
+}: {
+  compounds?: Compound[]
+  injections?: InjectionLog[]
+  vitals?: VitalLog[]
+  exams?: LabExam[]
+  protocols?: Protocol[]
+}) {
+  const compoundMap = new Map((compounds ?? []).map((c) => [c.id, c]))
+  const recentBP = (vitals ?? []).slice(0, 10)
+  const avgSys = recentBP.length ? Math.round(recentBP.reduce((s, v) => s + v.systolic, 0) / recentBP.length) : null
+  const avgDia = recentBP.length ? Math.round(recentBP.reduce((s, v) => s + v.diastolic, 0) / recentBP.length) : null
+  const recentInjections = (injections ?? []).slice(0, 20)
+
+  return (
+    <div className="print-report">
+      <div className="print-header">
+        <div>
+          <h1>Apollo Health — Clinical Summary</h1>
+          <p>Generated {format(new Date(), 'MMMM d, yyyy')}</p>
+        </div>
+        <p style={{ fontSize: 11, color: '#666', maxWidth: 300, textAlign: 'right' }}>
+          This report is for informational purposes only. Please discuss with your healthcare provider.
+        </p>
+      </div>
+
+      {/* Active Protocols */}
+      {protocols && protocols.filter((p) => !p.archived).length > 0 && (
+        <section className="print-section">
+          <h2>Active Protocols</h2>
+          <table className="print-table">
+            <thead>
+              <tr>
+                <th>Protocol</th>
+                <th>Compound</th>
+                <th>Dose</th>
+                <th>Schedule</th>
+                <th>Phase</th>
+                <th>Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              {protocols.filter((p) => !p.archived).map((p) => (
+                <tr key={p.id}>
+                  <td>{p.name}</td>
+                  <td>{compoundMap.get(p.compoundId)?.name ?? '—'}</td>
+                  <td>{p.dose} {p.unit}</td>
+                  <td>{describeCadence(p.cadence)}</td>
+                  <td>{p.phase ?? '—'}</td>
+                  <td>{p.startedAt ? format(parseISO(p.startedAt), 'MMM d, yyyy') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {/* Blood Pressure */}
+      {recentBP.length > 0 && (
+        <section className="print-section">
+          <h2>Blood Pressure <span style={{ fontSize: 12, fontWeight: 400, color: '#555' }}>({recentBP.length} readings)</span></h2>
+          {avgSys && <p className="print-stat">Average: <strong>{avgSys}/{avgDia} mmHg</strong> — {avgSys >= 130 ? '⚠ Elevated' : '✓ Normal range'}</p>}
+          <table className="print-table">
+            <thead>
+              <tr><th>Date</th><th>Systolic</th><th>Diastolic</th><th>Pulse</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+              {recentBP.map((v) => (
+                <tr key={v.id}>
+                  <td>{format(parseISO(v.measuredAt), 'MMM d, yyyy HH:mm')}</td>
+                  <td style={{ color: v.systolic >= 140 ? '#dc2626' : v.systolic >= 130 ? '#d97706' : undefined }}>{v.systolic}</td>
+                  <td>{v.diastolic}</td>
+                  <td>{v.pulse ?? '—'}</td>
+                  <td>{v.notes ?? ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {/* Recent Lab Exams */}
+      {exams && exams.length > 0 && (
+        <section className="print-section">
+          <h2>Lab History</h2>
+          <table className="print-table">
+            <thead>
+              <tr><th>Date</th><th>Panel / Test</th><th>Lab</th></tr>
+            </thead>
+            <tbody>
+              {exams.slice(0, 10).map((e) => (
+                <tr key={e.id}>
+                  <td>{e.collectedAt ? format(parseISO(e.collectedAt), 'MMM d, yyyy') : '—'}</td>
+                  <td>{e.name}</td>
+                  <td>{e.labName ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {/* Injection Log */}
+      {recentInjections.length > 0 && (
+        <section className="print-section">
+          <h2>Recent Injections</h2>
+          <table className="print-table">
+            <thead>
+              <tr><th>Date</th><th>Compound</th><th>Dose</th><th>Route</th><th>Site</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+              {recentInjections.map((inj) => (
+                <tr key={inj.id}>
+                  <td>{format(parseISO(inj.takenAt), 'MMM d, yyyy HH:mm')}</td>
+                  <td>{compoundMap.get(inj.compoundId)?.name ?? '—'}</td>
+                  <td>{inj.dose} {compoundMap.get(inj.compoundId)?.unit ?? ''}</td>
+                  <td>{(inj as { route?: string }).route ?? 'IM'}</td>
+                  <td>{inj.site ?? '—'}</td>
+                  <td>{inj.notes ?? ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      <p className="print-footer">
+        Exported from Apollo Health · {format(new Date(), 'MMMM d, yyyy')} · Data is stored locally on your device.
+      </p>
+    </div>
   )
 }
 

@@ -1,12 +1,22 @@
-import { useEffect, useState } from 'react'
-import { ChevronRight, Plus, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronRight, Plus, Search, X } from 'lucide-react'
 import { db, type Compound, type Protocol, type ProtocolCadence, type TestosteroneEster, type Unit } from '../lib/db'
 import { esterProfiles } from '../lib/insights'
+import { PK_COMPOUND_NAMES, formsForCompound } from '../lib/pk'
 
 const UNITS: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const COMPOUND_COLORS = ['#0f766e', '#6366f1', '#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6']
 const ESTER_OPTIONS: TestosteroneEster[] = ['Enanthate', 'Cypionate', 'Propionate', 'Undecanoate', 'Custom']
+
+// Mapping of PK compound name → default unit
+const COMPOUND_DEFAULT_UNIT: Record<string, Unit> = {
+  'Anadrol': 'mg', 'Anavar': 'mg', 'Arimidex': 'mg', 'Aromasin': 'mg',
+  'Boldenone': 'mg', 'Dianabol': 'mg', 'Halotestin': 'mg',
+  'Masteron': 'mg', 'Nandrolone': 'mg', 'Primobolan': 'mg',
+  'Superdrol': 'mg', 'Testosterone': 'mg', 'Trenbolone': 'mg',
+  'Trestolone (MENT)': 'mg', 'Turinabol': 'mg', 'Winstrol': 'mg',
+}
 
 type Step = 'compound' | 'protocol' | 'vial'
 const STEPS: Step[] = ['compound', 'protocol', 'vial']
@@ -26,6 +36,15 @@ export function ProtocolWizard({
   const isEditMode = editProtocol !== undefined
   const [step, setStep] = useState<Step>('compound')
   const [showAddCompound, setShowAddCompound] = useState(false)
+
+  // Preset search
+  const [presetQuery, setPresetQuery] = useState('')
+  const [presetForm, setPresetForm] = useState('')
+  const filteredPresets = useMemo(() => {
+    if (!presetQuery.trim()) return []
+    const q = presetQuery.toLowerCase()
+    return PK_COMPOUND_NAMES.filter((n) => n.toLowerCase().includes(q)).slice(0, 8)
+  }, [presetQuery])
 
   // Compound fields
   const [cName, setCName] = useState('')
@@ -79,6 +98,7 @@ export function ProtocolWizard({
         setSavedCompoundId(null)
         setSavedProtocolCompoundId(null)
         setCName(''); setCDefaultDose('')
+        setPresetQuery(''); setPresetForm('')
         setPCompoundId(''); setPName(''); setPDose('')
         setVLabel('Vial #1'); setVTotalMl(''); setVConc('')
       }
@@ -105,6 +125,9 @@ export function ProtocolWizard({
 
   async function saveCompound() {
     if (!cName) return
+    // If a preset form was chosen and it looks like an ester, match it
+    const detectedEster = ESTER_OPTIONS.find((e) => presetForm.toLowerCase().includes(e.toLowerCase()))
+    const effectiveEster = detectedEster ?? cEster
     const id = await db.compounds.add({
       name: cName,
       category: cCategory,
@@ -112,9 +135,9 @@ export function ProtocolWizard({
       unit: cUnit,
       color: cColor,
       schedule: '',
-      ester: isTRT ? cEster : undefined,
-      halfLifeDays: isTRT ? esterProfiles[cEster]?.halfLifeDays : undefined,
-      peakHours: isTRT ? esterProfiles[cEster]?.peakHours : undefined,
+      ester: isTRT ? effectiveEster : undefined,
+      halfLifeDays: isTRT ? esterProfiles[effectiveEster]?.halfLifeDays : undefined,
+      peakHours: isTRT ? esterProfiles[effectiveEster]?.peakHours : undefined,
     })
     setSavedCompoundId(id)
     setPCompoundId(String(id))
@@ -244,6 +267,60 @@ export function ProtocolWizard({
                 </>
               ) : (
                 <>
+                  {/* Preset search */}
+                  <div className="wide-field" style={{ position: 'relative' }}>
+                    <label>
+                      Quick-start from library
+                      <div style={{ position: 'relative', marginTop: 4 }}>
+                        <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-mute)', pointerEvents: 'none' }} />
+                        <input
+                          value={presetQuery}
+                          onChange={(e) => setPresetQuery(e.target.value)}
+                          placeholder="Search Testosterone, Nandrolone…"
+                          style={{ paddingLeft: 30 }}
+                        />
+                      </div>
+                    </label>
+                    {filteredPresets.length > 0 && (
+                      <div style={{
+                        border: '1px solid var(--line)', borderRadius: 'var(--radius)', background: 'var(--surface)',
+                        boxShadow: 'var(--shadow-lg)', marginTop: 4, overflow: 'hidden',
+                      }}>
+                        {filteredPresets.map((name) => {
+                          const forms = formsForCompound(name).filter(Boolean)
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              style={{
+                                display: 'block', width: '100%', textAlign: 'left',
+                                padding: '8px 12px', background: 'none', border: 'none',
+                                borderBottom: '1px solid var(--line)', cursor: 'pointer',
+                                color: 'var(--ink)', fontSize: 13,
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                              onClick={() => {
+                                setCName(name + (forms.length === 1 && forms[0] ? ` ${forms[0]}` : ''))
+                                setCCategory(name === 'Testosterone' ? 'TRT' : 'Other')
+                                setCUnit(COMPOUND_DEFAULT_UNIT[name] ?? 'mg')
+                                if (forms.length === 1 && forms[0]) setPresetForm(forms[0])
+                                setPresetQuery('')
+                              }}
+                            >
+                              <span style={{ fontWeight: 500 }}>{name}</span>
+                              {forms.filter(Boolean).length > 0 && (
+                                <span style={{ color: 'var(--ink-mute)', fontSize: 11, marginLeft: 8 }}>
+                                  {forms.filter(Boolean).join(' · ')}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   <label className="wide-field">
                     Name
                     <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Testosterone Enanthate" autoFocus />
