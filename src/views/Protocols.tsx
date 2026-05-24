@@ -20,12 +20,12 @@ import {
 } from '../lib/db'
 import {
   buildWeightDoseSeries,
+  esterProfiles,
   weightSummary,
 } from '../lib/insights'
 import { describeCadence } from '../lib/schedule'
 import { deleteInjection, pickActiveVial } from '../lib/injections'
 import { findPKCompound, buildDailyReleaseCurve } from '../lib/pk'
-import { esterProfiles } from '../lib/insights'
 import { EmptyState } from '../components/EmptyState'
 import { SiteCombobox } from '../components/SiteCombobox'
 import { TimeRangePicker } from '../components/TimeRangePicker'
@@ -113,21 +113,13 @@ export function Protocols({
         </section>
       )}
 
-      {/* ── 3. CHARTS ─────────────────────────────────────────────────────── */}
+      {/* ── 3. SITE ROTATION + HISTORY ─────────────────────────────────── */}
       {injections.length > 0 && (
-        <>
-          {/* PKCurvePanel renders its own <section> wrapper so an empty box never shows */}
-          <PKCurvePanel compounds={compounds} injections={injections} />
-          <section className="surface col-7">
-            <RetaChart compounds={compounds} injections={injections} />
-          </section>
-          <section className="surface col-5">
-            <SiteRotation injections={injections} recentSites={recentSites} />
-          </section>
-        </>
+        <section className="surface col-7">
+          <SiteRotation injections={injections} recentSites={recentSites} />
+        </section>
       )}
 
-      {/* ── 4. HISTORY ───────────────────────────────────────────────────── */}
       <section className={injections.length > 0 ? 'surface col-5' : 'surface col-12'}>
         <RecentDoses injections={injections} compounds={compounds} vials={vials ?? []} />
       </section>
@@ -674,8 +666,6 @@ function SiteRotation({ injections, recentSites }: { injections: InjectionLog[];
   )
 }
 
-// ── Testosterone curve ─────────────────────────────────────────────────────
-
 // ── Multi-compound PK curve chart ─────────────────────────────────────────
 
 function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
@@ -1078,3 +1068,6 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
     </div>
   )
 }
+
+// Retained for future use — not currently rendered
+void PKCurvePanel; void RetaChart

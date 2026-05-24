@@ -7,23 +7,17 @@ import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } fro
 import { extractMarkersFromText, type ExtractedMarker } from '../lib/pdf'
 import { markerHistory, type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
-import { RangeBar } from '../components/RangeBar'
 import { EmptyState } from '../components/EmptyState'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type RowData = {
-  raw: string
-  canonicalKey?: string
-  label: string
+type MarkerRow = {
+  marker: string           // canonical display name
+  key?: string             // canonical key (for trend click)
   panel: LabPanel
-  value?: number
-  rawValue: string
-  unit?: string
-  low?: number
-  high?: number
-  previous?: number
-  delta?: number
+  // Values across exams, newest first.
+  // undefined = this exam didn't include this marker.
+  values: Array<{ value?: number; rawValue: string; unit?: string; low?: number; high?: number } | undefined>
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
@@ -50,63 +44,82 @@ export function Labs({
   const markerTargets = useLiveQuery(() => db.markerTargets.toArray(), [], [])
   const targetByKey = useMemo(() => new Map((markerTargets ?? []).map((t) => [t.marker, t])), [markerTargets])
 
-  // Per-marker sorted history for delta calculation and charting
-  const historyByMarker = useMemo(() => {
-    const map = new Map<string, EnrichedResult[]>()
-    for (const r of results) {
-      if (!r.exam || r.value === undefined) continue
-      const list = map.get(r.marker.toLowerCase()) ?? []
-      list.push(r)
-      map.set(r.marker.toLowerCase(), list)
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => parseISO(a.exam!.collectedAt).getTime() - parseISO(b.exam!.collectedAt).getTime())
-    }
-    return map
-  }, [results])
+  // Sort exams newest first (already done from App.tsx, but re-sort to be safe)
+  const sortedExams = useMemo(
+    () => [...exams].sort((a, b) => b.collectedAt.localeCompare(a.collectedAt)),
+    [exams],
+  )
 
-  // Latest exam rows, grouped by panel
-  const latestExam = exams[0]
-  const groupedRows = useMemo<Map<LabPanel, RowData[]>>(() => {
-    const grouped = new Map<LabPanel, RowData[]>()
-    if (!latestExam) return grouped
-    const rows = results
-      .filter((r) => r.examId === latestExam.id)
-      .map((r): RowData => {
-        const canon = canonicalize(r.marker)
-        const personal = canon ? targetByKey.get(canon.key) : undefined
-        const hist = historyByMarker.get(r.marker.toLowerCase()) ?? []
-        const idx = hist.findIndex((x) => x.id === r.id)
-        const prev = idx > 0 ? hist[idx - 1] : undefined
-        const delta = r.value !== undefined && prev?.value !== undefined ? r.value - prev.value : undefined
+  // Show up to 5 most recent exams as columns
+  const examColumns = sortedExams.slice(0, 5)
+
+
+  // Build the comparison table: unique markers × exam columns
+  const groupedRows = useMemo<Map<LabPanel, MarkerRow[]>>(() => {
+    if (examColumns.length === 0) return new Map()
+
+    // Collect all unique marker names from results in these exams
+    const examIdSet = new Set(examColumns.map((e) => e.id))
+    const relevantResults = results.filter((r) => r.examId !== undefined && examIdSet.has(r.examId))
+
+    // Deduplicate markers by canonical key (or raw name)
+    const markerOrder: string[] = []
+    const markerMap = new Map<string, string>() // raw name → canonical key or raw fallback
+
+    for (const r of relevantResults) {
+      const canon = canonicalize(r.marker)
+      const key = canon?.key ?? r.marker.toLowerCase()
+      if (!markerMap.has(key)) {
+        markerOrder.push(key)
+        markerMap.set(key, r.marker)
+      }
+    }
+
+    // Build rows
+    const grouped = new Map<LabPanel, MarkerRow[]>()
+    for (const key of markerOrder) {
+      const rawName = markerMap.get(key)!
+      const canon = canonicalize(rawName)
+      const panel = canon?.panel ?? 'Other'
+      const personal = canon ? targetByKey.get(canon.key) : undefined
+
+      const values = examColumns.map((exam) => {
+        // Find result in this exam matching the marker
+        const r = results.find(
+          (x) => x.examId === exam.id && (
+            x.marker.toLowerCase() === rawName.toLowerCase() ||
+            (canon && canonicalize(x.marker)?.key === canon.key)
+          ),
+        )
+        if (!r) return undefined
         const low = personal?.low ?? r.low ?? canon?.optimal?.low
         const high = personal?.high ?? r.high ?? canon?.optimal?.high
-        return {
-          raw: r.marker,
-          canonicalKey: canon?.key,
-          label: canon?.label ?? r.marker,
-          panel: canon?.panel ?? 'Other',
-          value: r.value,
-          rawValue: r.rawValue,
-          unit: r.unit ?? canon?.unit ?? personal?.unit,
-          low, high, previous: prev?.value, delta,
-        }
+        return { value: r.value, rawValue: r.rawValue, unit: r.unit ?? canon?.unit ?? personal?.unit, low, high }
       })
-    for (const row of rows) {
-      const list = grouped.get(row.panel) ?? []
+
+      const row: MarkerRow = {
+        marker: canon?.label ?? rawName,
+        key: canon?.key,
+        panel,
+        values,
+      }
+
+      const list = grouped.get(panel) ?? []
       list.push(row)
-      grouped.set(row.panel, list)
+      grouped.set(panel, list)
     }
+
     return grouped
-  }, [latestExam, results, historyByMarker, targetByKey])
+  }, [examColumns, results, targetByKey])
 
   const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [collapsedPanels, setCollapsedPanels] = useState<Set<LabPanel>>(new Set())
 
-  // Topbar "Add result" button triggers this
   useEffect(() => {
     if (addOpen) { setShowAddForm(true); onAddClose?.() }
   }, [addOpen, onAddClose])
+
   const selectedHistory = useMemo(() => {
     if (!selectedKey) return []
     const matches = results.filter((r) => canonicalize(r.marker)?.key === selectedKey)
@@ -142,53 +155,37 @@ export function Labs({
     await db.files.update(latestFile.id, { status: 'Reviewed' })
   }
 
-  const panelCount = PANEL_ORDER.filter((p) => groupedRows.has(p)).length
+  function togglePanel(panel: LabPanel) {
+    setCollapsedPanels((prev) => {
+      const next = new Set(prev)
+      if (next.has(panel)) next.delete(panel)
+      else next.add(panel)
+      return next
+    })
+  }
+
+  const hasData = examColumns.length > 0
 
   return (
     <div className="content-grid">
 
-      {/* ── Latest panel ──────────────────────────────────────────────────── */}
-      <section className="surface col-12">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Latest panel</span>
-            <h3>
-              {latestExam
-                ? `${latestExam.name} · ${format(parseISO(latestExam.collectedAt), 'MMM d, yyyy')}`
-                : 'No exams yet'}
-            </h3>
+      {/* ── PDF pending banner ── */}
+      {latestFile && extracted.length > 0 && (
+        <section className="surface col-12" style={{ background: 'var(--accent-soft)', borderColor: 'rgba(15,118,110,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <FileText size={14} style={{ color: 'var(--accent-ink)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <strong style={{ fontSize: 13, color: 'var(--accent-ink)' }}>PDF ready to import</strong>
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--accent-ink)', opacity: 0.8 }}>{latestFile.name} · {extracted.length} markers detected</span>
+            </div>
+            <button type="button" className="primary-button" style={{ background: 'var(--accent)', height: 30, fontSize: 12 }} onClick={() => saveExtracted(extracted)}>
+              Import {extracted.length} markers
+            </button>
           </div>
-          {latestExam && (
-            <span className="safety-chip">{results.filter((r) => r.examId === latestExam.id).length} markers</span>
-          )}
-        </div>
+        </section>
+      )}
 
-        {panelCount > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            {PANEL_ORDER.map((panel) => {
-              const rows = groupedRows.get(panel)
-              if (!rows || rows.length === 0) return null
-              return (
-                <PanelSection
-                  key={panel}
-                  panel={panel}
-                  rows={rows}
-                  onSelectKey={setSelectedKey}
-                  selectedKey={selectedKey}
-                />
-              )
-            })}
-          </div>
-        ) : (
-          <EmptyState
-            icon={FlaskConical}
-            title="No lab results yet"
-            detail="Upload a PDF in Files or add markers manually below."
-          />
-        )}
-      </section>
-
-      {/* ── Marker history chart — full width, only when a marker is selected ── */}
+      {/* ── Marker trend chart — shown when a marker row is clicked ── */}
       {selectedKey && (
         <section className="surface col-12">
           <div className="panel-header">
@@ -209,31 +206,131 @@ export function Labs({
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <p className="panel-note">Add results from at least 2 panels to see a trend.</p>
+            <p className="panel-note">Add results from at least 2 exams to see a trend.</p>
           )}
           {metaForKey(selectedKey)?.optimal?.note && (
-            <p className="panel-note">{metaForKey(selectedKey)?.optimal?.note}</p>
+            <p className="panel-note" style={{ marginTop: 8 }}>{metaForKey(selectedKey)?.optimal?.note}</p>
           )}
         </section>
       )}
 
-      {/* ── PDF pending banner — only when there's something to import ── */}
-      {latestFile && extracted.length > 0 && (
-        <section className="surface col-12" style={{ background: 'var(--accent-soft)', borderColor: 'rgba(15,118,110,0.2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <FileText size={14} style={{ color: 'var(--accent-ink)', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <strong style={{ fontSize: 13, color: 'var(--accent-ink)' }}>PDF ready to import</strong>
-              <span style={{ display: 'block', fontSize: 11, color: 'var(--accent-ink)', opacity: 0.8 }}>{latestFile.name} · {extracted.length} markers detected</span>
-            </div>
-            <button type="button" className="primary-button" style={{ background: 'var(--accent)', height: 30, fontSize: 12 }} onClick={() => saveExtracted(extracted)}>
-              Import {extracted.length} markers
-            </button>
+      {/* ── Main comparison table ── */}
+      <section className="surface col-12">
+        <div className="panel-header">
+          <div>
+            <span className="section-label">All exams</span>
+            <h3>Marker comparison</h3>
           </div>
-        </section>
-      )}
+          <button type="button" className="ghost-button" onClick={() => setShowAddForm((v) => !v)}>
+            <Plus size={12} /> Add result
+          </button>
+        </div>
 
-      {/* ── Manual add form — shown only when triggered from topbar ── */}
+        {!hasData ? (
+          <EmptyState
+            icon={FlaskConical}
+            title="No lab results yet"
+            detail="Upload a PDF in Files or add markers manually."
+          />
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="labs-compare-table">
+              <thead>
+                <tr>
+                  <th>Marker</th>
+                  {examColumns.map((exam) => (
+                    <th key={exam.id} style={{ textAlign: 'right' }}>
+                      {exam.name}<br />
+                      <span style={{ fontWeight: 400, opacity: 0.7 }}>{format(parseISO(exam.collectedAt), 'MMM d, yy')}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {PANEL_ORDER.map((panel) => {
+                  const rows = groupedRows.get(panel)
+                  if (!rows || rows.length === 0) return null
+                  const collapsed = collapsedPanels.has(panel)
+                  const outCount = rows.reduce((n, row) => {
+                    const latest = row.values[0]
+                    if (!latest?.value) return n
+                    const out = (latest.high !== undefined && latest.value > latest.high) ||
+                      (latest.low !== undefined && latest.value < latest.low)
+                    return out ? n + 1 : n
+                  }, 0)
+                  return (
+                    <>
+                      {/* Panel header row */}
+                      <tr key={`panel-${panel}`} style={{ cursor: 'pointer' }} onClick={() => togglePanel(panel)}>
+                        <td colSpan={examColumns.length + 1} style={{ padding: '12px 0 4px', borderTop: '2px solid var(--line)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {collapsed ? <ChevronRight size={12} style={{ color: 'var(--ink-mute)' }} /> : <ChevronDown size={12} style={{ color: 'var(--ink-mute)' }} />}
+                            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-dim)' }}>{panel}</span>
+                            {outCount > 0 && (
+                              <span className="chip" style={{ background: 'var(--bad-soft)', color: 'var(--bad)', fontSize: 10 }}>
+                                {outCount} out
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Marker rows */}
+                      {!collapsed && rows.map((row) => {
+                        const latestVal = row.values[0]
+                        const isSelected = row.key === selectedKey
+                        const isOut = latestVal?.value !== undefined && (
+                          (latestVal.high !== undefined && latestVal.value > latestVal.high) ||
+                          (latestVal.low !== undefined && latestVal.value < latestVal.low)
+                        )
+                        return (
+                          <tr
+                            key={row.marker}
+                            className={isSelected ? 'selected' : undefined}
+                            onClick={() => row.key && setSelectedKey(isSelected ? undefined : row.key)}
+                            style={{ cursor: row.key ? 'pointer' : 'default' }}
+                          >
+                            <td>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: isOut ? 'var(--bad)' : 'var(--ink)' }}>
+                                {row.marker}
+                              </span>
+                            </td>
+                            {row.values.map((cell, ci) => {
+                              if (!cell) return <td key={ci} style={{ color: 'var(--ink-mute)', textAlign: 'right', fontSize: 12 }}>—</td>
+                              const out = cell.value !== undefined && (
+                                (cell.high !== undefined && cell.value > cell.high) ||
+                                (cell.low !== undefined && cell.value < cell.low)
+                              )
+                              // Delta: compare with next column (older exam)
+                              const nextCell = row.values[ci + 1]
+                              const delta = cell.value !== undefined && nextCell?.value !== undefined
+                                ? cell.value - nextCell.value
+                                : undefined
+                              return (
+                                <td key={ci} style={{ textAlign: 'right' }}>
+                                  <div className={`labs-val-cell${out ? ' out' : ''}`} style={{ justifyContent: 'flex-end' }}>
+                                    <span>{cell.rawValue}{cell.unit ? ` ${cell.unit}` : ''}</span>
+                                    {ci === 0 && delta !== undefined && Math.abs(delta) > 0.05 && (
+                                      <span className={`labs-delta ${delta > 0 ? 'up' : 'down'}`}>
+                                        {delta > 0 ? '↑' : '↓'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                              )
+                            })}
+                          </tr>
+                        )
+                      })}
+                    </>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* ── Manual add form ── */}
       {showAddForm && (
         <section className="surface col-6">
           <div className="panel-header">
@@ -264,84 +361,6 @@ export function Labs({
         </section>
       )}
 
-    </div>
-  )
-}
-
-// ── Panel section ──────────────────────────────────────────────────────────
-
-function PanelSection({
-  panel,
-  rows,
-  onSelectKey,
-  selectedKey,
-}: {
-  panel: LabPanel
-  rows: RowData[]
-  onSelectKey: (key: string | undefined) => void
-  selectedKey?: string
-}) {
-  const [collapsed, setCollapsed] = useState(true)
-  const outCount = rows.filter((r) => {
-    if (r.value === undefined) return false
-    return (r.high !== undefined && r.value > r.high) || (r.low !== undefined && r.value < r.low)
-  }).length
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setCollapsed((c) => !c)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          background: 'none', border: 'none', padding: '0 0 8px',
-          cursor: 'pointer', width: '100%', textAlign: 'left',
-        }}
-      >
-        {collapsed ? <ChevronRight size={13} style={{ color: 'var(--ink-mute)' }} /> : <ChevronDown size={13} style={{ color: 'var(--ink-mute)' }} />}
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-dim)' }}>{panel}</span>
-        {outCount > 0 && (
-          <span className="chip" style={{ background: 'var(--bad-soft)', color: 'var(--bad)', fontSize: 10 }}>
-            {outCount} out of range
-          </span>
-        )}
-      </button>
-
-      {!collapsed && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
-          {rows.map((row) => {
-            const out = (row.value !== undefined && row.high !== undefined && row.value > row.high) ||
-              (row.value !== undefined && row.low !== undefined && row.value < row.low)
-            const active = row.canonicalKey === selectedKey
-            return (
-              <div
-                key={row.raw}
-                className="range-bar-row"
-                style={{
-                  cursor: row.canonicalKey ? 'pointer' : 'default',
-                  background: active ? 'var(--accent-soft)' : undefined,
-                  borderRadius: active ? 'var(--radius-sm)' : undefined,
-                }}
-                onClick={() => row.canonicalKey && onSelectKey(active ? undefined : row.canonicalKey)}
-              >
-                <div className="marker">
-                  {row.label}
-                  {row.raw !== row.label && <small style={{ color: 'var(--ink-mute)', marginLeft: 4 }}>{row.raw}</small>}
-                </div>
-                <RangeBar value={row.value} previous={row.previous} low={row.low} high={row.high} />
-                <div className="value">
-                  <span className={out ? 'range-pill out' : 'range-pill ok'}>
-                    {row.rawValue}{row.unit ? ` ${row.unit}` : ''}
-                  </span>
-                </div>
-                <div className={`delta ${row.delta !== undefined ? (row.delta >= 0 ? 'good' : 'bad') : ''}`}>
-                  {row.delta !== undefined ? `${row.delta >= 0 ? '+' : ''}${row.delta.toFixed(1)}` : '—'}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }

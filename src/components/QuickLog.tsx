@@ -1,28 +1,126 @@
-// Quick-log modal — opens from sidebar buttons without navigating away.
-// Three tabs: Injection | Blood Pressure | Symptoms.
+// Quick-log modal — opens from topbar/sidebar without navigating away.
+// Two tabs: Injection | Blood Pressure.
+// Symptoms are embedded inline in each form.
+// Weight is a field on the injection form.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Brain, Droplet, HeartPulse, Plus, Scale, X } from 'lucide-react'
-import { db, type BodyMetric, type Compound, type Symptom, type Unit } from '../lib/db'
+import { ChevronDown, ChevronUp, Droplet, HeartPulse, Plus, X } from 'lucide-react'
+import { db, type Compound, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from './SiteCombobox'
 import { COMMON_SITES } from '../lib/sites'
 import type { QuickLogPrefill } from '../App'
 
-type Tab = 'injection' | 'bp' | 'symptoms' | 'weight'
+type Tab = 'injection' | 'bp'
 
-const SLIDERS: Array<{ key: keyof Symptom; label: string }> = [
-  { key: 'libido', label: 'Libido' },
-  { key: 'sleep', label: 'Sleep' },
-  { key: 'mood', label: 'Mood' },
-  { key: 'energy', label: 'Energy' },
-  { key: 'waterRetention', label: 'Water retention' },
-  { key: 'acne', label: 'Acne' },
-  { key: 'nippleSensitivity', label: 'Nipple sensitivity' },
-  { key: 'jointPain', label: 'Joint pain' },
-  { key: 'headache', label: 'Headache' },
+// ── Symptom chip definitions ───────────────────────────────────────────────
+
+type ChipDef = {
+  label: string
+  key: keyof Symptom
+  positiveValue: number   // value written when chip is selected
+}
+
+const CHIPS: ChipDef[] = [
+  { label: 'Good mood', key: 'mood', positiveValue: 4 },
+  { label: 'Low mood', key: 'mood', positiveValue: 2 },
+  { label: 'High energy', key: 'energy', positiveValue: 4 },
+  { label: 'Tired', key: 'energy', positiveValue: 1 },
+  { label: 'Good sleep', key: 'sleep', positiveValue: 4 },
+  { label: 'Poor sleep', key: 'sleep', positiveValue: 1 },
+  { label: 'High libido', key: 'libido', positiveValue: 4 },
+  { label: 'Low libido', key: 'libido', positiveValue: 1 },
+  { label: 'Acne', key: 'acne', positiveValue: 3 },
+  { label: 'Joint pain', key: 'jointPain', positiveValue: 3 },
+  { label: 'Water retention', key: 'waterRetention', positiveValue: 3 },
+  { label: 'Nipple sensitivity', key: 'nippleSensitivity', positiveValue: 3 },
+  { label: 'Headache', key: 'headache', positiveValue: 3 },
 ]
+
+// Map selected chip labels → a partial Symptom record
+function chipsToSymptom(selected: string[]): Partial<Symptom> {
+  const out: Partial<Symptom> = {}
+  for (const label of selected) {
+    const def = CHIPS.find((c) => c.label === label)
+    if (def) (out as Record<string, number>)[def.key as string] = def.positiveValue
+  }
+  return out
+}
+
+// ── Inline symptom chip picker ─────────────────────────────────────────────
+
+function SymptomsChipPicker({
+  selected,
+  notes,
+  onChangeSelected,
+  onChangeNotes,
+}: {
+  selected: string[]
+  notes: string
+  onChangeSelected: (s: string[]) => void
+  onChangeNotes: (n: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  function toggle(label: string) {
+    // chips sharing the same key are mutually exclusive (e.g. Good mood / Low mood)
+    const def = CHIPS.find((c) => c.label === label)!
+    const conflicting = CHIPS.filter((c) => c.key === def.key && c.label !== label).map((c) => c.label)
+    const next = selected.includes(label)
+      ? selected.filter((s) => s !== label)
+      : [...selected.filter((s) => !conflicting.includes(s)), label]
+    onChangeSelected(next)
+  }
+
+  const summary = selected.length > 0
+    ? selected.join(' · ')
+    : open ? '' : 'No symptoms logged'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <button
+        type="button"
+        className="symptom-section-toggle"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        <span style={{ flex: 1, textAlign: 'left' }}>
+          How do you feel?
+          {!open && selected.length > 0 && (
+            <span style={{ color: 'var(--accent-ink)', marginLeft: 6, fontWeight: 600 }}>
+              {summary}
+            </span>
+          )}
+        </span>
+      </button>
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="symptom-chips">
+            {CHIPS.map(({ label }) => (
+              <button
+                key={label}
+                type="button"
+                className={`symptom-chip${selected.includes(label) ? ' selected' : ''}`}
+                onClick={() => toggle(label)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <input
+            placeholder="Notes (optional)"
+            value={notes}
+            onChange={(e) => onChangeNotes(e.target.value)}
+            style={{ width: '100%', fontSize: 13 }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main QuickLog modal ────────────────────────────────────────────────────
 
 export function QuickLog({
   open,
@@ -83,12 +181,6 @@ export function QuickLog({
             <button type="button" role="tab" className={tab === 'bp' ? 'active' : undefined} onClick={() => setTab('bp')}>
               <HeartPulse size={12} /> BP
             </button>
-            <button type="button" role="tab" className={tab === 'symptoms' ? 'active' : undefined} onClick={() => setTab('symptoms')}>
-              <Brain size={12} /> Symptoms
-            </button>
-            <button type="button" role="tab" className={tab === 'weight' ? 'active' : undefined} onClick={() => setTab('weight')}>
-              <Scale size={12} /> Weight
-            </button>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
         </div>
@@ -97,8 +189,6 @@ export function QuickLog({
         <div style={{ overflowY: 'auto', padding: '20px 24px 28px' }}>
           {tab === 'injection' && <InjectionForm compounds={compounds} prefill={prefill} onSaved={onClose} />}
           {tab === 'bp' && <BPForm onSaved={onClose} />}
-          {tab === 'symptoms' && <SymptomsForm onSaved={onClose} />}
-          {tab === 'weight' && <WeightForm onSaved={onClose} />}
         </div>
       </div>
     </div>
@@ -117,30 +207,44 @@ function InjectionForm({
   onSaved: () => void
 }) {
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
-  const injections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().limit(30).toArray(), [], [])
+  const injections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().limit(50).toArray(), [], [])
+
   const recentSites = useMemo(() => {
     const seen = new Set<string>()
     const out: string[] = []
     for (const inj of injections ?? []) {
       if (inj.site && !seen.has(inj.site)) { seen.add(inj.site); out.push(inj.site) }
-      if (out.length >= 6) break
+      if (out.length >= 8) break
     }
     return out
+  }, [injections])
+
+  // Last recorded weight for placeholder
+  const lastWeightKg = useMemo(() => {
+    for (const inj of injections ?? []) {
+      if (inj.weightKg !== undefined) return inj.weightKg
+    }
+    return undefined
   }, [injections])
 
   const [compoundId, setCompoundId] = useState<number | ''>(prefill?.compoundId ?? compounds[0]?.id ?? '')
   const [dose, setDose] = useState(prefill?.dose !== undefined ? String(prefill.dose) : '')
   const [site, setSite] = useState(COMMON_SITES[0])
+  const [weightKg, setWeightKg] = useState('')
   const [notes, setNotes] = useState('')
+  const [symptomChips, setSymptomChips] = useState<string[]>([])
+  const [symptomNotes, setSymptomNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const compound = compounds.find((c) => c.id === compoundId)
 
-  // Re-initialise when modal opens with a different prefill
   useEffect(() => {
     if (prefill?.compoundId !== undefined) setCompoundId(prefill.compoundId)
     else if (compounds[0]?.id) setCompoundId(compounds[0].id)
     setDose(prefill?.dose !== undefined ? String(prefill.dose) : '')
     setNotes('')
+    setWeightKg('')
+    setSymptomChips([])
+    setSymptomNotes('')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill?.compoundId, prefill?.dose, prefill?.scheduledAt])
 
@@ -163,14 +267,22 @@ function InjectionForm({
         site,
         notes: notes || undefined,
         vialId: activeVialId,
+        weightKg: weightKg ? Number(weightKg) : undefined,
       })
-      // If triggered from a scheduled protocol dose, mark it as done
       if (prefill?.protocolId && prefill?.scheduledAt) {
         await db.protocolDoses.add({
           protocolId: prefill.protocolId,
           scheduledAt: prefill.scheduledAt,
           status: 'done',
           injectionId,
+        })
+      }
+      // Save symptom snapshot if any chips selected or notes written
+      if (symptomChips.length > 0 || symptomNotes) {
+        await db.symptoms.add({
+          recordedAt: new Date().toISOString(),
+          ...chipsToSymptom(symptomChips),
+          notes: symptomNotes || undefined,
         })
       }
       onSaved()
@@ -199,10 +311,27 @@ function InjectionForm({
         Site
         <SiteCombobox value={site} onChange={setSite} recentSites={recentSites} />
       </label>
+      <label>
+        Weight (kg)
+        <input
+          inputMode="decimal"
+          placeholder={lastWeightKg !== undefined ? `${lastWeightKg} (last)` : 'e.g. 82.5'}
+          value={weightKg}
+          onChange={(e) => setWeightKg(e.target.value)}
+        />
+      </label>
       <label className="wide-field">
         Notes (optional)
         <input value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
+      <div className="wide-field" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+        <SymptomsChipPicker
+          selected={symptomChips}
+          notes={symptomNotes}
+          onChangeSelected={setSymptomChips}
+          onChangeNotes={setSymptomNotes}
+        />
+      </div>
       <button type="button" className="primary-button wide-field" onClick={save} disabled={busy || !dose}>
         <Plus size={14} /> {busy ? 'Saving…' : 'Log injection'}
       </button>
@@ -216,7 +345,8 @@ function BPForm({ onSaved }: { onSaved: () => void }) {
   const [sys, setSys] = useState('')
   const [dia, setDia] = useState('')
   const [pulse, setPulse] = useState('')
-  const [weight, setWeight] = useState('')
+  const [symptomChips, setSymptomChips] = useState<string[]>([])
+  const [symptomNotes, setSymptomNotes] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function save() {
@@ -228,8 +358,14 @@ function BPForm({ onSaved }: { onSaved: () => void }) {
         systolic: Number(sys),
         diastolic: Number(dia),
         pulse: pulse ? Number(pulse) : undefined,
-        weightKg: weight ? Number(weight) : undefined,
       })
+      if (symptomChips.length > 0 || symptomNotes) {
+        await db.symptoms.add({
+          recordedAt: new Date().toISOString(),
+          ...chipsToSymptom(symptomChips),
+          notes: symptomNotes || undefined,
+        })
+      }
       onSaved()
     } finally {
       setBusy(false)
@@ -246,121 +382,20 @@ function BPForm({ onSaved }: { onSaved: () => void }) {
         Diastolic
         <input inputMode="numeric" placeholder="80" value={dia} onChange={(e) => setDia(e.target.value)} />
       </label>
-      <label>
+      <label className="wide-field">
         Pulse (bpm)
         <input inputMode="numeric" placeholder="65" value={pulse} onChange={(e) => setPulse(e.target.value)} />
       </label>
-      <label>
-        Weight (kg)
-        <input inputMode="decimal" placeholder="82.5" value={weight} onChange={(e) => setWeight(e.target.value)} />
-      </label>
+      <div className="wide-field" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+        <SymptomsChipPicker
+          selected={symptomChips}
+          notes={symptomNotes}
+          onChangeSelected={setSymptomChips}
+          onChangeNotes={setSymptomNotes}
+        />
+      </div>
       <button type="button" className="primary-button wide-field" onClick={save} disabled={busy || !sys || !dia}>
         <Plus size={14} /> {busy ? 'Saving…' : 'Save reading'}
-      </button>
-    </div>
-  )
-}
-
-// ── Weight & body composition ──────────────────────────────────────────────
-
-function WeightForm({ onSaved }: { onSaved: () => void }) {
-  const [weight, setWeight] = useState('')
-  const [bodyFat, setBodyFat] = useState('')
-  const [waist, setWaist] = useState('')
-  const [busy, setBusy] = useState(false)
-  const canSave = !!(weight || bodyFat || waist)
-
-  async function save() {
-    if (!canSave) return
-    setBusy(true)
-    try {
-      const entry: Omit<BodyMetric, 'id'> = {
-        measuredAt: new Date().toISOString(),
-        source: 'manual',
-        weightKg: weight ? Number(weight) : undefined,
-        bodyFatPct: bodyFat ? Number(bodyFat) : undefined,
-        waistCm: waist ? Number(waist) : undefined,
-      }
-      await db.bodyMetrics.add(entry)
-      onSaved()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="form-grid">
-      <label>
-        Weight (kg)
-        <input inputMode="decimal" placeholder="82.5" value={weight} onChange={(e) => setWeight(e.target.value)} autoFocus />
-      </label>
-      <label>
-        Body fat (%)
-        <input inputMode="decimal" placeholder="18.5" value={bodyFat} onChange={(e) => setBodyFat(e.target.value)} />
-      </label>
-      <label className="wide-field">
-        Waist (cm)
-        <input inputMode="decimal" placeholder="86" value={waist} onChange={(e) => setWaist(e.target.value)} />
-      </label>
-      <button type="button" className="primary-button wide-field" onClick={save} disabled={busy || !canSave}>
-        <Plus size={14} /> {busy ? 'Saving…' : 'Save measurement'}
-      </button>
-    </div>
-  )
-}
-
-// ── Symptoms ───────────────────────────────────────────────────────────────
-
-function SymptomsForm({ onSaved }: { onSaved: () => void }) {
-  const [draft, setDraft] = useState<Partial<Symptom>>({})
-  const [notes, setNotes] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function save() {
-    setBusy(true)
-    try {
-      await db.symptoms.add({
-        recordedAt: new Date().toISOString(),
-        ...draft,
-        notes: notes || undefined,
-      })
-      onSaved()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div className="symptom-grid" style={{ '--symptom-cols': 2 } as React.CSSProperties}>
-        {SLIDERS.map(({ key, label }) => {
-          const val = (draft[key] as number | undefined) ?? 0
-          return (
-            <div className="symptom-cell" key={key as string}>
-              <label>
-                {label}
-                <strong style={{ minWidth: 16, textAlign: 'right' }}>{val}</strong>
-              </label>
-              <input
-                type="range" min={0} max={5} step={1}
-                value={val}
-                onChange={(e) => setDraft({ ...draft, [key]: Number(e.target.value) })}
-              />
-            </div>
-          )
-        })}
-      </div>
-      <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--ink-dim)', fontWeight: 500 }}>
-        Notes (optional)
-        <textarea
-          rows={2}
-          style={{ resize: 'none', border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', fontSize: 13 }}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </label>
-      <button type="button" className="primary-button" style={{ alignSelf: 'flex-start' }} onClick={save} disabled={busy}>
-        <Plus size={14} /> {busy ? 'Saving…' : 'Save snapshot'}
       </button>
     </div>
   )

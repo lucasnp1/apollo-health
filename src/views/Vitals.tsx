@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import type { BodyMetric } from '../lib/db'
 import { HeartPulse, Plus, Trash2 } from 'lucide-react'
 import {
   Area,
@@ -19,14 +18,12 @@ import { db, type VitalLog } from '../lib/db'
 import { TimeRangePicker } from '../components/TimeRangePicker'
 import { filterByRange, type TimeRange } from '../lib/timeRange'
 import { EmptyState } from '../components/EmptyState'
-import { Sparkline } from '../components/Sparkline'
 
 export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   const [range, setRange] = useState<TimeRange>('3M')
   const [form, setForm] = useState({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
   const bpGoal = goals.find((g) => g.kind === 'bp' && !g.achievedAt)
-  const bodyMetrics = useLiveQuery(() => db.bodyMetrics.orderBy('measuredAt').toArray(), [], [])
 
   const filtered = useMemo(
     () => filterByRange(vitals, range, (v) => parseISO(v.measuredAt)).slice().reverse(),
@@ -169,93 +166,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         )}
       </section>
 
-      <BodyCompositionPanel metrics={bodyMetrics} range={range} />
 
     </div>
-  )
-}
-
-function BodyCompositionPanel({ metrics, range }: { metrics: BodyMetric[]; range: TimeRange }) {
-  const filtered = useMemo(
-    () => filterByRange(metrics, range, (m) => parseISO(m.measuredAt)),
-    [metrics, range],
-  )
-  const latest = (predicate: (m: BodyMetric) => boolean) => [...filtered].reverse().find(predicate)
-  const lastWeight = latest((m) => m.weightKg !== undefined)
-  const lastBf = latest((m) => m.bodyFatPct !== undefined)
-  const lastWaist = latest((m) => m.waistCm !== undefined)
-  const lastRhr = latest((m) => m.restingHr !== undefined)
-  const lastHrv = latest((m) => m.hrvMs !== undefined)
-
-  const weightSpark = filtered
-    .filter((m) => m.weightKg !== undefined)
-    .slice(-30)
-    .map((m) => m.weightKg as number)
-  const rhrSpark = filtered
-    .filter((m) => m.restingHr !== undefined)
-    .slice(-30)
-    .map((m) => m.restingHr as number)
-  const hrvSpark = filtered
-    .filter((m) => m.hrvMs !== undefined)
-    .slice(-30)
-    .map((m) => m.hrvMs as number)
-
-  const empty = filtered.length === 0
-  return (
-    <section className="surface col-6">
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Body</span>
-          <h3>Composition &amp; cardio</h3>
-        </div>
-        <span className="safety-chip">From Apple Health import or manual</span>
-      </div>
-      {empty ? (
-        <p className="panel-note">
-          Nothing in this range yet. Import an Apple Health <strong>export.xml</strong> in Files to populate.
-        </p>
-      ) : (
-        <div className="stat-grid">
-          <div className="stat">
-            <span className="stat-label">Weight</span>
-            <span className="stat-value">{lastWeight?.weightKg !== undefined ? `${lastWeight.weightKg.toFixed(1)} kg` : '—'}</span>
-            <Sparkline values={weightSpark} />
-            <span className="stat-detail">
-              {lastWeight ? format(parseISO(lastWeight.measuredAt), 'MMM d') : ''}
-            </span>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Body fat</span>
-            <span className="stat-value">{lastBf?.bodyFatPct !== undefined ? `${lastBf.bodyFatPct.toFixed(1)}%` : '—'}</span>
-            <span className="stat-detail">
-              {lastBf ? format(parseISO(lastBf.measuredAt), 'MMM d') : ''}
-            </span>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Waist</span>
-            <span className="stat-value">{lastWaist?.waistCm !== undefined ? `${lastWaist.waistCm.toFixed(1)} cm` : '—'}</span>
-            <span className="stat-detail">
-              {lastWaist ? format(parseISO(lastWaist.measuredAt), 'MMM d') : ''}
-            </span>
-          </div>
-          <div className="stat">
-            <span className="stat-label">Resting HR</span>
-            <span className="stat-value">{lastRhr?.restingHr !== undefined ? `${Math.round(lastRhr.restingHr)} bpm` : '—'}</span>
-            <Sparkline values={rhrSpark} />
-            <span className="stat-detail">
-              {lastRhr ? format(parseISO(lastRhr.measuredAt), 'MMM d') : ''}
-            </span>
-          </div>
-          <div className="stat">
-            <span className="stat-label">HRV (SDNN)</span>
-            <span className="stat-value">{lastHrv?.hrvMs !== undefined ? `${Math.round(lastHrv.hrvMs)} ms` : '—'}</span>
-            <Sparkline values={hrvSpark} />
-            <span className="stat-detail">
-              {lastHrv ? format(parseISO(lastHrv.measuredAt), 'MMM d') : ''}
-            </span>
-          </div>
-        </div>
-      )}
-    </section>
   )
 }

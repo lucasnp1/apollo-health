@@ -59,12 +59,18 @@ export function findCompound(compounds: Compound[], needle: string) {
   return compounds.find((compound) => compound.name.toLowerCase().includes(needle.toLowerCase()))
 }
 
-export function buildWeightDoseSeries(compounds: Compound[], injections: InjectionLog[]) {
-  const reta = findCompound(compounds, 'reta')
-  if (!reta?.id) return []
+/** @deprecated Use buildAllWeightSeries instead — reads weight from all injections, not just 'reta' */
+export function buildWeightDoseSeries(_compounds: Compound[], injections: InjectionLog[]) {
+  return buildAllWeightSeries(injections)
+}
 
+/**
+ * Returns a weight series sourced from ALL injections that have weightKg logged.
+ * Sorted oldest → newest. The weight widget on Overview uses this.
+ */
+export function buildAllWeightSeries(injections: InjectionLog[]) {
   return injections
-    .filter((entry) => entry.compoundId === reta.id && (entry.weightKg !== undefined || entry.dose !== undefined))
+    .filter((entry) => entry.weightKg !== undefined)
     .sort((a, b) => parseISO(a.takenAt).getTime() - parseISO(b.takenAt).getTime())
     .map((entry) => ({
       date: format(parseISO(entry.takenAt), 'MMM d'),

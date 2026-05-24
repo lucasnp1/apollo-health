@@ -1,10 +1,9 @@
 import { useMemo } from 'react'
-import { AlertTriangle, CalendarClock, ChevronRight, Droplet, FlaskConical, HeartPulse } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
+import { AlertTriangle, CalendarClock, ChevronRight, Droplet, HeartPulse, Syringe } from 'lucide-react'
+import { formatDistanceToNow, format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
 import {
-  buildTestosteroneCurve,
   buildWeightDoseSeries,
   flagLatestResults,
   weightSummary,
@@ -46,22 +45,28 @@ export function Overview({
 
   const weightSeries = buildWeightDoseSeries(compounds, injections)
   const weightStats = weightSummary(weightSeries)
-  const tCurve = buildTestosteroneCurve(compounds, injections)
   const labFlags = flagLatestResults(results)
   const latestExam = exams[0]
   const latestBp = vitals[0]
+  const latestSymptom = symptoms[0]
 
   const bpSpark = vitals.slice(0, 14).reverse().map((v) => v.systolic)
-  const weightSpark = weightSeries
-    .filter((p) => p.weight !== undefined)
-    .slice(-14)
-    .map((p) => p.weight as number)
-  const latestSymptom = symptoms[0]
+  const weightSpark = weightSeries.filter((p) => p.weight !== undefined).slice(-14).map((p) => p.weight as number)
+
+  // 7-day average BP
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const recentVitals = vitals.filter((v) => parseISO(v.measuredAt).getTime() >= sevenDaysAgo)
+  const avgBp = recentVitals.length >= 2
+    ? {
+        sys: Math.round(recentVitals.reduce((s, v) => s + v.systolic, 0) / recentVitals.length),
+        dia: Math.round(recentVitals.reduce((s, v) => s + v.diastolic, 0) / recentVitals.length),
+      }
+    : undefined
 
   return (
     <div className="content-grid">
 
-      {/* ── 1. Status — always first ── */}
+      {/* ── 1. Status stat cards ── */}
       <section className="surface col-12">
         <div className="panel-header">
           <div><span className="section-label">Now</span><h3>Status</h3></div>
@@ -71,9 +76,11 @@ export function Overview({
             label="Blood pressure"
             value={latestBp ? `${latestBp.systolic}/${latestBp.diastolic}` : '—'}
             detail={
-              bpGoal && latestBp
-                ? `Goal ${bpGoal.target} · ${latestBp.systolic - bpGoal.target > 0 ? `${latestBp.systolic - bpGoal.target} over` : 'on target'}`
-                : latestBp ? `${latestBp.pulse ?? '--'} bpm · ${format(parseISO(latestBp.measuredAt), 'MMM d')}` : 'No reading'
+              avgBp
+                ? `avg 7d: ${avgBp.sys}/${avgBp.dia} · ${latestBp?.pulse ?? '—'} bpm`
+                : latestBp
+                  ? `${latestBp.pulse ?? '—'} bpm · ${format(parseISO(latestBp.measuredAt), 'MMM d')}`
+                  : 'No reading'
             }
             spark={<Sparkline values={bpSpark} />}
             tone={
@@ -88,7 +95,9 @@ export function Overview({
             detail={
               weightGoal && weightStats.latest !== undefined
                 ? `Goal ${weightGoal.target} kg · ${(weightGoal.target - weightStats.latest >= 0 ? '+' : '')}${(weightGoal.target - weightStats.latest).toFixed(1)} kg to go`
-                : weightStats.delta !== undefined ? `${weightStats.delta >= 0 ? '+' : ''}${weightStats.delta.toFixed(1)} kg · ${weightStats.percent?.toFixed(1)}%` : 'No weight data'
+                : weightStats.delta !== undefined
+                  ? `${weightStats.delta >= 0 ? '+' : ''}${weightStats.delta.toFixed(1)} kg · ${weightStats.percent?.toFixed(1)}%`
+                  : 'Log weight with injection'
             }
             spark={<Sparkline values={weightSpark} />}
             tone={
@@ -98,9 +107,9 @@ export function Overview({
             }
           />
           <StatCard
-            label="T-load (est.)"
-            value={tCurve.activeNow ? `${tCurve.activeNow} mg` : '—'}
-            detail={tCurve.lastInjection ? `Last ${format(parseISO(tCurve.lastInjection.takenAt), 'MMM d')} · ${tCurve.ester}` : 'No testosterone log'}
+            label="Mood / energy"
+            value={latestSymptom ? `${latestSymptom.mood ?? '—'} / ${latestSymptom.energy ?? '—'}` : '—'}
+            detail={latestSymptom ? format(parseISO(latestSymptom.recordedAt), 'MMM d') : 'Log via injection or BP'}
           />
           <StatCard
             label="Lab flags"
@@ -108,15 +117,50 @@ export function Overview({
             detail={latestExam ? `Latest ${format(parseISO(latestExam.collectedAt), 'MMM d')}` : 'No exams'}
             tone={labFlags.length ? 'warn' : undefined}
           />
-          <StatCard
-            label="Mood / energy"
-            value={latestSymptom ? `${latestSymptom.mood ?? '—'} / ${latestSymptom.energy ?? '—'}` : '—'}
-            detail={latestSymptom ? format(parseISO(latestSymptom.recordedAt), 'MMM d') : 'Log via quick log'}
-          />
         </div>
       </section>
 
-      {/* ── 2. Upcoming doses (col-6) + Lab flags (col-6) ── */}
+      {/* ── 2. Recent doses — prominent on mobile ── */}
+      <section className="surface col-6">
+        <div className="panel-header">
+          <div><span className="section-label">History</span><h3>Recent doses</h3></div>
+          <button type="button" className="ghost-button" onClick={() => onNavigate('meds')}>
+            All <ChevronRight size={14} />
+          </button>
+        </div>
+        {injections.length > 0 ? (
+          <div className="stack">
+            {injections.slice(0, 6).map((inj) => {
+              const compound = compoundMap.get(inj.compoundId)
+              return (
+                <div className="row" key={inj.id}>
+                  <Syringe size={13} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />
+                  <div>
+                    <strong>{compound?.name ?? 'Injection'}</strong>
+                    <span className="sub">
+                      {inj.dose} {inj.unit}
+                      {inj.site ? ` · ${inj.site}` : ''}
+                      {inj.weightKg ? ` · ${inj.weightKg} kg` : ''}
+                    </span>
+                  </div>
+                  <time style={{ fontSize: 11, color: 'var(--ink-mute)', whiteSpace: 'nowrap' }}>
+                    {formatDistanceToNow(parseISO(inj.takenAt), { addSuffix: true })}
+                  </time>
+                  <span />
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="empty">
+            <Syringe size={16} />
+            <strong>No doses logged yet</strong>
+            <span>Tap + Add to log your first injection.</span>
+          </div>
+        )}
+      </section>
+
+      {/* ── 3. Upcoming doses ── */}
       <section className="surface col-6">
         <div className="panel-header">
           <div><span className="section-label">Schedule · next 7 days</span><h3>Upcoming doses</h3></div>
@@ -126,13 +170,13 @@ export function Overview({
         </div>
         {head ? (
           <div className="stack">
-            {[{ item: head, compound: headCompound }, ...upcoming.slice(1).map((item) => ({ item, compound: compoundMap.get(item.protocol.compoundId) }))].map(({ item, compound }, idx) => {
+            {[{ item: head, compound: headCompound }, ...upcoming.slice(1).map((item) => ({ item, compound: compoundMap.get(item.protocol.compoundId) }))].map(({ item, compound: c }, idx) => {
               const isNext = idx === 0
               return (
                 <div className="row" key={`${item.protocol.id}-${idx}`}>
                   <CalendarClock size={13} style={{ color: isNext ? 'var(--accent)' : 'var(--ink-mute)', flexShrink: 0 }} />
                   <div>
-                    <strong>{compound?.name ?? 'Compound'}</strong>
+                    <strong>{c?.name ?? 'Compound'}</strong>
                     <span className="sub">{item.protocol.dose} {item.protocol.unit} · {format(item.scheduledAt, 'EEE MMM d')}</span>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
@@ -167,14 +211,15 @@ export function Overview({
         )}
       </section>
 
-      <section className="surface col-6">
-        <div className="panel-header">
-          <div><span className="section-label">Watch list</span><h3>Lab flags</h3></div>
-          <button type="button" className="ghost-button" onClick={() => onNavigate('labs')}>
-            Labs <ChevronRight size={14} />
-          </button>
-        </div>
-        {labFlags.length > 0 ? (
+      {/* ── 4. Lab flags ── */}
+      {labFlags.length > 0 && (
+        <section className="surface col-12">
+          <div className="panel-header">
+            <div><span className="section-label">Watch list</span><h3>Lab flags</h3></div>
+            <button type="button" className="ghost-button" onClick={() => onNavigate('labs')}>
+              Labs <ChevronRight size={14} />
+            </button>
+          </div>
           <div className="stack">
             {labFlags.slice(0, 6).map((result) => (
               <div className="row" key={result.id}>
@@ -188,14 +233,8 @@ export function Overview({
               </div>
             ))}
           </div>
-        ) : (
-          <div className="empty">
-            <FlaskConical size={16} />
-            <strong>No flags on latest panel</strong>
-            <span>All markers within range, or no reference data yet.</span>
-          </div>
-        )}
-      </section>
+        </section>
+      )}
 
     </div>
   )
@@ -209,6 +248,6 @@ function labStatusLabel(r: LabResult) {
   return 'Flag'
 }
 
-// Droplet / HeartPulse retained for future tone variants.
+// Suppress unused icon warnings
 void Droplet
 void HeartPulse

@@ -10,7 +10,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  Scale,
   Settings as SettingsIcon,
   Syringe,
 } from 'lucide-react'
@@ -39,12 +38,12 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: 'meds', label: 'Protocols', icon: Syringe },
   { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
+  { id: 'settings', label: 'Settings', icon: SettingsIcon },
   { id: 'timeline', label: 'Timeline', icon: CalendarClock },
   { id: 'files', label: 'Files', icon: FileText },
-  { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
 
-type QuickLogTab = 'injection' | 'bp' | 'symptoms' | 'weight'
+type QuickLogTab = 'injection' | 'bp'
 
 export type QuickLogPrefill = {
   compoundId?: number
@@ -192,12 +191,6 @@ function Shell({
           <button type="button" onClick={() => openQuickLog('bp')}>
             <Plus size={13} /><span>Blood pressure</span>
           </button>
-          <button type="button" onClick={() => openQuickLog('symptoms')}>
-            <Plus size={13} /><span>Symptoms</span>
-          </button>
-          <button type="button" onClick={() => openQuickLog('weight')}>
-            <Scale size={13} /><span>Weight</span>
-          </button>
           <button type="button" onClick={() => setActiveView('files')}>
             <Plus size={13} /><span>Upload PDF</span>
           </button>
@@ -231,18 +224,13 @@ function Shell({
             <h1>{titleFor(activeView)}</h1>
           </div>
           <div className="topbar-actions">
-            {/* Page-specific actions */}
             {activeView === 'labs' && (
               <button type="button" className="ghost-button" onClick={() => setLabAddOpen(true)}>
                 <Plus size={12} /> Add result
               </button>
             )}
-            {/* Global quick-log actions */}
-            <button type="button" className="ghost-button" onClick={() => openQuickLog('bp')}>
-              <HeartPulse size={12} /> BP
-            </button>
-            <button type="button" className="ghost-button" onClick={() => openQuickLog('injection')}>
-              <Syringe size={12} /> Injection
+            <button type="button" className="primary-button" onClick={() => openQuickLog('injection')}>
+              <Plus size={13} /> Add
             </button>
           </div>
         </header>
