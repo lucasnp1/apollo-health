@@ -3,7 +3,8 @@ import { api, type ApiUser, type LoginPayload, type SignupPayload } from './api'
 
 export type AuthState =
   | { status: 'loading' }
-  | { status: 'guest' }
+  | { status: 'guest' }     // unauthenticated, sign-in screen shown
+  | { status: 'local' }     // user explicitly chose local-only mode
   | { status: 'authed'; user: ApiUser }
 
 export function useAuth() {
@@ -14,6 +15,11 @@ export function useAuth() {
   useEffect(() => {
     if (fetched.current) return
     fetched.current = true
+    // Restore local-only preference across page reloads
+    if (localStorage.getItem('apollo-local-mode') === '1') {
+      setState({ status: 'local' })
+      return
+    }
     void (async () => {
       try {
         const me = await api.get<{ user: ApiUser | null }>('/api/auth/me')
@@ -52,12 +58,14 @@ export function useAuth() {
     try {
       await api.post('/api/auth/logout')
     } finally {
+      localStorage.removeItem('apollo-local-mode')
       setState({ status: 'guest' })
     }
   }, [])
 
   const continueAsGuest = useCallback(() => {
-    setState({ status: 'guest' })
+    localStorage.setItem('apollo-local-mode', '1')
+    setState({ status: 'local' })
   }, [])
 
   return { state, error, login, signup, logout, continueAsGuest }

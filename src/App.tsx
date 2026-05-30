@@ -78,6 +78,9 @@ function App() {
     return <SignIn auth={auth} />
   }
 
+  // 'local' = user explicitly chose local-only mode — show full app, no sync
+  // 'authed' = signed in — show full app with sync
+
   return (
     <Shell
       activeView={activeView}
@@ -105,6 +108,7 @@ function Shell({
   auth: AuthBundle
 }) {
   const isAuthed = auth.state.status === 'authed'
+  // local-only users see no sync UI, but the same Shell
   const sync = useSync(isAuthed)
 
   const [qlOpen, setQlOpen] = useState(false)
