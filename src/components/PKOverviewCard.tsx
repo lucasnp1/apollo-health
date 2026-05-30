@@ -1,18 +1,16 @@
 /**
- * PKOverviewCard — full-cycle pharmacokinetics chart.
+ * PKOverviewCard — Cycle Timeline
  *
- * Displays the release-rate curve (mg/day) for each active non-asNeeded protocol,
- * identical in shape to steroidplanner.com:
+ * Shows a unified "what happened / what's coming" chart per active protocol:
  *
- *   ─── LOGGED (past actual injections)   ─ ─ PROJECTED (future scheduled doses)
- *        Today │                 Protocol end │
+ *   ─── LOGGED (past actual injections, solid area)
+ *   - - PROJECTED (future scheduled doses, dashed area)
+ *   💉  Injection markers at each logged dose
+ *   🩸  Bloodwork markers at each lab exam
+ *   │   Today  │ Protocol end
  *
- * Two recharts Area series share the same chart:
- *   • "logged"    – computed from actual InjectionLog rows, null after today
- *   • "projected" – computed from protocol schedule, null before today (overlaps at today)
- *
- * The formula (first-order release):
- *   R(t) = dose × (activeDosePct/100) × exp(−t×λ) × λ     where λ = ln2 / halfLifeDays
+ * Compound-name fix: when compound.ester is not set, infer it by scanning the
+ * compound name for known PK form strings (e.g. "Testosterone Enanthate" → Enanthate).
  */
 
 import { useMemo } from 'react'
@@ -27,25 +25,40 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { Compound, InjectionLog, Protocol, ProtocolDose } from '../lib/db'
-import { findPKCompound } from '../lib/pk'
+import type { Compound, InjectionLog, LabExam, Protocol, ProtocolDose } from '../lib/db'
+import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
 import { generateDoseInstants } from '../lib/schedule'
 import { useTheme } from '../lib/useTheme'
 
 const MS_PER_DAY = 86_400_000
-const PTS_PER_DAY = 6   // 4-hour resolution — captures sharp peaks & smooth troughs
+const PTS_PER_DAY = 6  // 4-hour resolution for smooth sawtooth
+
+// ── Infer ester from compound name when compound.ester field is not set ──────
+function inferEster(name: string): string | undefined {
+  const lower = name.toLowerCase()
+  // Check all known PK forms — longest match first to avoid "Prop" matching "Propionate"
+  const forms = [...new Set(PK_COMPOUNDS.map(c => c.form).filter(Boolean))]
+    .sort((a, b) => b.length - a.length)
+  return forms.find(f => lower.includes(f.toLowerCase()))
+}
 
 type ChartPt = {
-  dayNum: number          // days since protocol.startedAt (float)
-  label: string           // x-axis tick label ("Day 7", "Day 14", …)
-  logged: number | null   // level from actual logged injections (past only)
-  projected: number | null // level from schedule projections  (future only, overlaps today)
+  dayNum: number
+  logged: number | null
+  projected: number | null
+}
+
+type EventMarker = {
+  dayNum: number
+  kind: 'injection' | 'bloodwork'
+  label: string
 }
 
 type CycleData = {
   pkName: string
   color: string
   chartData: ChartPt[]
+  events: EventMarker[]
   todayDayNum: number
   endDayNum: number | null
   currentLevel: number
@@ -54,8 +67,8 @@ type CycleData = {
   protocolEndLabel: string | null
 }
 
-function releaseAt(doseMs: number, dose: number, activePct: number, lambda: number, ptMs: number): number {
-  const tDays = (ptMs - doseMs) / MS_PER_DAY
+function releaseAt(injMs: number, dose: number, activePct: number, lambda: number, ptMs: number): number {
+  const tDays = (ptMs - injMs) / MS_PER_DAY
   if (tDays < 0) return 0
   return dose * (activePct / 100) * Math.exp(-tDays * lambda) * lambda
 }
@@ -65,99 +78,72 @@ function buildCycleData(
   compound: Compound,
   loggedInjections: InjectionLog[],
   _protocolDoses: ProtocolDose[],
+  exams: LabExam[],
 ): CycleData | null {
-  // Match PK compound — try ester field first, then parse from name
-  const pk = findPKCompound(compound.name, compound.ester ?? undefined)
-    ?? findPKCompound(compound.name)  // fallback without ester
+  // Match PK compound — infer ester from name when compound.ester not set
+  const esterHint = compound.ester ?? inferEster(compound.name)
+  const pk = findPKCompound(compound.name, esterHint)
+    ?? findPKCompound(compound.name)
   if (!pk) return null
 
   const startMs = Date.parse(protocol.startedAt)
   if (isNaN(startMs)) return null
 
-  const nowMs = Date.now()
-  const endMs = protocol.endsAt ? Date.parse(protocol.endsAt) : null
+  const nowMs   = Date.now()
+  const endMs   = protocol.endsAt ? Date.parse(protocol.endsAt) : null
+  const tailMs  = Math.ceil(pk.halfLifeDays * 5) * MS_PER_DAY
+  const winEndMs = (endMs ?? nowMs + 90 * MS_PER_DAY) + tailMs
+  const totalDays = Math.ceil((winEndMs - startMs) / MS_PER_DAY)
+  const lambda    = Math.LN2 / pk.halfLifeDays
 
-  // Decay tail: 5× half-life after last injection (curve decays to ~3%)
-  const tailDays = Math.ceil(pk.halfLifeDays * 5)
-  // Chart window end: end of protocol + tail, or today + 90d if no end date
-  const windowEndMs = (endMs ?? nowMs + 90 * MS_PER_DAY) + tailDays * MS_PER_DAY
-  const totalDays = Math.ceil((windowEndMs - startMs) / MS_PER_DAY)
-  const totalPts  = totalDays * PTS_PER_DAY
-
-  const lambda = Math.LN2 / pk.halfLifeDays
-
-  // Past logged injections for this compound
+  // Logged injections for this compound (up to now)
   const loggedDoses = loggedInjections
     .filter(i => i.compoundId === compound.id)
     .map(i => ({ ms: Date.parse(i.takenAt), dose: i.dose ?? 0 }))
-    .filter(i => !isNaN(i.ms) && i.ms <= nowMs + 60_000) // up to now (+ 1-min tolerance)
+    .filter(i => !isNaN(i.ms) && i.ms <= nowMs + 60_000)
 
-  // Future projected injections from protocol schedule
+  // Future projected doses from protocol schedule
   const futureEnd = endMs ? new Date(endMs + MS_PER_DAY) : addDays(new Date(), 180)
-  const futureInstants = (protocol.cadence.kind !== 'asNeeded')
+  const futureInstants = protocol.cadence.kind !== 'asNeeded'
     ? generateDoseInstants(protocol, new Date(nowMs), futureEnd)
     : []
   const projectedDoses = futureInstants.map(d => ({ ms: d.getTime(), dose: protocol.dose }))
 
-  // All doses combined (for the future curve — logged tails still decay into future)
-  const allDoses = [
-    ...loggedDoses,
-    ...projectedDoses,
-  ]
+  // All doses for projecting the future (logged tails still decay forward)
+  const allDoses = [...loggedDoses, ...projectedDoses]
 
-  // Build chart data
+  // Build chart points
   const chartData: ChartPt[] = []
-  let todayDayNum = -1
+  let todayDayNum = (nowMs - startMs) / MS_PER_DAY
   let currentLevel = 0
 
+  const totalPts = totalDays * PTS_PER_DAY
   for (let i = 0; i < totalPts; i++) {
-    const ptMs  = startMs + (i / PTS_PER_DAY) * MS_PER_DAY
+    // Downsample to 2 pts/day for rendering speed, but keep 6pt/day resolution for peaks
+    if (i % 3 !== 0) continue
+
+    const ptMs   = startMs + (i / PTS_PER_DAY) * MS_PER_DAY
     const dayNum = i / PTS_PER_DAY
-    const isPast = ptMs <= nowMs + 60_000  // points on or before now
+    const isPast = ptMs <= nowMs + 60_000
 
-    // Logged level: only actual past injections
-    const loggedLevel = loggedDoses.reduce((acc, inj) => acc + releaseAt(inj.ms, inj.dose, pk.activeDosePct, lambda, ptMs), 0)
-    // Projected level: past tails + future scheduled doses
-    const projLevel   = allDoses.reduce((acc, inj) => acc + releaseAt(inj.ms, inj.dose, pk.activeDosePct, lambda, ptMs), 0)
+    const loggedLevel   = loggedDoses.reduce((s, inj) => s + releaseAt(inj.ms, inj.dose, pk.activeDosePct, lambda, ptMs), 0)
+    const projectedLevel = allDoses.reduce((s, inj) => s + releaseAt(inj.ms, inj.dose, pk.activeDosePct, lambda, ptMs), 0)
 
-    const levelNow = isPast ? loggedLevel : projLevel
-
-    if (Math.abs(ptMs - nowMs) < (MS_PER_DAY / PTS_PER_DAY) * 0.5) {
-      todayDayNum = dayNum
-      currentLevel = levelNow
+    if (Math.abs(ptMs - nowMs) < (MS_PER_DAY / PTS_PER_DAY) * 0.75) {
+      currentLevel = isPast ? loggedLevel : projectedLevel
     }
-
-    // Only emit every PTS_PER_DAY/2 points to keep recharts fast (= every 8h)
-    // but always emit points near today and protocol end for precise reference lines
-    const nearToday = Math.abs(ptMs - nowMs) < 2 * MS_PER_DAY
-    const nearEnd   = endMs !== null && Math.abs(ptMs - endMs) < 2 * MS_PER_DAY
-    if (i % 2 !== 0 && !nearToday && !nearEnd) continue
-
-    const showLabel = Math.round(dayNum) % 7 === 0 && Math.abs(dayNum - Math.round(dayNum)) < 0.5
-    const label = showLabel ? `Day ${Math.round(dayNum)}` : ''
 
     chartData.push({
       dayNum: parseFloat(dayNum.toFixed(2)),
-      label,
-      logged: isPast ? parseFloat(Math.max(0, loggedLevel).toFixed(3)) : null,
-      projected: !isPast ? parseFloat(Math.max(0, projLevel).toFixed(3)) : null,
+      logged:    isPast ? parseFloat(Math.max(0, loggedLevel).toFixed(3))    : null,
+      projected: !isPast ? parseFloat(Math.max(0, projectedLevel).toFixed(3)) : null,
     })
   }
 
-  // If today is before any logged data, set current to projected level
-  if (todayDayNum < 0 && chartData.length > 0) {
-    const todayPt = chartData.reduce((best, pt) =>
-      Math.abs(pt.dayNum - (nowMs - startMs) / MS_PER_DAY) <
-      Math.abs(best.dayNum - (nowMs - startMs) / MS_PER_DAY) ? pt : best
-    )
-    todayDayNum = todayPt.dayNum
-  }
-
-  // Find next peak and trough in the projected window
+  // Next peak + trough in projected window
   const projPts = chartData.filter(p => p.projected !== null)
   let nextPeak: CycleData['nextPeak'] = null
   let nextTrough: CycleData['nextTrough'] = null
-
   let peaked = false
   for (let i = 1; i < projPts.length - 1; i++) {
     const prev = projPts[i - 1].projected!
@@ -173,6 +159,29 @@ function buildCycleData(
     }
   }
 
+  // Event markers: logged injections + bloodwork exams in the chart window
+  const events: EventMarker[] = []
+
+  for (const inj of loggedDoses) {
+    const dayNum = (inj.ms - startMs) / MS_PER_DAY
+    if (dayNum >= 0 && dayNum <= totalDays) {
+      events.push({ dayNum: parseFloat(dayNum.toFixed(2)), kind: 'injection', label: '💉' })
+    }
+  }
+
+  for (const exam of exams) {
+    const examMs = Date.parse(exam.collectedAt)
+    if (isNaN(examMs)) continue
+    const dayNum = (examMs - startMs) / MS_PER_DAY
+    if (dayNum >= -7 && dayNum <= totalDays) {
+      events.push({
+        dayNum: parseFloat(dayNum.toFixed(2)),
+        kind: 'bloodwork',
+        label: `🩸 ${format(parseISO(exam.collectedAt), 'MMM d')}`,
+      })
+    }
+  }
+
   const endDayNum = endMs !== null ? (endMs - startMs) / MS_PER_DAY : null
   const protocolEndLabel = protocol.endsAt ? format(parseISO(protocol.endsAt), 'MMM d') : null
 
@@ -180,6 +189,7 @@ function buildCycleData(
     pkName: pk.form ? `${pk.compound} ${pk.form}` : pk.compound,
     color: compound.color ?? '#0f766e',
     chartData,
+    events,
     todayDayNum,
     endDayNum,
     currentLevel,
@@ -189,9 +199,9 @@ function buildCycleData(
   }
 }
 
-function StatPill({
-  label, value, sub, color,
-}: { label: string; value: string; sub?: string; color?: string }) {
+function StatPill({ label, value, sub, color }: {
+  label: string; value: string; sub?: string; color?: string
+}) {
   return (
     <div style={{ textAlign: 'right' }}>
       <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-mute)' }}>{label}</div>
@@ -206,11 +216,13 @@ export function PKOverviewCard({
   injections,
   protocols,
   protocolDoses,
+  exams,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
   protocols: Protocol[]
   protocolDoses: ProtocolDose[]
+  exams: LabExam[]
 }) {
   const { chart: colors } = useTheme()
 
@@ -221,33 +233,40 @@ export function PKOverviewCard({
       .flatMap(p => {
         const c = compoundMap.get(p.compoundId)
         if (!c) return []
-        const data = buildCycleData(p, c, injections, protocolDoses)
-        return data ? [{ protocol: p, compound: c, data }] : []
+        const data = buildCycleData(p, c, injections, protocolDoses, exams)
+        return data ? [{ protocol: p, data }] : []
       })
-  }, [compounds, injections, protocols, protocolDoses])
+  }, [compounds, injections, protocols, protocolDoses, exams])
 
   if (cycleInfos.length === 0) return null
 
   return (
     <>
       {cycleInfos.map(({ protocol, data }) => {
-        const { chartData, todayDayNum, endDayNum, currentLevel, nextPeak, nextTrough, protocolEndLabel, pkName, color } = data
+        const {
+          chartData, events, todayDayNum, endDayNum,
+          currentLevel, nextPeak, nextTrough,
+          protocolEndLabel, pkName, color,
+        } = data
 
-        // Format relative time from day numbers
-        const nowMs = Date.now()
         const startMs = Date.parse(protocol.startedAt)
-        const daysFromNow = (dayNum: number) => dayNum - (nowMs - startMs) / MS_PER_DAY
+        const nowMs   = Date.now()
+        const daysFromNow = (d: number) => d - (nowMs - startMs) / MS_PER_DAY
 
-        const peakIn = nextPeak ? daysFromNow(nextPeak.dayNum) : null
+        const peakIn   = nextPeak   ? daysFromNow(nextPeak.dayNum)   : null
         const troughIn = nextTrough ? daysFromNow(nextTrough.dayNum) : null
 
         function relTime(days: number | null): string {
           if (days === null) return '—'
           const abs = Math.abs(days)
           if (abs < 0.1) return 'Now'
-          if (abs < 1) return `${Math.round(abs * 24)}h`
+          if (abs < 1)   return `${Math.round(abs * 24)}h`
           return `${abs.toFixed(1)}d`
         }
+
+        // Separate injection and bloodwork events for legend display
+        const injEvents = events.filter(e => e.kind === 'injection')
+        const bwEvents  = events.filter(e => e.kind === 'bloodwork')
 
         return (
           <section
@@ -255,10 +274,10 @@ export function PKOverviewCard({
             className="surface col-12"
             style={{ borderLeft: `3px solid ${color}` }}
           >
-            {/* Header */}
+            {/* ── Header ── */}
             <div className="panel-header" style={{ marginBottom: 12 }}>
               <div>
-                <span className="section-label">Release curve · {protocol.name}</span>
+                <span className="section-label">Cycle timeline · {protocol.name}</span>
                 <h3 style={{ color }}>
                   {pkName}
                   <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-dim)', marginLeft: 8 }}>
@@ -267,49 +286,29 @@ export function PKOverviewCard({
                 </h3>
               </div>
               <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <StatPill
-                  label="Now"
-                  value={`${currentLevel.toFixed(1)}`}
-                  sub="mg/day"
-                  color={color}
-                />
+                <StatPill label="Now" value={`${currentLevel.toFixed(1)}`} sub="mg/day" color={color} />
                 {nextPeak && peakIn !== null && peakIn > 0 && (
-                  <StatPill
-                    label="Next peak"
-                    value={`in ${relTime(peakIn)}`}
-                    sub={`${nextPeak.level.toFixed(1)} mg/d`}
-                    color="var(--warn)"
-                  />
+                  <StatPill label="Next peak" value={`in ${relTime(peakIn)}`} sub={`${nextPeak.level.toFixed(1)} mg/d`} color="var(--warn)" />
                 )}
                 {nextTrough && troughIn !== null && troughIn > 0 && (
-                  <StatPill
-                    label="Trough · bloodwork"
-                    value={`in ${relTime(troughIn)}`}
-                    sub={`${nextTrough.level.toFixed(1)} mg/d`}
-                    color="var(--good)"
-                  />
+                  <StatPill label="Trough · labs" value={`in ${relTime(troughIn)}`} sub={`${nextTrough.level.toFixed(1)} mg/d`} color="var(--good)" />
                 )}
                 {protocolEndLabel && (
-                  <StatPill
-                    label="Protocol ends"
-                    value={protocolEndLabel}
-                  />
+                  <StatPill label="Protocol ends" value={protocolEndLabel} />
                 )}
               </div>
             </div>
 
-            {/* Chart */}
-            <ResponsiveContainer width="100%" height={180}>
+            {/* ── Chart ── */}
+            <ResponsiveContainer width="100%" height={190}>
               <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
                 <defs>
-                  {/* Logged (past) — solid fill */}
                   <linearGradient id={`pkLogged-${protocol.id}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity={0.45} />
-                    <stop offset="100%" stopColor={color} stopOpacity={0.05} />
+                    <stop offset="0%" stopColor={color} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0.04} />
                   </linearGradient>
-                  {/* Projected (future) — lighter fill */}
                   <linearGradient id={`pkProj-${protocol.id}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity={0.22} />
+                    <stop offset="0%" stopColor={color} stopOpacity={0.18} />
                     <stop offset="100%" stopColor={color} stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -320,10 +319,11 @@ export function PKOverviewCard({
                   dataKey="dayNum"
                   type="number"
                   domain={['dataMin', 'dataMax']}
-                  tickFormatter={(v: number) => {
-                    if (Math.round(v) % 7 === 0 && Math.abs(v - Math.round(v)) < 0.5) return `Day ${Math.round(v)}`
-                    return ''
-                  }}
+                  tickFormatter={(v: number) =>
+                    Math.round(v) % 7 === 0 && Math.abs(v - Math.round(v)) < 0.4
+                      ? `Day ${Math.round(v)}`
+                      : ''
+                  }
                   tickLine={false}
                   axisLine={false}
                   tick={{ fill: colors.tick, fontSize: 10 }}
@@ -332,8 +332,7 @@ export function PKOverviewCard({
                   tickLine={false}
                   axisLine={false}
                   tick={{ fill: colors.tick, fontSize: 10 }}
-                  unit=""
-                  width={44}
+                  width={40}
                   tickFormatter={(v: number) => v.toFixed(0)}
                 />
 
@@ -349,10 +348,10 @@ export function PKOverviewCard({
                     `${(v as number).toFixed(2)} mg/day`,
                     name === 'logged' ? 'Logged' : 'Projected',
                   ]}
-                  labelFormatter={(dayNum) => `Day ${(dayNum as number).toFixed(1)}`}
+                  labelFormatter={(v) => `Day ${(v as number).toFixed(1)}`}
                 />
 
-                {/* Today marker */}
+                {/* Today */}
                 <ReferenceLine
                   x={todayDayNum}
                   stroke={color}
@@ -361,7 +360,7 @@ export function PKOverviewCard({
                   label={{ value: 'Today', position: 'insideTopRight', fill: color, fontSize: 9 }}
                 />
 
-                {/* Protocol end marker */}
+                {/* Protocol end */}
                 {endDayNum !== null && (
                   <ReferenceLine
                     x={endDayNum}
@@ -372,7 +371,7 @@ export function PKOverviewCard({
                   />
                 )}
 
-                {/* Next peak marker */}
+                {/* Next peak */}
                 {nextPeak && (
                   <ReferenceLine
                     x={nextPeak.dayNum}
@@ -383,7 +382,7 @@ export function PKOverviewCard({
                   />
                 )}
 
-                {/* Next trough / bloodwork marker */}
+                {/* Next trough / bloodwork window */}
                 {nextTrough && (
                   <ReferenceLine
                     x={nextTrough.dayNum}
@@ -394,7 +393,31 @@ export function PKOverviewCard({
                   />
                 )}
 
-                {/* Logged (past) series — solid */}
+                {/* Injection event markers */}
+                {injEvents.map((ev, i) => (
+                  <ReferenceLine
+                    key={`inj-${i}`}
+                    x={ev.dayNum}
+                    stroke={color}
+                    strokeOpacity={0.35}
+                    strokeWidth={1}
+                    strokeDasharray="1 0"
+                  />
+                ))}
+
+                {/* Bloodwork event markers */}
+                {bwEvents.map((ev, i) => (
+                  <ReferenceLine
+                    key={`bw-${i}`}
+                    x={ev.dayNum}
+                    stroke="#e53e3e"
+                    strokeWidth={1.5}
+                    strokeDasharray="2 3"
+                    label={{ value: '🩸', position: 'insideTopLeft', fill: '#e53e3e', fontSize: 11 }}
+                  />
+                ))}
+
+                {/* Logged (past) series */}
                 <Area
                   type="monotone"
                   dataKey="logged"
@@ -407,14 +430,14 @@ export function PKOverviewCard({
                   isAnimationActive={false}
                 />
 
-                {/* Projected (future) series — lighter stroke, dashed */}
+                {/* Projected (future) series */}
                 <Area
                   type="monotone"
                   dataKey="projected"
                   stroke={color}
                   strokeWidth={1.5}
                   strokeDasharray="5 3"
-                  strokeOpacity={0.6}
+                  strokeOpacity={0.55}
                   fill={`url(#pkProj-${protocol.id})`}
                   dot={false}
                   activeDot={{ r: 3, fill: color }}
@@ -424,22 +447,38 @@ export function PKOverviewCard({
               </AreaChart>
             </ResponsiveContainer>
 
-            {/* Legend */}
-            <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 10, color: 'var(--ink-mute)', alignItems: 'center' }}>
+            {/* ── Legend ── */}
+            <div style={{
+              display: 'flex', gap: 14, marginTop: 8, fontSize: 10,
+              color: 'var(--ink-mute)', alignItems: 'center', flexWrap: 'wrap',
+            }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <svg width="18" height="4"><line x1="0" y1="2" x2="18" y2="2" stroke={color} strokeWidth="2" /></svg>
-                Logged doses
+                <svg width="16" height="6">
+                  <line x1="0" y1="3" x2="16" y2="3" stroke={color} strokeWidth="2" />
+                </svg>
+                Injections (logged)
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <svg width="18" height="4"><line x1="0" y1="2" x2="18" y2="2" stroke={color} strokeWidth="2" strokeDasharray="4 3" strokeOpacity="0.6" /></svg>
-                Projected schedule
+                <svg width="16" height="6">
+                  <line x1="0" y1="3" x2="16" y2="3" stroke={color} strokeWidth="2" strokeDasharray="5 3" strokeOpacity="0.55" />
+                </svg>
+                Projected
               </span>
+              {bwEvents.length > 0 && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <svg width="16" height="6">
+                    <line x1="0" y1="3" x2="16" y2="3" stroke="#e53e3e" strokeWidth="1.5" strokeDasharray="2 3" />
+                  </svg>
+                  Bloodwork drawn
+                </span>
+              )}
               <span style={{ marginLeft: 'auto', color: 'var(--ink-dim)' }}>Release rate · mg/day</span>
             </div>
 
+            {/* Bloodwork advice note */}
             {nextTrough && troughIn !== null && troughIn > 0 && troughIn < 30 && (
               <p className="panel-note" style={{ marginTop: 6 }}>
-                Optimal bloodwork window: get labs at trough ({relTime(troughIn)}) — right before your next injection for the most accurate baseline.
+                Best time for bloodwork: {relTime(troughIn)} from now (trough before next injection).
               </p>
             )}
           </section>

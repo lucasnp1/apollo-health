@@ -211,7 +211,7 @@ export function Overview({
       </section>
 
       {/* ── 1c. Personalized PK curve ── */}
-      <PKOverviewCard compounds={compounds} injections={injections} protocols={protocols} protocolDoses={protocolDoses} />
+      <PKOverviewCard compounds={compounds} injections={injections} protocols={protocols} protocolDoses={protocolDoses} exams={exams} />
 
       {/* ── 2. Recent doses — prominent on mobile ── */}
       <section className="surface col-6">
