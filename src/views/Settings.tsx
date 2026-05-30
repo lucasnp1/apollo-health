@@ -420,14 +420,29 @@ function DangerSettings() {
         Wipes every local table — compounds, injections, vitals, labs, files, protocols, vials, symptoms,
         targets, body metrics, and your passphrase. <strong>Cannot be undone.</strong>
       </p>
-      <button
-        type="button"
-        className="ghost-button"
-        style={{ alignSelf: 'flex-start', color: 'var(--bad)', borderColor: 'var(--bad-soft)' }}
-        onClick={() => setModalOpen(true)}
-      >
-        <Trash2 size={14} /> Wipe local data…
-      </button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="ghost-button"
+          style={{ color: 'var(--warn)', borderColor: 'rgba(245,158,11,0.3)' }}
+          onClick={async () => {
+            if (!confirm('Delete all lab exams and results? This cannot be undone.')) return
+            await db.results.clear()
+            await db.exams.clear()
+            await db.files.clear()
+          }}
+        >
+          <Trash2 size={14} /> Clear all lab data…
+        </button>
+        <button
+          type="button"
+          className="ghost-button"
+          style={{ alignSelf: 'flex-start', color: 'var(--bad)', borderColor: 'var(--bad-soft)' }}
+          onClick={() => setModalOpen(true)}
+        >
+          <Trash2 size={14} /> Wipe all local data…
+        </button>
+      </div>
 
       {/* Confirmation modal */}
       {modalOpen && (

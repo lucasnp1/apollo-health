@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTheme } from '../lib/useTheme'
 import {
   ChevronDown, ChevronRight, ChevronUp,
-  Edit2, FileText, FlaskConical, Plus, Trash2, Upload, X,
+  Edit2, FileText, FlaskConical, Plus, Trash2, X,
 } from 'lucide-react'
 import {
   CartesianGrid, Line, LineChart, ResponsiveContainer,
@@ -11,7 +11,7 @@ import {
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
-import { extractMarkersFromText, extractPdfText, type ExtractedMarker } from '../lib/pdf'
+import { extractMarkersFromText, type ExtractedMarker } from '../lib/pdf'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
 import { EmptyState } from '../components/EmptyState'
@@ -170,21 +170,21 @@ function MarkerHistoryPane({
   return (
     <div className="marker-history-pane">
       {/* Header */}
-      <div className="panel-header" style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10, gap: 12 }}>
         <div>
-          <span className="section-label">
+          <span className="section-label" style={{ display: 'block' }}>
             {summary.panel} · all tests
           </span>
-          <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
             {summary.label}
             {summary.unit && <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-dim)' }}>{summary.unit}</span>}
           </h3>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
           <button
             type="button"
             className="ghost-button"
-            style={{ fontSize: 12 }}
+            style={{ fontSize: 12, height: 30 }}
             onClick={onEditTarget}
           >
             <Edit2 size={11} /> {hasPersonalTarget ? 'Edit range' : 'Set range'}
@@ -414,19 +414,6 @@ export function Labs({
     setEditingTargetKey(null); setTargetLow(''); setTargetHigh('')
   }
 
-  // PDF upload
-  async function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const extractedText = await extractPdfText(file)
-    await db.files.add({
-      name: file.name, type: file.type || 'application/pdf',
-      size: file.size, addedAt: new Date().toISOString(),
-      status: extractedText ? 'Needs review' : 'Stored', extractedText, blob: file,
-    })
-    e.target.value = ''
-  }
-
   // Manual add
   const [examName, setExamName] = useState('Blood panel')
   const [marker,   setMarker]   = useState('Total Testosterone')
@@ -485,19 +472,7 @@ export function Labs({
       {/* ── No data empty state ── */}
       {!hasData && (
         <section className="surface col-12">
-          <div className="panel-header">
-            <div><span className="section-label">All exams</span><h3>Lab results</h3></div>
-            <div className="labs-inline-actions" style={{ display: 'flex', gap: 8 }}>
-              <label className="ghost-button" style={{ cursor: 'pointer' }}>
-                <input type="file" accept="application/pdf" hidden onChange={handlePdfUpload} />
-                <Upload size={12} /> Upload PDF
-              </label>
-              <button type="button" className="ghost-button" onClick={() => setShowAddForm(v => !v)}>
-                <Plus size={12} /> Add result
-              </button>
-            </div>
-          </div>
-          <EmptyState icon={FlaskConical} title="No lab results yet" detail="Upload a PDF or add markers manually." />
+          <EmptyState icon={FlaskConical} title="No lab results yet" detail="Upload a PDF or add markers manually using the buttons in the top right." />
         </section>
       )}
 
@@ -537,19 +512,6 @@ export function Labs({
                   </span>
                 )}
               </div>
-              {/* Upload/add buttons only on first panel header */}
-              {panel === PANEL_ORDER[0] && (
-                <div className="labs-inline-actions" style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
-                  <label className="ghost-button" style={{ cursor: 'pointer', height: 30, fontSize: 12 }}>
-                    <input type="file" accept="application/pdf" hidden onChange={handlePdfUpload} />
-                    <Upload size={11} /> Upload PDF
-                  </label>
-                  <button type="button" className="ghost-button" style={{ height: 30, fontSize: 12 }}
-                    onClick={() => setShowAddForm(v => !v)}>
-                    <Plus size={11} /> Add result
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Marker cards grid */}

@@ -16,6 +16,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
+import { extractPdfText } from './lib/pdf'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { useInjectionReminders } from './lib/useInjectionReminders'
@@ -116,6 +117,24 @@ function Shell({
   const [qlPrefill, setQlPrefill] = useState<QuickLogPrefill | undefined>(undefined)
   const [labAddOpen, setLabAddOpen] = useState(false)
   const [protocolWizardOpen, setProtocolWizardOpen] = useState(false)
+
+  async function handleLabPdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const extractedText = await extractPdfText(file)
+    await db.files.add({
+      name: file.name,
+      type: file.type || 'application/pdf',
+      size: file.size,
+      addedAt: new Date().toISOString(),
+      status: extractedText ? 'Needs review' : 'Stored',
+      extractedText,
+      blob: file,
+    })
+    e.target.value = ''
+    // Switch to labs tab so the import banner shows
+    setActiveView('labs')
+  }
   const [editingProtocol, setEditingProtocol] = useState<(import('./lib/db').Protocol & { id: number }) | undefined>(undefined)
 
   function openQuickLog(tab: QuickLogTab, prefill?: QuickLogPrefill) {
@@ -234,11 +253,15 @@ function Shell({
             <h1>{titleFor(activeView)}</h1>
           </div>
           <div className="topbar-actions">
-            {activeView === 'labs' && (
+            {activeView === 'labs' && (<>
+              <label className="ghost-button" style={{ cursor: 'pointer' }}>
+                <input type="file" accept="application/pdf" hidden onChange={handleLabPdfUpload} />
+                Upload PDF
+              </label>
               <button type="button" className="ghost-button" onClick={() => setLabAddOpen(true)}>
                 <Plus size={12} /> Add result
               </button>
-            )}
+            </>)}
             {/* "Create protocol" hidden on mobile — accessible from the empty-state button */}
             {activeView === 'meds' && (
               <button type="button" className="primary-button hide-mobile" onClick={() => setProtocolWizardOpen(true)}>
