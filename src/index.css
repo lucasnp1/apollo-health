@@ -960,6 +960,29 @@ select {
 
   /* Fix #5: Site rotation — adaptive columns so long names never overflow */
   .body-diagram { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); }
+
+  /* Fix #6: Panel header — allow h3 to wrap naturally (no hard truncation on mobile) */
+  .panel-header h3 { white-space: normal; overflow: visible; text-overflow: clip; }
+
+  /* Fix #7: Safety chip (Symptoms) — hide on mobile, title needs the space */
+  .safety-chip { display: none; }
+
+  /* Fix #8: Pill-tabs — compact on mobile to prevent overflow */
+  .pill-tabs button { padding: 4px 7px; font-size: 11px; }
+
+  /* Fix #9: Onboarding checklist rows — allow title and sub to wrap.
+     Must beat .row span.sub (0,2,1), so use .row.onboarding-check span.sub (0,3,1) */
+  .row.onboarding-check strong,
+  .row.onboarding-check span.sub {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    max-width: none;
+  }
+
+  /* Fix #10: Labs inline action buttons in panel header — redundant on mobile (same in topbar).
+     !important needed to beat the inline style={{ display: 'flex' }} on the container. */
+  .labs-inline-actions { display: none !important; }
 }
 
 /* ---------- Timeline ---------- */

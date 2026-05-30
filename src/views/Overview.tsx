@@ -88,7 +88,7 @@ export function Overview({
             <div><span className="section-label">Getting started</span><h3>Set up your health record</h3></div>
           </div>
           <div className="stack" style={{ gap: 10 }}>
-            <div className="row" style={{ alignItems: 'center' }}>
+            <div className="row onboarding-check" style={{ alignItems: 'center' }}>
               {hasProtocol
                 ? <CheckCircle2 size={16} style={{ color: 'var(--good)', flexShrink: 0 }} />
                 : <Circle size={16} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />}
@@ -104,7 +104,7 @@ export function Overview({
                 </button>
               )}
             </div>
-            <div className="row" style={{ alignItems: 'center' }}>
+            <div className="row onboarding-check" style={{ alignItems: 'center' }}>
               {hasInjection
                 ? <CheckCircle2 size={16} style={{ color: 'var(--good)', flexShrink: 0 }} />
                 : <Circle size={16} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />}
@@ -120,7 +120,7 @@ export function Overview({
                 </button>
               )}
             </div>
-            <div className="row" style={{ alignItems: 'center' }}>
+            <div className="row onboarding-check" style={{ alignItems: 'center' }}>
               {hasLabs
                 ? <CheckCircle2 size={16} style={{ color: 'var(--good)', flexShrink: 0 }} />
                 : <Circle size={16} style={{ color: 'var(--ink-mute)', flexShrink: 0 }} />}
@@ -163,7 +163,7 @@ export function Overview({
         </div>
         <div className="stat-grid">
           <StatCard
-            label="Blood pressure"
+            label="BP"
             value={latestBp ? `${latestBp.systolic}/${latestBp.diastolic}` : '—'}
             detail={
               avgBp
@@ -197,7 +197,7 @@ export function Overview({
             }
           />
           <StatCard
-            label="Lab flags"
+            label="Flags"
             value={String(labFlags.length)}
             detail={latestExam ? `Latest ${format(parseISO(latestExam.collectedAt), 'MMM d')}` : 'No exams'}
             tone={labFlags.length ? 'warn' : undefined}

@@ -276,7 +276,7 @@ export function Labs({
             <span className="section-label">All exams</span>
             <h3>Marker comparison</h3>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="labs-inline-actions" style={{ display: 'flex', gap: 8 }}>
             <label className="ghost-button" style={{ cursor: 'pointer' }}>
               <input type="file" accept="application/pdf" hidden onChange={handlePdfUpload} />
               <Upload size={12} /> Upload PDF
