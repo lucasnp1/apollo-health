@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Bell, BellOff, Download, LogOut, Moon, Printer, Sun, Trash2, UserCircle, X } from 'lucide-react'
+import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, Sun, Trash2, UserCircle, X } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { db } from '../lib/db'
 import { wipeLocalDatabase } from '../lib/lock'
@@ -75,6 +75,10 @@ export function Settings({
           exams={exams}
           protocols={protocols}
         />
+      </section>
+
+      <section className="surface col-6">
+        <LabDataSettings />
       </section>
 
       <section className="surface col-12">
@@ -376,6 +380,46 @@ function PrintReport({
   )
 }
 
+function LabDataSettings() {
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+
+  async function clearLabs() {
+    if (!confirm('Clear all lab exams and results? This cannot be undone.')) return
+    setBusy(true)
+    try {
+      await db.results.clear()
+      await db.exams.clear()
+      await db.files.clear()
+      setDone(true)
+      setTimeout(() => setDone(false), 3000)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="panel-header">
+        <div><span className="section-label">Labs</span><h3>Lab data</h3></div>
+        <FlaskConical size={16} style={{ color: 'var(--accent-ink)' }} />
+      </div>
+      <p className="muted-copy">
+        Remove all imported lab results and exams. Use this to fix duplicate data before re-importing from PDFs.
+      </p>
+      <button
+        type="button"
+        className="ghost-button"
+        style={{ alignSelf: 'flex-start', color: 'var(--warn)', borderColor: 'rgba(245,158,11,0.3)' }}
+        onClick={clearLabs}
+        disabled={busy}
+      >
+        <Trash2 size={14} /> {done ? 'Cleared ✓' : busy ? 'Clearing…' : 'Clear all lab data'}
+      </button>
+    </>
+  )
+}
+
 function DangerSettings() {
   const [modalOpen, setModalOpen] = useState(false)
   const [confirmText, setConfirmText] = useState('')
@@ -420,29 +464,14 @@ function DangerSettings() {
         Wipes every local table — compounds, injections, vitals, labs, files, protocols, vials, symptoms,
         targets, body metrics, and your passphrase. <strong>Cannot be undone.</strong>
       </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          className="ghost-button"
-          style={{ color: 'var(--warn)', borderColor: 'rgba(245,158,11,0.3)' }}
-          onClick={async () => {
-            if (!confirm('Delete all lab exams and results? This cannot be undone.')) return
-            await db.results.clear()
-            await db.exams.clear()
-            await db.files.clear()
-          }}
-        >
-          <Trash2 size={14} /> Clear all lab data…
-        </button>
-        <button
-          type="button"
-          className="ghost-button"
-          style={{ alignSelf: 'flex-start', color: 'var(--bad)', borderColor: 'var(--bad-soft)' }}
-          onClick={() => setModalOpen(true)}
-        >
-          <Trash2 size={14} /> Wipe all local data…
-        </button>
-      </div>
+      <button
+        type="button"
+        className="ghost-button"
+        style={{ alignSelf: 'flex-start', color: 'var(--bad)', borderColor: 'var(--bad-soft)' }}
+        onClick={() => setModalOpen(true)}
+      >
+        <Trash2 size={14} /> Wipe all local data…
+      </button>
 
       {/* Confirmation modal */}
       {modalOpen && (

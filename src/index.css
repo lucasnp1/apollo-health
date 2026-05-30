@@ -339,6 +339,7 @@ time,
   letter-spacing: -0.005em;
   box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, var(--shadow-sm);
   transition: background 120ms, transform 80ms;
+  white-space: nowrap;
 }
 .primary-button:hover { background: var(--ink); }
 .primary-button:active { transform: translateY(1px); }
@@ -346,15 +347,16 @@ time,
 
 .ghost-button {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 32px; padding: 0 12px;
+  height: 36px; padding: 0 14px;
   background: var(--surface);
   color: var(--ink-dim);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 12px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 500;
   box-shadow: var(--shadow-sm);
   transition: color 120ms, border-color 120ms;
+  white-space: nowrap;
 }
 .ghost-button:hover { color: var(--ink); border-color: var(--line-strong); }
 
@@ -1387,6 +1389,42 @@ select {
   .marker-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-2); }
   .mc-value    { font-size: 18px; }
   .history-row { grid-template-columns: 1fr auto auto; gap: 8px; }
+}
+
+/* ── Dark-mode button overrides ────────────────────────────────────────── */
+/* primary-button: in dark mode --ink-2 is near-white → use accent instead */
+:root[data-theme="dark"] .primary-button {
+  background: #1f2937;
+  color: #f9fafb;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 1px 3px rgba(0,0,0,0.5);
+}
+:root[data-theme="dark"] .primary-button:hover {
+  background: #374151;
+}
+:root[data-theme="dark"] .primary-button:disabled {
+  background: var(--surface-3);
+  color: var(--ink-mute);
+}
+/* ghost-button: give it an elevated surface so it stands out from card bg */
+:root[data-theme="dark"] .ghost-button {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+  color: var(--ink-dim);
+}
+:root[data-theme="dark"] .ghost-button:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+/* icon-button: same — elevate above card background */
+:root[data-theme="dark"] .icon-button {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+:root[data-theme="dark"] .icon-button:hover {
+  background: var(--surface-3);
+  border-color: var(--line-strong);
+  color: var(--ink);
 }
 
 /* ── Dark-mode overrides for elements that can't use CSS vars natively ─── */
