@@ -1204,6 +1204,191 @@ select {
   .labs-compare-table td:first-child { padding-left: 0; }
 }
 
+/* ── Marker card grid ──────────────────────────────────────────────────── */
+
+.marker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--space-3);
+}
+
+.marker-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: var(--space-3) var(--space-3);
+  background: var(--surface-2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms, box-shadow 120ms, transform 120ms;
+  min-width: 0;
+}
+.marker-card:hover  { border-color: var(--accent); box-shadow: var(--shadow); transform: translateY(-1px); }
+.marker-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+.marker-card.out    { border-color: var(--bad); }
+.marker-card.out.selected { background: color-mix(in srgb, var(--bad) 8%, var(--surface)); }
+
+.mc-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+.mc-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+.mc-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.mc-badge.good { background: var(--good-soft, #dcfce7); color: var(--good, #16a34a); }
+.mc-badge.warn { background: var(--bad-soft,  #fee2e2); color: var(--bad,  #dc2626); }
+
+.mc-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.mc-value {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  line-height: 1;
+}
+.mc-unit {
+  font-size: 11px;
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+.mc-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  margin-left: auto;
+}
+.mc-delta.up   { color: var(--bad);  }
+.mc-delta.down { color: var(--good); }
+
+/* Range bar */
+.mc-range-bar {
+  position: relative;
+  height: 4px;
+  background: var(--line);
+  border-radius: 2px;
+  margin-top: 2px;
+  overflow: visible;
+}
+.mc-range-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--accent);
+  border-radius: 2px;
+  opacity: 0.35;
+  min-width: 4px;
+  max-width: 100%;
+}
+.mc-range-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  max-left: 0;
+}
+.mc-range-dot.good { background: var(--good); }
+.mc-range-dot.warn { background: var(--bad);  }
+.mc-range-dot.none { background: var(--ink-mute); }
+
+.mc-range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--ink-mute);
+  margin-top: 2px;
+}
+
+.mc-date {
+  font-size: 10px;
+  color: var(--ink-dim);
+  margin-top: 2px;
+}
+.mc-count {
+  margin-left: 4px;
+  color: var(--ink-mute);
+}
+
+/* ── Marker history pane ───────────────────────────────────────────────── */
+
+.marker-history-pane {
+  padding: 4px 0 8px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.history-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.history-row:first-child { border-top: 0; }
+.history-row.out { background: color-mix(in srgb, var(--bad) 4%, transparent); border-radius: 4px; padding-left: 6px; }
+.history-row-date {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.history-row-date span:first-child { font-weight: 600; color: var(--ink); font-size: 13px; }
+.history-exam-name { font-size: 11px; color: var(--ink-mute); }
+.history-row-val {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.history-val-num {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.history-val-num.good { color: var(--ink); }
+.history-val-num.bad  { color: var(--bad); }
+
+@media (max-width: 760px) {
+  .marker-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-2); }
+  .mc-value    { font-size: 18px; }
+  .history-row { grid-template-columns: 1fr auto auto; gap: 8px; }
+}
+
 /* ── Dark-mode overrides for elements that can't use CSS vars natively ─── */
 :root[data-theme="dark"] .recharts-cartesian-grid line { stroke: #3c3835; }
 :root[data-theme="dark"] .recharts-cartesian-axis-tick text { fill: #78716c; }

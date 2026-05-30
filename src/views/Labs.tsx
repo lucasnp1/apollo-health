@@ -1,27 +1,292 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTheme } from '../lib/useTheme'
-import { ChevronDown, ChevronRight, Edit2, FileText, FlaskConical, Plus, Trash2, Upload, X } from 'lucide-react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import {
+  ChevronDown, ChevronRight, ChevronUp,
+  Edit2, FileText, FlaskConical, Plus, Trash2, Upload, X,
+} from 'lucide-react'
+import {
+  CartesianGrid, Line, LineChart, ResponsiveContainer,
+  Tooltip, XAxis, YAxis, ReferenceLine,
+} from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
 import { extractMarkersFromText, extractPdfText, type ExtractedMarker } from '../lib/pdf'
-import { markerHistory, type EnrichedResult } from '../lib/insights'
+import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
 import { EmptyState } from '../components/EmptyState'
 
-// ── Types ──────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-type MarkerRow = {
-  marker: string           // canonical display name
-  key?: string             // canonical key (for trend click)
-  panel: LabPanel
-  // Values across exams, newest first.
-  // undefined = this exam didn't include this marker.
-  values: Array<{ resultId?: number; value?: number; rawValue: string; unit?: string; low?: number; high?: number } | undefined>
+type MarkerEntry = {
+  resultId?: number
+  examId: number
+  examName: string
+  date: string           // ISO string
+  value: number | undefined
+  rawValue: string
+  unit?: string
+  low?: number
+  high?: number
 }
 
-// ── Main component ─────────────────────────────────────────────────────────
+type MarkerSummary = {
+  key: string
+  label: string
+  panel: LabPanel
+  unit?: string
+  low?: number
+  high?: number
+  entries: MarkerEntry[]  // all exams, newest first
+}
+
+// ── Range helpers ─────────────────────────────────────────────────────────────
+
+function rangeStatus(v: number | undefined, low?: number, high?: number): 'good' | 'warn' | 'none' {
+  if (v === undefined) return 'none'
+  if (low !== undefined && v < low) return 'warn'
+  if (high !== undefined && v > high) return 'warn'
+  return 'good'
+}
+
+// Returns a 0–1 position for the value within [low, high], clamped
+function rangePos(v: number, low?: number, high?: number): number | null {
+  if (low === undefined || high === undefined) return null
+  const range = high - low
+  if (range <= 0) return null
+  return Math.max(0, Math.min(1, (v - low) / range))
+}
+
+// ── Compact marker card ────────────────────────────────────────────────────────
+
+function MarkerCard({
+  summary,
+  selected,
+  onClick,
+}: {
+  summary: MarkerSummary
+  selected: boolean
+  onClick: () => void
+}) {
+  const latest  = summary.entries[0]
+  const prev    = summary.entries[1]
+  const val     = latest?.value
+  const status  = rangeStatus(val, summary.low, summary.high)
+  const pos     = val !== undefined ? rangePos(val, summary.low, summary.high) : null
+  const delta   = val !== undefined && prev?.value !== undefined ? val - prev.value : undefined
+
+  return (
+    <button
+      type="button"
+      className={`marker-card${selected ? ' selected' : ''}${status === 'warn' ? ' out' : ''}`}
+      onClick={onClick}
+      aria-pressed={selected}
+    >
+      {/* Top row: name + status badge */}
+      <div className="mc-top">
+        <span className="mc-name">{summary.label}</span>
+        {val !== undefined && status !== 'none' && (
+          <span className={`mc-badge ${status}`}>
+            {status === 'good' ? 'OK' : val !== undefined && summary.high !== undefined && val > summary.high ? 'HIGH' : 'LOW'}
+          </span>
+        )}
+      </div>
+
+      {/* Main value + delta */}
+      <div className="mc-value-row">
+        <span className="mc-value">
+          {val !== undefined ? latest.rawValue : '—'}
+        </span>
+        {summary.unit && val !== undefined && (
+          <span className="mc-unit">{summary.unit}</span>
+        )}
+        {delta !== undefined && Math.abs(delta) > 0.05 && (
+          <span className={`mc-delta ${delta > 0 ? 'up' : 'down'}`}>
+            {delta > 0 ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
+          </span>
+        )}
+      </div>
+
+      {/* Range bar */}
+      {pos !== null && (
+        <div className="mc-range-bar">
+          <div className="mc-range-fill" style={{ width: `${pos * 100}%` }} />
+          <div className={`mc-range-dot ${status}`} style={{ left: `${pos * 100}%` }} />
+        </div>
+      )}
+      {summary.low !== undefined && summary.high !== undefined && (
+        <div className="mc-range-labels">
+          <span>{summary.low}</span>
+          <span>{summary.high}</span>
+        </div>
+      )}
+
+      {/* Exam date */}
+      {latest && (
+        <div className="mc-date">
+          {format(parseISO(latest.date), 'MMM d, yyyy')}
+          {summary.entries.length > 1 && (
+            <span className="mc-count">· {summary.entries.length} tests</span>
+          )}
+        </div>
+      )}
+    </button>
+  )
+}
+
+// ── History pane (shown below a panel when a marker is selected) ───────────────
+
+function MarkerHistoryPane({
+  summary,
+  onClose,
+  onDelete,
+  onEditTarget,
+  hasPersonalTarget,
+  colors,
+}: {
+  summary: MarkerSummary
+  onClose: () => void
+  onDelete: (resultId: number) => void
+  onEditTarget: () => void
+  hasPersonalTarget: boolean
+  colors: ReturnType<typeof useTheme>['chart']
+}) {
+  const meta = metaForKey(summary.key)
+  const chartData = [...summary.entries]
+    .filter(e => e.value !== undefined)
+    .reverse()  // oldest → newest for chart
+    .map(e => ({
+      date: format(parseISO(e.date), 'MMM d yy'),
+      value: e.value,
+    }))
+
+  const min = Math.min(...chartData.map(d => d.value!))
+  const max = Math.max(...chartData.map(d => d.value!))
+  const pad = (max - min) * 0.25 || 5
+  const yMin = Math.max(0, Math.floor(min - pad))
+  const yMax = Math.ceil(max + pad)
+
+  return (
+    <div className="marker-history-pane">
+      {/* Header */}
+      <div className="panel-header" style={{ marginBottom: 10 }}>
+        <div>
+          <span className="section-label">
+            {summary.panel} · all tests
+          </span>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {summary.label}
+            {summary.unit && <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-dim)' }}>{summary.unit}</span>}
+          </h3>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className="ghost-button"
+            style={{ fontSize: 12 }}
+            onClick={onEditTarget}
+          >
+            <Edit2 size={11} /> {hasPersonalTarget ? 'Edit range' : 'Set range'}
+          </button>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Optimal range note */}
+      {meta?.optimal?.note && (
+        <p className="panel-note" style={{ marginBottom: 8 }}>{meta.optimal.note}</p>
+      )}
+
+      {/* Line chart */}
+      {chartData.length > 1 ? (
+        <ResponsiveContainer width="100%" height={160}>
+          <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+            <CartesianGrid stroke={colors.grid} vertical={false} />
+            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
+            <YAxis domain={[yMin, yMax]} tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
+            <Tooltip
+              contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }}
+              formatter={(v) => [`${v} ${summary.unit ?? ''}`.trim(), summary.label]}
+            />
+            {summary.low !== undefined && (
+              <ReferenceLine y={summary.low} stroke="var(--warn)" strokeDasharray="3 3" strokeWidth={1} />
+            )}
+            {summary.high !== undefined && (
+              <ReferenceLine y={summary.high} stroke="var(--warn)" strokeDasharray="3 3" strokeWidth={1} />
+            )}
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke="var(--accent)"
+              strokeWidth={2.5}
+              dot={{ r: 4, fill: 'var(--accent)', strokeWidth: 0 }}
+              activeDot={{ r: 5 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      ) : (
+        <p className="panel-note">Need at least 2 tests to show a trend.</p>
+      )}
+
+      {/* All tests list */}
+      <div className="history-list" style={{ marginTop: 12 }}>
+        {summary.entries.map((entry, i) => {
+          const status = rangeStatus(entry.value, summary.low, summary.high)
+          const nextEntry = summary.entries[i + 1]
+          const delta = entry.value !== undefined && nextEntry?.value !== undefined
+            ? entry.value - nextEntry.value
+            : undefined
+          return (
+            <div
+              key={entry.resultId ?? i}
+              className={`history-row${status === 'warn' ? ' out' : ''}`}
+            >
+              <div className="history-row-date">
+                <span>{format(parseISO(entry.date), 'MMM d, yyyy')}</span>
+                <span className="history-exam-name">{entry.examName}</span>
+              </div>
+              <div className="history-row-val">
+                <span className={`history-val-num ${status === 'warn' ? 'bad' : 'good'}`}>
+                  {entry.rawValue}
+                  {entry.unit && <span style={{ fontSize: 11, fontWeight: 400, marginLeft: 3, color: 'var(--ink-dim)' }}>{entry.unit}</span>}
+                </span>
+                {delta !== undefined && Math.abs(delta) > 0.05 && (
+                  <span className={`mc-delta ${delta > 0 ? 'up' : 'down'}`} style={{ fontSize: 11 }}>
+                    {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
+                  </span>
+                )}
+                {status !== 'none' && (
+                  <span className={`mc-badge ${status}`} style={{ fontSize: 10 }}>
+                    {status === 'good' ? 'OK' : entry.value !== undefined && summary.high !== undefined && entry.value > summary.high ? 'HIGH' : 'LOW'}
+                  </span>
+                )}
+              </div>
+              {entry.resultId !== undefined && (
+                <button
+                  type="button"
+                  className="icon-button danger"
+                  style={{ width: 22, height: 22, opacity: 0.4 }}
+                  title="Delete this result"
+                  onClick={() => onDelete(entry.resultId!)}
+                  onMouseOver={e => (e.currentTarget.style.opacity = '1')}
+                  onMouseOut={e => (e.currentTarget.style.opacity = '0.4')}
+                  aria-label="Delete result"
+                >
+                  <Trash2 size={11} />
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Main Labs component ────────────────────────────────────────────────────────
 
 export function Labs({
   exams,
@@ -44,159 +309,134 @@ export function Labs({
 }) {
   const { chart: colors } = useTheme()
   const markerTargets = useLiveQuery(() => db.markerTargets.toArray(), [], [])
-  const targetByKey = useMemo(() => new Map((markerTargets ?? []).map((t) => [t.marker, t])), [markerTargets])
+  const targetByKey   = useMemo(() => new Map((markerTargets ?? []).map(t => [t.marker, t])), [markerTargets])
 
-  // Sort exams newest first (already done from App.tsx, but re-sort to be safe)
-  const sortedExams = useMemo(
-    () => [...exams].sort((a, b) => b.collectedAt.localeCompare(a.collectedAt)),
-    [exams],
-  )
+  // Build marker summaries from ALL exams (newest first per entry)
+  const markersByPanel = useMemo<Map<LabPanel, MarkerSummary[]>>(() => {
+    if (exams.length === 0) return new Map()
 
-  // Show up to 5 most recent exams as columns — deduplicate by id to prevent same-exam repeated columns
-  const examColumns = useMemo(() => {
-    const seen = new Set<number>()
-    return sortedExams.filter((e) => {
-      if (e.id === undefined || seen.has(e.id)) return false
-      seen.add(e.id)
-      return true
-    }).slice(0, 5)
-  }, [sortedExams])
+    const examById = new Map(exams.map(e => [e.id, e]))
+    const keyOrder: string[] = []
+    const summaryMap = new Map<string, MarkerSummary>()
 
+    // Sort results by exam date newest → oldest
+    const sorted = [...results].sort((a, b) => {
+      const ea = examById.get(a.examId)
+      const eb = examById.get(b.examId)
+      if (!ea || !eb) return 0
+      return eb.collectedAt.localeCompare(ea.collectedAt)
+    })
 
-  // Build the comparison table: unique markers × exam columns
-  const groupedRows = useMemo<Map<LabPanel, MarkerRow[]>>(() => {
-    if (examColumns.length === 0) return new Map()
+    for (const r of sorted) {
+      const exam = examById.get(r.examId)
+      if (!exam) continue
+      const canon    = canonicalize(r.marker)
+      const key      = canon?.key ?? r.marker.toLowerCase().trim()
+      const personal = canon ? targetByKey.get(canon.key) : undefined
+      const low      = personal?.low  ?? r.low  ?? canon?.optimal?.low
+      const high     = personal?.high ?? r.high ?? canon?.optimal?.high
 
-    // Collect all unique marker names from results in these exams
-    const examIdSet = new Set(examColumns.map((e) => e.id))
-    const relevantResults = results.filter((r) => r.examId !== undefined && examIdSet.has(r.examId))
-
-    // Deduplicate markers by canonical key (or raw name)
-    const markerOrder: string[] = []
-    const markerMap = new Map<string, string>() // raw name → canonical key or raw fallback
-
-    for (const r of relevantResults) {
-      const canon = canonicalize(r.marker)
-      const key = canon?.key ?? r.marker.toLowerCase()
-      if (!markerMap.has(key)) {
-        markerOrder.push(key)
-        markerMap.set(key, r.marker)
+      if (!summaryMap.has(key)) {
+        keyOrder.push(key)
+        summaryMap.set(key, {
+          key,
+          label:   canon?.label ?? r.marker,
+          panel:   canon?.panel ?? 'Other',
+          unit:    canon?.unit  ?? r.unit,
+          low,
+          high,
+          entries: [],
+        })
       }
+      summaryMap.get(key)!.entries.push({
+        resultId: r.id,
+        examId:   r.examId,
+        examName: exam.name,
+        date:     exam.collectedAt,
+        value:    r.value,
+        rawValue: r.rawValue,
+        unit:     r.unit ?? canon?.unit,
+        low,
+        high,
+      })
     }
 
-    // Build rows
-    const grouped = new Map<LabPanel, MarkerRow[]>()
-    for (const key of markerOrder) {
-      const rawName = markerMap.get(key)!
-      const canon = canonicalize(rawName)
-      const panel = canon?.panel ?? 'Other'
-      const personal = canon ? targetByKey.get(canon.key) : undefined
+    // Group by panel in PANEL_ORDER order
+    const grouped = new Map<LabPanel, MarkerSummary[]>()
+    for (const panel of PANEL_ORDER) grouped.set(panel, [])
 
-      const values = examColumns.map((exam) => {
-        // Find result in this exam matching the marker
-        const r = results.find(
-          (x) => x.examId === exam.id && (
-            x.marker.toLowerCase() === rawName.toLowerCase() ||
-            (canon && canonicalize(x.marker)?.key === canon.key)
-          ),
-        )
-        if (!r) return undefined
-        const low = personal?.low ?? r.low ?? canon?.optimal?.low
-        const high = personal?.high ?? r.high ?? canon?.optimal?.high
-        return { resultId: r.id, value: r.value, rawValue: r.rawValue, unit: r.unit ?? canon?.unit ?? personal?.unit, low, high }
-      })
-
-      const row: MarkerRow = {
-        marker: canon?.label ?? rawName,
-        key: canon?.key,
-        panel,
-        values,
-      }
-
-      const list = grouped.get(panel) ?? []
-      list.push(row)
-      grouped.set(panel, list)
+    for (const key of keyOrder) {
+      const s = summaryMap.get(key)!
+      const list = grouped.get(s.panel) ?? []
+      list.push(s)
+      grouped.set(s.panel, list)
     }
 
     return grouped
-  }, [examColumns, results, targetByKey])
+  }, [exams, results, targetByKey])
 
-  const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined)
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [collapsedPanels, setCollapsedPanels] = useState<Set<LabPanel>>(new Set())
-  const [editingTargetKey, setEditingTargetKey] = useState<string | null>(null)
-  const [targetLow, setTargetLow] = useState('')
-  const [targetHigh, setTargetHigh] = useState('')
+  const hasData = exams.length > 0
 
-  async function saveTarget(key: string, unit?: string) {
-    if (!key) return
-    const data = {
-      marker: key,
-      low: targetLow ? Number(targetLow) : undefined,
-      high: targetHigh ? Number(targetHigh) : undefined,
-      unit,
-    }
-    const existing = targetByKey.get(key)
-    if (existing?.id) {
-      await db.markerTargets.update(existing.id, data)
-    } else {
-      await db.markerTargets.add(data)
-    }
-    setEditingTargetKey(null)
-    setTargetLow('')
-    setTargetHigh('')
+  const [selectedKey,      setSelectedKey]      = useState<string | null>(null)
+  const [showAddForm,      setShowAddForm]       = useState(false)
+  const [collapsedPanels,  setCollapsedPanels]   = useState<Set<LabPanel>>(new Set())
+  const [editingTargetKey, setEditingTargetKey]  = useState<string | null>(null)
+  const [targetLow,        setTargetLow]         = useState('')
+  const [targetHigh,       setTargetHigh]        = useState('')
+
+  useEffect(() => { if (addOpen) { setShowAddForm(true); onAddClose?.() } }, [addOpen, onAddClose])
+
+  function togglePanel(panel: LabPanel) {
+    setCollapsedPanels(prev => {
+      const next = new Set(prev)
+      next.has(panel) ? next.delete(panel) : next.add(panel)
+      return next
+    })
   }
 
   function openTargetEdit(key: string) {
-    const existing = targetByKey.get(key)
-    setTargetLow(existing?.low !== undefined ? String(existing.low) : '')
-    setTargetHigh(existing?.high !== undefined ? String(existing.high) : '')
+    const ex = targetByKey.get(key)
+    setTargetLow(ex?.low   !== undefined ? String(ex.low)  : '')
+    setTargetHigh(ex?.high !== undefined ? String(ex.high) : '')
     setEditingTargetKey(key)
   }
 
-  useEffect(() => {
-    if (addOpen) { setShowAddForm(true); onAddClose?.() }
-  }, [addOpen, onAddClose])
+  async function saveTarget(key: string, unit?: string) {
+    const data = { marker: key, low: targetLow ? Number(targetLow) : undefined, high: targetHigh ? Number(targetHigh) : undefined, unit }
+    const existing = targetByKey.get(key)
+    existing?.id ? await db.markerTargets.update(existing.id, data) : await db.markerTargets.add(data)
+    setEditingTargetKey(null); setTargetLow(''); setTargetHigh('')
+  }
 
-  const selectedHistory = useMemo(() => {
-    if (!selectedKey) return []
-    const matches = results.filter((r) => canonicalize(r.marker)?.key === selectedKey)
-    if (matches.length === 0) return []
-    return markerHistory(matches.map((m) => ({ ...m })), matches[0].marker)
-  }, [results, selectedKey])
-
-  // PDF upload → feeds into the pending banner automatically
+  // PDF upload
   async function handlePdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     const extractedText = await extractPdfText(file)
     await db.files.add({
-      name: file.name,
-      type: file.type || 'application/pdf',
-      size: file.size,
-      addedAt: new Date().toISOString(),
-      status: extractedText ? 'Needs review' : 'Stored',
-      extractedText,
-      blob: file,
+      name: file.name, type: file.type || 'application/pdf',
+      size: file.size, addedAt: new Date().toISOString(),
+      status: extractedText ? 'Needs review' : 'Stored', extractedText, blob: file,
     })
     e.target.value = ''
   }
 
   // Manual add
   const [examName, setExamName] = useState('Blood panel')
-  const [marker, setMarker] = useState('Total Testosterone')
-  const [value, setValue] = useState('')
-  const [unit, setUnit] = useState('ng/dL')
+  const [marker,   setMarker]   = useState('Total Testosterone')
+  const [value,    setValue]    = useState('')
+  const [unit,     setUnit]     = useState('ng/dL')
+  const [manualDate, setManualDate] = useState(new Date().toISOString().slice(0, 10))
 
   async function addManual() {
-    const id = await db.exams.add({ name: examName || 'Blood panel', collectedAt: new Date().toISOString(), labName: 'Manual entry' })
+    const id = await db.exams.add({ name: examName || 'Blood panel', collectedAt: new Date(manualDate).toISOString(), labName: 'Manual entry' })
     await db.results.add({ examId: id, marker, value: Number(value), rawValue: value, unit })
     setValue('')
   }
 
   // PDF review
-  const latestFile = files.find((f) => f.status === 'Needs review')
-  const extracted = latestFile?.extractedText ? extractMarkersFromText(latestFile.extractedText) : []
+  const latestFile = files.find(f => f.status === 'Needs review')
+  const extracted  = latestFile?.extractedText ? extractMarkersFromText(latestFile.extractedText) : []
 
   async function saveExtracted(items: ExtractedMarker[]) {
     if (!latestFile?.id || items.length === 0) return
@@ -206,20 +446,13 @@ export function Labs({
       labName: 'PDF import',
       sourceFileId: latestFile.id,
     })
-    await db.results.bulkAdd(items.map((item) => ({ examId, marker: item.marker, value: item.value, rawValue: String(item.value), unit: item.unit })))
+    await db.results.bulkAdd(items.map(item => ({ examId, marker: item.marker, value: item.value, rawValue: String(item.value), unit: item.unit })))
     await db.files.update(latestFile.id, { status: 'Reviewed' })
   }
 
-  function togglePanel(panel: LabPanel) {
-    setCollapsedPanels((prev) => {
-      const next = new Set(prev)
-      if (next.has(panel)) next.delete(panel)
-      else next.add(panel)
-      return next
-    })
-  }
-
-  const hasData = examColumns.length > 0
+  const selectedSummary = selectedKey
+    ? [...markersByPanel.values()].flat().find(s => s.key === selectedKey)
+    : null
 
   return (
     <div className="content-grid">
@@ -231,244 +464,149 @@ export function Labs({
             <FileText size={14} style={{ color: 'var(--accent-ink)', flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <strong style={{ fontSize: 13, color: 'var(--accent-ink)' }}>PDF ready to import</strong>
-              <span style={{ display: 'block', fontSize: 11, color: 'var(--accent-ink)', opacity: 0.8 }}>{latestFile.name} · {extracted.length} markers detected</span>
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--accent-ink)', opacity: 0.8 }}>
+                {latestFile.name} · {extracted.length} markers detected
+              </span>
             </div>
-            <button type="button" className="primary-button" style={{ background: 'var(--accent)', height: 30, fontSize: 12 }} onClick={() => saveExtracted(extracted)}>
+            <button type="button" className="primary-button" style={{ background: 'var(--accent)', height: 30, fontSize: 12 }}
+              onClick={() => saveExtracted(extracted)}>
               Import {extracted.length} markers
             </button>
           </div>
         </section>
       )}
 
-      {/* ── Marker trend chart — shown when a marker row is clicked ── */}
-      {selectedKey && (
+      {/* ── No data empty state ── */}
+      {!hasData && (
         <section className="surface col-12">
           <div className="panel-header">
-            <div>
-              <span className="section-label">Trend</span>
-              <h3>{metaForKey(selectedKey)?.label ?? selectedKey}</h3>
+            <div><span className="section-label">All exams</span><h3>Lab results</h3></div>
+            <div className="labs-inline-actions" style={{ display: 'flex', gap: 8 }}>
+              <label className="ghost-button" style={{ cursor: 'pointer' }}>
+                <input type="file" accept="application/pdf" hidden onChange={handlePdfUpload} />
+                <Upload size={12} /> Upload PDF
+              </label>
+              <button type="button" className="ghost-button" onClick={() => setShowAddForm(v => !v)}>
+                <Plus size={12} /> Add result
+              </button>
             </div>
-            <button type="button" className="ghost-button" onClick={() => setSelectedKey(undefined)}>Close</button>
           </div>
-          {selectedHistory.length > 1 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={selectedHistory} margin={{ top: 8, right: 10, bottom: 0, left: -12 }}>
-                <CartesianGrid stroke={colors.grid} vertical={false} />
-                <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
-                <YAxis tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }} />
-                <Line type="monotone" dataKey="value" stroke="#0f766e" strokeWidth={2.5} dot />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="panel-note">Add results from at least 2 exams to see a trend.</p>
-          )}
-          {metaForKey(selectedKey)?.optimal?.note && (
-            <p className="panel-note" style={{ marginTop: 8 }}>{metaForKey(selectedKey)?.optimal?.note}</p>
-          )}
+          <EmptyState icon={FlaskConical} title="No lab results yet" detail="Upload a PDF or add markers manually." />
         </section>
       )}
 
-      {/* ── Main comparison table ── */}
-      <section className="surface col-12">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">All exams</span>
-            <h3>Marker comparison</h3>
-          </div>
-          <div className="labs-inline-actions" style={{ display: 'flex', gap: 8 }}>
-            <label className="ghost-button" style={{ cursor: 'pointer' }}>
-              <input type="file" accept="application/pdf" hidden onChange={handlePdfUpload} />
-              <Upload size={12} /> Upload PDF
-            </label>
-            <button type="button" className="ghost-button" onClick={() => setShowAddForm((v) => !v)}>
-              <Plus size={12} /> Add result
-            </button>
-          </div>
-        </div>
+      {/* ── Panel sections ── */}
+      {hasData && PANEL_ORDER.map(panel => {
+        const summaries = markersByPanel.get(panel)
+        if (!summaries || summaries.length === 0) return null
+        const collapsed = collapsedPanels.has(panel)
 
-        {!hasData ? (
-          <EmptyState
-            icon={FlaskConical}
-            title="No lab results yet"
-            detail="Upload a PDF in Files or add markers manually."
-          />
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="labs-compare-table">
-              <thead>
-                <tr>
-                  <th>Marker</th>
-                  {examColumns.map((exam) => (
-                    <th key={exam.id} style={{ textAlign: 'right' }}>
-                      {exam.name}<br />
-                      <span style={{ fontWeight: 400, opacity: 0.7 }}>{format(parseISO(exam.collectedAt), 'MMM d, yy')}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {PANEL_ORDER.map((panel) => {
-                  const rows = groupedRows.get(panel)
-                  if (!rows || rows.length === 0) return null
-                  const collapsed = collapsedPanels.has(panel)
-                  const outCount = rows.reduce((n, row) => {
-                    const latest = row.values[0]
-                    if (!latest?.value) return n
-                    const out = (latest.high !== undefined && latest.value > latest.high) ||
-                      (latest.low !== undefined && latest.value < latest.low)
-                    return out ? n + 1 : n
-                  }, 0)
-                  return (
-                    <Fragment key={panel}>
-                      {/* Panel header row */}
-                      <tr style={{ cursor: 'pointer' }} onClick={() => togglePanel(panel)}>
-                        <td colSpan={examColumns.length + 1} style={{ padding: '12px 0 4px', borderTop: '2px solid var(--line)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {collapsed ? <ChevronRight size={12} style={{ color: 'var(--ink-mute)' }} /> : <ChevronDown size={12} style={{ color: 'var(--ink-mute)' }} />}
-                            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-dim)' }}>{panel}</span>
-                            {outCount > 0 && (
-                              <span className="chip" style={{ background: 'var(--bad-soft)', color: 'var(--bad)', fontSize: 10 }}>
-                                {outCount} out
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      {/* Marker rows */}
-                      {!collapsed && rows.map((row) => {
-                        const latestVal = row.values[0]
-                        const isSelected = row.key === selectedKey
-                        const isEditingTarget = row.key === editingTargetKey
-                        const hasPersonalTarget = row.key && targetByKey.has(row.key)
-                        const isOut = latestVal?.value !== undefined && (
-                          (latestVal.high !== undefined && latestVal.value > latestVal.high) ||
-                          (latestVal.low !== undefined && latestVal.value < latestVal.low)
-                        )
-                        return (
-                          <Fragment key={row.marker}>
-                            <tr
-                              className={isSelected ? 'selected' : undefined}
-                              onClick={() => row.key && setSelectedKey(isSelected ? undefined : row.key)}
-                              style={{ cursor: row.key ? 'pointer' : 'default' }}
-                            >
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 13, fontWeight: 600, color: isOut ? 'var(--bad)' : 'var(--ink)' }}>
-                                    {row.marker}
-                                  </span>
-                                  {hasPersonalTarget && (
-                                    <span style={{ fontSize: 10, color: 'var(--accent-ink)', background: 'var(--accent-soft)', borderRadius: 4, padding: '1px 5px' }}>custom</span>
-                                  )}
-                                  {row.key && (
-                                    <button
-                                      type="button"
-                                      className="icon-button"
-                                      style={{ width: 20, height: 20, opacity: 0.5, marginLeft: 'auto' }}
-                                      title="Set personal reference range"
-                                      onClick={(e) => { e.stopPropagation(); openTargetEdit(row.key!) }}
-                                      aria-label="Set target range"
-                                    >
-                                      <Edit2 size={11} />
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                              {row.values.map((cell, ci) => {
-                                if (!cell) return <td key={ci} style={{ color: 'var(--ink-mute)', textAlign: 'right', fontSize: 12 }}>—</td>
-                                const out = cell.value !== undefined && (
-                                  (cell.high !== undefined && cell.value > cell.high) ||
-                                  (cell.low !== undefined && cell.value < cell.low)
-                                )
-                                // Delta: compare with next column (older exam)
-                                const nextCell = row.values[ci + 1]
-                                const delta = cell.value !== undefined && nextCell?.value !== undefined
-                                  ? cell.value - nextCell.value
-                                  : undefined
-                                return (
-                                  <td key={ci} style={{ textAlign: 'right' }}>
-                                    <div className={`labs-val-cell${out ? ' out' : ''}`} style={{ justifyContent: 'flex-end', gap: 4 }}>
-                                      <span>{cell.rawValue}{cell.unit ? ` ${cell.unit}` : ''}</span>
-                                      {ci === 0 && delta !== undefined && Math.abs(delta) > 0.05 && (
-                                        <span className={`labs-delta ${delta > 0 ? 'up' : 'down'}`}>
-                                          {delta > 0 ? '↑' : '↓'}
-                                        </span>
-                                      )}
-                                      {cell.resultId !== undefined && (
-                                        <button
-                                          type="button"
-                                          className="icon-button danger"
-                                          style={{ width: 18, height: 18, opacity: 0, transition: 'opacity 0.15s' }}
-                                          title="Delete this result"
-                                          onClick={(e) => { e.stopPropagation(); void db.results.delete(cell.resultId!) }}
-                                          aria-label="Delete result"
-                                          onMouseOver={(e) => (e.currentTarget.style.opacity = '1')}
-                                          onMouseOut={(e) => (e.currentTarget.style.opacity = '0')}
-                                        >
-                                          <Trash2 size={10} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </td>
-                                )
-                              })}
-                            </tr>
-                            {/* Inline target edit row */}
-                            {isEditingTarget && (
-                              <tr onClick={(e) => e.stopPropagation()}>
-                                <td colSpan={examColumns.length + 1} style={{ padding: '8px 0', background: 'var(--accent-soft)' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '0 4px' }}>
-                                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-ink)' }}>Personal range for {row.marker}:</span>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
-                                      Low
-                                      <input
-                                        inputMode="decimal"
-                                        placeholder="e.g. 700"
-                                        value={targetLow}
-                                        onChange={(e) => setTargetLow(e.target.value)}
-                                        style={{ width: 80, fontSize: 12 }}
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
-                                    </label>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
-                                      High
-                                      <input
-                                        inputMode="decimal"
-                                        placeholder="e.g. 1000"
-                                        value={targetHigh}
-                                        onChange={(e) => setTargetHigh(e.target.value)}
-                                        style={{ width: 80, fontSize: 12 }}
-                                        onClick={(e) => e.stopPropagation()}
-                                      />
-                                    </label>
-                                    <button type="button" className="primary-button" style={{ height: 26, fontSize: 11, padding: '0 10px' }}
-                                      onClick={(e) => { e.stopPropagation(); void saveTarget(row.key!, latestVal?.unit) }}>
-                                      Save
-                                    </button>
-                                    {hasPersonalTarget && (
-                                      <button type="button" className="ghost-button" style={{ height: 26, fontSize: 11, color: 'var(--bad)' }}
-                                        onClick={(e) => { e.stopPropagation(); void db.markerTargets.where('marker').equals(row.key!).delete(); setEditingTargetKey(null) }}>
-                                        Remove custom
-                                      </button>
-                                    )}
-                                    <button type="button" className="icon-button" onClick={(e) => { e.stopPropagation(); setEditingTargetKey(null) }}>
-                                      <X size={13} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
-                        )
-                      })}
-                    </Fragment>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+        // Count out-of-range markers
+        const outCount = summaries.filter(s => {
+          const v = s.entries[0]?.value
+          return rangeStatus(v, s.low, s.high) === 'warn'
+        }).length
+
+        // Is the selected marker in this panel?
+        const selectedInPanel = selectedSummary?.panel === panel
+
+        return (
+          <section key={panel} className="surface col-12">
+            {/* Panel header */}
+            <div
+              className="panel-header"
+              style={{ cursor: 'pointer', userSelect: 'none', marginBottom: collapsed ? 0 : 12 }}
+              onClick={() => togglePanel(panel)}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {collapsed
+                  ? <ChevronRight size={13} style={{ color: 'var(--ink-mute)' }} />
+                  : <ChevronDown  size={13} style={{ color: 'var(--ink-mute)' }} />
+                }
+                <span className="section-label" style={{ margin: 0 }}>{panel}</span>
+                <span style={{ fontSize: 11, color: 'var(--ink-dim)' }}>{summaries.length} markers</span>
+                {outCount > 0 && (
+                  <span className="chip" style={{ background: 'var(--bad-soft)', color: 'var(--bad)', fontSize: 10, height: 18 }}>
+                    {outCount} out of range
+                  </span>
+                )}
+              </div>
+              {/* Upload/add buttons only on first panel header */}
+              {panel === PANEL_ORDER[0] && (
+                <div className="labs-inline-actions" style={{ display: 'flex', gap: 8 }} onClick={e => e.stopPropagation()}>
+                  <label className="ghost-button" style={{ cursor: 'pointer', height: 30, fontSize: 12 }}>
+                    <input type="file" accept="application/pdf" hidden onChange={handlePdfUpload} />
+                    <Upload size={11} /> Upload PDF
+                  </label>
+                  <button type="button" className="ghost-button" style={{ height: 30, fontSize: 12 }}
+                    onClick={() => setShowAddForm(v => !v)}>
+                    <Plus size={11} /> Add result
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Marker cards grid */}
+            {!collapsed && (
+              <div className="marker-grid">
+                {summaries.map(s => (
+                  <MarkerCard
+                    key={s.key}
+                    summary={s}
+                    selected={selectedKey === s.key}
+                    onClick={() => setSelectedKey(selectedKey === s.key ? null : s.key)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* History pane — shown inline when a marker in this panel is selected */}
+            {!collapsed && selectedInPanel && selectedSummary && (
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+                <MarkerHistoryPane
+                  summary={selectedSummary}
+                  onClose={() => setSelectedKey(null)}
+                  onDelete={(id) => void db.results.delete(id)}
+                  onEditTarget={() => openTargetEdit(selectedSummary.key)}
+                  hasPersonalTarget={targetByKey.has(selectedSummary.key)}
+                  colors={colors}
+                />
+                {/* Inline target editor */}
+                {editingTargetKey === selectedSummary.key && (
+                  <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--accent-soft)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-ink)' }}>
+                      Personal range for {selectedSummary.label}:
+                    </span>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+                      Low
+                      <input inputMode="decimal" placeholder="e.g. 700" value={targetLow}
+                        onChange={e => setTargetLow(e.target.value)} style={{ width: 80, fontSize: 12 }} />
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+                      High
+                      <input inputMode="decimal" placeholder="e.g. 1000" value={targetHigh}
+                        onChange={e => setTargetHigh(e.target.value)} style={{ width: 80, fontSize: 12 }} />
+                    </label>
+                    <button type="button" className="primary-button" style={{ height: 28, fontSize: 11, padding: '0 10px' }}
+                      onClick={() => void saveTarget(selectedSummary.key, selectedSummary.unit)}>
+                      Save
+                    </button>
+                    {targetByKey.has(selectedSummary.key) && (
+                      <button type="button" className="ghost-button" style={{ height: 28, fontSize: 11, color: 'var(--bad)' }}
+                        onClick={() => { void db.markerTargets.where('marker').equals(selectedSummary.key).delete(); setEditingTargetKey(null) }}>
+                        Remove custom
+                      </button>
+                    )}
+                    <button type="button" className="icon-button" onClick={() => setEditingTargetKey(null)}>
+                      <X size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )
+      })}
 
       {/* ── Manual add form ── */}
       {showAddForm && (
@@ -479,28 +617,33 @@ export function Labs({
           </div>
           <div className="form-grid">
             <label className="wide-field">
-              Exam name
-              <input value={examName} onChange={(e) => setExamName(e.target.value)} />
+              Exam / panel name
+              <input value={examName} onChange={e => setExamName(e.target.value)} />
+            </label>
+            <label>
+              Date
+              <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} />
             </label>
             <label>
               Marker
-              <input value={marker} onChange={(e) => setMarker(e.target.value)} />
+              <input value={marker} onChange={e => setMarker(e.target.value)} />
             </label>
             <label>
               Value
-              <input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
+              <input inputMode="decimal" value={value} onChange={e => setValue(e.target.value)} />
             </label>
             <label>
               Unit
-              <input value={unit} onChange={(e) => setUnit(e.target.value)} />
+              <input value={unit} onChange={e => setUnit(e.target.value)} />
             </label>
-            <button type="button" className="primary-button wide-field" onClick={async () => { await addManual(); setShowAddForm(false) }} disabled={!value}>
+            <button type="button" className="primary-button wide-field"
+              onClick={async () => { await addManual(); setShowAddForm(false) }}
+              disabled={!value}>
               <Plus size={14} /> Save marker
             </button>
           </div>
         </section>
       )}
-
     </div>
   )
 }
