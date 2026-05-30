@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, Sun, Trash2, UserCircle, X } from 'lucide-react'
+import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, Sun, Trash2, Upload, UserCircle, X } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { db } from '../lib/db'
 import { wipeLocalDatabase } from '../lib/lock'
@@ -9,6 +9,24 @@ import type { useAuth } from '../lib/useAuth'
 import type { Compound, InjectionLog, LabExam, Protocol, VitalLog } from '../lib/db'
 
 type AuthBundle = ReturnType<typeof useAuth>
+
+async function importJson(file: File) {
+  const text = await file.text()
+  const dump = JSON.parse(text)
+  // Only import tables that exist in the dump — merge, don't wipe everything
+  if (Array.isArray(dump.exams)         && dump.exams.length)         await db.exams.bulkPut(dump.exams)
+  if (Array.isArray(dump.results)       && dump.results.length)       await db.results.bulkPut(dump.results)
+  if (Array.isArray(dump.compounds)     && dump.compounds.length)     await db.compounds.bulkPut(dump.compounds)
+  if (Array.isArray(dump.injections)    && dump.injections.length)    await db.injections.bulkPut(dump.injections)
+  if (Array.isArray(dump.vitals)        && dump.vitals.length)        await db.vitals.bulkPut(dump.vitals)
+  if (Array.isArray(dump.protocols)     && dump.protocols.length)     await db.protocols.bulkPut(dump.protocols)
+  if (Array.isArray(dump.protocolDoses) && dump.protocolDoses.length) await db.protocolDoses.bulkPut(dump.protocolDoses)
+  if (Array.isArray(dump.vials)         && dump.vials.length)         await db.vials.bulkPut(dump.vials)
+  if (Array.isArray(dump.symptoms)      && dump.symptoms.length)      await db.symptoms.bulkPut(dump.symptoms)
+  if (Array.isArray(dump.markerTargets) && dump.markerTargets.length) await db.markerTargets.bulkPut(dump.markerTargets)
+  if (Array.isArray(dump.goals)         && dump.goals.length)         await db.goals.bulkPut(dump.goals)
+  if (Array.isArray(dump.bodyMetrics)   && dump.bodyMetrics.length)   await db.bodyMetrics.bulkPut(dump.bodyMetrics)
+}
 
 async function exportJson() {
   const dump = {
@@ -211,8 +229,23 @@ function BackupSettings({
   exams?: LabExam[]
   protocols?: Protocol[]
 }) {
-  function printReport() {
-    window.print()
+  const [importing, setImporting] = useState(false)
+  const [importDone, setImportDone] = useState(false)
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      await importJson(file)
+      setImportDone(true)
+      setTimeout(() => setImportDone(false), 4000)
+    } catch (err) {
+      alert('Import failed: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
   }
 
   return (
@@ -220,17 +253,21 @@ function BackupSettings({
       <div className="panel-header">
         <div>
           <span className="section-label">Backup &amp; export</span>
-          <h3>Data export</h3>
+          <h3>Data export / import</h3>
         </div>
       </div>
       <p className="muted-copy">
-        Download a full JSON backup, or print a clinical summary to share with your doctor.
+        Download a full JSON backup to transfer between devices, or import a backup file.
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button type="button" className="primary-button" onClick={exportJson}>
           <Download size={14} /> Download JSON
         </button>
-        <button type="button" className="ghost-button" onClick={printReport}>
+        <label className="ghost-button" style={{ cursor: 'pointer' }}>
+          <input type="file" accept="application/json" hidden onChange={handleImport} disabled={importing} />
+          <Upload size={14} /> {importDone ? 'Imported ✓' : importing ? 'Importing…' : 'Import JSON'}
+        </label>
+        <button type="button" className="ghost-button" onClick={() => window.print()}>
           <Printer size={14} /> Print report
         </button>
       </div>
