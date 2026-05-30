@@ -42,6 +42,20 @@ function inferEster(name: string): string | undefined {
   return forms.find(f => lower.includes(f.toLowerCase()))
 }
 
+// Parse common shorthand ester names from free text (e.g. protocol name "Test E 200mg")
+function inferEsterFromText(text: string): string | undefined {
+  const t = text.toLowerCase()
+  if (/enanthate|enanth|\btest[\s-]*e\b|\bte\b/.test(t))  return 'Enanthate'
+  if (/cypionate|cyp|\btest[\s-]*c\b/.test(t))            return 'Cypionate'
+  if (/propionate|prop|\btest[\s-]*p\b/.test(t))          return 'Propionate'
+  if (/undecanoate|nebido|aveed/.test(t))                 return 'Undecanoate'
+  if (/decanoate(?!.*undeca)|deca/.test(t))               return 'Decanoate'
+  if (/phenylpropionate|phenprop|\bpp\b/.test(t))         return 'Phenylpropionate'
+  if (/suspension|susp|\btest[\s-]*s\b/.test(t))          return 'Suspension'
+  if (/sustanon|sust/.test(t))                            return 'Sustanon 250'
+  return undefined
+}
+
 type ChartPt = {
   dayNum: number
   logged: number | null
@@ -80,8 +94,12 @@ function buildCycleData(
   _protocolDoses: ProtocolDose[],
   exams: LabExam[],
 ): CycleData | null {
-  // Match PK compound — infer ester from name when compound.ester not set
-  const esterHint = compound.ester ?? inferEster(compound.name)
+  // Match PK compound — 3-tier ester inference:
+  // 1. compound.ester field  2. parse compound name  3. parse protocol name (e.g. "Test E 200mg")
+  const esterHint = (compound.ester && compound.ester !== 'Custom' ? compound.ester : undefined)
+    ?? inferEster(compound.name)
+    ?? inferEsterFromText(protocol.name)
+    ?? inferEsterFromText(compound.name)
   const pk = findPKCompound(compound.name, esterHint)
     ?? findPKCompound(compound.name)
   if (!pk) return null

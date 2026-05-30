@@ -348,7 +348,13 @@ export function Labs({
           entries: [],
         })
       }
-      summaryMap.get(key)!.entries.push({
+      // Deduplicate: same marker in same exam (same exam imported twice → same name+date)
+      // Key = examName + date-only + marker key. Only keep the first occurrence.
+      const summary = summaryMap.get(key)!
+      const dupKey = `${exam.name}|${exam.collectedAt.slice(0, 10)}`
+      if (summary.entries.some(e => `${e.examName}|${e.date.slice(0, 10)}` === dupKey)) continue
+
+      summary.entries.push({
         resultId: r.id,
         examId:   r.examId,
         examName: exam.name,
