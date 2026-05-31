@@ -74,20 +74,23 @@ async function syncTable(spec: TableSpec, direction: Direction): Promise<TableSy
 }
 
 // --- pull -----------------------------------------------------------------
+// Batched: one DB transaction per page of results instead of one per row.
+// Before: N rows × (1 read + 1 write + M FK reads) = many IDB round-trips.
+// After:  1 bulk read + pre-fetched FK cache + 1 bulkPut/bulkDelete = fast.
 
 async function pullTable(spec: TableSpec): Promise<number> {
   const cursorRow = await db.meta.get(CURSOR_KEY(spec.slug))
   let since = Number(cursorRow?.value || 0)
   let pulled = 0
+
   for (let i = 0; i < 50; i++) {
     const res = await api.get<{ rows: Array<Record<string, unknown>>; cursor: number; hasMore: boolean }>(
       `/api/sync/${spec.slug}?since=${since}`,
     )
     if (!res.rows.length) break
-    for (const row of res.rows) {
-      await applyServerRow(spec, row)
-      pulled++
-    }
+
+    pulled += await applyServerRowsBatch(spec, res.rows)
+
     since = Math.max(since, Number(res.cursor) || since)
     await db.meta.put({ key: CURSOR_KEY(spec.slug), value: String(since) })
     if (!res.hasMore) break
@@ -95,38 +98,99 @@ async function pullTable(spec: TableSpec): Promise<number> {
   return pulled
 }
 
-async function applyServerRow(spec: TableSpec, row: Record<string, unknown>): Promise<void> {
-  const serverId = String(row.id)
-  if (!serverId) return
+async function applyServerRowsBatch(
+  spec: TableSpec,
+  rows: Array<Record<string, unknown>>,
+): Promise<number> {
+  if (!rows.length) return 0
   const table = dexieTable(spec)
-  const existing = await table.where('serverId').equals(serverId).first()
-  const isDeleted = row.deletedAt !== null && row.deletedAt !== undefined
 
-  if (isDeleted) {
-    if (existing?.id !== undefined) await table.delete(existing.id)
-    return
+  // 1. Look up ALL existing local rows in one query
+  const serverIds = rows.map((r) => String(r.id)).filter(Boolean)
+  const existingRows = await table.where('serverId').anyOf(serverIds).toArray()
+  const existingMap = new Map(
+    existingRows.map((r) => [(r as Record<string, unknown>).serverId as string, r]),
+  )
+
+  // 2. Pre-fetch ALL FK targets in one pass per FK field
+  const fkCache = await buildFkCache(spec, rows)
+
+  // 3. Build the to-put and to-delete lists
+  const toDelete: number[] = []
+  const toPut: Record<string, unknown>[] = []
+  let count = 0
+
+  for (const row of rows) {
+    const serverId = String(row.id)
+    if (!serverId) continue
+    const existing = existingMap.get(serverId) as Record<string, unknown> | undefined
+
+    if (row.deletedAt !== null && row.deletedAt !== undefined) {
+      if (existing?.id !== undefined) toDelete.push(existing.id as number)
+      continue
+    }
+
+    const localRow = translateFkSync(spec, row, fkCache)
+    localRow.serverId = serverId
+    localRow.updatedAt = Number(row.updatedAt) || Date.now()
+    localRow.dirty = 0
+    localRow.deletedAtSync = undefined
+
+    if (existing?.id !== undefined) {
+      toPut.push({ ...existing, ...localRow })
+    } else {
+      delete localRow.id
+      toPut.push(localRow)
+    }
+    count++
   }
 
-  // Translate FK strings → local numeric ids
-  const localRow = await translateFkForPull(spec, row)
-  localRow.serverId = serverId
-  localRow.updatedAt = Number(row.updatedAt) || Date.now()
-  localRow.dirty = 0
-  localRow.deletedAtSync = undefined
-
-  if (existing?.id !== undefined) {
-    // Use a put-style update that overwrites whole row but keeps Dexie id
-    const merged = { ...existing, ...localRow }
-    // Cast: dexieTable() returns a typed Injections table but at runtime accepts any row shape.
-    await (table as unknown as { put: (row: unknown) => Promise<unknown> }).put(merged)
-  } else {
-    // Drop id so Dexie auto-assigns
-    delete (localRow as Record<string, unknown>).id
-    await (table as unknown as { add: (row: unknown) => Promise<unknown> }).add(localRow)
+  // 4. ONE transaction — one useLiveQuery notification fires, not N
+  if (toDelete.length || toPut.length) {
+    await db.transaction('rw', table, async () => {
+      if (toDelete.length) await (table as unknown as { bulkDelete: (ids: number[]) => Promise<void> }).bulkDelete(toDelete)
+      if (toPut.length)   await (table as unknown as { bulkPut: (rows: unknown[]) => Promise<unknown> }).bulkPut(toPut)
+    })
   }
+
+  return count
 }
 
-async function translateFkForPull(spec: TableSpec, row: Record<string, unknown>): Promise<Record<string, unknown>> {
+/** Pre-fetch all FK target ids for a batch of server rows. */
+async function buildFkCache(
+  spec: TableSpec,
+  rows: Array<Record<string, unknown>>,
+): Promise<Map<string, Map<string, number>>> {
+  const result = new Map<string, Map<string, number>>()
+  if (!spec.foreignKeys?.length) return result
+
+  for (const fk of spec.foreignKeys) {
+    const targetSpec = TABLES.find((t) => t.slug === fk.targetTable)
+    if (!targetSpec) continue
+
+    const fkIds = [...new Set(
+      rows.map((r) => r[fk.field]).filter((v): v is string => typeof v === 'string' && v.length > 0),
+    )]
+
+    if (!fkIds.length) { result.set(fk.field, new Map()); continue }
+
+    const targetRows = await dexieTable(targetSpec).where('serverId').anyOf(fkIds).toArray()
+    const idMap = new Map<string, number>()
+    for (const tr of targetRows) {
+      const r = tr as Record<string, unknown>
+      if (r.serverId && r.id !== undefined) idMap.set(r.serverId as string, r.id as number)
+    }
+    result.set(fk.field, idMap)
+  }
+  return result
+}
+
+/** Synchronous FK translation using the pre-built cache. */
+function translateFkSync(
+  spec: TableSpec,
+  row: Record<string, unknown>,
+  fkCache: Map<string, Map<string, number>>,
+): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [client, type] of Object.entries(spec.columns)) {
     const v = row[client]
@@ -135,27 +199,16 @@ async function translateFkForPull(spec: TableSpec, row: Record<string, unknown>)
     } else if (type === 'bool') {
       out[client] = Boolean(v)
     } else if (type === 'json' && typeof v === 'string') {
-      try {
-        out[client] = JSON.parse(v)
-      } catch {
-        out[client] = v
-      }
+      try { out[client] = JSON.parse(v) } catch { out[client] = v }
     } else {
       out[client] = v
     }
   }
-  // FK strings → local numeric ids
   if (spec.foreignKeys) {
     for (const fk of spec.foreignKeys) {
       const serverFk = row[fk.field]
       if (typeof serverFk === 'string' && serverFk.length > 0) {
-        const targetSpec = TABLES.find((t) => t.slug === fk.targetTable)
-        if (targetSpec) {
-          const targetRow = (await dexieTable(targetSpec).where('serverId').equals(serverFk).first()) as
-            | { id?: number }
-            | undefined
-          out[fk.field] = targetRow?.id ?? undefined
-        }
+        out[fk.field] = fkCache.get(fk.field)?.get(serverFk) ?? undefined
       } else if (typeof serverFk === 'number') {
         out[fk.field] = serverFk
       } else {
@@ -189,17 +242,20 @@ async function pushTable(spec: TableSpec): Promise<{ pushed: number; conflicts: 
     { rows: payload },
   )
 
-  // Clear dirty on rows the server accepted. For tombstoned rows that pushed
-  // successfully, also remove from local Dexie.
+  // Batch-clear dirty flags and delete tombstones in one transaction
   const written = new Set(res.written)
+  const toDelete: number[] = []
+  const toClearDirty: number[] = []
   for (const row of dirty) {
-    const sid = row.serverId as string
-    if (!written.has(sid)) continue
-    if (row.deletedAtSync) {
-      await table.delete(row.id!)
-    } else {
-      await tablePutSyncFields(spec, row.id!, { dirty: 0 })
-    }
+    if (!written.has(row.serverId as string)) continue
+    if (row.deletedAtSync) toDelete.push(row.id!)
+    else                   toClearDirty.push(row.id!)
+  }
+  if (toDelete.length || toClearDirty.length) {
+    await db.transaction('rw', table, async () => {
+      if (toDelete.length) await (table as unknown as { bulkDelete: (ids: number[]) => Promise<void> }).bulkDelete(toDelete)
+      await Promise.all(toClearDirty.map((id) => dexieTable(spec).update(id, { dirty: 0 })))
+    })
   }
   return { pushed: res.written.length, conflicts: res.conflicts.length }
 }
