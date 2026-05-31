@@ -157,6 +157,22 @@ const CATALOG: Array<MarkerMeta & { aliases: string[] }> = [
     aliases: ['total cholesterol', 'cholesterol total'],
     optimal: { high: 200 },
   },
+  {
+    key: 'non_hdl',
+    label: 'Non-HDL Cholesterol',
+    panel: 'Lipids',
+    unit: 'mmol/L',
+    aliases: ['non-hdl cholesterol', 'non hdl cholesterol', 'non hdl', 'nonhdl'],
+    optimal: { high: 3.37 },
+  },
+  {
+    key: 'tc_hdl_ratio',
+    label: 'TC/HDL Ratio',
+    panel: 'Lipids',
+    unit: '',
+    aliases: ['total cholesterol / hdl ratio', 'tc/hdl ratio', 'tc hdl ratio', 'cholesterol/hdl ratio'],
+    optimal: { high: 4 },
+  },
 
   // ── Metabolic ──────────────────────────────────────────────────────────────
   {
@@ -253,6 +269,15 @@ const CATALOG: Array<MarkerMeta & { aliases: string[] }> = [
     panel: 'Liver',
     unit: 'U/L',
     aliases: ['ggt', 'gamma-gt', 'gamma gt'],
+  },
+
+  {
+    key: 'creatine_kinase',
+    label: 'Creatine Kinase',
+    panel: 'Liver',
+    unit: 'U/L',
+    aliases: ['creatine kinase', 'ck', 'cpk', 'creatine phosphokinase'],
+    optimal: { high: 200 },
   },
 
   // ── Thyroid ────────────────────────────────────────────────────────────────

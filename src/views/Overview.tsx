@@ -50,7 +50,7 @@ export function Overview({
   const weightSeries = buildWeightDoseSeries(compounds, injections)
   const weightStats = weightSummary(weightSeries)
   const labFlags = flagLatestResults(results)
-  const latestExam = exams[0]
+  void labFlags // kept for future use
   const latestBp = vitals[0]
 
   // HCT alert — hematocrit > 52% is a safety flag for TRT users
@@ -156,12 +156,12 @@ export function Overview({
         </section>
       )}
 
-      {/* ── 1. Status stat cards + site rotation ── */}
-      <section className="surface col-8">
+      {/* ── 1. Status stat cards ── */}
+      <section className="surface col-4">
         <div className="panel-header">
           <div><span className="section-label">Now</span><h3>Status</h3></div>
         </div>
-        <div className="stat-grid">
+        <div className="stat-grid" style={{ gridTemplateColumns: '1fr' }}>
           <StatCard
             label="BP"
             value={latestBp ? `${latestBp.systolic}/${latestBp.diastolic}` : '—'}
@@ -196,17 +196,11 @@ export function Overview({
                 : weightStats.delta !== undefined && weightStats.delta < 0 ? 'good' : undefined
             }
           />
-          <StatCard
-            label="Flags"
-            value={String(labFlags.length)}
-            detail={latestExam ? `Latest ${format(parseISO(latestExam.collectedAt), 'MMM d')}` : 'No exams'}
-            tone={labFlags.length ? 'warn' : undefined}
-          />
         </div>
       </section>
 
-      {/* ── 1b. Site rotation — same row as status ── */}
-      <section className="surface col-4">
+      {/* ── 1b. Site rotation — larger now that Flags card is gone ── */}
+      <section className="surface col-8">
         <SiteRotation injections={injections} recentSites={[]} />
       </section>
 

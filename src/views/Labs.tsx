@@ -15,6 +15,7 @@ import { extractMarkersFromText, type ExtractedMarker } from '../lib/pdf'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
 import { EmptyState } from '../components/EmptyState'
+import { LabComposites } from '../components/LabComposites'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -468,6 +469,9 @@ export function Labs({
           </div>
         </section>
       )}
+
+      {/* ── Health composites ── */}
+      {hasData && <LabComposites results={results} exams={exams} />}
 
       {/* ── No data empty state ── */}
       {!hasData && (
