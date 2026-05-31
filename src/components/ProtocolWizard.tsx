@@ -1,26 +1,19 @@
+/**
+ * ProtocolWizard — simplified single-screen form.
+ *
+ * Creates (or edits) a compound + protocol in one step.
+ * No vials, no multi-step pagination.
+ */
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight, Plus, Search, X } from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 import { db, type Compound, type Protocol, type ProtocolCadence, type TestosteroneEster, type Unit } from '../lib/db'
 import { esterProfiles } from '../lib/insights'
 import { PK_COMPOUND_NAMES, formsForCompound } from '../lib/pk'
 
 const UNITS: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const COMPOUND_COLORS = ['#0f766e', '#6366f1', '#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6']
-const ESTER_OPTIONS: TestosteroneEster[] = ['Enanthate', 'Cypionate', 'Propionate', 'Undecanoate', 'Custom']
-
-// Mapping of PK compound name → default unit
-const COMPOUND_DEFAULT_UNIT: Record<string, Unit> = {
-  'Anadrol': 'mg', 'Anavar': 'mg', 'Arimidex': 'mg', 'Aromasin': 'mg',
-  'Boldenone': 'mg', 'Dianabol': 'mg', 'Halotestin': 'mg',
-  'Masteron': 'mg', 'Nandrolone': 'mg', 'Primobolan': 'mg',
-  'Superdrol': 'mg', 'Testosterone': 'mg', 'Trenbolone': 'mg',
-  'Trestolone (MENT)': 'mg', 'Turinabol': 'mg', 'Winstrol': 'mg',
-}
-
-type Step = 'compound' | 'protocol' | 'vial'
-const STEPS: Step[] = ['compound', 'protocol', 'vial']
-const STEP_LABELS: Record<Step, string> = { compound: 'Compound', protocol: 'Protocol', vial: 'Vial' }
+const COLORS = ['#0891b2', '#6366f1', '#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#0f766e', '#d97706']
+const ESTERS: TestosteroneEster[] = ['Enanthate', 'Cypionate', 'Propionate', 'Undecanoate', 'Custom']
 
 export function ProtocolWizard({
   open,
@@ -33,458 +26,426 @@ export function ProtocolWizard({
   compounds: Compound[]
   editProtocol?: Protocol & { id: number }
 }) {
-  const isEditMode = editProtocol !== undefined
-  const [step, setStep] = useState<Step>('compound')
-  const [showAddCompound, setShowAddCompound] = useState(false)
+  const isEdit = !!editProtocol
 
-  // Preset search
-  const [presetQuery, setPresetQuery] = useState('')
-  const [presetForm, setPresetForm] = useState('')
+  // Compound
+  const [compoundMode, setCompoundMode] = useState<'existing' | 'new'>('existing')
+  const [selectedCompoundId, setSelectedCompoundId] = useState('')
+  const [presetQuery, setPresetQuery]   = useState('')
+  const [presetForm, setPresetForm]     = useState('')
+  const [cName, setCName]       = useState('')
+  const [cEster, setCEster]     = useState<TestosteroneEster>('Enanthate')
+  const [cColor, setCColor]     = useState(COLORS[0])
+  const [cCategory, setCCategory] = useState<Compound['category']>('TRT')
+
   const filteredPresets = useMemo(() => {
     if (!presetQuery.trim()) return []
     const q = presetQuery.toLowerCase()
-    return PK_COMPOUND_NAMES.filter((n) => n.toLowerCase().includes(q)).slice(0, 8)
+    return PK_COMPOUND_NAMES.filter(n => n.toLowerCase().includes(q)).slice(0, 6)
   }, [presetQuery])
 
-  // Compound fields
-  const [cName, setCName] = useState('')
-  const [cCategory, setCCategory] = useState<Compound['category']>('TRT')
-  const [cUnit, setCUnit] = useState<Unit>('mg')
-  const [cColor, setCColor] = useState(COMPOUND_COLORS[0])
-  const [cEster, setCEster] = useState<TestosteroneEster>('Enanthate')
-  const [cDefaultDose, setCDefaultDose] = useState('')
+  const formOptions = useMemo(() => {
+    if (!cName) return []
+    return formsForCompound(cName)
+  }, [cName])
 
-  // Protocol fields
-  const [pCompoundId, setPCompoundId] = useState<string>('')
-  const [pName, setPName] = useState('')
-  const [pDose, setPDose] = useState('')
-  const [pUnit, setPUnit] = useState<Unit>('mg')
-  const [pKind, setPKind] = useState<ProtocolCadence['kind']>('everyNDays')
-  const [pN, setPN] = useState('3.5')
-  const [pDow, setPDow] = useState<number[]>([1, 4])
-  const [pTime, setPTime] = useState('09:00')
+  // Protocol
+  const [pName,  setPName]  = useState('')
+  const [pDose,  setPDose]  = useState('')
+  const [pUnit,  setPUnit]  = useState<Unit>('mg')
+  const [pKind,  setPKind]  = useState<ProtocolCadence['kind']>('everyNDays')
+  const [pN,     setPN]     = useState('3.5')
+  const [pDow,   setPDow]   = useState<number[]>([1, 4])
+  const [pTime,  setPTime]  = useState('09:00')
   const [pPhase, setPPhase] = useState<Protocol['phase']>('Maintenance')
-  const [savedCompoundId, setSavedCompoundId] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
 
-  // Vial fields
-  const [vLabel, setVLabel] = useState('Vial #1')
-  const [vTotalMl, setVTotalMl] = useState('')
-  const [vConc, setVConc] = useState('')
-  const [savedProtocolCompoundId, setSavedProtocolCompoundId] = useState<number | null>(null)
-
-  // Reset when opening
+  // Init / reset
   useEffect(() => {
-    if (open) {
-      if (editProtocol) {
-        // Edit mode: pre-fill from existing protocol
-        setStep('protocol')
-        setShowAddCompound(false)
-        setPCompoundId(String(editProtocol.compoundId))
-        setPName(editProtocol.name)
-        setPDose(String(editProtocol.dose))
-        setPUnit(editProtocol.unit)
-        setPPhase(editProtocol.phase ?? 'Maintenance')
-        const cad = editProtocol.cadence
-        setPKind(cad.kind)
-        if (cad.kind === 'everyNDays') setPN(String(cad.n))
-        if (cad.kind === 'weekly') setPDow(cad.daysOfWeek)
-        if (cad.kind === 'everyNDays' || cad.kind === 'weekly') setPTime(cad.timeOfDay ?? '09:00')
-        if (cad.kind === 'daily') setPTime(cad.timesOfDay?.[0] ?? '09:00')
-        setSavedCompoundId(null)
-        setSavedProtocolCompoundId(null)
-      } else {
-        setStep('compound')
-        setShowAddCompound(compounds.length === 0)
-        setSavedCompoundId(null)
-        setSavedProtocolCompoundId(null)
-        setCName(''); setCDefaultDose('')
-        setPresetQuery(''); setPresetForm('')
-        setPCompoundId(''); setPName(''); setPDose('')
-        setVLabel('Vial #1'); setVTotalMl(''); setVConc('')
-      }
+    if (!open) return
+    if (isEdit && editProtocol) {
+      setCompoundMode('existing')
+      setSelectedCompoundId(String(editProtocol.compoundId))
+      setPName(editProtocol.name)
+      setPDose(String(editProtocol.dose))
+      setPUnit(editProtocol.unit)
+      setPPhase(editProtocol.phase ?? 'Maintenance')
+      const cad = editProtocol.cadence
+      setPKind(cad.kind)
+      if (cad.kind === 'everyNDays') setPN(String(cad.n))
+      if (cad.kind === 'weekly')     setPDow(cad.daysOfWeek)
+      if ((cad.kind === 'everyNDays' || cad.kind === 'weekly')) setPTime(cad.timeOfDay ?? '09:00')
+      if (cad.kind === 'daily') setPTime(cad.timesOfDay?.[0] ?? '09:00')
+    } else {
+      setCompoundMode(compounds.length === 0 ? 'new' : 'existing')
+      setSelectedCompoundId('')
+      setCName(''); setCEster('Enanthate'); setCColor(COLORS[0]); setCCategory('TRT')
+      setPresetQuery(''); setPresetForm('')
+      setPName(''); setPDose(''); setPUnit('mg')
+      setPKind('everyNDays'); setPN('3.5'); setPDow([1, 4]); setPTime('09:00')
+      setPPhase('Maintenance')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editProtocol?.id, compounds.length])
+  }, [open, editProtocol?.id])
 
   // Escape key
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
   }, [open, onClose])
 
   if (!open) return null
 
-  const isTRT = cCategory === 'TRT' || (
-    compounds.find((c) => c.id === Number(pCompoundId))?.category === 'TRT'
+  const selectedCompound = compounds.find(c => String(c.id) === selectedCompoundId)
+  const isTRT = compoundMode === 'new'
+    ? cCategory === 'TRT'
+    : selectedCompound?.category === 'TRT'
+
+  const canSave = pDose && (
+    (compoundMode === 'existing' && selectedCompoundId) ||
+    (compoundMode === 'new' && cName)
   )
 
-  const effectivePCompoundId = pCompoundId || (savedCompoundId ? String(savedCompoundId) : '')
-  const stepIndex = STEPS.indexOf(step)
+  async function save() {
+    if (!canSave || saving) return
+    setSaving(true)
+    try {
+      let compoundId: number
+      if (compoundMode === 'new') {
+        const detectedEster = ESTERS.find(e => presetForm.toLowerCase().includes(e.toLowerCase()))
+        const effectiveEster = detectedEster ?? cEster
+        compoundId = await db.compounds.add({
+          name: cName,
+          category: cCategory,
+          defaultDose: Number(pDose) || 100,
+          unit: pUnit,
+          color: cColor,
+          schedule: '',
+          ester: isTRT ? effectiveEster : undefined,
+          halfLifeDays: isTRT ? esterProfiles[effectiveEster]?.halfLifeDays : undefined,
+          peakHours:    isTRT ? esterProfiles[effectiveEster]?.peakHours    : undefined,
+        })
+      } else {
+        compoundId = Number(selectedCompoundId)
+      }
 
-  async function saveCompound() {
-    if (!cName) return
-    // If a preset form was chosen and it looks like an ester, match it
-    const detectedEster = ESTER_OPTIONS.find((e) => presetForm.toLowerCase().includes(e.toLowerCase()))
-    const effectiveEster = detectedEster ?? cEster
-    const id = await db.compounds.add({
-      name: cName,
-      category: cCategory,
-      defaultDose: Number(cDefaultDose) || 100,
-      unit: cUnit,
-      color: cColor,
-      schedule: '',
-      ester: isTRT ? effectiveEster : undefined,
-      halfLifeDays: isTRT ? esterProfiles[effectiveEster]?.halfLifeDays : undefined,
-      peakHours: isTRT ? esterProfiles[effectiveEster]?.peakHours : undefined,
-    })
-    setSavedCompoundId(id)
-    setPCompoundId(String(id))
-    setPDose(cDefaultDose)
-    setPUnit(cUnit)
-    setPName(`${cName} protocol`)
-    setStep('protocol')
-    setShowAddCompound(false)
-    setCName(''); setCDefaultDose('')
-  }
+      let cadence: ProtocolCadence
+      if      (pKind === 'everyNDays') cadence = { kind: 'everyNDays', n: Number(pN) || 1, timeOfDay: pTime }
+      else if (pKind === 'weekly')     cadence = { kind: 'weekly', daysOfWeek: pDow, timeOfDay: pTime }
+      else if (pKind === 'daily')      cadence = { kind: 'daily', timesOfDay: [pTime] }
+      else                             cadence = { kind: 'asNeeded' }
 
-  async function saveProtocol() {
-    const cid = Number(pCompoundId) || savedCompoundId
-    if (!cid || !pDose) return
-    let cadence: ProtocolCadence
-    if (pKind === 'everyNDays') cadence = { kind: pKind, n: Number(pN) || 1, timeOfDay: pTime }
-    else if (pKind === 'weekly') cadence = { kind: pKind, daysOfWeek: pDow, timeOfDay: pTime }
-    else if (pKind === 'daily') cadence = { kind: pKind, timesOfDay: [pTime] }
-    else cadence = { kind: 'asNeeded' }
-    const data = {
-      name: pName || `${compounds.find((c) => c.id === cid)?.name ?? ''} protocol`,
-      compoundId: cid,
-      dose: Number(pDose),
-      unit: pUnit,
-      cadence,
-      phase: pPhase,
-    }
-    if (isEditMode && editProtocol.id) {
-      await db.protocols.update(editProtocol.id, data)
+      const name = pName.trim() || (
+        compoundMode === 'new' ? `${cName}` : `${selectedCompound?.name ?? ''}`
+      )
+      const proto = { name, compoundId, dose: Number(pDose), unit: pUnit, cadence, phase: pPhase }
+
+      if (isEdit && editProtocol.id) {
+        await db.protocols.update(editProtocol.id, proto)
+      } else {
+        await db.protocols.add({ ...proto, startedAt: new Date().toISOString() })
+      }
       onClose()
-    } else {
-      await db.protocols.add({ ...data, startedAt: new Date().toISOString() })
-      setSavedProtocolCompoundId(cid)
-      setStep('vial')
-      setPName(''); setPDose('')
+    } finally {
+      setSaving(false)
     }
-  }
-
-  async function saveVial() {
-    const cid = Number(pCompoundId) || savedCompoundId || savedProtocolCompoundId
-    if (!cid || !vTotalMl) return
-    await db.vials.add({
-      compoundId: cid,
-      label: vLabel || 'Vial #1',
-      totalMl: Number(vTotalMl),
-      remainingMl: Number(vTotalMl),
-      concentrationMgPerMl: Number(vConc) || undefined,
-      openedAt: new Date().toISOString(),
-    })
-    onClose()
   }
 
   return (
     <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 50,
-        background: 'rgba(10,10,10,0.45)', backdropFilter: 'blur(3px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
-      }}
+      style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      role="dialog"
-      aria-modal
     >
       <div style={{
         background: 'var(--surface)',
-        borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-lg)',
-        width: '100%', maxWidth: 480,
-        maxHeight: '90dvh',
-        display: 'flex', flexDirection: 'column',
-        overflow: 'hidden',
+        borderRadius: '20px 20px 0 0',
+        width: '100%',
+        maxWidth: 560,
+        maxHeight: '92vh',
+        overflowY: 'auto',
+        padding: '0 0 env(safe-area-inset-bottom, 20px)',
       }}>
+        {/* Handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--line)' }} />
+        </div>
+
         {/* Header */}
-        <div style={{ padding: '22px 24px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div>
-            <span className="section-label">{isEditMode ? 'Edit protocol' : 'New protocol'}</span>
-            <h3 style={{ margin: 0 }}>
-              {STEP_LABELS[step]}
-              {!isEditMode && (
-                <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-dim)', marginLeft: 8 }}>
-                  Step {stepIndex + 1} of 3
-                </span>
-              )}
-            </h3>
-          </div>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 16px' }}>
+          <h3 style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.01 }}>
+            {isEdit ? 'Edit protocol' : 'New protocol'}
+          </h3>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
+            <X size={16} />
+          </button>
         </div>
 
-        {/* Step dots */}
-        <div style={{ display: 'flex', gap: 6, padding: '12px 24px 0', alignItems: 'center' }}>
-          {STEPS.map((s, i) => (
-            <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: i <= stepIndex ? 'var(--accent)' : 'var(--line)',
-                transition: 'background 200ms',
-              }} />
-              {i < STEPS.length - 1 && (
-                <div style={{ width: 20, height: 2, background: i < stepIndex ? 'var(--accent)' : 'var(--line)', borderRadius: 1 }} />
-              )}
-            </div>
-          ))}
-          <span style={{ fontSize: 11, color: 'var(--ink-mute)', marginLeft: 4 }}>
-            {STEP_LABELS[step]}
-          </span>
-        </div>
+        <div style={{ padding: '0 20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* Body */}
-        <div style={{ overflowY: 'auto', padding: '20px 24px 28px' }}>
-
-          {/* ── Step 1: Compound ── */}
-          {step === 'compound' && (
-            <div className="form-grid">
-              {!showAddCompound && compounds.length > 0 ? (
-                <>
-                  <p className="panel-note wide-field">
-                    You have {compounds.length} compound{compounds.length !== 1 ? 's' : ''} set up.
-                    Jump to protocol or add a new compound.
-                  </p>
-                  <button type="button" className="ghost-button wide-field" onClick={() => setShowAddCompound(true)}>
-                    <Plus size={14} /> Add new compound
-                  </button>
-                  <button type="button" className="primary-button wide-field" onClick={() => setStep('protocol')} style={{ justifyContent: 'center' }}>
-                    Use existing compound <ChevronRight size={14} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  {/* Preset search */}
-                  <div className="wide-field" style={{ position: 'relative' }}>
-                    <label>
-                      Quick-start from library
-                      <div style={{ position: 'relative', marginTop: 4 }}>
-                        <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-mute)', pointerEvents: 'none' }} />
-                        <input
-                          value={presetQuery}
-                          onChange={(e) => setPresetQuery(e.target.value)}
-                          placeholder="Search Testosterone, Nandrolone…"
-                          style={{ paddingLeft: 30 }}
-                        />
-                      </div>
-                    </label>
-                    {filteredPresets.length > 0 && (
-                      <div style={{
-                        border: '1px solid var(--line)', borderRadius: 'var(--radius)', background: 'var(--surface)',
-                        boxShadow: 'var(--shadow-lg)', marginTop: 4, overflow: 'hidden',
-                      }}>
-                        {filteredPresets.map((name) => {
-                          const forms = formsForCompound(name).filter(Boolean)
-                          return (
-                            <button
-                              key={name}
-                              type="button"
-                              style={{
-                                display: 'block', width: '100%', textAlign: 'left',
-                                padding: '8px 12px', background: 'none', border: 'none',
-                                borderBottom: '1px solid var(--line)', cursor: 'pointer',
-                                color: 'var(--ink)', fontSize: 13,
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-2)')}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                              onClick={() => {
-                                setCName(name + (forms.length === 1 && forms[0] ? ` ${forms[0]}` : ''))
-                                setCCategory(name === 'Testosterone' ? 'TRT' : 'Other')
-                                setCUnit(COMPOUND_DEFAULT_UNIT[name] ?? 'mg')
-                                if (forms.length === 1 && forms[0]) setPresetForm(forms[0])
-                                setPresetQuery('')
-                              }}
-                            >
-                              <span style={{ fontWeight: 500 }}>{name}</span>
-                              {forms.filter(Boolean).length > 0 && (
-                                <span style={{ color: 'var(--ink-mute)', fontSize: 11, marginLeft: 8 }}>
-                                  {forms.filter(Boolean).join(' · ')}
-                                </span>
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  <label className="wide-field">
-                    Name
-                    <input value={cName} onChange={(e) => setCName(e.target.value)} placeholder="Testosterone Enanthate" autoFocus />
-                  </label>
-                  <label>
-                    Category
-                    <select value={cCategory} onChange={(e) => setCCategory(e.target.value as Compound['category'])}>
-                      {['TRT', 'Peptide', 'Ancillary', 'Supplement', 'Other'].map((c) => <option key={c}>{c}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    Default dose
-                    <input inputMode="decimal" value={cDefaultDose} onChange={(e) => setCDefaultDose(e.target.value)} placeholder="100" />
-                  </label>
-                  <label>
-                    Unit
-                    <select value={cUnit} onChange={(e) => setCUnit(e.target.value as Unit)}>
-                      {UNITS.map((u) => <option key={u}>{u}</option>)}
-                    </select>
-                  </label>
-                  {cCategory === 'TRT' && (
-                    <label className="wide-field">
-                      Ester
-                      <select value={cEster} onChange={(e) => setCEster(e.target.value as TestosteroneEster)}>
-                        {ESTER_OPTIONS.map((e) => <option key={e}>{e}</option>)}
-                      </select>
-                    </label>
-                  )}
-                  <label className="wide-field">
-                    Colour
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-                      {COMPOUND_COLORS.map((col) => (
-                        <button key={col} type="button" onClick={() => setCColor(col)} style={{
-                          width: 24, height: 24, borderRadius: '50%', background: col, border: 'none',
-                          outline: cColor === col ? `2px solid ${col}` : 'none',
-                          outlineOffset: 2, cursor: 'pointer',
-                        }} />
-                      ))}
-                    </div>
-                  </label>
-                  <div style={{ display: 'flex', gap: 8 }} className="wide-field">
-                    <button type="button" className="primary-button" onClick={saveCompound} disabled={!cName} style={{ flex: 1, justifyContent: 'center' }}>
-                      Save &amp; next <ChevronRight size={14} />
-                    </button>
-                    {compounds.length > 0 && (
-                      <button type="button" className="ghost-button" onClick={() => { setShowAddCompound(false) }}>
-                        <X size={13} /> Cancel
+          {/* ── Compound section ── */}
+          {!isEdit && (
+            <section>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Compound</span>
+                {compounds.length > 0 && (
+                  <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 2, gap: 1 }}>
+                    {(['existing', 'new'] as const).map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setCompoundMode(m)}
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          background: compoundMode === m ? 'var(--surface)' : 'transparent',
+                          color: compoundMode === m ? 'var(--ink)' : 'var(--ink-mute)',
+                          boxShadow: compoundMode === m ? 'var(--shadow-sm)' : 'none',
+                        }}
+                      >
+                        {m === 'existing' ? 'Existing' : 'New'}
                       </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ── Step 2: Protocol ── */}
-          {step === 'protocol' && (
-            <div className="form-grid">
-              <label>
-                Compound
-                <select value={effectivePCompoundId} onChange={(e) => {
-                  setPCompoundId(e.target.value)
-                  const c = compounds.find((x) => String(x.id) === e.target.value)
-                  if (c) { setPDose(String(c.defaultDose)); setPUnit(c.unit) }
-                }}>
-                  <option value="">Select compound…</option>
-                  {compounds.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </label>
-              <label>
-                Protocol name
-                <input value={pName} onChange={(e) => setPName(e.target.value)} placeholder="TestE cruise" />
-              </label>
-              <label>
-                Dose
-                <input inputMode="decimal" value={pDose} onChange={(e) => setPDose(e.target.value)} />
-              </label>
-              <label>
-                Unit
-                <select value={pUnit} onChange={(e) => setPUnit(e.target.value as Unit)}>
-                  {UNITS.map((u) => <option key={u}>{u}</option>)}
-                </select>
-              </label>
-              <label>
-                Phase
-                <select value={pPhase} onChange={(e) => setPPhase(e.target.value as Protocol['phase'])}>
-                  {['Blast', 'Cruise', 'Maintenance', 'PCT', 'Bridge', 'Trial'].map((p) => <option key={p}>{p}</option>)}
-                </select>
-              </label>
-              <label className="wide-field">
-                Cadence
-                <select value={pKind} onChange={(e) => setPKind(e.target.value as ProtocolCadence['kind'])}>
-                  <option value="everyNDays">Every N days</option>
-                  <option value="weekly">Days of week</option>
-                  <option value="daily">Daily at fixed time</option>
-                  <option value="asNeeded">As needed</option>
-                </select>
-              </label>
-              {pKind === 'everyNDays' && (
-                <label>
-                  Every N days
-                  <input inputMode="decimal" value={pN} onChange={(e) => setPN(e.target.value)} />
-                </label>
-              )}
-              {pKind === 'weekly' && (
-                <label className="wide-field">
-                  Days of week
-                  <div className="chip-row" style={{ marginTop: 4 }}>
-                    {DOW.map((d, i) => (
-                      <button type="button" key={d} className={pDow.includes(i) ? 'chip active' : 'chip'}
-                        onClick={() => setPDow((cur) => cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i].sort())}
-                      >{d}</button>
                     ))}
                   </div>
-                </label>
-              )}
-              {pKind !== 'asNeeded' && (
-                <label>
-                  Time
-                  <input type="time" value={pTime} onChange={(e) => setPTime(e.target.value)} />
-                </label>
-              )}
-              <div style={{ display: 'flex', gap: 8 }} className="wide-field">
-                {!isEditMode && (
-                  <button type="button" className="ghost-button" onClick={() => setStep('compound')}>
-                    ← Back
-                  </button>
                 )}
-                <button type="button" className="primary-button" onClick={saveProtocol} disabled={!pDose || !effectivePCompoundId} style={{ flex: 1, justifyContent: 'center' }}>
-                  {isEditMode ? 'Save changes' : (<>Save &amp; next <ChevronRight size={14} /></>)}
-                </button>
               </div>
-            </div>
+
+              {compoundMode === 'existing' ? (
+                <select
+                  value={selectedCompoundId}
+                  onChange={e => {
+                    setSelectedCompoundId(e.target.value)
+                    const c = compounds.find(x => String(x.id) === e.target.value)
+                    if (c && !pDose) { setPDose(String(c.defaultDose)); setPUnit(c.unit) }
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">Select compound…</option>
+                  {compounds.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.ester ? ` (${c.ester})` : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* Preset search */}
+                  <div style={{ position: 'relative' }}>
+                    <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-mute)', pointerEvents: 'none' }} />
+                    <input
+                      value={presetQuery}
+                      onChange={e => { setPresetQuery(e.target.value); if (!e.target.value) setPresetForm('') }}
+                      placeholder="Search compound (e.g. Testosterone)…"
+                      style={{ paddingLeft: 34, width: '100%' }}
+                    />
+                    {filteredPresets.length > 0 && (
+                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, marginTop: 4, overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
+                        {filteredPresets.map(name => (
+                          <button
+                            key={name}
+                            type="button"
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 14, fontWeight: 500, color: 'var(--ink)', borderBottom: '1px solid var(--line)' }}
+                            onClick={() => {
+                              setCName(name)
+                              setPresetQuery(name)
+                              setPresetForm('')
+                              if (filteredPresets.length) setPresetQuery('')
+                              // Clear dropdown
+                              setTimeout(() => setPresetQuery(''), 0)
+                              const forms = formsForCompound(name)
+                              if (forms.length === 1) setPresetForm(forms[0])
+                            }}
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Manual name if no preset selected */}
+                  {!filteredPresets.length && (
+                    <input
+                      value={cName}
+                      onChange={e => setCName(e.target.value)}
+                      placeholder="Compound name"
+                      style={{ width: '100%' }}
+                    />
+                  )}
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Category</span>
+                      <select value={cCategory} onChange={e => setCCategory(e.target.value as Compound['category'])}>
+                        {(['TRT', 'Ancillary', 'Peptide', 'Supplement', 'Other'] as Compound['category'][]).map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {isTRT && formOptions.length > 0 && (
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Ester</span>
+                        <select value={presetForm || cEster} onChange={e => { setPresetForm(e.target.value); setCEster(e.target.value as TestosteroneEster) }}>
+                          {formOptions.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    {isTRT && formOptions.length === 0 && (
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Ester</span>
+                        <select value={cEster} onChange={e => setCEster(e.target.value as TestosteroneEster)}>
+                          {ESTERS.map(e => <option key={e}>{e}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Color swatches */}
+                  <div>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', display: 'block', marginBottom: 8 }}>Colour</span>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {COLORS.map(c => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setCColor(c)}
+                          aria-label={c}
+                          style={{
+                            width: 28, height: 28, borderRadius: '50%', background: c, flexShrink: 0,
+                            outline: cColor === c ? `3px solid ${c}` : 'none',
+                            outlineOffset: 2,
+                            boxShadow: cColor === c ? `0 0 0 2px var(--surface), 0 0 0 4px ${c}` : 'none',
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </section>
           )}
 
-          {/* ── Step 3: Vial ── */}
-          {step === 'vial' && (
-            <div className="form-grid">
-              <p className="panel-note wide-field">
-                Protocol saved. Optionally add a vial to track volume and get run-out estimates.
-              </p>
-              <label>
-                Label
-                <input value={vLabel} onChange={(e) => setVLabel(e.target.value)} placeholder="Vial #1" />
-              </label>
-              <label>
-                Total mL
-                <input inputMode="decimal" value={vTotalMl} onChange={(e) => setVTotalMl(e.target.value)} placeholder="10" />
-              </label>
-              <label>
-                Concentration (mg/mL)
-                <input inputMode="decimal" value={vConc} onChange={(e) => setVConc(e.target.value)} placeholder="200" />
-              </label>
-              <div style={{ display: 'flex', gap: 8 }} className="wide-field">
-                <button type="button" className="ghost-button" onClick={onClose}>
-                  Skip
-                </button>
-                <button type="button" className="primary-button" onClick={saveVial} disabled={!vTotalMl} style={{ flex: 1, justifyContent: 'center' }}>
-                  <Plus size={14} /> Create
-                </button>
+          {/* ── Schedule section ── */}
+          <section>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-dim)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 10 }}>
+              Schedule
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* Dose row */}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Dose</span>
+                  <input inputMode="decimal" value={pDose} onChange={e => setPDose(e.target.value)} placeholder="200" />
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Unit</span>
+                  <select value={pUnit} onChange={e => setPUnit(e.target.value as Unit)}>
+                    {UNITS.map(u => <option key={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Phase</span>
+                  <select value={pPhase} onChange={e => setPPhase(e.target.value as Protocol['phase'])}>
+                    {['TRT', 'Blast', 'Cruise', 'PCT', 'Maintenance', 'Bridge', 'Trial'].map(p => <option key={p}>{p}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Frequency */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Frequency</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {([
+                    { kind: 'everyNDays', label: 'Every N days' },
+                    { kind: 'weekly',     label: 'Days of week' },
+                    { kind: 'daily',      label: 'Daily' },
+                    { kind: 'asNeeded',   label: 'As needed' },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.kind}
+                      type="button"
+                      onClick={() => setPKind(opt.kind)}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 10,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        textAlign: 'left',
+                        background: pKind === opt.kind ? 'var(--accent-soft)' : 'var(--surface-2)',
+                        color: pKind === opt.kind ? 'var(--accent)' : 'var(--ink-dim)',
+                        border: pKind === opt.kind ? '1.5px solid var(--accent)' : '1.5px solid transparent',
+                        transition: 'all 120ms',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Cadence detail */}
+                {pKind === 'everyNDays' && (
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
+                    <span style={{ fontSize: 13, color: 'var(--ink-dim)', whiteSpace: 'nowrap' }}>Every</span>
+                    <input inputMode="decimal" value={pN} onChange={e => setPN(e.target.value)} style={{ width: 72 }} />
+                    <span style={{ fontSize: 13, color: 'var(--ink-dim)', whiteSpace: 'nowrap' }}>days</span>
+                  </div>
+                )}
+                {pKind === 'weekly' && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                    {DOW.map((d, i) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setPDow(cur => cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i].sort())}
+                        style={{
+                          width: 40, height: 40,
+                          borderRadius: '50%',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          background: pDow.includes(i) ? 'var(--accent)' : 'var(--surface-2)',
+                          color: pDow.includes(i) ? '#fff' : 'var(--ink-dim)',
+                          transition: 'all 120ms',
+                        }}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {pKind !== 'asNeeded' && (
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
+                    <span style={{ fontSize: 13, color: 'var(--ink-dim)' }}>Time</span>
+                    <input type="time" value={pTime} onChange={e => setPTime(e.target.value)} style={{ width: 120 }} />
+                  </div>
+                )}
+              </div>
+
+              {/* Optional protocol name */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Label <span style={{ fontWeight: 400, color: 'var(--ink-mute)' }}>(optional)</span></span>
+                <input
+                  value={pName}
+                  onChange={e => setPName(e.target.value)}
+                  placeholder={compoundMode === 'new' ? cName || 'e.g. Test E 200mg' : selectedCompound?.name || 'e.g. Test E 200mg'}
+                />
               </div>
             </div>
-          )}
+          </section>
 
+          {/* Save */}
+          <button
+            type="button"
+            className="primary-button"
+            style={{ width: '100%', justifyContent: 'center', height: 50, fontSize: 16 }}
+            onClick={save}
+            disabled={!canSave || saving}
+          >
+            <Plus size={16} /> {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add protocol'}
+          </button>
         </div>
       </div>
     </div>

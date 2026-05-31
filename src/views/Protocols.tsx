@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTheme } from '../lib/useTheme'
 import {
-  Calendar, Droplet, Pencil, Plus, Syringe, Trash2, X,
+  Archive, Pencil, Plus, Syringe, Trash2, X,
 } from 'lucide-react'
 import { differenceInHours, format, parseISO, subDays } from 'date-fns'
 import {
@@ -14,14 +14,13 @@ import {
   type Compound,
   type InjectionLog,
   type Protocol,
-  type Vial,
 } from '../lib/db'
 import {
   buildWeightDoseSeries,
   weightSummary,
 } from '../lib/insights'
 import { describeCadence } from '../lib/schedule'
-import { deleteInjection, pickActiveVial } from '../lib/injections'
+import { deleteInjection } from '../lib/injections'
 import { findPKCompound, buildDailyReleaseCurve } from '../lib/pk'
 import { EmptyState } from '../components/EmptyState'
 import { SiteCombobox } from '../components/SiteCombobox'
@@ -42,7 +41,6 @@ export function Protocols({
   onEditProtocol: (p: Protocol & { id: number }) => void
 }) {
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
-  const vials = useLiveQuery(() => db.vials.toArray(), [], [])
 
   const activeProtocols = (protocols ?? []).filter((p) => !p.archived)
 
@@ -64,7 +62,6 @@ export function Protocols({
                 key={p.id}
                 protocol={p}
                 compounds={compounds}
-                vials={vials ?? []}
                 injections={injections}
                 onLog={onOpenQuickLog}
                 onEdit={p.id !== undefined ? () => onEditProtocol(p as Protocol & { id: number }) : undefined}
@@ -73,9 +70,9 @@ export function Protocols({
           </div>
         ) : (
           <div className="empty">
-            <Syringe size={16} />
+            <Syringe size={22} />
             <strong>No protocols yet</strong>
-            <span>Tap "Create protocol" to set up your first compound and schedule.</span>
+            <span>Set up your first compound and dose schedule.</span>
             <button type="button" className="primary-button" onClick={onOpenWizard}>
               <Plus size={14} /> Create protocol
             </button>
@@ -85,12 +82,7 @@ export function Protocols({
 
       {/* ── 2. RECENT DOSES ─────────────────────────────────────────────── */}
       <section className="surface col-12">
-        <RecentDoses injections={injections} compounds={compounds} vials={vials ?? []} />
-      </section>
-
-      {/* ── 3. VIALS & ARCHIVE ──────────────────────────────────────────── */}
-      <section className="surface col-12">
-        <ProtocolManage protocols={activeProtocols} compounds={compounds} vials={vials ?? []} />
+        <RecentDoses injections={injections} compounds={compounds} />
       </section>
 
     </div>
@@ -102,205 +94,62 @@ export function Protocols({
 function ProtocolQuickRow({
   protocol,
   compounds,
-  vials,
   injections,
   onLog,
   onEdit,
 }: {
   protocol: Protocol
   compounds: Compound[]
-  vials: Vial[]
   injections: InjectionLog[]
   onLog: (tab: 'injection', prefill?: import('../App').QuickLogPrefill) => void
   onEdit?: () => void
 }) {
   const compound = compounds.find((c) => c.id === protocol.compoundId)
-  const activeVial = compound ? pickActiveVial(vials, compound.id!) : undefined
   const lastInj = injections.find((i) => i.compoundId === protocol.compoundId)
   const hoursSince = lastInj ? differenceInHours(new Date(), parseISO(lastInj.takenAt)) : undefined
 
   const lastLabel = hoursSince !== undefined
-    ? hoursSince < 1 ? 'Just now'
+    ? hoursSince < 1  ? 'Just now'
     : hoursSince < 24 ? `${hoursSince}h ago`
     : `${Math.round(hoursSince / 24)}d ago`
     : 'Never'
-
-  const vialPct = activeVial ? (activeVial.remainingMl / Math.max(activeVial.totalMl, 0.001)) * 100 : 100
-  const vialTone = vialPct < 15 ? 'var(--bad)' : vialPct < 35 ? 'var(--warn)' : 'var(--good)'
 
   return (
     <div className="row protocol-quick-row">
       <span className="dot" style={{ background: compound?.color ?? 'var(--accent)', width: 10, height: 10 }} />
       <div>
         <strong style={{ fontSize: 13 }}>{protocol.name}</strong>
-        <span className="sub">{compound?.name} · {protocol.dose} {protocol.unit} · {describeCadence(protocol.cadence)}</span>
+        <span className="sub">
+          {compound?.name} · {protocol.dose} {protocol.unit} · {describeCadence(protocol.cadence)}
+        </span>
       </div>
-      {/* hide-mobile: phase chip hidden on narrow screens */}
-      <span className="chip hide-mobile">{protocol.phase ?? 'Active'}</span>
-      {/* last-logged: also hidden on mobile via CSS (.protocol-quick-row .last-logged) */}
+      {protocol.phase && <span className="chip hide-mobile">{protocol.phase}</span>}
       <span className="last-logged" style={{ fontSize: 11, color: hoursSince !== undefined && hoursSince < 24 ? 'var(--warn)' : 'var(--ink-mute)', whiteSpace: 'nowrap' }}>
         {lastLabel}
       </span>
-      {/* hide-mobile: vial mL hidden on narrow screens */}
-      {activeVial ? (
-        <span className="hide-mobile" style={{ fontSize: 11, color: vialTone, whiteSpace: 'nowrap' }}>
-          <Droplet size={10} style={{ verticalAlign: -1 }} /> {activeVial.remainingMl.toFixed(1)} mL
-        </span>
-      ) : (
-        <span className="hide-mobile" style={{ fontSize: 11, color: 'var(--ink-mute)' }}>No vial</span>
-      )}
       {onEdit && (
-        <button
-          type="button"
-          className="icon-button hide-mobile"
-          style={{ width: 28, height: 28 }}
-          onClick={onEdit}
-          aria-label="Edit protocol"
-          title="Edit protocol"
-        >
+        <button type="button" className="icon-button hide-mobile" style={{ width: 28, height: 28 }} onClick={onEdit} aria-label="Edit" title="Edit">
           <Pencil size={13} />
         </button>
       )}
       <button
         type="button"
+        className="icon-button hide-mobile"
+        style={{ width: 28, height: 28 }}
+        onClick={() => protocol.id !== undefined && db.protocols.update(protocol.id, { archived: true })}
+        aria-label="Archive"
+        title="Archive protocol"
+      >
+        <Archive size={13} />
+      </button>
+      <button
+        type="button"
         className="primary-button"
-        style={{ height: 28, fontSize: 11, padding: '0 12px', background: compound?.color ?? undefined, whiteSpace: 'nowrap' }}
+        style={{ height: 32, fontSize: 13, padding: '0 14px', background: compound?.color ?? undefined }}
         onClick={() => onLog('injection', { compoundId: protocol.compoundId, dose: protocol.dose, unit: protocol.unit, protocolId: protocol.id })}
       >
         Log
       </button>
-    </div>
-  )
-}
-
-// ── Protocol management — archive + vials ──────────────────────────────────
-
-function ProtocolManage({
-  protocols,
-  compounds,
-  vials,
-}: {
-  protocols: Protocol[]
-  compounds: Compound[]
-  vials: Vial[]
-}) {
-  const compoundMap = new Map(compounds.map((c) => [c.id, c]))
-  const [showAddVial, setShowAddVial] = useState<number | null>(null) // protocolId
-
-  if (protocols.length === 0) {
-    return (
-      <>
-        <div className="panel-header">
-          <div><span className="section-label">Manage</span><h3>Vials</h3></div>
-        </div>
-        <EmptyState icon={Calendar} title="No protocols yet" detail="Use the setup panel to add your first compound + protocol." />
-      </>
-    )
-  }
-
-  return (
-    <>
-      <div className="panel-header">
-        <div><span className="section-label">Manage</span><h3>Vials &amp; archive</h3></div>
-      </div>
-      <div className="stack">
-        {protocols.map((p) => {
-          const c = compoundMap.get(p.compoundId)
-          const protVials = vials.filter((v) => v.compoundId === p.compoundId && !v.archived)
-          return (
-            <div key={p.id} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {/* Protocol row */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span className="dot" style={{ background: c?.color ?? 'var(--accent)', flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <strong style={{ fontSize: 13 }}>{p.name}</strong>
-                  <span className="sub">{c?.name ?? '?'} · {p.dose} {p.unit} · {describeCadence(p.cadence)}</span>
-                </div>
-                {p.phase && <span className="chip" style={{ flexShrink: 0 }}>{p.phase}</span>}
-                <button
-                  type="button"
-                  className="ghost-button"
-                  style={{ height: 28, fontSize: 11, flexShrink: 0 }}
-                  onClick={() => db.protocols.update(p.id!, { archived: true })}
-                >
-                  Archive
-                </button>
-              </div>
-              {/* Vials */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 20 }}>
-                {protVials.map((v) => {
-                  const pct = (v.remainingMl / Math.max(v.totalMl, 0.001)) * 100
-                  const tone = pct < 15 ? 'bad' : pct < 35 ? 'warn' : 'good'
-                  return (
-                    <div key={v.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '6px 10px', borderRadius: 'var(--radius-sm)',
-                      background: 'var(--surface-2)', border: '1px solid var(--line)',
-                    }}>
-                      <Droplet size={12} style={{ color: `var(--${tone})`, flexShrink: 0 }} />
-                      <span style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{v.label}</span>
-                      <span style={{ fontSize: 12, color: 'var(--ink-dim)' }}>{v.remainingMl.toFixed(1)} / {v.totalMl} mL</span>
-                      {/* progress bar */}
-                      <div style={{ width: 48, height: 4, borderRadius: 2, background: 'var(--line)', flexShrink: 0, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${pct}%`, background: `var(--${tone})`, borderRadius: 2 }} />
-                      </div>
-                      <button
-                        type="button"
-                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--ink-mute)', lineHeight: 1, flexShrink: 0 }}
-                        onClick={() => db.vials.update(v.id!, { archived: true })}
-                        aria-label="Remove vial"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  )
-                })}
-                {showAddVial === p.id ? (
-                  <AddVialInline compoundId={p.compoundId} onDone={() => setShowAddVial(null)} />
-                ) : (
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    style={{ height: 30, fontSize: 12, alignSelf: 'flex-start' }}
-                    onClick={() => setShowAddVial(p.id!)}
-                  >
-                    <Plus size={11} /> Add vial
-                  </button>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </>
-  )
-}
-
-function AddVialInline({ compoundId, onDone }: { compoundId: number; onDone: () => void }) {
-  const [label, setLabel] = useState('')
-  const [totalMl, setTotalMl] = useState('')
-  const [conc, setConc] = useState('')
-
-  async function save() {
-    if (!totalMl) return
-    await db.vials.add({
-      compoundId,
-      label: label || 'Vial',
-      totalMl: Number(totalMl),
-      remainingMl: Number(totalMl),
-      concentrationMgPerMl: Number(conc) || undefined,
-      openedAt: new Date().toISOString(),
-    })
-    onDone()
-  }
-
-  return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
-      <input placeholder="Label" value={label} onChange={(e) => setLabel(e.target.value)} style={{ width: 80, height: 28, fontSize: 12 }} />
-      <input placeholder="mL" inputMode="decimal" value={totalMl} onChange={(e) => setTotalMl(e.target.value)} style={{ width: 60, height: 28, fontSize: 12 }} />
-      <input placeholder="mg/mL" inputMode="decimal" value={conc} onChange={(e) => setConc(e.target.value)} style={{ width: 70, height: 28, fontSize: 12 }} />
-      <button type="button" className="primary-button" style={{ height: 28, fontSize: 12 }} onClick={save} disabled={!totalMl}><Plus size={11} /></button>
-      <button type="button" className="ghost-button" style={{ height: 28, fontSize: 12 }} onClick={onDone}><X size={11} /></button>
     </div>
   )
 }
@@ -527,9 +376,8 @@ function RetaChart({ compounds, injections }: { compounds: Compound[]; injection
 
 // ── Recent doses ──────────────────────────────────────────────────────────
 
-function RecentDoses({ injections, compounds, vials }: { injections: InjectionLog[]; compounds: Compound[]; vials: Vial[] }) {
+function RecentDoses({ injections, compounds }: { injections: InjectionLog[]; compounds: Compound[] }) {
   const compoundMap = new Map(compounds.map((c) => [c.id, c]))
-  const vialMap = new Map(vials.map((v) => [v.id, v]))
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [editEntry, setEditEntry] = useState<InjectionLog | null>(null)
 
@@ -542,7 +390,7 @@ function RecentDoses({ injections, compounds, vials }: { injections: InjectionLo
     <>
       {confirmId !== null && (
         <ConfirmDialog
-          message="Delete this injection log? The vial volume will be restored."
+          message="Delete this injection log?"
           onConfirm={() => handleDelete(confirmId)}
           onCancel={() => setConfirmId(null)}
         />
@@ -564,7 +412,6 @@ function RecentDoses({ injections, compounds, vials }: { injections: InjectionLo
         <div className="stack">
           {injections.slice(0, 10).map((entry) => {
             const c = compoundMap.get(entry.compoundId)
-            const v = entry.vialId ? vialMap.get(entry.vialId) : undefined
             return (
               <div className="row" key={entry.id} style={{ gridTemplateColumns: 'auto minmax(0,1fr) auto auto auto' }}>
                 <span className="dot" style={{ background: c?.color ?? 'var(--accent)' }} />
@@ -573,7 +420,6 @@ function RecentDoses({ injections, compounds, vials }: { injections: InjectionLo
                   <span className="sub">
                     {entry.rawDose ?? `${entry.dose ?? ''} ${entry.unit}`}
                     {entry.site ? ` · ${entry.site}` : ''}
-                    {v ? ` · ${v.label}` : ''}
                     {entry.weightKg !== undefined ? ` · ${entry.weightKg} kg` : ''}
                     {entry.notes ? ` · ${entry.notes}` : ''}
                   </span>
