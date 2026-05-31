@@ -1236,15 +1236,19 @@ select {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 4px;
+  gap: 6px;
 }
 .mc-name {
   font-size: 12px;
   font-weight: 700;
   color: var(--ink);
   line-height: 1.25;
-  /* readable name, no uppercase so long names stay legible */
+  /* allow wrap so badge never gets pushed off */
+  min-width: 0;
+  flex: 1;
 }
+/* Badge stays at top-right, never shrinks */
+.mc-badge { flex-shrink: 0; }
 .mc-badge {
   font-size: 9px;
   font-weight: 700;
@@ -1351,67 +1355,69 @@ select {
 }
 
 /* ── Health composite cards ───────────────────────────────────────────── */
-.composite-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.composite-list { display: flex; flex-direction: column; gap: 5px; }
+
 .composite-card {
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--surface-2);
   overflow: hidden;
-  transition: border-color 120ms;
 }
-.composite-header {
-  display: grid;
-  grid-template-columns: 28px 1fr auto;
+
+/* Always-visible compact row */
+.composite-row {
+  display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
-  padding: 10px 14px;
-  text-align: left;
-  cursor: pointer;
+  padding: 9px 12px;
+  flex-wrap: wrap;
+}
+.composite-icon  { font-size: 15px; line-height: 1; flex-shrink: 0; }
+.composite-label { font-size: 12px; font-weight: 700; color: var(--ink); flex-shrink: 0; min-width: 100px; }
+
+/* Pill cluster */
+.composite-pills {
+  display: flex; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0;
+}
+.composite-pill {
+  display: flex; align-items: baseline; gap: 4px; font-size: 11px; font-weight: 600;
+  white-space: nowrap;
+}
+.composite-pill-label { color: var(--ink-mute); font-weight: 500; }
+.composite-pill-val   { font-family: var(--font-mono); }
+
+.composite-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 8px;
+  border-radius: 6px; flex-shrink: 0; white-space: nowrap;
+}
+.composite-toggle {
+  color: var(--ink-mute); display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
   transition: background 100ms;
 }
-.composite-header:hover { background: var(--surface-3); }
-.composite-icon { font-size: 16px; line-height: 1; }
-.composite-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.composite-label {
-  font-size: 12px; font-weight: 700; color: var(--ink);
-}
-.composite-headline {
-  font-size: 11px; color: var(--ink-dim);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.composite-badge {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.05em; padding: 3px 8px; border-radius: 6px;
-  flex-shrink: 0;
-}
+.composite-toggle:hover { background: var(--surface-3); }
+
+/* Expandable detail */
 .composite-detail {
-  padding: 8px 14px 12px 52px;
+  padding: 8px 12px 12px 12px;
   border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 8px;
 }
-.composite-note {
-  font-size: 12px; color: var(--ink-dim); line-height: 1.55;
-  margin: 0 0 8px;
+.composite-note { font-size: 12px; color: var(--ink-dim); line-height: 1.55; margin: 0; }
+
+.composite-rec {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px;
+  background: var(--accent-soft);
+  border-radius: 6px;
+  border-left: 2px solid var(--accent);
 }
-.composite-markers {
-  display: flex; flex-direction: column; gap: 4px;
-}
-.composite-marker-row {
-  display: grid; grid-template-columns: 80px 1fr 16px;
-  align-items: center; gap: 8px;
-  font-size: 12px;
-}
-.composite-marker-name { color: var(--ink-mute); font-weight: 600; }
-.composite-marker-val  { font-family: var(--font-mono); font-weight: 600; }
-.composite-marker-status { font-size: 11px; font-weight: 700; text-align: right; }
+.composite-rec-text   { font-size: 12px; color: var(--ink); line-height: 1.5; }
+.composite-rec-source { font-size: 10px; color: var(--ink-mute); font-style: italic; }
 
 @media (max-width: 760px) {
-  .composite-detail { padding-left: 14px; }
-  .composite-marker-row { grid-template-columns: 70px 1fr 16px; }
+  .composite-label { min-width: 80px; }
+  .composite-pills { gap: 6px; }
 }
 
 /* ── Marker history pane ───────────────────────────────────────────────── */

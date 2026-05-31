@@ -72,8 +72,13 @@ function MarkerCard({
   const latest  = summary.entries[0]
   const prev    = summary.entries[1]
   const val     = latest?.value
-  const status  = rangeStatus(val, summary.low, summary.high)
-  const pos     = val !== undefined ? rangePos(val, summary.low, summary.high) : null
+  // Use the LATEST entry's own confirmed range for the badge.
+  // This means: if latest test has no lab range → no HIGH/LOW badge.
+  // Never use summary-level catalog ranges for badges (avoids unit-mismatch false alarms).
+  const latestLow  = latest?.low
+  const latestHigh = latest?.high
+  const status  = rangeStatus(val, latestLow, latestHigh)
+  const pos     = val !== undefined ? rangePos(val, latestLow, latestHigh) : null
   const delta   = val !== undefined && prev?.value !== undefined ? val - prev.value : undefined
 
   return (
@@ -83,12 +88,12 @@ function MarkerCard({
       onClick={onClick}
       aria-pressed={selected}
     >
-      {/* Top row: name + status badge */}
+      {/* Top row: name + status badge — name truncates, badge never clips */}
       <div className="mc-top">
         <span className="mc-name">{summary.label}</span>
         {val !== undefined && status !== 'none' && (
           <span className={`mc-badge ${status}`}>
-            {status === 'good' ? 'OK' : val !== undefined && summary.high !== undefined && val > summary.high ? 'HIGH' : 'LOW'}
+            {status === 'good' ? 'OK' : latestHigh !== undefined && val !== undefined && val > latestHigh ? 'HIGH' : 'LOW'}
           </span>
         )}
       </div>
@@ -96,7 +101,7 @@ function MarkerCard({
       {/* Main value + delta */}
       <div className="mc-value-row">
         <span className="mc-value">
-          {val !== undefined ? latest.rawValue : '—'}
+          {val !== undefined ? (latest.rawValue || String(val)) : '—'}
         </span>
         {summary.unit && val !== undefined && (
           <span className="mc-unit">{summary.unit}</span>
@@ -116,10 +121,10 @@ function MarkerCard({
           <div className={`mc-range-dot ${status}`} style={{ left: `${pos * 100}%` }} />
         </div>
       )}
-      {summary.low !== undefined && summary.high !== undefined && (
+      {latestLow !== undefined && latestHigh !== undefined && (
         <div className="mc-range-labels">
-          <span>{summary.low}</span>
-          <span>{summary.high}</span>
+          <span>{latestLow}</span>
+          <span>{latestHigh}</span>
         </div>
       )}
 
@@ -334,8 +339,17 @@ export function Labs({
       const canon    = canonicalize(r.marker)
       const key      = canon?.key ?? r.marker.toLowerCase().trim()
       const personal = canon ? targetByKey.get(canon.key) : undefined
-      const low      = personal?.low  ?? r.low  ?? canon?.optimal?.low
-      const high     = personal?.high ?? r.high ?? canon?.optimal?.high
+
+      // Confirmed range: lab-provided or user personal only — NEVER catalog.
+      // Using catalog ranges causes false HIGH/LOW when units differ between labs.
+      const confirmedLow  = personal?.low  ?? r.low
+      const confirmedHigh = personal?.high ?? r.high
+
+      // Sanitize rawValue: strip reference range text like "[80.0 - 98.0]; Outside..."
+      const cleanRaw = r.rawValue
+        ?.replace(/\s*[\[\(][0-9].*$/, '')  // strip [range] notation
+        ?.replace(/\s*;.*$/, '')             // strip ; comments
+        ?.trim()
 
       if (!summaryMap.has(key)) {
         keyOrder.push(key)
@@ -344,13 +358,11 @@ export function Labs({
           label:   canon?.label ?? r.marker,
           panel:   canon?.panel ?? 'Other',
           unit:    canon?.unit  ?? r.unit,
-          low,
-          high,
+          low:     confirmedLow,
+          high:    confirmedHigh,
           entries: [],
         })
       }
-      // Deduplicate: same marker in same exam (same exam imported twice → same name+date)
-      // Key = examName + date-only + marker key. Only keep the first occurrence.
       const summary = summaryMap.get(key)!
       const dupKey = `${exam.name}|${exam.collectedAt.slice(0, 10)}`
       if (summary.entries.some(e => `${e.examName}|${e.date.slice(0, 10)}` === dupKey)) continue
@@ -361,10 +373,10 @@ export function Labs({
         examName: exam.name,
         date:     exam.collectedAt,
         value:    r.value,
-        rawValue: r.rawValue,
+        rawValue: cleanRaw ?? r.rawValue,
         unit:     r.unit ?? canon?.unit,
-        low,
-        high,
+        low:      confirmedLow,
+        high:     confirmedHigh,
       })
     }
 
