@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   Brain,
@@ -21,19 +21,21 @@ import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { useInjectionReminders } from './lib/useInjectionReminders'
 import { InstallPrompt } from './components/InstallPrompt'
-import { QuickLog } from './components/QuickLog'
-import { ProtocolWizard } from './components/ProtocolWizard'
+// Modals are lazy — only loaded when first opened
+const QuickLog       = lazy(() => import('./components/QuickLog').then(m => ({ default: m.QuickLog })))
+const ProtocolWizard = lazy(() => import('./components/ProtocolWizard').then(m => ({ default: m.ProtocolWizard })))
 import { SyncBanner } from './components/SyncBanner'
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
+// Overview is eager (first screen) — everything else is lazy
 import { Overview } from './views/Overview'
-import { Protocols } from './views/Protocols'
-import { Vitals } from './views/Vitals'
-import { Labs } from './views/Labs'
-import { Targets } from './views/Targets'
-import { Timeline } from './views/Timeline'
-import { Symptoms } from './views/Symptoms'
-import { Settings } from './views/Settings'
+const Protocols = lazy(() => import('./views/Protocols').then(m => ({ default: m.Protocols })))
+const Vitals    = lazy(() => import('./views/Vitals').then(m => ({ default: m.Vitals })))
+const Labs      = lazy(() => import('./views/Labs').then(m => ({ default: m.Labs })))
+const Targets   = lazy(() => import('./views/Targets').then(m => ({ default: m.Targets })))
+const Timeline  = lazy(() => import('./views/Timeline').then(m => ({ default: m.Timeline })))
+const Symptoms  = lazy(() => import('./views/Symptoms').then(m => ({ default: m.Symptoms })))
+const Settings  = lazy(() => import('./views/Settings').then(m => ({ default: m.Settings })))
 import './index.css'
 
 const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
@@ -143,32 +145,54 @@ function Shell({
     setQlOpen(true)
   }
 
-  const compounds = useLiveQuery(async () => (await db.compounds.toArray()).filter((c) => !c.archived), [], [])
+  const compounds = useLiveQuery(
+    () => db.compounds.filter(c => !c.archived).toArray(),
+    [], [],
+  )
   const injections = useLiveQuery(
     async () => {
-      const all = (await db.injections.orderBy('takenAt').reverse().toArray()).filter((i) => !i.deletedAtSync)
-      // Deduplicate phantom sync duplicates: same compound + same dose + same minute bucket.
-      // Sync can create copies with slightly different sub-second timestamps (all show "01:00"
-      // in the UI). Keeping the one with the lowest Dexie id (oldest write).
+      // Fetch only the most recent 500 injections — enough for all UI needs
+      const all = await db.injections
+        .orderBy('takenAt').reverse()
+        .filter(i => !i.deletedAtSync)
+        .limit(500)
+        .toArray()
+      // Deduplicate sync phantoms: same compound + dose + minute bucket
       const seen = new Set<string>()
       return all
-        .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))   // lowest id first so we keep the original
+        .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
         .filter((i) => {
-          const minuteBucket = Math.floor(Date.parse(i.takenAt) / 60_000)
-          const key = `${i.compoundId}|${i.dose ?? ''}|${minuteBucket}`
+          const bucket = Math.floor(Date.parse(i.takenAt) / 60_000)
+          const key = `${i.compoundId}|${i.dose ?? ''}|${bucket}`
           if (seen.has(key)) return false
           seen.add(key)
           return true
         })
-        .sort((a, b) => b.takenAt.localeCompare(a.takenAt))   // restore newest-first order
+        .sort((a, b) => b.takenAt.localeCompare(a.takenAt))
     },
     [], [],
   )
-  const vitals = useLiveQuery(() => db.vitals.orderBy('measuredAt').reverse().toArray(), [], [])
-  const exams = useLiveQuery(() => db.exams.orderBy('collectedAt').reverse().toArray(), [], [])
-  const results = useLiveQuery(() => db.results.toArray(), [], [])
-  const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
-  const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
+  // Vitals: cap at 200 — charts only show last 50, stats use last 14
+  const vitals = useLiveQuery(
+    () => db.vitals.orderBy('measuredAt').reverse().limit(200).toArray(),
+    [], [],
+  )
+  const exams = useLiveQuery(
+    () => db.exams.orderBy('collectedAt').reverse().toArray(),
+    [], [],
+  )
+  const results = useLiveQuery(
+    () => db.results.toArray(),
+    [], [],
+  )
+  const protocols = useLiveQuery(
+    () => db.protocols.toArray(),
+    [], [],
+  )
+  const protocolDoses = useLiveQuery(
+    () => db.protocolDoses.toArray(),
+    [], [],
+  )
 
   // Injection reminders — fires notifications before upcoming doses
   useInjectionReminders(protocols, protocolDoses, compounds ?? [])
@@ -298,27 +322,28 @@ function Shell({
             onOpenWizard={() => setProtocolWizardOpen(true)}
           />
         )}
-        {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} onOpenWizard={() => setProtocolWizardOpen(true)} onEditProtocol={(p) => { setEditingProtocol(p); setProtocolWizardOpen(true) }} />}
-        {activeView === 'vitals' && <Vitals vitals={vitals} />}
-        {activeView === 'labs' && (
-          <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} />
-        )}
-        {activeView === 'symptoms' && <Symptoms />}
-        {/* targets: no nav page, code kept */}
-        {activeView === 'targets' && <Targets />}
-        {activeView === 'timeline' && (
-          <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
-        )}
-        {activeView === 'settings' && (
-          <Settings
-            auth={auth}
-            compounds={compounds}
-            injections={injections}
-            vitals={vitals}
-            exams={exams}
-            protocols={protocols}
-          />
-        )}
+        <Suspense fallback={<div className="view-loading" />}>
+          {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} onOpenWizard={() => setProtocolWizardOpen(true)} onEditProtocol={(p) => { setEditingProtocol(p); setProtocolWizardOpen(true) }} />}
+          {activeView === 'vitals' && <Vitals vitals={vitals} />}
+          {activeView === 'labs' && (
+            <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} />
+          )}
+          {activeView === 'symptoms' && <Symptoms />}
+          {activeView === 'targets' && <Targets />}
+          {activeView === 'timeline' && (
+            <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
+          )}
+          {activeView === 'settings' && (
+            <Settings
+              auth={auth}
+              compounds={compounds}
+              injections={injections}
+              vitals={vitals}
+              exams={exams}
+              protocols={protocols}
+            />
+          )}
+        </Suspense>
       </main>
 
       <nav className="mobile-tabs" aria-label="Mobile primary">

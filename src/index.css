@@ -1077,6 +1077,9 @@ select {
 
 /* ---------- Passphrase lock ---------- */
 
+/* Lazy-loaded view placeholder — just takes up space while chunk downloads */
+.view-loading { flex: 1; }
+
 .lock-shell {
   min-height: 100vh;
   min-height: 100svh;

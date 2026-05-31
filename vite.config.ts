@@ -4,6 +4,22 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  build: {
+    // Vite 8 / Rolldown chunk splitting
+    rolldownOptions: {
+      output: {
+        advancedChunks: {
+          groups: [
+            { name: 'vendor-react',  test: /node_modules\/(react|react-dom|scheduler)\// },
+            { name: 'vendor-charts', test: /node_modules\/(recharts|d3-|victory-)/ },
+            { name: 'vendor-dexie',  test: /node_modules\/(dexie)/ },
+            { name: 'vendor-dates',  test: /node_modules\/(date-fns)/ },
+            { name: 'vendor-icons',  test: /node_modules\/(lucide-react)/ },
+          ],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

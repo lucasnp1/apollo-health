@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { lazy, Suspense, useMemo } from 'react'
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, Circle, Droplet, FlaskConical, HeartPulse, Plus, Syringe } from 'lucide-react'
-import { PKOverviewCard } from '../components/PKOverviewCard'
+// Lazy — recharts loads after initial paint so the page appears immediately
+const PKOverviewCard = lazy(() => import('../components/PKOverviewCard').then(m => ({ default: m.PKOverviewCard })))
 import { formatDistanceToNow, format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
@@ -205,7 +206,9 @@ export function Overview({
       </section>
 
       {/* ── 1c. Personalized PK curve ── */}
-      <PKOverviewCard compounds={compounds} injections={injections} protocols={protocols} protocolDoses={protocolDoses} exams={exams} />
+      <Suspense fallback={null}>
+        <PKOverviewCard compounds={compounds} injections={injections} protocols={protocols} protocolDoses={protocolDoses} exams={exams} />
+      </Suspense>
 
       {/* ── 2. Recent doses — prominent on mobile ── */}
       <section className="surface col-6">
