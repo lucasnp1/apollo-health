@@ -36,11 +36,18 @@ export function toggleTheme() {
  */
 export function getChartColors(dark: boolean) {
   return {
-    grid:          dark ? '#3c3835' : '#e7e5e4',
-    tick:          dark ? '#78716c' : '#a8a29e',
-    tooltipBg:     dark ? '#1c1917' : '#ffffff',
-    tooltipBorder: dark ? '#3c3835' : '#e7e5e4',
-    tooltipText:   dark ? '#fafaf9' : '#0a0a0a',
+    // Very faint grid — Apple Health barely shows grid lines
+    grid:          dark ? 'rgba(84,84,88,0.35)' : 'rgba(60,60,67,0.10)',
+    tick:          dark ? 'rgba(235,235,245,0.40)' : 'rgba(60,60,67,0.45)',
+    // Tooltip: Apple-style card with hairline border
+    tooltipBg:     dark ? '#1c1c1e' : '#ffffff',
+    tooltipBorder: dark ? 'rgba(84,84,88,0.60)' : 'rgba(60,60,67,0.18)',
+    tooltipText:   dark ? '#ffffff' : '#000000',
+    // Semantic colours (used by charts directly)
+    accent:        dark ? '#22d3ee' : '#0891b2',
+    good:          dark ? '#30d158' : '#34c759',
+    warn:          dark ? '#ff9f0a' : '#ff9500',
+    bad:           dark ? '#ff453a' : '#ff3b30',
   }
 }
 
