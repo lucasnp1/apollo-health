@@ -216,6 +216,33 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         ) : (
           <EmptyState icon={HeartPulse} title="No readings in this range" detail="Use the + button above to log." />
         )}
+
+        {/* TRT-aware BP insight — testosterone is a common cause of raised BP */}
+        {stats && (() => {
+          const meanStatus = classifyBp(Math.round(stats.meanSys), Math.round(stats.meanDia))
+          if (meanStatus === 'normal') {
+            return (
+              <p className="panel-note" style={{ marginTop: 8, color: 'var(--good)' }}>
+                ✓ BP is well controlled on your current protocol. Keep logging — testosterone can raise BP over time, so watch the trend.
+              </p>
+            )
+          }
+          const m = BP_META[meanStatus]
+          return (
+            <div style={{ marginTop: 10, padding: '10px 12px', background: m.soft, borderRadius: 10, borderLeft: `3px solid ${m.color}` }}>
+              <strong style={{ fontSize: 13, color: m.color }}>
+                {meanStatus === 'stage2' || meanStatus === 'crisis' ? 'Blood pressure is high' : 'Blood pressure is elevated'}
+                {' '}(avg {stats.meanSys.toFixed(0)}/{stats.meanDia.toFixed(0)})
+              </strong>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--ink-dim)', lineHeight: 1.5 }}>
+                Raised BP is one of the most common effects of testosterone — it increases red blood cells and fluid retention.
+                {meanStatus === 'stage2' || meanStatus === 'crisis'
+                  ? ' Consider lowering your dose, prioritise cardio, reduce sodium, and discuss with your doctor. Check your haematocrit on next bloodwork.'
+                  : ' Watch the trend, stay hydrated, add regular cardio, and reduce sodium. If it keeps climbing, review your dose.'}
+              </p>
+            </div>
+          )
+        })()}
       </section>
 
       {/* ── Row 2: Recent readings (full width) ── */}
