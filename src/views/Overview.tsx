@@ -12,7 +12,7 @@ import {
   weightSummary,
   type EnrichedResult,
 } from '../lib/insights'
-import { nextDose, timeUntil, upcomingSchedule } from '../lib/schedule'
+import { simpleUpcomingSchedule, timeUntil } from '../lib/schedule'
 import { Sparkline } from '../components/Sparkline'
 import { StatCard } from '../components/StatCard'
 import type { View } from '../app/views'
@@ -39,14 +39,15 @@ export function Overview({
 })
  {
   const protocols = useLiveQuery(() => db.protocols.filter((p) => !p.archived).toArray(), [], [])
-  const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
   const weightGoal = goals.find((g) => g.kind === 'weight' && !g.achievedAt)
   const bpGoal = goals.find((g) => g.kind === 'bp' && !g.achievedAt)
   const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id, c])), [compounds])
-  const upcoming = upcomingSchedule(protocols, protocolDoses, new Date(), 7).slice(0, 5)
-  const head = nextDose(protocols, protocolDoses)
-  const headCompound = head ? compoundMap.get(head.protocol.compoundId) : undefined
+  // Simple schedule: next due = last injection + interval (no ProtocolDose dependency)
+  const upcoming = useMemo(
+    () => simpleUpcomingSchedule(protocols, injections).slice(0, 5),
+    [protocols, injections],
+  )
 
   const weightSeries = buildWeightDoseSeries(compounds, injections)
   const weightStats = weightSummary(weightSeries)
@@ -207,7 +208,7 @@ export function Overview({
 
       {/* ── 1c. Personalized PK curve ── */}
       <Suspense fallback={null}>
-        <PKOverviewCard compounds={compounds} injections={injections} protocols={protocols} protocolDoses={protocolDoses} exams={exams} />
+        <PKOverviewCard compounds={compounds} injections={injections} protocols={protocols} protocolDoses={[]} exams={exams} />
       </Suspense>
 
       {/* ── 2. Recent doses — prominent on mobile ── */}
@@ -253,40 +254,40 @@ export function Overview({
       {/* ── 3. Upcoming doses ── */}
       <section className="surface col-6">
         <div className="panel-header">
-          <div><span className="section-label">Schedule · next 7 days</span><h3>Upcoming doses</h3></div>
+          <div><span className="section-label">Your schedule</span><h3>Upcoming doses</h3></div>
           <button type="button" className="ghost-button" onClick={() => onNavigate('meds')}>
-            Protocols <ChevronRight size={14} />
+            My compounds <ChevronRight size={14} />
           </button>
         </div>
-        {head ? (
+        {upcoming.length > 0 ? (
           <div className="stack">
-            {[{ item: head, compound: headCompound }, ...upcoming.slice(1).map((item) => ({ item, compound: compoundMap.get(item.protocol.compoundId) }))].map(({ item, compound: c }, idx) => {
+            {upcoming.map((item, idx) => {
+              const c = compoundMap.get(item.protocol.compoundId)
               const isNext = idx === 0
+              const overdue = item.isOverdue
               return (
-                <div className="row" key={`${item.protocol.id}-${idx}`}>
-                  <CalendarClock size={13} style={{ color: isNext ? 'var(--accent)' : 'var(--ink-mute)', flexShrink: 0 }} />
+                <div className="row" key={item.protocol.id} style={{ gridTemplateColumns: 'auto minmax(0,1fr) auto auto' }}>
+                  <CalendarClock size={13} style={{ color: overdue ? 'var(--bad)' : isNext ? 'var(--accent)' : 'var(--ink-mute)', flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>
                     <strong>{c?.name ?? 'Compound'}</strong>
-                    <span className="sub">{item.protocol.dose} {item.protocol.unit} · {format(item.scheduledAt, 'EEE MMM d')}</span>
+                    <span className="sub">{item.protocol.dose} {item.protocol.unit} · {format(item.nextDue, 'EEE MMM d')}</span>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
-                    color: isNext ? 'var(--accent-ink)' : 'var(--ink-mute)',
-                    background: isNext ? 'var(--accent-soft)' : 'transparent',
-                    padding: isNext ? '2px 8px' : '2px 0',
-                    borderRadius: 999,
+                  <span style={{
+                    fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
+                    color: overdue ? 'var(--bad)' : isNext ? 'var(--accent)' : 'var(--ink-mute)',
+                    background: overdue ? 'var(--bad-soft)' : isNext ? 'var(--accent-soft)' : 'transparent',
+                    padding: '2px 8px', borderRadius: 999,
                   }}>
-                    {timeUntil(item.scheduledAt)}
+                    {overdue ? `${Math.round(Math.abs(item.daysUntil))}d overdue` : timeUntil(item.nextDue)}
                   </span>
-                  {isNext ? (
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      style={{ height: 26, fontSize: 11, padding: '0 8px', whiteSpace: 'nowrap', flexShrink: 0 }}
-                      onClick={() => onOpenQuickLog('injection', { compoundId: item.protocol.compoundId, dose: item.protocol.dose, unit: item.protocol.unit, protocolId: item.protocol.id, scheduledAt: item.scheduledAt.toISOString() })}
-                    >
-                      Mark taken
-                    </button>
-                  ) : <span />}
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    style={{ height: 26, fontSize: 11, padding: '0 10px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    onClick={() => onOpenQuickLog('injection', { compoundId: item.protocol.compoundId, dose: item.protocol.dose, unit: item.protocol.unit, protocolId: item.protocol.id, scheduledAt: item.nextDue.toISOString() })}
+                  >
+                    Log
+                  </button>
                 </div>
               )
             })}
@@ -295,8 +296,8 @@ export function Overview({
           <div className="empty">
             <CalendarClock size={16} />
             <strong>No scheduled doses</strong>
-            <span>Add a protocol to populate this list.</span>
-            <button type="button" className="primary-button" onClick={() => onNavigate('meds')}>Set up protocols</button>
+            <span>Add a compound to populate this list.</span>
+            <button type="button" className="primary-button" onClick={() => onNavigate('meds')}>My compounds</button>
           </div>
         )}
       </section>

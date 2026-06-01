@@ -25,6 +25,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        skipWaiting: true,        // activate new SW immediately, no waiting
+        clientsClaim: true,       // take control of all open tabs right away
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{css,html,js,json,mjs,svg,webmanifest}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,

@@ -1,5 +1,89 @@
 import { addDays, addMinutes, isAfter, isBefore, parseISO, setHours, setMinutes, startOfDay } from 'date-fns'
-import type { Protocol, ProtocolCadence, ProtocolDose } from './db'
+import type { InjectionLog, Protocol, ProtocolCadence, ProtocolDose } from './db'
+
+/**
+ * Simple next-due calculation — no ProtocolDose dependency.
+ * Looks at the last injection for each protocol's compound and adds the interval.
+ * This is the primary "upcoming" calculation used in the UI.
+ */
+export type SimpleScheduleItem = {
+  protocol: Protocol
+  nextDue: Date
+  lastInjectionDate: Date | null
+  isOverdue: boolean
+  daysUntil: number   // negative = overdue
+}
+
+export function simpleUpcomingSchedule(
+  protocols: Protocol[],
+  injections: InjectionLog[],
+): SimpleScheduleItem[] {
+  const now = Date.now()
+  const results: SimpleScheduleItem[] = []
+
+  for (const p of protocols) {
+    if (p.archived || p.cadence.kind === 'asNeeded') continue
+    if (p.endsAt && Date.parse(p.endsAt) < now) continue
+
+    // Last injection for this compound (most recent)
+    const lastInj = injections
+      .filter(i => i.compoundId === p.compoundId)
+      .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0]
+    const lastDate = lastInj ? parseISO(lastInj.takenAt) : null
+
+    const nextDue = calcNextDue(p.cadence, lastDate, parseISO(p.startedAt))
+    if (!nextDue) continue
+
+    results.push({
+      protocol: p,
+      nextDue,
+      lastInjectionDate: lastDate,
+      isOverdue: nextDue.getTime() < now,
+      daysUntil: (nextDue.getTime() - now) / 86_400_000,
+    })
+  }
+
+  return results.sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
+}
+
+function calcNextDue(
+  cadence: ProtocolCadence,
+  lastDate: Date | null,
+  startDate: Date,
+): Date | null {
+  const now = new Date()
+
+  if (!lastDate) {
+    // Never injected — due on start date or now, whichever is later
+    const d = new Date(Math.max(startDate.getTime(), now.getTime()))
+    if (cadence.kind === 'everyNDays') return applyTime(d, cadence.timeOfDay)
+    if (cadence.kind === 'weekly') return applyTime(d, cadence.timeOfDay)
+    if (cadence.kind === 'daily')  return applyTime(d, cadence.timesOfDay?.[0])
+    return d
+  }
+
+  if (cadence.kind === 'everyNDays') {
+    return applyTime(addDays(lastDate, cadence.n), cadence.timeOfDay)
+  }
+
+  if (cadence.kind === 'weekly') {
+    const sorted = [...cadence.daysOfWeek].sort((a, b) => a - b)
+    // Walk forward from lastDate + 1 day until we hit a scheduled weekday
+    for (let offset = 1; offset <= 8; offset++) {
+      const candidate = addDays(lastDate, offset)
+      if (sorted.includes(candidate.getDay())) {
+        return applyTime(candidate, cadence.timeOfDay)
+      }
+    }
+    return null
+  }
+
+  if (cadence.kind === 'daily') {
+    return applyTime(addDays(lastDate, 1), cadence.timesOfDay?.[0])
+  }
+
+  return null
+}
 
 const DAY = 24 * 60 * 60 * 1000
 

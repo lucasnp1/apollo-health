@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
+import type { SimpleScheduleItem } from '../lib/schedule'
 import { useTheme } from '../lib/useTheme'
 import {
-  Archive, Pencil, Plus, Syringe, Trash2, X,
+  Archive, CheckCircle2, Clock, Pencil, Plus, Syringe, Trash2, X,
 } from 'lucide-react'
 import { differenceInHours, format, parseISO, subDays } from 'date-fns'
 import {
@@ -19,7 +20,7 @@ import {
   buildWeightDoseSeries,
   weightSummary,
 } from '../lib/insights'
-import { describeCadence } from '../lib/schedule'
+import { describeCadence, simpleUpcomingSchedule } from '../lib/schedule'
 import { deleteInjection } from '../lib/injections'
 import { findPKCompound, buildDailyReleaseCurve } from '../lib/pk'
 import { EmptyState } from '../components/EmptyState'
@@ -41,40 +42,50 @@ export function Protocols({
   onEditProtocol: (p: Protocol & { id: number }) => void
 }) {
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
-
-  const activeProtocols = (protocols ?? []).filter((p) => !p.archived)
+  const activeProtocols = useMemo(
+    () => (protocols ?? []).filter(p => !p.archived),
+    [protocols],
+  )
+  const schedule = useMemo(
+    () => simpleUpcomingSchedule(activeProtocols, injections),
+    [activeProtocols, injections],
+  )
 
   return (
     <div className="content-grid">
 
-      {/* ── 1. ACTIVE PROTOCOLS ──────────────────────────────────────────── */}
+      {/* ── 1. MY COMPOUNDS ──────────────────────────────────────────────── */}
       <section className="surface col-12">
         <div className="panel-header">
           <div>
             <span className="section-label">Active</span>
-            <h3>My protocols</h3>
+            <h3>My compounds</h3>
           </div>
         </div>
         {activeProtocols.length > 0 ? (
-          <div className="stack">
-            {activeProtocols.map((p) => (
-              <ProtocolQuickRow
-                key={p.id}
-                protocol={p}
-                compounds={compounds}
-                injections={injections}
-                onLog={onOpenQuickLog}
-                onEdit={p.id !== undefined ? () => onEditProtocol(p as Protocol & { id: number }) : undefined}
-              />
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {activeProtocols.map((p) => {
+              const schedItem = schedule.find(s => s.protocol.id === p.id)
+              return (
+                <CompoundCard
+                  key={p.id}
+                  protocol={p}
+                  compounds={compounds}
+                  injections={injections}
+                  schedItem={schedItem}
+                  onLog={onOpenQuickLog}
+                  onEdit={p.id !== undefined ? () => onEditProtocol(p as Protocol & { id: number }) : undefined}
+                />
+              )
+            })}
           </div>
         ) : (
           <div className="empty">
             <Syringe size={22} />
-            <strong>No protocols yet</strong>
-            <span>Set up your first compound and dose schedule.</span>
+            <strong>Nothing set up yet</strong>
+            <span>Add a compound to track your schedule and doses.</span>
             <button type="button" className="primary-button" onClick={onOpenWizard}>
-              <Plus size={14} /> Create protocol
+              <Plus size={14} /> Add compound
             </button>
           </div>
         )}
@@ -89,67 +100,125 @@ export function Protocols({
   )
 }
 
-// ── Compact protocol row — tap Log to open prefilled QuickLog modal ─────────
+// ── Compound card — shows next due, last injection, Log button ─────────────
 
-function ProtocolQuickRow({
+function CompoundCard({
   protocol,
   compounds,
   injections,
+  schedItem,
   onLog,
   onEdit,
 }: {
   protocol: Protocol
   compounds: Compound[]
   injections: InjectionLog[]
+  schedItem?: SimpleScheduleItem
   onLog: (tab: 'injection', prefill?: import('../App').QuickLogPrefill) => void
   onEdit?: () => void
 }) {
-  const compound = compounds.find((c) => c.id === protocol.compoundId)
-  const lastInj = injections.find((i) => i.compoundId === protocol.compoundId)
+  const compound = compounds.find(c => c.id === protocol.compoundId)
+  const color = compound?.color ?? 'var(--accent)'
+  const lastInj = injections.find(i => i.compoundId === protocol.compoundId)
   const hoursSince = lastInj ? differenceInHours(new Date(), parseISO(lastInj.takenAt)) : undefined
 
-  const lastLabel = hoursSince !== undefined
-    ? hoursSince < 1  ? 'Just now'
-    : hoursSince < 24 ? `${hoursSince}h ago`
+  const lastLabel = hoursSince === undefined ? 'Never injected'
+    : hoursSince < 1   ? 'Just now'
+    : hoursSince < 24  ? `${Math.round(hoursSince)}h ago`
     : `${Math.round(hoursSince / 24)}d ago`
-    : 'Never'
+
+  const overdue = schedItem?.isOverdue ?? false
+  const nextLabel = !schedItem ? null
+    : overdue
+      ? `${Math.round(Math.abs(schedItem.daysUntil))}d overdue`
+      : schedItem.daysUntil < 0.5 ? 'Due now'
+      : schedItem.daysUntil < 1   ? 'Due today'
+      : `Due ${format(schedItem.nextDue, 'EEE MMM d')}`
 
   return (
-    <div className="row protocol-quick-row">
-      <span className="dot" style={{ background: compound?.color ?? 'var(--accent)', width: 10, height: 10 }} />
-      <div>
-        <strong style={{ fontSize: 13 }}>{protocol.name}</strong>
-        <span className="sub">
-          {compound?.name} · {protocol.dose} {protocol.unit} · {describeCadence(protocol.cadence)}
-        </span>
+    <div style={{
+      background: 'var(--surface-2)',
+      borderRadius: 'var(--radius)',
+      border: `1.5px solid ${overdue ? 'var(--bad)' : 'var(--line)'}`,
+      borderLeft: `4px solid ${color}`,
+      padding: '14px 16px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+    }}>
+      {/* Top row: name + actions */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', letterSpacing: -0.01 }}>
+            {compound?.name ?? protocol.name}
+            {compound?.ester && <span style={{ fontWeight: 400, color: 'var(--ink-mute)', marginLeft: 6, fontSize: 13 }}>{compound.ester}</span>}
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--ink-dim)', marginTop: 2 }}>
+            {protocol.dose} {protocol.unit} · {describeCadence(protocol.cadence)}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          {onEdit && (
+            <button type="button" className="icon-button" style={{ width: 30, height: 30 }} onClick={onEdit} aria-label="Edit">
+              <Pencil size={13} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="icon-button"
+            style={{ width: 30, height: 30 }}
+            onClick={() => protocol.id !== undefined && db.protocols.update(protocol.id, { archived: true })}
+            aria-label="Archive"
+          >
+            <Archive size={13} />
+          </button>
+        </div>
       </div>
-      {protocol.phase && <span className="chip hide-mobile">{protocol.phase}</span>}
-      <span className="last-logged" style={{ fontSize: 11, color: hoursSince !== undefined && hoursSince < 24 ? 'var(--warn)' : 'var(--ink-mute)', whiteSpace: 'nowrap' }}>
-        {lastLabel}
-      </span>
-      {onEdit && (
-        <button type="button" className="icon-button hide-mobile" style={{ width: 28, height: 28 }} onClick={onEdit} aria-label="Edit" title="Edit">
-          <Pencil size={13} />
+
+      {/* Bottom row: last injection + next due + Log button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Last injection */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <CheckCircle2 size={13} style={{ color: hoursSince !== undefined ? 'var(--good)' : 'var(--ink-mute)', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: 'var(--ink-mute)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {lastLabel}
+          </span>
+        </div>
+
+        {/* Next due */}
+        {nextLabel && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+            <Clock size={12} style={{ color: overdue ? 'var(--bad)' : 'var(--accent)', flexShrink: 0 }} />
+            <span style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: overdue ? 'var(--bad)' : 'var(--accent)',
+              background: overdue ? 'var(--bad-soft)' : 'var(--accent-soft)',
+              padding: '2px 8px',
+              borderRadius: 999,
+              whiteSpace: 'nowrap',
+            }}>
+              {nextLabel}
+            </span>
+          </div>
+        )}
+
+        {/* Log button */}
+        <button
+          type="button"
+          className="primary-button"
+          style={{ height: 34, fontSize: 13, padding: '0 16px', background: color, flexShrink: 0 }}
+          onClick={() => onLog('injection', {
+            compoundId: protocol.compoundId,
+            dose: protocol.dose,
+            unit: protocol.unit,
+            protocolId: protocol.id,
+            scheduledAt: schedItem?.nextDue.toISOString(),
+          })}
+        >
+          Log
         </button>
-      )}
-      <button
-        type="button"
-        className="icon-button hide-mobile"
-        style={{ width: 28, height: 28 }}
-        onClick={() => protocol.id !== undefined && db.protocols.update(protocol.id, { archived: true })}
-        aria-label="Archive"
-        title="Archive protocol"
-      >
-        <Archive size={13} />
-      </button>
-      <button
-        type="button"
-        className="primary-button"
-        style={{ height: 32, fontSize: 13, padding: '0 14px', background: compound?.color ?? undefined }}
-        onClick={() => onLog('injection', { compoundId: protocol.compoundId, dose: protocol.dose, unit: protocol.unit, protocolId: protocol.id })}
-      >
-        Log
-      </button>
+      </div>
     </div>
   )
 }
