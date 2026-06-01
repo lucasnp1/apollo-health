@@ -11,6 +11,7 @@ import {
   PanelLeftOpen,
   Plus,
   Settings as SettingsIcon,
+  Share2,
   Syringe,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -24,6 +25,7 @@ import { InstallPrompt } from './components/InstallPrompt'
 // Modals are lazy — only loaded when first opened
 const QuickLog       = lazy(() => import('./components/QuickLog').then(m => ({ default: m.QuickLog })))
 const ProtocolWizard = lazy(() => import('./components/ProtocolWizard').then(m => ({ default: m.ProtocolWizard })))
+const ExportSheet    = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportSheet })))
 import { SyncBanner } from './components/SyncBanner'
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
@@ -118,6 +120,7 @@ function Shell({
   const [qlTab, setQlTab] = useState<QuickLogTab>('injection')
   const [qlPrefill, setQlPrefill] = useState<QuickLogPrefill | undefined>(undefined)
   const [labAddOpen, setLabAddOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [protocolWizardOpen, setProtocolWizardOpen] = useState(false)
 
   async function handleLabPdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -286,6 +289,12 @@ function Shell({
                 <Plus size={12} /> Add result
               </button>
             </>)}
+            {/* Share/export — shown on data-rich views */}
+            {(activeView === 'meds' || activeView === 'labs' || activeView === 'vitals') && (
+              <button type="button" className="icon-button" onClick={() => setExportOpen(true)} aria-label="Export for doctor" title="Share with doctor">
+                <Share2 size={15} />
+              </button>
+            )}
             {/* "Create protocol" hidden on mobile — accessible from the empty-state button */}
             {activeView === 'meds' && (
               <button type="button" className="primary-button hide-mobile" onClick={() => setProtocolWizardOpen(true)}>
@@ -376,6 +385,19 @@ function Shell({
       />
 
       <InstallPrompt />
+
+      <Suspense fallback={null}>
+        {exportOpen && (
+          <ExportSheet
+            compounds={compounds ?? []}
+            injections={injections ?? []}
+            vitals={vitals ?? []}
+            exams={exams ?? []}
+            results={enrichedResults ?? []}
+            onClose={() => setExportOpen(false)}
+          />
+        )}
+      </Suspense>
     </div>
   )
 }

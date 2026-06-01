@@ -24,6 +24,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   const { chart: colors } = useTheme()
   const [range, setRange] = useState<TimeRange>('3M')
   const [form, setForm] = useState({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
+  const [editingVital, setEditingVital] = useState<VitalLog | null>(null)
   const [weightForm, setWeightForm] = useState({ weightKg: '', measuredAt: new Date().toISOString().slice(0, 16) })
   const [goalEditKind, setGoalEditKind] = useState<'weight' | 'bp' | null>(null)
   const [goalForm, setGoalForm] = useState({ target: '', label: '' })
@@ -56,15 +57,37 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
     }
   }, [filtered])
 
+  function startEditVital(v: VitalLog) {
+    setEditingVital(v)
+    setForm({
+      systolic: String(v.systolic),
+      diastolic: String(v.diastolic),
+      pulse: v.pulse !== undefined ? String(v.pulse) : '',
+      measuredAt: v.measuredAt.slice(0, 16),
+      notes: v.notes ?? '',
+    })
+  }
+
+  function cancelEdit() {
+    setEditingVital(null)
+    setForm({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
+  }
+
   async function add() {
     if (!form.systolic || !form.diastolic) return
-    await db.vitals.add({
+    const data = {
       measuredAt: new Date(form.measuredAt).toISOString(),
       systolic: Number(form.systolic),
       diastolic: Number(form.diastolic),
       pulse: form.pulse ? Number(form.pulse) : undefined,
-      notes: form.notes,
-    })
+      notes: form.notes || undefined,
+    }
+    if (editingVital?.id !== undefined) {
+      await db.vitals.update(editingVital.id, data)
+      setEditingVital(null)
+    } else {
+      await db.vitals.add(data)
+    }
     setForm({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
   }
 
@@ -100,9 +123,14 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
       <section className="surface col-5">
         <div className="panel-header">
           <div>
-            <span className="section-label">New reading</span>
-            <h3>Log BP</h3>
+            <span className="section-label">{editingVital ? 'Editing reading' : 'New reading'}</span>
+            <h3>{editingVital ? 'Edit BP' : 'Log BP'}</h3>
           </div>
+          {editingVital && (
+            <button type="button" className="icon-button" onClick={cancelEdit} aria-label="Cancel edit">
+              <X size={14} />
+            </button>
+          )}
         </div>
         <div className="form-grid">
           <label>
@@ -125,7 +153,12 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
             Notes
             <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </label>
-          <button type="button" className="primary-button wide-field" onClick={add}><Plus size={15} /> Save</button>
+          <button type="button" className="primary-button wide-field" onClick={add} disabled={!form.systolic || !form.diastolic}>
+            {editingVital ? <><Edit2 size={14} /> Update</> : <><Plus size={15} /> Save</>}
+          </button>
+          {editingVital && (
+            <button type="button" className="ghost-button wide-field" onClick={cancelEdit}>Cancel</button>
+          )}
         </div>
       </section>
 
@@ -187,6 +220,9 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
                   <span className="sub">{v.pulse ? `${v.pulse} bpm` : 'No pulse'}{v.notes ? ` · ${v.notes}` : ''}</span>
                 </div>
                 <time>{format(parseISO(v.measuredAt), 'MMM d HH:mm')}</time>
+                <button type="button" className="icon-button" onClick={() => startEditVital(v)} aria-label="Edit">
+                  <Edit2 size={13} />
+                </button>
                 <button type="button" className="icon-button danger" onClick={() => db.vitals.delete(v.id!)} aria-label="Delete">
                   <Trash2 size={13} />
                 </button>
