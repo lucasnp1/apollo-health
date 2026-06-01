@@ -162,7 +162,7 @@ export function Overview({
         <div className="panel-header">
           <div><span className="section-label">Now</span><h3>Status</h3></div>
         </div>
-        <div className="stat-grid" style={{ gridTemplateColumns: '1fr' }}>
+        <div className="stat-grid">
           <StatCard
             label="BP"
             value={latestBp ? `${latestBp.systolic}/${latestBp.diastolic}` : '—'}

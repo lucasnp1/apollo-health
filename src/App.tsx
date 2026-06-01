@@ -13,6 +13,7 @@ import {
   Settings as SettingsIcon,
   Share2,
   Syringe,
+  Upload,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -280,30 +281,37 @@ function Shell({
             <h1>{titleFor(activeView)}</h1>
           </div>
           <div className="topbar-actions">
-            {activeView === 'labs' && (<>
-              <label className="ghost-button" style={{ cursor: 'pointer' }}>
-                <input type="file" accept="application/pdf" hidden onChange={handleLabPdfUpload} />
-                Upload PDF
-              </label>
-              <button type="button" className="ghost-button" onClick={() => setLabAddOpen(true)}>
-                <Plus size={12} /> Add result
-              </button>
-            </>)}
             {/* Share/export — shown on data-rich views */}
             {(activeView === 'meds' || activeView === 'labs' || activeView === 'vitals') && (
               <button type="button" className="icon-button" onClick={() => setExportOpen(true)} aria-label="Export for doctor" title="Share with doctor">
                 <Share2 size={15} />
               </button>
             )}
-            {/* "Create protocol" hidden on mobile — accessible from the empty-state button */}
+
+            {/* Labs actions — Upload PDF + Add result (icon-only on mobile) */}
+            {activeView === 'labs' && (<>
+              <label className="ghost-button topbar-labelled" style={{ cursor: 'pointer' }} title="Upload PDF">
+                <input type="file" accept="application/pdf" hidden onChange={handleLabPdfUpload} />
+                <Upload size={14} /> <span className="btn-label">Upload</span>
+              </label>
+              <button type="button" className="primary-button topbar-labelled" onClick={() => setLabAddOpen(true)} title="Add result">
+                <Plus size={14} /> <span className="btn-label">Add result</span>
+              </button>
+            </>)}
+
+            {/* Create protocol — Protocols page */}
             {activeView === 'meds' && (
-              <button type="button" className="primary-button hide-mobile" onClick={() => setProtocolWizardOpen(true)}>
-                <Plus size={13} /> Create protocol
+              <button type="button" className="primary-button topbar-labelled" onClick={() => setProtocolWizardOpen(true)} title="Create protocol">
+                <Plus size={14} /> <span className="btn-label">New protocol</span>
               </button>
             )}
-            <button type="button" className="primary-button" onClick={() => openQuickLog('injection')}>
-              <Plus size={13} /> Add
-            </button>
+
+            {/* Generic quick-log Add — skipped on Labs (uses Add result) and Meds (uses Log button on row) */}
+            {activeView !== 'labs' && activeView !== 'meds' && (
+              <button type="button" className="primary-button topbar-labelled" onClick={() => openQuickLog('injection')} title="Add">
+                <Plus size={14} /> <span className="btn-label">Add</span>
+              </button>
+            )}
             {/* Settings gear — mobile only, since Settings tab is #6 and hidden in bottom nav */}
             {activeView !== 'settings' && (
               <button

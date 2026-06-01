@@ -302,7 +302,15 @@ time,
 }
 .topbar h1 { margin: 0; }
 
-.topbar-actions { display: flex; align-items: center; gap: var(--space-2); }
+.topbar-actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+
+/* On mobile: hide text labels in topbar buttons so they become compact icon buttons */
+@media (max-width: 760px) {
+  .topbar-labelled {
+    padding: 0 12px;
+  }
+  .topbar-labelled .btn-label { display: none; }
+}
 
 .privacy-pill {
   display: inline-flex; align-items: center; gap: 6px;
@@ -517,8 +525,8 @@ time,
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 .stat {
-  display: flex; flex-direction: column; gap: 5px;
-  padding: var(--space-4);
+  display: flex; flex-direction: column; gap: 4px;
+  padding: var(--space-3) var(--space-4);
   background: var(--surface);
   border: none;
   border-radius: var(--radius);
@@ -964,8 +972,8 @@ select {
     max-width: 52vw;
   }
 
-  /* Fix #3: stat-grid — force 3 equal columns so cards never wrap asymmetrically */
-  .stat-grid { grid-template-columns: repeat(3, 1fr); }
+  /* Stat-grid — 2 equal columns on mobile (works for 2-card status section) */
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
 
   /* Fix #4: Utility to hide/show elements by breakpoint */
   .hide-mobile { display: none !important; }
@@ -1375,69 +1383,75 @@ select {
 }
 
 /* ── Health composite cards ───────────────────────────────────────────── */
-.composite-list { display: flex; flex-direction: column; gap: 5px; }
+.composite-list { display: flex; flex-direction: column; gap: 6px; }
 
 .composite-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--surface-2);
-  overflow: hidden;
+  padding: 11px 14px;
+  transition: background 120ms;
 }
+.composite-card:hover { background: var(--surface-3); }
 
-/* Always-visible compact row */
-.composite-row {
+/* Header row: icon + label · badge + chevron */
+.composite-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  flex-wrap: wrap;
+  gap: 9px;
 }
 .composite-icon  { font-size: 15px; line-height: 1; flex-shrink: 0; }
-.composite-label { font-size: 12px; font-weight: 700; color: var(--ink); flex-shrink: 0; min-width: 100px; }
+.composite-label { font-size: 14px; font-weight: 700; color: var(--ink); flex: 1; min-width: 0; }
 
-/* Pill cluster */
+.composite-badge {
+  font-size: 10px; font-weight: 700; padding: 3px 9px;
+  border-radius: 100px; flex-shrink: 0; white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.composite-toggle {
+  color: var(--ink-mute); display: grid; place-items: center;
+  width: 18px; flex-shrink: 0;
+}
+
+/* Pills row — sits below header, wraps freely */
 .composite-pills {
-  display: flex; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0;
+  display: flex; gap: 6px 14px; flex-wrap: wrap;
+  padding-left: 24px;   /* align under the label, past the icon */
 }
 .composite-pill {
-  display: flex; align-items: baseline; gap: 4px; font-size: 11px; font-weight: 600;
+  display: flex; align-items: baseline; gap: 4px; font-size: 12px; font-weight: 600;
   white-space: nowrap;
 }
 .composite-pill-label { color: var(--ink-mute); font-weight: 500; }
 .composite-pill-val   { font-family: var(--font-mono); }
 
-.composite-badge {
-  font-size: 10px; font-weight: 700; padding: 2px 8px;
-  border-radius: 6px; flex-shrink: 0; white-space: nowrap;
-}
-.composite-toggle {
-  color: var(--ink-mute); display: grid; place-items: center;
-  width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
-  transition: background 100ms;
-}
-.composite-toggle:hover { background: var(--surface-3); }
-
 /* Expandable detail */
 .composite-detail {
-  padding: 8px 12px 12px 12px;
-  border-top: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 8px;
+  margin-top: 2px;
+  padding-top: 10px;
+  padding-left: 24px;
+  border-top: 1px solid var(--line);
 }
-.composite-note { font-size: 12px; color: var(--ink-dim); line-height: 1.55; margin: 0; }
+.composite-note { font-size: 13px; color: var(--ink-dim); line-height: 1.55; margin: 0; }
 
 .composite-rec {
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 12px;
   background: var(--accent-soft);
-  border-radius: 6px;
+  border-radius: 10px;
   border-left: 2px solid var(--accent);
 }
-.composite-rec-text   { font-size: 12px; color: var(--ink); line-height: 1.5; }
-.composite-rec-source { font-size: 10px; color: var(--ink-mute); font-style: italic; }
+.composite-rec-text   { font-size: 13px; color: var(--ink); line-height: 1.5; }
+.composite-rec-source { font-size: 11px; color: var(--ink-mute); font-style: italic; }
 
 @media (max-width: 760px) {
-  .composite-label { min-width: 80px; }
-  .composite-pills { gap: 6px; }
+  .composite-pills, .composite-detail { padding-left: 0; }
 }
 
 /* ── Marker history pane ───────────────────────────────────────────────── */

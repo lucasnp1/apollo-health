@@ -221,7 +221,7 @@ function StatPill({ label, value, sub, color }: {
   label: string; value: string; sub?: string; color?: string
 }) {
   return (
-    <div style={{ textAlign: 'right' }}>
+    <div style={{ flexShrink: 0 }}>
       <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-mute)' }}>{label}</div>
       <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)', color: color ?? 'var(--ink)', lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: 10, color: 'var(--ink-dim)', marginTop: 1 }}>{sub}</div>}
@@ -293,28 +293,28 @@ export function PKOverviewCard({
             style={{ borderLeft: `3px solid ${color}` }}
           >
             {/* ── Header ── */}
-            <div className="panel-header" style={{ marginBottom: 12 }}>
-              <div>
-                <span className="section-label">Cycle timeline · {protocol.name}</span>
-                <h3 style={{ color }}>
-                  {pkName}
-                  <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-dim)', marginLeft: 8 }}>
-                    {protocol.dose} {protocol.unit}
-                  </span>
-                </h3>
-              </div>
-              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                <StatPill label="Now" value={`${currentLevel.toFixed(1)}`} sub="mg/day" color={color} />
-                {nextPeak && peakIn !== null && peakIn > 0 && (
-                  <StatPill label="Next peak" value={`in ${relTime(peakIn)}`} sub={`${nextPeak.level.toFixed(1)} mg/d`} color="var(--warn)" />
-                )}
-                {nextTrough && troughIn !== null && troughIn > 0 && (
-                  <StatPill label="Trough · labs" value={`in ${relTime(troughIn)}`} sub={`${nextTrough.level.toFixed(1)} mg/d`} color="var(--good)" />
-                )}
-                {protocolEndLabel && (
-                  <StatPill label="Protocol ends" value={protocolEndLabel} />
-                )}
-              </div>
+            {/* Title row */}
+            <div style={{ marginBottom: 10 }}>
+              <span className="section-label">Cycle timeline · {protocol.name}</span>
+              <h3 style={{ color, margin: 0 }}>
+                {pkName}
+                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-dim)', marginLeft: 8 }}>
+                  {protocol.dose} {protocol.unit}
+                </span>
+              </h3>
+            </div>
+            {/* Stat pills — horizontal scroll on mobile so they never wrap or get cut */}
+            <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, marginBottom: 8, WebkitOverflowScrolling: 'touch' }}>
+              <StatPill label="Now" value={`${currentLevel.toFixed(1)}`} sub="mg/day" color={color} />
+              {nextPeak && peakIn !== null && peakIn > 0 && (
+                <StatPill label="Next peak" value={`in ${relTime(peakIn)}`} sub={`${nextPeak.level.toFixed(1)} mg/d`} color="var(--warn)" />
+              )}
+              {nextTrough && troughIn !== null && troughIn > 0 && (
+                <StatPill label="Trough · labs" value={`in ${relTime(troughIn)}`} sub={`${nextTrough.level.toFixed(1)} mg/d`} color="var(--good)" />
+              )}
+              {protocolEndLabel && (
+                <StatPill label="Protocol ends" value={protocolEndLabel} />
+              )}
             </div>
 
             {/* ── Chart ── */}

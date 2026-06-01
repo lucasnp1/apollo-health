@@ -12,9 +12,7 @@ export function Sparkline({
   stroke?: string
   fill?: string
 }) {
-  if (values.length < 2) {
-    return <svg className="sparkline" viewBox={`0 0 ${width} ${height}`} aria-hidden="true" />
-  }
+  if (values.length < 2) return null
   const min = Math.min(...values)
   const max = Math.max(...values)
   const range = max - min || 1

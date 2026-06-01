@@ -325,40 +325,43 @@ function CompositeCard({ panel, expanded, onToggle }: {
   const hasDetail = panel.note || panel.recommendations.length > 0
 
   return (
-    <div className="composite-card" style={{ borderLeft: `3px solid ${statusColor}` }}>
-      {/* Always-visible header row */}
-      <div className="composite-row">
+    <button
+      type="button"
+      className="composite-card"
+      style={{ borderLeft: `3px solid ${statusColor}` }}
+      onClick={hasDetail ? onToggle : undefined}
+    >
+      {/* Header row: icon + name (left) · badge + chevron (right) */}
+      <div className="composite-head">
         <span className="composite-icon">{panel.icon}</span>
         <span className="composite-label">{panel.label}</span>
-
-        {/* Inline pill values */}
-        <div className="composite-pills">
-          {panel.pills.map(p => (
-            <span
-              key={p.label}
-              className="composite-pill"
-              style={{
-                color: p.status === 'good' ? 'var(--good)'
-                  : p.status === 'warn' ? 'var(--warn)'
-                  : p.status === 'bad'  ? 'var(--bad)'
-                  : 'var(--ink-dim)',
-              }}
-            >
-              <span className="composite-pill-label">{p.label}</span>
-              <span className="composite-pill-val">{p.display}</span>
-            </span>
-          ))}
-        </div>
-
         <span className="composite-badge" style={{ background: statusBg, color: statusColor }}>
           {statusText}
         </span>
-
         {hasDetail && (
-          <button type="button" className="composite-toggle" onClick={onToggle} aria-label="Toggle detail">
-            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          </button>
+          <span className="composite-toggle" aria-hidden>
+            {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </span>
         )}
+      </div>
+
+      {/* Pills row — wraps freely on its own line, never collides with badge */}
+      <div className="composite-pills">
+        {panel.pills.map(p => (
+          <span
+            key={p.label}
+            className="composite-pill"
+            style={{
+              color: p.status === 'good' ? 'var(--good)'
+                : p.status === 'warn' ? 'var(--warn)'
+                : p.status === 'bad'  ? 'var(--bad)'
+                : 'var(--ink-dim)',
+            }}
+          >
+            <span className="composite-pill-label">{p.label}</span>
+            <span className="composite-pill-val">{p.display}</span>
+          </span>
+        ))}
       </div>
 
       {/* Expandable detail */}
@@ -373,7 +376,7 @@ function CompositeCard({ panel, expanded, onToggle }: {
           ))}
         </div>
       )}
-    </div>
+    </button>
   )
 }
 
@@ -401,9 +404,9 @@ export function LabComposites({ results, exams }: { results: EnrichedResult[]; e
   return (
     <section className="surface col-12">
       <div className="panel-header" style={{ marginBottom: 10 }}>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <span className="section-label">Smart analysis</span>
-          <h3>Health composites</h3>
+          <h3 style={{ whiteSpace: 'nowrap' }}>Composites</h3>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {actionCount  > 0 && <span className="chip" style={{ background: 'var(--bad-soft)',  color: 'var(--bad)'  }}>{actionCount} action</span>}
