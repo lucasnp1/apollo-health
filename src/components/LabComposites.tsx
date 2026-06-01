@@ -403,12 +403,12 @@ export function LabComposites({ results, exams }: { results: EnrichedResult[]; e
 
   return (
     <section className="surface col-12">
-      <div className="panel-header" style={{ marginBottom: 10 }}>
-        <div style={{ minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+        <div>
           <span className="section-label">Smart analysis</span>
-          <h3 style={{ whiteSpace: 'nowrap' }}>Composites</h3>
+          <h3 style={{ margin: 0 }}>Composites</h3>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {actionCount  > 0 && <span className="chip" style={{ background: 'var(--bad-soft)',  color: 'var(--bad)'  }}>{actionCount} action</span>}
           {monitorCount > 0 && <span className="chip" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>{monitorCount} monitor</span>}
         </div>

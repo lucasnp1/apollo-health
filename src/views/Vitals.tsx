@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Edit2, HeartPulse, Plus, Scale, Target, Trash2, X } from 'lucide-react'
+import { Edit2, HeartPulse, Scale, Target, Trash2, X } from 'lucide-react'
 import { useTheme } from '../lib/useTheme'
 import {
   Area,
@@ -119,51 +119,36 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   return (
     <div className="content-grid">
 
-      {/* ── Row 1: Log form (left) + BP chart (right) ── */}
-      <section className="surface col-5">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">{editingVital ? 'Editing reading' : 'New reading'}</span>
-            <h3>{editingVital ? 'Edit BP' : 'Log BP'}</h3>
+      {/* ── Edit BP bottom sheet ── */}
+      {editingVital && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget) cancelEdit() }}
+        >
+          <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '0 0 env(safe-area-inset-bottom, 20px)' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--line)' }} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 16px' }}>
+              <h3 style={{ margin: 0, fontSize: 17 }}>Edit reading</h3>
+              <button type="button" className="icon-button" onClick={cancelEdit}><X size={16} /></button>
+            </div>
+            <div className="form-grid" style={{ padding: '0 20px 24px' }}>
+              <label>Systolic<input inputMode="numeric" value={form.systolic} onChange={(e) => setForm({ ...form, systolic: e.target.value })} /></label>
+              <label>Diastolic<input inputMode="numeric" value={form.diastolic} onChange={(e) => setForm({ ...form, diastolic: e.target.value })} /></label>
+              <label>Pulse<input inputMode="numeric" value={form.pulse} onChange={(e) => setForm({ ...form, pulse: e.target.value })} /></label>
+              <label>Measured at<input type="datetime-local" value={form.measuredAt} onChange={(e) => setForm({ ...form, measuredAt: e.target.value })} /></label>
+              <label className="wide-field">Notes<input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
+              <button type="button" className="primary-button wide-field" style={{ height: 50, fontSize: 16 }} onClick={add} disabled={!form.systolic || !form.diastolic}>
+                <Edit2 size={16} /> Save changes
+              </button>
+            </div>
           </div>
-          {editingVital && (
-            <button type="button" className="icon-button" onClick={cancelEdit} aria-label="Cancel edit">
-              <X size={14} />
-            </button>
-          )}
         </div>
-        <div className="form-grid">
-          <label>
-            Systolic
-            <input inputMode="numeric" value={form.systolic} onChange={(e) => setForm({ ...form, systolic: e.target.value })} />
-          </label>
-          <label>
-            Diastolic
-            <input inputMode="numeric" value={form.diastolic} onChange={(e) => setForm({ ...form, diastolic: e.target.value })} />
-          </label>
-          <label>
-            Pulse
-            <input inputMode="numeric" value={form.pulse} onChange={(e) => setForm({ ...form, pulse: e.target.value })} />
-          </label>
-          <label>
-            Measured at
-            <input type="datetime-local" value={form.measuredAt} onChange={(e) => setForm({ ...form, measuredAt: e.target.value })} />
-          </label>
-          <label className="wide-field">
-            Notes
-            <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          </label>
-          <button type="button" className="primary-button wide-field" onClick={add} disabled={!form.systolic || !form.diastolic}>
-            {editingVital ? <><Edit2 size={14} /> Update</> : <><Plus size={15} /> Save</>}
-          </button>
-          {editingVital && (
-            <button type="button" className="ghost-button wide-field" onClick={cancelEdit}>Cancel</button>
-          )}
-        </div>
-      </section>
+      )}
 
-      {/* BP trend + stats — col-7 sits beside the form */}
-      <section className="surface col-7">
+      {/* ── BP trend — full width ── */}
+      <section className="surface col-12">
         <div className="panel-header">
           <div>
             <span className="section-label">Blood pressure</span>
@@ -213,24 +198,24 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         {filtered.length > 0 ? (
           <div className="stack">
             {filtered.slice().reverse().slice(0, 20).map((v) => (
-              <div className="row" key={v.id}>
-                <HeartPulse size={13} />
-                <div>
-                  <strong>{v.systolic}/{v.diastolic}</strong>
-                  <span className="sub">{v.pulse ? `${v.pulse} bpm` : 'No pulse'}{v.notes ? ` · ${v.notes}` : ''}</span>
+              <div className="row" key={v.id} style={{ gridTemplateColumns: 'auto minmax(0,1fr) auto auto auto', alignItems: 'center' }}>
+                <HeartPulse size={13} style={{ color: 'var(--bad)', flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <strong>{v.systolic}/{v.diastolic} mmHg</strong>
+                  <span className="sub">{v.pulse ? `${v.pulse} bpm` : ''}{v.notes ? ` · ${v.notes}` : ''}</span>
                 </div>
-                <time>{format(parseISO(v.measuredAt), 'MMM d HH:mm')}</time>
-                <button type="button" className="icon-button" onClick={() => startEditVital(v)} aria-label="Edit">
+                <time style={{ whiteSpace: 'nowrap' }}>{format(parseISO(v.measuredAt), 'MMM d HH:mm')}</time>
+                <button type="button" className="icon-button" style={{ width: 32, height: 32 }} onClick={() => startEditVital(v)} aria-label="Edit">
                   <Edit2 size={13} />
                 </button>
-                <button type="button" className="icon-button danger" onClick={() => db.vitals.delete(v.id!)} aria-label="Delete">
+                <button type="button" className="icon-button danger" style={{ width: 32, height: 32 }} onClick={() => db.vitals.delete(v.id!)} aria-label="Delete">
                   <Trash2 size={13} />
                 </button>
               </div>
             ))}
           </div>
         ) : (
-          <EmptyState icon={HeartPulse} title="No readings yet" detail="Log your first reading above." />
+          <EmptyState icon={HeartPulse} title="No readings yet" detail="Tap the + button above to log your first reading." />
         )}
       </section>
 

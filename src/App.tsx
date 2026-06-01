@@ -10,6 +10,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Calculator,
   Settings as SettingsIcon,
   Share2,
   Syringe,
@@ -26,7 +27,8 @@ import { InstallPrompt } from './components/InstallPrompt'
 // Modals are lazy — only loaded when first opened
 const QuickLog       = lazy(() => import('./components/QuickLog').then(m => ({ default: m.QuickLog })))
 const ProtocolWizard = lazy(() => import('./components/ProtocolWizard').then(m => ({ default: m.ProtocolWizard })))
-const ExportSheet    = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportSheet })))
+const ExportSheet      = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportSheet })))
+const DoseCalculator   = lazy(() => import('./components/DoseCalculator').then(m => ({ default: m.DoseCalculator })))
 import { SyncBanner } from './components/SyncBanner'
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
@@ -122,6 +124,7 @@ function Shell({
   const [qlPrefill, setQlPrefill] = useState<QuickLogPrefill | undefined>(undefined)
   const [labAddOpen, setLabAddOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [calcOpen,   setCalcOpen]   = useState(false)
   const [protocolWizardOpen, setProtocolWizardOpen] = useState(false)
 
   async function handleLabPdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -281,6 +284,12 @@ function Shell({
             <h1>{titleFor(activeView)}</h1>
           </div>
           <div className="topbar-actions">
+            {/* Dose calculator — Protocols page only */}
+            {activeView === 'meds' && (
+              <button type="button" className="icon-button" onClick={() => setCalcOpen(true)} aria-label="Dose calculator" title="Dose calculator">
+                <Calculator size={15} />
+              </button>
+            )}
             {/* Share/export — shown on data-rich views */}
             {(activeView === 'meds' || activeView === 'labs' || activeView === 'vitals') && (
               <button type="button" className="icon-button" onClick={() => setExportOpen(true)} aria-label="Export for doctor" title="Share with doctor">
@@ -306,10 +315,15 @@ function Shell({
               </button>
             )}
 
-            {/* Generic quick-log Add — skipped on Labs (uses Add result) and Meds (uses Log button on row) */}
+            {/* Generic quick-log Add — skipped on Labs; on Vitals opens BP tab */}
             {activeView !== 'labs' && activeView !== 'meds' && (
-              <button type="button" className="primary-button topbar-labelled" onClick={() => openQuickLog('injection')} title="Add">
-                <Plus size={14} /> <span className="btn-label">Add</span>
+              <button
+                type="button"
+                className="primary-button topbar-labelled"
+                onClick={() => openQuickLog(activeView === 'vitals' ? 'bp' : 'injection')}
+                title={activeView === 'vitals' ? 'Log reading' : 'Add'}
+              >
+                <Plus size={14} /> <span className="btn-label">{activeView === 'vitals' ? 'Log reading' : 'Add'}</span>
               </button>
             )}
             {/* Settings gear — mobile only, since Settings tab is #6 and hidden in bottom nav */}
@@ -395,6 +409,7 @@ function Shell({
       <InstallPrompt />
 
       <Suspense fallback={null}>
+        {calcOpen && <DoseCalculator onClose={() => setCalcOpen(false)} />}
         {exportOpen && (
           <ExportSheet
             compounds={compounds ?? []}

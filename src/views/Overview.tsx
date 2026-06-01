@@ -202,7 +202,7 @@ export function Overview({
 
       {/* ── 1b. Site rotation — larger now that Flags card is gone ── */}
       <section className="surface col-8">
-        <SiteRotation injections={injections} recentSites={[]} />
+        <SiteRotation injections={injections} compounds={compounds} />
       </section>
 
       {/* ── 1c. Personalized PK curve ── */}

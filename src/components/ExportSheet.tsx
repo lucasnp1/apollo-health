@@ -207,10 +207,24 @@ export function ExportSheet({
   const [inclBP, setInclBP]   = useState(false)
   const [selectedCompounds, setSelectedCompounds] = useState<number[]>([])
 
-  // Default to all compounds with injection history
+  // Compounds with injection history — deduplicated by canonical name so
+  // "Testosterone" and "Testosterone Enanthate" don't both appear as separate entries
   const compoundsWithHistory = useMemo(() => {
     const ids = new Set(injections.map(i => i.compoundId))
-    return compounds.filter(c => ids.has(c.id!))
+    const all = compounds.filter(c => ids.has(c.id!))
+    // Keep only one compound per unique base name (prefer the one with most injections)
+    const countById = new Map<number, number>()
+    for (const inj of injections) countById.set(inj.compoundId, (countById.get(inj.compoundId) ?? 0) + 1)
+    const seen = new Map<string, Compound>()
+    for (const c of all) {
+      // Canonical key: strip ester/form from name, lower-case first word
+      const key = c.name.toLowerCase().split(/[\s-]/)[0]
+      const existing = seen.get(key)
+      if (!existing || (countById.get(c.id!) ?? 0) > (countById.get(existing.id!) ?? 0)) {
+        seen.set(key, c)
+      }
+    }
+    return [...seen.values()]
   }, [compounds, injections])
 
   // Init selected compounds on mount
