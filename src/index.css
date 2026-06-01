@@ -472,6 +472,9 @@ time,
   gap: var(--space-3);
 }
 .panel-header > div { min-width: 0; flex: 1; }
+/* Action elements in the header must NOT stretch (pill-tabs, button groups) */
+.panel-header > .pill-tabs,
+.panel-header > button { flex: 0 0 auto; }
 .panel-header h3 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .section-label {
   display: block;
@@ -843,34 +846,36 @@ select {
 /* ---------- Body diagram (site rotation) ---------- */
 
 .body-diagram {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-top: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
 }
+/* Compact site pill — name + days inline on one line */
 .body-cell {
   position: relative;
-  padding: 14px 10px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 11px;
   background: var(--surface-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  text-align: center;
-  font-size: 11px;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--ink-dim);
   cursor: pointer;
   transition: border-color 120ms, background 120ms;
+  white-space: nowrap;
 }
 .body-cell:hover { border-color: var(--line-strong); }
 .body-cell.recent-1 { background: var(--bad-soft); border-color: rgba(220,38,38,0.25); color: var(--bad); }
 .body-cell.recent-3 { background: var(--warn-soft); border-color: rgba(234,88,12,0.25); color: var(--warn); }
 .body-cell.recent-7 { background: var(--accent-soft); border-color: rgba(15,118,110,0.2); color: var(--accent-ink); }
 .body-cell small {
-  display: block;
   color: var(--ink-mute);
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-mono);
-  margin-top: 4px;
   font-weight: 500;
 }
 
@@ -1446,8 +1451,8 @@ select {
 }
 
 /* ── Site rotation route groups ───────────────────────────────────────── */
-.site-rotation-body { display: flex; flex-direction: column; gap: 12px; }
-.site-route-group   { display: flex; flex-direction: column; gap: 6px; }
+.site-rotation-body { display: flex; flex-direction: column; gap: 10px; }
+.site-route-group   { display: flex; flex-direction: column; gap: 5px; }
 .site-route-label   {
   display: flex; align-items: center; gap: 6px;
   font-size: 10px; font-weight: 700; text-transform: uppercase;
