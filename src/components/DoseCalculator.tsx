@@ -22,26 +22,19 @@ export function DoseCalculator({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      className="sheet-overlay"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '0 0 env(safe-area-inset-bottom, 20px)' }}>
-        {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--line)' }} />
-        </div>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 16px' }}>
-          <div>
-            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: 'var(--ink-mute)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tools</p>
-            <h3 style={{ margin: 0, fontSize: 17, display: 'flex', alignItems: 'center', gap: 7 }}>
-              <Calculator size={17} /> Dose calculator
-            </h3>
-          </div>
+      <div className="sheet">
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Calculator size={18} /> Dose calculator
+          </h3>
           <button type="button" className="icon-button" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <div style={{ padding: '0 20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="sheet-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Inputs */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

@@ -292,26 +292,17 @@ export function ExportSheet({
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+      className="sheet-overlay"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 520, maxHeight: '88vh', overflowY: 'auto', padding: '0 0 env(safe-area-inset-bottom, 20px)' }}>
-
-        {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--line)' }} />
-        </div>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 16px' }}>
-          <div>
-            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--ink-mute)', marginBottom: 2 }}>Export</p>
-            <h3 style={{ margin: 0, fontSize: 17 }}>Share with doctor</h3>
-          </div>
+      <div className="sheet">
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <h3>Share with doctor</h3>
           <button type="button" className="icon-button" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <div style={{ padding: '0 20px 28px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <div className="sheet-body" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
 
           {/* Date range */}
           <div>

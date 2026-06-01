@@ -155,34 +155,19 @@ export function ProtocolWizard({
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: '0 0 0' }}
+      className="sheet-overlay"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{
-        background: 'var(--surface)',
-        borderRadius: '20px 20px 0 0',
-        width: '100%',
-        maxWidth: 560,
-        maxHeight: '92vh',
-        overflowY: 'auto',
-        padding: '0 0 env(safe-area-inset-bottom, 20px)',
-      }}>
-        {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--line)' }} />
-        </div>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 16px' }}>
-          <h3 style={{ fontSize: 17, fontWeight: 700, letterSpacing: -0.01 }}>
-            {isEdit ? 'Edit protocol' : 'New protocol'}
-          </h3>
+      <div className="sheet" style={{ maxWidth: 560 }}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <h3>{isEdit ? 'Edit protocol' : 'New protocol'}</h3>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
             <X size={16} />
           </button>
         </div>
 
-        <div style={{ padding: '0 20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="sheet-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* ── Compound section ── */}
           {!isEdit && (

@@ -122,18 +122,16 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
       {/* ── Edit BP bottom sheet ── */}
       {editingVital && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
+          className="sheet-overlay"
           onClick={(e) => { if (e.target === e.currentTarget) cancelEdit() }}
         >
-          <div style={{ background: 'var(--surface)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 480, padding: '0 0 env(safe-area-inset-bottom, 20px)' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
-              <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--line)' }} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 16px' }}>
-              <h3 style={{ margin: 0, fontSize: 17 }}>Edit reading</h3>
+          <div className="sheet" style={{ maxWidth: 480 }}>
+            <div className="sheet-handle" />
+            <div className="sheet-header">
+              <h3>Edit reading</h3>
               <button type="button" className="icon-button" onClick={cancelEdit}><X size={16} /></button>
             </div>
-            <div className="form-grid" style={{ padding: '0 20px 24px' }}>
+            <div className="form-grid sheet-body">
               <label>Systolic<input inputMode="numeric" value={form.systolic} onChange={(e) => setForm({ ...form, systolic: e.target.value })} /></label>
               <label>Diastolic<input inputMode="numeric" value={form.diastolic} onChange={(e) => setForm({ ...form, diastolic: e.target.value })} /></label>
               <label>Pulse<input inputMode="numeric" value={form.pulse} onChange={(e) => setForm({ ...form, pulse: e.target.value })} /></label>

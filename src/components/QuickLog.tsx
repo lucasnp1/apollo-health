@@ -154,27 +154,15 @@ export function QuickLog({
 
   return (
     <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 50,
-        background: 'rgba(10,10,10,0.45)', backdropFilter: 'blur(3px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
-      }}
+      className="sheet-overlay"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       role="dialog"
       aria-modal
     >
-      <div style={{
-        background: 'var(--surface)',
-        borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-lg)',
-        width: '100%', maxWidth: 540,
-        maxHeight: '90dvh',
-        display: 'flex', flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 24px 0' }}>
+      <div className="sheet" style={{ maxWidth: 540 }}>
+        <div className="sheet-handle" />
+        {/* Header — tab switcher + close */}
+        <div className="sheet-header">
           <div className="pill-tabs" role="tablist">
             <button type="button" role="tab" className={tab === 'injection' ? 'active' : undefined} onClick={() => setTab('injection')}>
               <Droplet size={12} /> Injection
@@ -186,8 +174,8 @@ export function QuickLog({
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
         </div>
 
-        {/* Body — scrollable */}
-        <div style={{ overflowY: 'auto', padding: '20px 24px 28px' }}>
+        {/* Body */}
+        <div className="sheet-body">
           {tab === 'injection' && <InjectionForm compounds={compounds} prefill={prefill} onSaved={onClose} />}
           {tab === 'bp' && <BPForm onSaved={onClose} />}
         </div>
