@@ -186,7 +186,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <EmptyState icon={HeartPulse} title="No readings in this range" detail="Log a reading on the left." />
+          <EmptyState icon={HeartPulse} title="No readings in this range" detail="Use the + button above to log." />
         )}
       </section>
 
@@ -261,7 +261,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
             ))}
           </div>
         ) : (
-          <EmptyState icon={Scale} title="No weight logs" detail="Log your weight on the left." />
+          <EmptyState icon={Scale} title="No weight logs" detail="Use the Weight section below." />
         )}
       </section>
 

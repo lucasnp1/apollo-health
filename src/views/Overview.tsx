@@ -189,7 +189,7 @@ export function Overview({
                 ? `Goal ${weightGoal.target} kg · ${(weightGoal.target - weightStats.latest >= 0 ? '+' : '')}${(weightGoal.target - weightStats.latest).toFixed(1)} kg to go`
                 : weightStats.delta !== undefined
                   ? `${weightStats.delta >= 0 ? '+' : ''}${weightStats.delta.toFixed(1)} kg · ${weightStats.percent?.toFixed(1)}%`
-                  : 'Log weight with injection'
+                  : 'No weight data'
             }
             spark={<Sparkline values={weightSpark} />}
             tone={

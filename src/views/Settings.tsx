@@ -259,15 +259,15 @@ function BackupSettings({
       <p className="muted-copy">
         Download a full JSON backup to transfer between devices, or import a backup file.
       </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" className="primary-button" onClick={exportJson}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button type="button" className="primary-button" style={{ alignSelf: 'flex-start' }} onClick={exportJson}>
           <Download size={14} /> Download JSON
         </button>
-        <label className="ghost-button" style={{ cursor: 'pointer' }}>
+        <label className="ghost-button" style={{ cursor: 'pointer', alignSelf: 'flex-start' }}>
           <input type="file" accept="application/json" hidden onChange={handleImport} disabled={importing} />
           <Upload size={14} /> {importDone ? 'Imported ✓' : importing ? 'Importing…' : 'Import JSON'}
         </label>
-        <button type="button" className="ghost-button" onClick={() => window.print()}>
+        <button type="button" className="ghost-button" style={{ alignSelf: 'flex-start' }} onClick={() => window.print()}>
           <Printer size={14} /> Print report
         </button>
       </div>

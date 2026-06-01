@@ -315,8 +315,8 @@ function Shell({
               </button>
             )}
 
-            {/* Generic quick-log Add — skipped on Labs; on Vitals opens BP tab */}
-            {activeView !== 'labs' && activeView !== 'meds' && (
+            {/* Generic quick-log Add — skipped on Labs, Meds, Settings */}
+            {activeView !== 'labs' && activeView !== 'meds' && activeView !== 'settings' && (
               <button
                 type="button"
                 className="primary-button topbar-labelled"
