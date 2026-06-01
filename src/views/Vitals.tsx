@@ -20,6 +20,25 @@ import { TimeRangePicker } from '../components/TimeRangePicker'
 import { filterByRange, type TimeRange } from '../lib/timeRange'
 import { EmptyState } from '../components/EmptyState'
 
+// ── BP classification (AHA categories) ─────────────────────────────────────
+type BpStatus = 'normal' | 'elevated' | 'stage1' | 'stage2' | 'crisis'
+
+function classifyBp(systolic: number, diastolic: number): BpStatus {
+  if (systolic >= 180 || diastolic >= 120) return 'crisis'
+  if (systolic >= 140 || diastolic >= 90)  return 'stage2'
+  if (systolic >= 130 || diastolic >= 80)  return 'stage1'
+  if (systolic >= 120)                      return 'elevated'
+  return 'normal'
+}
+
+const BP_META: Record<BpStatus, { color: string; soft: string; label: string }> = {
+  normal:   { color: 'var(--good)', soft: 'var(--good-soft)', label: 'Normal' },
+  elevated: { color: 'var(--warn)', soft: 'var(--warn-soft)', label: 'Elevated' },
+  stage1:   { color: 'var(--warn)', soft: 'var(--warn-soft)', label: 'Stage 1' },
+  stage2:   { color: 'var(--bad)',  soft: 'var(--bad-soft)',  label: 'Stage 2' },
+  crisis:   { color: 'var(--bad)',  soft: 'var(--bad-soft)',  label: 'Crisis' },
+}
+
 export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   const { chart: colors } = useTheme()
   const [range, setRange] = useState<TimeRange>('3M')
@@ -42,7 +61,15 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
     systolic: v.systolic,
     diastolic: v.diastolic,
     pulse: v.pulse,
+    statusColor: BP_META[classifyBp(v.systolic, v.diastolic)].color,
   }))
+
+  // Custom dot — coloured by that reading's BP status
+  type DotProps = { cx?: number; cy?: number; payload?: { statusColor?: string } }
+  const StatusDot = ({ cx, cy, payload }: DotProps) => {
+    if (cx == null || cy == null) return <></>
+    return <circle cx={cx} cy={cy} r={3.5} fill={payload?.statusColor ?? '#0f766e'} stroke="var(--surface)" strokeWidth={1.5} />
+  }
 
   const stats = useMemo(() => {
     if (filtered.length === 0) return undefined
@@ -169,12 +196,15 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
                 </linearGradient>
               </defs>
               <CartesianGrid stroke={colors.grid} vertical={false} />
-              <ReferenceArea y1={140} y2={200} fill="rgba(239,68,68,0.08)" />
-              <ReferenceArea y1={130} y2={140} fill="rgba(245,158,11,0.08)" />
+              {/* BP category bands — Stage 2 (red), Stage 1/Elevated (amber), Normal (green tint) */}
+              <ReferenceArea y1={140} y2={200} fill="rgba(255,59,48,0.07)" />
+              <ReferenceArea y1={130} y2={140} fill="rgba(255,149,0,0.07)" />
+              <ReferenceArea y1={120} y2={130} fill="rgba(255,149,0,0.04)" />
+              <ReferenceArea y1={60}  y2={120} fill="rgba(52,199,89,0.05)" />
               <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
               <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
               <Tooltip contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }} />
-              <Area type="monotone" dataKey="systolic" stroke="#0f766e" strokeWidth={2.5} fill="url(#sysFill)" />
+              <Area type="monotone" dataKey="systolic" stroke="#0f766e" strokeWidth={2.5} fill="url(#sysFill)" dot={<StatusDot />} activeDot={{ r: 5 }} />
               <Line type="monotone" dataKey="diastolic" stroke="#98a2af" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="pulse" stroke="#c084fc" strokeWidth={1.5} dot={false} />
               {bpGoal && (
@@ -195,12 +225,18 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         </div>
         {filtered.length > 0 ? (
           <div className="stack">
-            {filtered.slice().reverse().slice(0, 20).map((v) => (
+            {filtered.slice().reverse().slice(0, 20).map((v) => {
+              const status = classifyBp(v.systolic, v.diastolic)
+              const meta = BP_META[status]
+              return (
               <div className="row" key={v.id} style={{ gridTemplateColumns: 'auto minmax(0,1fr) auto auto auto', alignItems: 'center' }}>
-                <HeartPulse size={13} style={{ color: 'var(--bad)', flexShrink: 0 }} />
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
                 <div style={{ minWidth: 0 }}>
-                  <strong>{v.systolic}/{v.diastolic} mmHg</strong>
-                  <span className="sub">{v.pulse ? `${v.pulse} bpm` : ''}{v.notes ? ` · ${v.notes}` : ''}</span>
+                  <strong style={{ color: meta.color }}>
+                    {v.systolic}/{v.diastolic}
+                    <span className="chip hide-mobile" style={{ background: meta.soft, color: meta.color, fontSize: 10, marginLeft: 8, verticalAlign: 'middle' }}>{meta.label}</span>
+                  </strong>
+                  <span className="sub">{meta.label} · {v.pulse ? `${v.pulse} bpm` : 'no pulse'}{v.notes ? ` · ${v.notes}` : ''}</span>
                 </div>
                 <time style={{ whiteSpace: 'nowrap' }}>{format(parseISO(v.measuredAt), 'MMM d HH:mm')}</time>
                 <button type="button" className="icon-button" style={{ width: 32, height: 32 }} onClick={() => startEditVital(v)} aria-label="Edit">
@@ -210,7 +246,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
                   <Trash2 size={13} />
                 </button>
               </div>
-            ))}
+            )})}
           </div>
         ) : (
           <EmptyState icon={HeartPulse} title="No readings yet" detail="Tap the + button above to log your first reading." />
