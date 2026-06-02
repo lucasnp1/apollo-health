@@ -282,21 +282,18 @@ function Shell({
 
       <main className="main-panel">
         <header className="topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-            {/* Hamburger — mobile only */}
-            <button
-              type="button"
-              className="icon-button show-mobile-only"
-              onClick={() => setMenuOpen(true)}
-              aria-label="Open menu"
-              style={{ flexShrink: 0 }}
-            >
-              <Menu size={18} />
-            </button>
-            <div>
-              <p className="eyeline">Personal health record</p>
-              <h1>{titleFor(activeView)}</h1>
-            </div>
+          {/* Hamburger sits as a direct topbar flex-child so it aligns with the gear on the right */}
+          <button
+            type="button"
+            className="icon-button show-mobile-only"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu size={18} />
+          </button>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p className="eyeline">Personal health record</p>
+            <h1>{titleFor(activeView)}</h1>
           </div>
           <div className="topbar-actions">
             {/* Dose calculator — Protocols page only */}
@@ -341,16 +338,15 @@ function Shell({
                 <Plus size={14} /> <span className="btn-label">{activeView === 'vitals' ? 'Log reading' : 'Add'}</span>
               </button>
             )}
-            {/* Settings gear — mobile only, since Settings tab is #6 and hidden in bottom nav */}
+            {/* Settings gear — mobile only */}
             {activeView !== 'settings' && (
               <button
                 type="button"
                 className="icon-button show-mobile-only"
                 onClick={() => setActiveView('settings')}
                 aria-label="Settings"
-                style={{ color: 'var(--ink-mute)' }}
               >
-                <SettingsIcon size={16} />
+                <SettingsIcon size={18} />
               </button>
             )}
           </div>
