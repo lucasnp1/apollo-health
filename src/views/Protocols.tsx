@@ -541,6 +541,7 @@ function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onCo
 function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog; compounds: Compound[]; onClose: () => void }) {
   const [compoundId, setCompoundId] = useState(entry.compoundId)
   const [dose, setDose] = useState(String(entry.dose ?? ''))
+  const [route, setRoute] = useState<'IM' | 'SubQ' | 'Oral' | 'Other'>(entry.route ?? 'IM')
   const [site, setSite] = useState(entry.site ?? '')
   const [notes, setNotes] = useState(entry.notes ?? '')
   const [takenAt, setTakenAt] = useState(entry.takenAt.slice(0, 16))
@@ -567,6 +568,7 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
         dose: dose ? Number(dose) : undefined,
         rawDose: dose ? `${dose} ${compound?.unit ?? entry.unit}` : entry.rawDose,
         unit: (compound?.unit ?? entry.unit) as InjectionLog['unit'],
+        route,
         site: site || undefined,
         notes: notes || undefined,
         takenAt: new Date(takenAt).toISOString(),
@@ -578,22 +580,14 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
   }
 
   return (
-    <div
-      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(10,10,10,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', width: '100%', maxWidth: 540, overflow: 'hidden' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 24px 0' }}>
-          <div>
-            <span className="section-label">Edit</span>
-            <h3 style={{ margin: '2px 0 0' }}>Injection log</h3>
-          </div>
+    <div className="sheet-overlay" onClick={onClose}>
+      <div className="sheet" style={{ maxWidth: 540 }} onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <h3>Edit injection</h3>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
         </div>
-        <div style={{ padding: '20px 24px 28px' }}>
+        <div className="sheet-body">
           <div className="form-grid">
             <label className="wide-field">
               Compound
@@ -604,6 +598,15 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
             <label>
               Dose ({compound?.unit ?? entry.unit})
               <input inputMode="decimal" value={dose} onChange={(e) => setDose(e.target.value)} />
+            </label>
+            <label>
+              Route
+              <select value={route} onChange={(e) => setRoute(e.target.value as typeof route)}>
+                <option value="IM">IM (Intramuscular)</option>
+                <option value="SubQ">SubQ (Subcutaneous)</option>
+                <option value="Oral">Oral</option>
+                <option value="Other">Other</option>
+              </select>
             </label>
             <label>
               Site

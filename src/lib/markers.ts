@@ -97,7 +97,7 @@ const CATALOG: Array<MarkerMeta & { aliases: string[] }> = [
     label: 'Hematocrit',
     panel: 'Blood Count',
     unit: '%',
-    aliases: ['hematocrit', 'haematocrit', 'hct'],
+    aliases: ['hematocrit', 'haematocrit', 'hct', 'packed cell volume', 'pcv', 'haematocrit ('],
     optimal: { high: 52, note: 'Above 52% raises hyperviscosity / cardiovascular concern in TRT context.' },
   },
   {
@@ -105,7 +105,7 @@ const CATALOG: Array<MarkerMeta & { aliases: string[] }> = [
     label: 'Hemoglobin',
     panel: 'Blood Count',
     unit: 'g/dL',
-    aliases: ['hemoglobin', 'haemoglobin', 'hgb'],
+    aliases: ['hemoglobin', 'haemoglobin', 'hgb', 'haemoglobin concentration', 'hemoglobin concentration'],
     optimal: { high: 17.5 },
   },
   {
@@ -113,7 +113,7 @@ const CATALOG: Array<MarkerMeta & { aliases: string[] }> = [
     label: 'Red Blood Cells',
     panel: 'Blood Count',
     unit: 'M/uL',
-    aliases: ['red blood cell', 'rbc'],
+    aliases: ['red blood cell', 'rbc', 'erythrocytes'],
   },
   {
     key: 'ferritin',

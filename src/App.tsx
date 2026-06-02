@@ -11,10 +11,12 @@ import {
   PanelLeftOpen,
   Plus,
   Calculator,
+  Menu,
   Settings as SettingsIcon,
   Share2,
   Syringe,
   Upload,
+  X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -125,6 +127,7 @@ function Shell({
   const [labAddOpen, setLabAddOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [calcOpen,   setCalcOpen]   = useState(false)
+  const [menuOpen,   setMenuOpen]   = useState(false)
   const [protocolWizardOpen, setProtocolWizardOpen] = useState(false)
 
   async function handleLabPdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -279,9 +282,21 @@ function Shell({
 
       <main className="main-panel">
         <header className="topbar">
-          <div>
-            <p className="eyeline">Personal health record</p>
-            <h1>{titleFor(activeView)}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            {/* Hamburger — mobile only */}
+            <button
+              type="button"
+              className="icon-button show-mobile-only"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
+              style={{ flexShrink: 0 }}
+            >
+              <Menu size={18} />
+            </button>
+            <div>
+              <p className="eyeline">Personal health record</p>
+              <h1>{titleFor(activeView)}</h1>
+            </div>
           </div>
           <div className="topbar-actions">
             {/* Dose calculator — Protocols page only */}
@@ -377,19 +392,50 @@ function Shell({
         </Suspense>
       </main>
 
-      <nav className="mobile-tabs" aria-label="Mobile primary">
-        {NAV.slice(0, 5).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={activeView === item.id ? 'mobile-tab active' : 'mobile-tab'}
-            onClick={() => setActiveView(item.id)}
+      {/* Mobile hamburger drawer — replaces bottom tabs */}
+      {menuOpen && (
+        <div
+          className="mobile-drawer-overlay"
+          onClick={() => setMenuOpen(false)}
+        >
+          <nav
+            className="mobile-drawer"
+            onClick={e => e.stopPropagation()}
+            aria-label="Mobile navigation"
           >
-            <item.icon size={17} />
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </nav>
+            {/* Drawer header */}
+            <div className="mobile-drawer-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div className="brand-mark"><Activity size={14} /></div>
+                <strong style={{ fontSize: 15 }}>Apollo Health</strong>
+              </div>
+              <button type="button" className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Close menu">
+                <X size={16} />
+              </button>
+            </div>
+            {/* Nav items — all pages */}
+            <div className="mobile-drawer-nav">
+              {NAV.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={activeView === item.id ? 'mobile-drawer-item active' : 'mobile-drawer-item'}
+                  onClick={() => { setActiveView(item.id); setMenuOpen(false) }}
+                >
+                  <item.icon size={18} />
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+            {/* Quick actions at bottom of drawer */}
+            <div className="mobile-drawer-footer">
+              <button type="button" className="primary-button" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { openQuickLog('injection'); setMenuOpen(false) }}>
+                <Plus size={14} /> Log injection
+              </button>
+            </div>
+          </nav>
+        </div>
+      )}
 
       <QuickLog
         open={qlOpen}

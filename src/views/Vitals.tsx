@@ -20,23 +20,27 @@ import { TimeRangePicker } from '../components/TimeRangePicker'
 import { filterByRange, type TimeRange } from '../lib/timeRange'
 import { EmptyState } from '../components/EmptyState'
 
-// ── BP classification (AHA categories) ─────────────────────────────────────
-type BpStatus = 'normal' | 'elevated' | 'stage1' | 'stage2' | 'crisis'
+// ── BP classification — ranges calibrated for steroid/TRT users ─────────────
+// Standard clinical cutoffs are designed for untrained, non-medicated adults.
+// Athletes on anabolic compounds typically run higher baseline BP due to
+// increased cardiac output, haematocrit, and fluid retention.
+// These ranges reflect community consensus from sports medicine and PED forums.
+type BpStatus = 'optimal' | 'good' | 'monitor' | 'high' | 'danger'
 
 function classifyBp(systolic: number, diastolic: number): BpStatus {
-  if (systolic >= 180 || diastolic >= 120) return 'crisis'
-  if (systolic >= 140 || diastolic >= 90)  return 'stage2'
-  if (systolic >= 130 || diastolic >= 80)  return 'stage1'
-  if (systolic >= 120)                      return 'elevated'
-  return 'normal'
+  if (systolic >= 160 || diastolic >= 105) return 'danger'
+  if (systolic >= 145 || diastolic >= 95)  return 'high'
+  if (systolic >= 135 || diastolic >= 88)  return 'monitor'
+  if (systolic >= 125 || diastolic >= 82)  return 'good'
+  return 'optimal'
 }
 
 const BP_META: Record<BpStatus, { color: string; soft: string; label: string }> = {
-  normal:   { color: 'var(--good)', soft: 'var(--good-soft)', label: 'Normal' },
-  elevated: { color: 'var(--warn)', soft: 'var(--warn-soft)', label: 'Elevated' },
-  stage1:   { color: 'var(--warn)', soft: 'var(--warn-soft)', label: 'Stage 1' },
-  stage2:   { color: 'var(--bad)',  soft: 'var(--bad-soft)',  label: 'Stage 2' },
-  crisis:   { color: 'var(--bad)',  soft: 'var(--bad-soft)',  label: 'Crisis' },
+  optimal: { color: 'var(--good)', soft: 'var(--good-soft)', label: 'Optimal' },
+  good:    { color: 'var(--good)', soft: 'var(--good-soft)', label: 'Good' },
+  monitor: { color: 'var(--warn)', soft: 'var(--warn-soft)', label: 'Monitor' },
+  high:    { color: 'var(--bad)',  soft: 'var(--bad-soft)',  label: 'High' },
+  danger:  { color: 'var(--bad)',  soft: 'var(--bad-soft)',  label: 'Action' },
 }
 
 export function Vitals({ vitals }: { vitals: VitalLog[] }) {
@@ -196,11 +200,11 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
                 </linearGradient>
               </defs>
               <CartesianGrid stroke={colors.grid} vertical={false} />
-              {/* BP category bands — Stage 2 (red), Stage 1/Elevated (amber), Normal (green tint) */}
-              <ReferenceArea y1={140} y2={200} fill="rgba(255,59,48,0.07)" />
-              <ReferenceArea y1={130} y2={140} fill="rgba(255,149,0,0.07)" />
-              <ReferenceArea y1={120} y2={130} fill="rgba(255,149,0,0.04)" />
-              <ReferenceArea y1={60}  y2={120} fill="rgba(52,199,89,0.05)" />
+              {/* BP bands — thresholds for steroid users (not general population) */}
+              <ReferenceArea y1={160} y2={200} fill="rgba(255,59,48,0.10)" />
+              <ReferenceArea y1={145} y2={160} fill="rgba(255,59,48,0.06)" />
+              <ReferenceArea y1={135} y2={145} fill="rgba(255,149,0,0.07)" />
+              <ReferenceArea y1={60}  y2={135} fill="rgba(52,199,89,0.04)" />
               <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
               <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
               <Tooltip contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }} />
@@ -220,10 +224,10 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         {/* TRT-aware BP insight — testosterone is a common cause of raised BP */}
         {stats && (() => {
           const meanStatus = classifyBp(Math.round(stats.meanSys), Math.round(stats.meanDia))
-          if (meanStatus === 'normal') {
+          if (meanStatus === 'optimal' || meanStatus === 'good') {
             return (
               <p className="panel-note" style={{ marginTop: 8, color: 'var(--good)' }}>
-                ✓ BP is well controlled on your current protocol. Keep logging — testosterone can raise BP over time, so watch the trend.
+                ✓ BP is well controlled ({stats.meanSys.toFixed(0)}/{stats.meanDia.toFixed(0)} avg). Keep logging — anabolics can push it up over time.
               </p>
             )
           }
@@ -231,14 +235,15 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
           return (
             <div style={{ marginTop: 10, padding: '10px 12px', background: m.soft, borderRadius: 10, borderLeft: `3px solid ${m.color}` }}>
               <strong style={{ fontSize: 13, color: m.color }}>
-                {meanStatus === 'stage2' || meanStatus === 'crisis' ? 'Blood pressure is high' : 'Blood pressure is elevated'}
-                {' '}(avg {stats.meanSys.toFixed(0)}/{stats.meanDia.toFixed(0)})
+                {meanStatus === 'danger' ? '⚠ Action needed' : meanStatus === 'high' ? 'BP is high' : 'BP needs monitoring'}
+                {' '}— avg {stats.meanSys.toFixed(0)}/{stats.meanDia.toFixed(0)}
               </strong>
               <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--ink-dim)', lineHeight: 1.5 }}>
-                Raised BP is one of the most common effects of testosterone — it increases red blood cells and fluid retention.
-                {meanStatus === 'stage2' || meanStatus === 'crisis'
-                  ? ' Consider lowering your dose, prioritise cardio, reduce sodium, and discuss with your doctor. Check your haematocrit on next bloodwork.'
-                  : ' Watch the trend, stay hydrated, add regular cardio, and reduce sodium. If it keeps climbing, review your dose.'}
+                {meanStatus === 'danger'
+                  ? 'This is too high on-cycle. Consider a blast break, reduce dose/compound count, add cardio, and see a doctor. Check haematocrit ASAP.'
+                  : meanStatus === 'high'
+                  ? 'Common on high-dose blasts or compounds like Tren, Anadrol, or Deca. Reduce sodium, increase cardio, consider an AI or dose cut. Check haematocrit next bloods.'
+                  : 'Expected on anabolic protocols. Stay hydrated, manage sodium, log readings consistently. If climbing, review your compound selection or dose.'}
               </p>
             </div>
           )
