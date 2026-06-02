@@ -15,20 +15,9 @@
 
 import { useMemo } from 'react'
 import { parseISO, format, addDays } from 'date-fns'
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 import type { Compound, InjectionLog, LabExam, Protocol, ProtocolDose } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
 import { generateDoseInstants } from '../lib/schedule'
-import { useTheme } from '../lib/useTheme'
 
 const MS_PER_DAY = 86_400_000
 const PTS_PER_DAY = 6  // 4-hour resolution for smooth sawtooth
@@ -217,18 +206,6 @@ function buildCycleData(
   }
 }
 
-function StatPill({ label, value, sub, color }: {
-  label: string; value: string; sub?: string; color?: string
-}) {
-  return (
-    <div style={{ flexShrink: 0 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-mute)' }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-mono)', color: color ?? 'var(--ink)', lineHeight: 1.1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 10, color: 'var(--ink-dim)', marginTop: 1 }}>{sub}</div>}
-    </div>
-  )
-}
-
 export function PKOverviewCard({
   compounds,
   injections,
@@ -242,8 +219,6 @@ export function PKOverviewCard({
   protocolDoses: ProtocolDose[]
   exams: LabExam[]
 }) {
-  const { chart: colors } = useTheme()
-
   const cycleInfos = useMemo(() => {
     const compoundMap = new Map(compounds.map(c => [c.id, c]))
     return protocols
@@ -259,10 +234,16 @@ export function PKOverviewCard({
   if (cycleInfos.length === 0) return null
 
   return (
-    <>
+    <section className="surface col-12">
+      <div className="panel-header" style={{ marginBottom: 10 }}>
+        <div>
+          <span className="section-label">Active compounds</span>
+          <h3>Release levels</h3>
+        </div>
+      </div>
+      <div className="pk-compounds-list">
       {cycleInfos.map(({ protocol, data }) => {
         const {
-          chartData, events, todayDayNum, endDayNum,
           currentLevel, nextPeak, nextTrough,
           protocolEndLabel, pkName, color,
         } = data
@@ -282,226 +263,53 @@ export function PKOverviewCard({
           return `${abs.toFixed(1)}d`
         }
 
-        // Separate injection and bloodwork events for legend display
-        const injEvents = events.filter(e => e.kind === 'injection')
-        const bwEvents  = events.filter(e => e.kind === 'bloodwork')
-
         return (
-          <section
+          <div
             key={protocol.id}
-            className="surface col-12"
+            className="pk-compound-row"
             style={{ borderLeft: `3px solid ${color}` }}
           >
-            {/* ── Header ── */}
-            {/* Title row */}
-            <div style={{ marginBottom: 10 }}>
-              <span className="section-label">Cycle timeline · {protocol.name}</span>
-              <h3 style={{ color, margin: 0 }}>
-                {pkName}
-                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-dim)', marginLeft: 8 }}>
-                  {protocol.dose} {protocol.unit}
-                </span>
-              </h3>
+            {/* Compound name + dose */}
+            <div className="pk-compound-info">
+              <span className="pk-compound-name" style={{ color }}>{pkName}</span>
+              <span className="pk-compound-dose">{protocol.dose} {protocol.unit}</span>
             </div>
-            {/* Stat pills — horizontal scroll on mobile so they never wrap or get cut */}
-            <div style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 4, marginBottom: 8, WebkitOverflowScrolling: 'touch' }}>
-              <StatPill label="Now" value={`${currentLevel.toFixed(1)}`} sub="mg/day" color={color} />
+            {/* Key stats — compact horizontal */}
+            <div className="pk-compound-stats">
+              <div className="pk-stat">
+                <span className="pk-stat-label">Now</span>
+                <span className="pk-stat-value" style={{ color }}>{currentLevel.toFixed(1)}<small>mg/d</small></span>
+              </div>
               {nextPeak && peakIn !== null && peakIn > 0 && (
-                <StatPill label="Next peak" value={`in ${relTime(peakIn)}`} sub={`${nextPeak.level.toFixed(1)} mg/d`} color="var(--warn)" />
+                <div className="pk-stat">
+                  <span className="pk-stat-label">Peak</span>
+                  <span className="pk-stat-value" style={{ color: 'var(--warn)' }}>in {relTime(peakIn)}</span>
+                </div>
               )}
               {nextTrough && troughIn !== null && troughIn > 0 && (
-                <StatPill label="Trough · labs" value={`in ${relTime(troughIn)}`} sub={`${nextTrough.level.toFixed(1)} mg/d`} color="var(--good)" />
+                <div className="pk-stat">
+                  <span className="pk-stat-label">Labs</span>
+                  <span className="pk-stat-value" style={{ color: 'var(--good)' }}>in {relTime(troughIn)}</span>
+                </div>
               )}
               {protocolEndLabel && (
-                <StatPill label="Protocol ends" value={protocolEndLabel} />
+                <div className="pk-stat">
+                  <span className="pk-stat-label">Ends</span>
+                  <span className="pk-stat-value">{protocolEndLabel}</span>
+                </div>
               )}
             </div>
 
-            {/* ── Chart ── */}
-            <ResponsiveContainer width="100%" height={190}>
-              <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
-                <defs>
-                  <linearGradient id={`pkLogged-${protocol.id}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity={0.4} />
-                    <stop offset="100%" stopColor={color} stopOpacity={0.04} />
-                  </linearGradient>
-                  <linearGradient id={`pkProj-${protocol.id}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity={0.18} />
-                    <stop offset="100%" stopColor={color} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-
-                <CartesianGrid stroke={colors.grid} vertical={false} />
-
-                <XAxis
-                  dataKey="dayNum"
-                  type="number"
-                  domain={['dataMin', 'dataMax']}
-                  tickFormatter={(v: number) =>
-                    Math.round(v) % 7 === 0 && Math.abs(v - Math.round(v)) < 0.4
-                      ? `Day ${Math.round(v)}`
-                      : ''
-                  }
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: colors.tick, fontSize: 10 }}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: colors.tick, fontSize: 10 }}
-                  width={40}
-                  tickFormatter={(v: number) => v.toFixed(0)}
-                />
-
-                <Tooltip
-                  contentStyle={{
-                    background: colors.tooltipBg,
-                    border: `1px solid ${colors.tooltipBorder}`,
-                    borderRadius: 10,
-                    fontSize: 12,
-                    color: colors.tooltipText,
-                  }}
-                  formatter={(v, name) => [
-                    `${(v as number).toFixed(2)} mg/day`,
-                    name === 'logged' ? 'Logged' : 'Projected',
-                  ]}
-                  labelFormatter={(v) => `Day ${(v as number).toFixed(1)}`}
-                />
-
-                {/* Today */}
-                <ReferenceLine
-                  x={todayDayNum}
-                  stroke={color}
-                  strokeDasharray="4 3"
-                  strokeWidth={1.5}
-                  label={{ value: 'Today', position: 'insideTopRight', fill: color, fontSize: 9 }}
-                />
-
-                {/* Protocol end */}
-                {endDayNum !== null && (
-                  <ReferenceLine
-                    x={endDayNum}
-                    stroke="var(--ink-mute)"
-                    strokeDasharray="3 3"
-                    strokeWidth={1}
-                    label={{ value: 'End', position: 'insideTopRight', fill: 'var(--ink-mute)', fontSize: 9 }}
-                  />
-                )}
-
-                {/* Next peak */}
-                {nextPeak && (
-                  <ReferenceLine
-                    x={nextPeak.dayNum}
-                    stroke="var(--warn)"
-                    strokeDasharray="2 4"
-                    strokeWidth={1}
-                    label={{ value: '↑ Peak', position: 'insideTopLeft', fill: 'var(--warn)', fontSize: 9 }}
-                  />
-                )}
-
-                {/* Next trough / bloodwork window */}
-                {nextTrough && (
-                  <ReferenceLine
-                    x={nextTrough.dayNum}
-                    stroke="var(--good)"
-                    strokeDasharray="2 4"
-                    strokeWidth={1}
-                    label={{ value: '🩸 Draw', position: 'insideTopLeft', fill: 'var(--good)', fontSize: 9 }}
-                  />
-                )}
-
-                {/* Injection event markers */}
-                {injEvents.map((ev, i) => (
-                  <ReferenceLine
-                    key={`inj-${i}`}
-                    x={ev.dayNum}
-                    stroke={color}
-                    strokeOpacity={0.35}
-                    strokeWidth={1}
-                    strokeDasharray="1 0"
-                  />
-                ))}
-
-                {/* Bloodwork event markers */}
-                {bwEvents.map((ev, i) => (
-                  <ReferenceLine
-                    key={`bw-${i}`}
-                    x={ev.dayNum}
-                    stroke="#e53e3e"
-                    strokeWidth={1.5}
-                    strokeDasharray="2 3"
-                    label={{ value: '🩸', position: 'insideTopLeft', fill: '#e53e3e', fontSize: 11 }}
-                  />
-                ))}
-
-                {/* Logged (past) series */}
-                <Area
-                  type="monotone"
-                  dataKey="logged"
-                  stroke={color}
-                  strokeWidth={2}
-                  fill={`url(#pkLogged-${protocol.id})`}
-                  dot={false}
-                  activeDot={{ r: 3, fill: color }}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
-
-                {/* Projected (future) series */}
-                <Area
-                  type="monotone"
-                  dataKey="projected"
-                  stroke={color}
-                  strokeWidth={1.5}
-                  strokeDasharray="5 3"
-                  strokeOpacity={0.55}
-                  fill={`url(#pkProj-${protocol.id})`}
-                  dot={false}
-                  activeDot={{ r: 3, fill: color }}
-                  connectNulls={false}
-                  isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-
-            {/* ── Legend ── */}
-            <div style={{
-              display: 'flex', gap: 14, marginTop: 8, fontSize: 10,
-              color: 'var(--ink-mute)', alignItems: 'center', flexWrap: 'wrap',
-            }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <svg width="16" height="6">
-                  <line x1="0" y1="3" x2="16" y2="3" stroke={color} strokeWidth="2" />
-                </svg>
-                Injections (logged)
+            {/* Bloodwork hint */}
+            {nextTrough && troughIn !== null && troughIn > 0 && troughIn < 14 && (
+              <span className="pk-compound-note">
+                🩸 Best bloodwork window in {relTime(troughIn)}
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <svg width="16" height="6">
-                  <line x1="0" y1="3" x2="16" y2="3" stroke={color} strokeWidth="2" strokeDasharray="5 3" strokeOpacity="0.55" />
-                </svg>
-                Projected
-              </span>
-              {bwEvents.length > 0 && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <svg width="16" height="6">
-                    <line x1="0" y1="3" x2="16" y2="3" stroke="#e53e3e" strokeWidth="1.5" strokeDasharray="2 3" />
-                  </svg>
-                  Bloodwork drawn
-                </span>
-              )}
-              <span style={{ marginLeft: 'auto', color: 'var(--ink-dim)' }}>Release rate · mg/day</span>
-            </div>
-
-            {/* Bloodwork advice note */}
-            {nextTrough && troughIn !== null && troughIn > 0 && troughIn < 30 && (
-              <p className="panel-note" style={{ marginTop: 6 }}>
-                Best time for bloodwork: {relTime(troughIn)} from now (trough before next injection).
-              </p>
             )}
-          </section>
+          </div>
         )
       })}
-    </>
+      </div>
+    </section>
   )
 }
