@@ -215,7 +215,7 @@ export function Overview({
       <section className="surface col-6">
         <div className="panel-header">
           <div><span className="section-label">History</span><h3>Recent doses</h3></div>
-          <button type="button" className="ghost-button" onClick={() => onNavigate('meds')}>
+          <button type="button" className="text-button" onClick={() => onNavigate('meds')}>
             All <ChevronRight size={14} />
           </button>
         </div>
@@ -255,7 +255,7 @@ export function Overview({
       <section className="surface col-6">
         <div className="panel-header">
           <div><span className="section-label">Your schedule</span><h3>Upcoming doses</h3></div>
-          <button type="button" className="ghost-button" onClick={() => onNavigate('meds')}>
+          <button type="button" className="text-button" onClick={() => onNavigate('meds')}>
             My compounds <ChevronRight size={14} />
           </button>
         </div>
@@ -307,7 +307,7 @@ export function Overview({
         <section className="surface col-12">
           <div className="panel-header">
             <div><span className="section-label">Watch list</span><h3>Lab flags</h3></div>
-            <button type="button" className="ghost-button" onClick={() => onNavigate('labs')}>
+            <button type="button" className="text-button" onClick={() => onNavigate('labs')}>
               Labs <ChevronRight size={14} />
             </button>
           </div>

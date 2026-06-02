@@ -390,62 +390,96 @@ time,
 
 /* ---------- Buttons ---------- */
 
+/* ═══════════════════════════════════════════════════════════════════
+   APOLLO BUTTON SYSTEM — one source of truth for all buttons
+
+   Three variants (all same height, aligned):
+
+   .primary-button  ← teal fill   — main CTAs ("Log", "Save", "Add")
+   .ghost-button    ← grey fill   — secondary actions ("Upload", "Archive")
+   .text-button     ← transparent — inline nav links ("All →", "Close")
+   .icon-button     ← icon-only   — compact icon actions (share, edit, delete)
+
+   Shared base props (height, font, active transform) live in .btn-base
+   which all four variants extend via CSS.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Shared base — inherit by all btn variants */
+.primary-button,
+.ghost-button,
+.text-button {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 38px; padding: 0 16px;
+  border: none;
+  border-radius: var(--radius-xl);    /* pill */
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transition: filter 100ms, transform 80ms, background 100ms;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+.primary-button:active,
+.ghost-button:active,
+.text-button:active { transform: scale(0.96); }
+.primary-button:disabled,
+.ghost-button:disabled,
+.text-button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Variant 1: PRIMARY — teal fill — main CTAs ── */
+.primary-button {
+  background: var(--accent);
+  color: #fff;
+}
+.primary-button:hover { filter: brightness(1.08); }
+
+/* ── Variant 2: GHOST — grey fill — secondary actions ── */
+.ghost-button {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.ghost-button:hover { filter: brightness(0.94); }
+:root[data-theme="dark"] .ghost-button {
+  background: var(--surface-2);
+  color: var(--ink);
+  outline: 0.5px solid var(--line);
+}
+
+/* ── Variant 3: TEXT — no bg — inline navigation links ── */
+.text-button {
+  background: transparent;
+  color: var(--ink-dim);
+  padding: 0 8px;          /* tighter — it's just text */
+  border-radius: var(--radius-sm);
+}
+.text-button:hover { background: var(--surface-2); color: var(--ink); }
+
+/* ── Icon button — icon-only, same diameter as button height ── */
 .icon-button {
   display: grid; place-items: center;
-  width: 34px; height: 34px;
+  width: 38px; height: 38px;    /* matches text button height */
   background: var(--surface-2);
   border: none;
   border-radius: 50%;
   color: var(--ink-dim);
   transition: background 120ms, color 120ms, transform 100ms;
+  flex-shrink: 0;
 }
 .icon-button:hover  { background: var(--surface-3); color: var(--ink); }
 .icon-button:active { transform: scale(0.93); }
 .icon-button.danger:hover { color: var(--bad); background: var(--bad-soft); }
 
-/* Primary — filled pill, Apple teal */
-.primary-button {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 38px; padding: 0 18px;
-  border-radius: var(--radius-xl);
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-  font-size: 15px;
-  letter-spacing: -0.01em;
-  transition: filter 120ms, transform 80ms;
-  white-space: nowrap;
-  border: none;
-}
-.primary-button:hover  { filter: brightness(1.08); }
-.primary-button:active { transform: scale(0.96); }
-.primary-button:disabled { opacity: 0.45; }
+/* Small size modifier — for use inside list rows */
+.icon-button.sm { width: 30px; height: 30px; }
 
-/* Ghost — tinted background, accent text, pill */
-.ghost-button {
-  display: inline-flex; align-items: center; gap: 6px;
-  height: 38px; padding: 0 16px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: none;
-  border-radius: var(--radius-xl);
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  transition: filter 120ms, transform 80ms;
-  white-space: nowrap;
-}
-.ghost-button:hover  { filter: brightness(0.95); }
-.ghost-button:active { transform: scale(0.96); }
-
+/* Legacy alias — kept so old code still works */
 .link-button {
-  justify-self: start;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  color: var(--ink-dim);
-  font-size: 12px;
-  font-weight: 600;
+  display: inline-flex; align-items: center; gap: 4px;
+  background: transparent; border: none;
+  color: var(--ink-dim); font-size: 13px; font-weight: 600;
+  padding: 0; cursor: pointer;
 }
 .link-button:hover { color: var(--accent); }
 
@@ -1042,20 +1076,19 @@ select {
     border-top: 0.5px solid var(--line);
   }
 
-  /* Bigger tap targets for standalone icon buttons (panels, forms, topbar) */
-  .icon-button { width: 40px; height: 40px; }
+  /* Mobile: all buttons scale to 44px (Apple HIG minimum tap target).
+     icon-button stays same diameter for alignment.
+     In compact list rows (.stack) they scale down to stay scannable. */
+  .primary-button,
+  .ghost-button,
+  .text-button    { height: 44px; }
+  .icon-button    { width: 44px;  height: 44px; }
 
-  /* Inside compact list rows, keep icon buttons at base size so they don't
-     crowd out content or push buttons off-screen on narrow phones          */
-  .stack .icon-button { width: 32px; height: 32px; }
-
-  /* Taller touch targets for primary + ghost buttons in panels/forms */
-  .primary-button { height: 44px; }
-  .ghost-button   { height: 40px; }
-
-  /* Inside rows, buttons must stay compact */
-  .stack .primary-button { height: 32px; }
-  .stack .ghost-button   { height: 32px; }
+  /* Inside list rows — compact so they don't crowd the content */
+  .stack .primary-button,
+  .stack .ghost-button,
+  .stack .text-button   { height: 32px; font-size: 13px; }
+  .stack .icon-button   { width: 32px;  height: 32px; }
 
   /* Labs range bar: drop the delta column and compress marker to fit 375px */
   .range-bar-row {
@@ -1610,26 +1643,21 @@ select {
 }
 
 /* ── Dark-mode button adjustments ──────────────────────────────────────── */
-/* Primary: accent teal works in dark too — just adjust text colour */
 :root[data-theme="dark"] .primary-button {
   background: var(--accent);
   color: #000;
 }
-/* Ghost: slightly elevated surface */
+/* ghost-button dark: keep grey fill with subtle outline */
 :root[data-theme="dark"] .ghost-button {
   background: var(--surface-2);
-  color: var(--accent);
-}
-:root[data-theme="dark"] .ghost-button:hover {
-  background: var(--surface-3);
-}
-:root[data-theme="dark"] .icon-button {
-  background: var(--surface-2);
-}
-:root[data-theme="dark"] .icon-button:hover {
-  background: var(--surface-3);
   color: var(--ink);
+  outline: 0.5px solid var(--line);
 }
+:root[data-theme="dark"] .ghost-button:hover { background: var(--surface-3); }
+:root[data-theme="dark"] .text-button { color: var(--ink-dim); }
+:root[data-theme="dark"] .text-button:hover { background: var(--surface-2); }
+:root[data-theme="dark"] .icon-button { background: var(--surface-2); }
+:root[data-theme="dark"] .icon-button:hover { background: var(--surface-3); color: var(--ink); }
 
 /* ── Dark-mode overrides for elements that can't use CSS vars natively ─── */
 :root[data-theme="dark"] .recharts-cartesian-grid line { stroke: #3c3835; }

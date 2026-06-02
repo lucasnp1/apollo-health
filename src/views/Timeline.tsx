@@ -159,7 +159,7 @@ export function Timeline({
           <h3>Timeline</h3>
         </div>
         {activeType && (
-          <button type="button" className="ghost-button" style={{ fontSize: 12 }} onClick={() => { setActiveType(null); setActiveCompoundId(null) }}>
+          <button type="button" className="text-button" onClick={() => { setActiveType(null); setActiveCompoundId(null) }}>
             Clear filter
           </button>
         )}

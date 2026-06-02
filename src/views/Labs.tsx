@@ -597,7 +597,7 @@ export function Labs({
         <section className="surface col-6">
           <div className="panel-header">
             <div><span className="section-label">Manual entry</span><h3>Add result</h3></div>
-            <button type="button" className="ghost-button" onClick={() => setShowAddForm(false)}>Close</button>
+            <button type="button" className="text-button" onClick={() => setShowAddForm(false)}>Close</button>
           </div>
           <div className="form-grid">
             <label className="wide-field">
