@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Brain, FileText, FlaskConical, HeartPulse, Syringe } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, startOfDay, startOfWeek, differenceInCalendarDays, isThisWeek, isToday, isYesterday } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
 
@@ -31,6 +31,92 @@ const TYPE_ICONS: Record<EventType, LucideIcon> = {
   lab: FlaskConical,
   file: FileText,
   symptom: Brain,
+}
+
+// ── Day/week grouped rendering ──────────────────────────────────────────────
+
+type Group = { label: string; subLabel?: string; events: TimelineEvent[] }
+
+function groupEvents(events: TimelineEvent[]): Group[] {
+  const now = new Date()
+  const groups = new Map<string, Group>()
+  const order: string[] = []
+
+  for (const e of events) {
+    const d = startOfDay(e.date)
+    const key = d.toISOString()
+
+    if (!groups.has(key)) {
+      let label: string
+      let subLabel: string | undefined
+      const daysAgo = differenceInCalendarDays(now, d)
+
+      if (isToday(d)) {
+        label = 'Today'
+        subLabel = format(d, 'EEE, MMM d')
+      } else if (isYesterday(d)) {
+        label = 'Yesterday'
+        subLabel = format(d, 'EEE, MMM d')
+      } else if (daysAgo < 7) {
+        label = format(d, 'EEEE')           // "Monday"
+        subLabel = format(d, 'MMM d')
+      } else if (isThisWeek(startOfWeek(d))) {
+        label = `This week`
+        subLabel = format(d, 'MMM d')
+      } else {
+        // Group by week for older entries
+        const weekStart = startOfWeek(d, { weekStartsOn: 1 })
+        const weekKey = weekStart.toISOString()
+        const weekLabel = `Week of ${format(weekStart, 'MMM d')}`
+
+        if (!groups.has(weekKey)) {
+          groups.set(weekKey, { label: weekLabel, events: [] })
+          order.push(weekKey)
+        }
+        groups.get(weekKey)!.events.push(e)
+        continue
+      }
+
+      groups.set(key, { label, subLabel, events: [] })
+      order.push(key)
+    }
+    groups.get(key)!.events.push(e)
+  }
+
+  return order.map(k => groups.get(k)!)
+}
+
+function TimelineGrouped({ events }: { events: TimelineEvent[] }) {
+  const groups = useMemo(() => groupEvents(events), [events])
+
+  return (
+    <div className="timeline-groups">
+      {groups.map((group, gi) => (
+        <div key={gi} className="timeline-group">
+          {/* Day/week header */}
+          <div className="timeline-group-header">
+            <span className="timeline-group-label">{group.label}</span>
+            {group.subLabel && (
+              <span className="timeline-group-sub">{group.subLabel}</span>
+            )}
+          </div>
+          {/* Events within this day/week */}
+          <div className="timeline-list">
+            {group.events.map((e) => (
+              <div className="timeline-item" key={e.id}>
+                <div className="timeline-icon"><e.icon size={13} /></div>
+                <div>
+                  <strong>{e.title}</strong>
+                  <span>{e.detail}</span>
+                </div>
+                <time>{format(e.date, 'HH:mm')}</time>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export function Timeline({
@@ -227,20 +313,7 @@ export function Timeline({
       {filtered.length === 0 ? (
         <p className="panel-note">No events match the current filter.</p>
       ) : (
-        <div className="timeline-list">
-          {filtered.map((e) => (
-            <div className="timeline-item" key={e.id}>
-              <div className="timeline-icon">
-                <e.icon size={14} />
-              </div>
-              <div>
-                <strong>{e.title}</strong>
-                <span>{e.detail}</span>
-              </div>
-              <time>{format(e.date, 'MMM d, yyyy HH:mm')}</time>
-            </div>
-          ))}
-        </div>
+        <TimelineGrouped events={filtered} />
       )}
     </section>
   )

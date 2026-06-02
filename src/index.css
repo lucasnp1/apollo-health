@@ -331,6 +331,7 @@ time,
   max-width: 520px;
   max-height: 92vh;
   max-height: 92dvh;
+  overflow-x: hidden;   /* prevent horizontal scroll from swatches/grids */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   /* clear the home indicator */
@@ -1149,6 +1150,23 @@ select {
 }
 
 /* ---------- Timeline ---------- */
+/* ── Timeline day/week groups ── */
+.timeline-groups { display: flex; flex-direction: column; gap: 0; }
+.timeline-group  { display: flex; flex-direction: column; }
+.timeline-group-header {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 14px 0 6px;
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+}
+.timeline-group:first-child .timeline-group-header { border-top: 0; margin-top: 0; padding-top: 0; }
+.timeline-group-label {
+  font-size: 13px; font-weight: 700; color: var(--ink);
+}
+.timeline-group-sub {
+  font-size: 11px; color: var(--ink-mute); font-weight: 500;
+}
+
 .timeline-list { display: flex; flex-direction: column; }
 .timeline-item {
   display: grid;

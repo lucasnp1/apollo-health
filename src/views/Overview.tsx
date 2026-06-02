@@ -7,9 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
 import { SiteRotation } from '../components/SiteRotation'
 import {
-  buildWeightDoseSeries,
   flagLatestResults,
-  weightSummary,
   type EnrichedResult,
 } from '../lib/insights'
 import { simpleUpcomingSchedule, timeUntil } from '../lib/schedule'
@@ -39,20 +37,14 @@ export function Overview({
 })
  {
   const protocols = useLiveQuery(() => db.protocols.filter((p) => !p.archived).toArray(), [], [])
-  const goals = useLiveQuery(() => db.goals.toArray(), [], [])
-  const weightGoal = goals.find((g) => g.kind === 'weight' && !g.achievedAt)
-  const bpGoal = goals.find((g) => g.kind === 'bp' && !g.achievedAt)
   const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id, c])), [compounds])
-  // Simple schedule: next due = last injection + interval (no ProtocolDose dependency)
   const upcoming = useMemo(
     () => simpleUpcomingSchedule(protocols, injections).slice(0, 5),
     [protocols, injections],
   )
 
-  const weightSeries = buildWeightDoseSeries(compounds, injections)
-  const weightStats = weightSummary(weightSeries)
   const labFlags = flagLatestResults(results)
-  void labFlags // kept for future use
+  void labFlags
   const latestBp = vitals[0]
 
   // HCT alert — hematocrit > 52% is a safety flag for TRT users
@@ -68,7 +60,6 @@ export function Overview({
   const showOnboarding = !hasProtocol || !hasInjection || !hasLabs
 
   const bpSpark = vitals.slice(0, 14).reverse().map((v) => v.systolic)
-  const weightSpark = weightSeries.filter((p) => p.weight !== undefined).slice(-14).map((p) => p.weight as number)
 
   // 7-day average BP
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
@@ -175,28 +166,7 @@ export function Overview({
                   : 'No reading'
             }
             spark={<Sparkline values={bpSpark} />}
-            tone={
-              bpGoal && latestBp
-                ? latestBp.systolic <= bpGoal.target ? 'good' : latestBp.systolic - bpGoal.target > 10 ? 'bad' : 'warn'
-                : latestBp && latestBp.systolic >= 140 ? 'bad' : latestBp && latestBp.systolic >= 130 ? 'warn' : undefined
-            }
-          />
-          <StatCard
-            label="Weight"
-            value={weightStats.latest ? `${weightStats.latest.toFixed(1)} kg` : '—'}
-            detail={
-              weightGoal && weightStats.latest !== undefined
-                ? `Goal ${weightGoal.target} kg · ${(weightGoal.target - weightStats.latest >= 0 ? '+' : '')}${(weightGoal.target - weightStats.latest).toFixed(1)} kg to go`
-                : weightStats.delta !== undefined
-                  ? `${weightStats.delta >= 0 ? '+' : ''}${weightStats.delta.toFixed(1)} kg · ${weightStats.percent?.toFixed(1)}%`
-                  : 'No weight data'
-            }
-            spark={<Sparkline values={weightSpark} />}
-            tone={
-              weightGoal && weightStats.latest !== undefined
-                ? Math.abs(weightGoal.target - weightStats.latest) < 0.5 ? 'good' : undefined
-                : weightStats.delta !== undefined && weightStats.delta < 0 ? 'good' : undefined
-            }
+            tone={latestBp && latestBp.systolic >= 145 ? 'bad' : latestBp && latestBp.systolic >= 135 ? 'warn' : undefined}
           />
         </div>
       </section>

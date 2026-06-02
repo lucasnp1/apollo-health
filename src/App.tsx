@@ -338,17 +338,7 @@ function Shell({
                 <Plus size={14} /> <span className="btn-label">{activeView === 'vitals' ? 'Log reading' : 'Add'}</span>
               </button>
             )}
-            {/* Settings gear — mobile only */}
-            {activeView !== 'settings' && (
-              <button
-                type="button"
-                className="icon-button show-mobile-only"
-                onClick={() => setActiveView('settings')}
-                aria-label="Settings"
-              >
-                <SettingsIcon size={18} />
-              </button>
-            )}
+            {/* Settings is accessible via the hamburger menu — no duplicate icon needed */}
           </div>
         </header>
 
