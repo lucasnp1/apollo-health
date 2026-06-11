@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, RotateCcw, Sun, Trash2, Upload, UserCircle, X } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -511,6 +511,22 @@ function PrintReport({
 function LabDataSettings() {
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
+  // Live dupe scan so the count refreshes as the user dedupes / imports.
+  const allExams = useLiveQuery(() => db.exams.toArray(), [], []) as LabExam[]
+  const dupeGroups = useMemo(() => {
+    const groups = new Map<string, LabExam[]>()
+    for (const ex of allExams) {
+      // Group on the same key the user perceives as "the same exam":
+      // name + collection date (rounded to day).
+      const key = `${ex.name.trim().toLowerCase()}|${ex.collectedAt.slice(0, 10)}`
+      const list = groups.get(key) ?? []
+      list.push(ex)
+      groups.set(key, list)
+    }
+    return [...groups.values()].filter((g) => g.length > 1)
+  }, [allExams])
+  const dupeExamCount = dupeGroups.reduce((sum: number, g: LabExam[]) => sum + (g.length - 1), 0)
+  const [scanShown, setScanShown] = useState(false)
 
   async function clearLabs() {
     if (!confirm('Clear all lab exams and results? This cannot be undone.')) return
@@ -526,14 +542,89 @@ function LabDataSettings() {
     }
   }
 
+  // Surgical: keep the OLDEST exam in each group + its results, delete the
+  // rest. Same-day same-name groups have effectively identical data, so
+  // the "oldest wins" rule preserves the original record and drops the
+  // accidental clones from re-imports.
+  async function dedupeExams() {
+    if (dupeExamCount === 0) return
+    if (!confirm(`Remove ${dupeExamCount} duplicate exam${dupeExamCount === 1 ? '' : 's'} and the ${'results'} attached to them? The oldest copy of each group is kept.`)) return
+    setBusy(true)
+    try {
+      const toDelete: number[] = []
+      for (const group of dupeGroups) {
+        // Sort by createdAt if available else by id; oldest first → keep [0].
+        const sorted = [...group].sort((a, b) => {
+          const at = (a as { createdAt?: number }).createdAt ?? a.id ?? 0
+          const bt = (b as { createdAt?: number }).createdAt ?? b.id ?? 0
+          return at - bt
+        })
+        for (let i = 1; i < sorted.length; i++) {
+          const id = sorted[i].id
+          if (typeof id === 'number') toDelete.push(id)
+        }
+      }
+      // Drop the results that belonged to the doomed exams first so we
+      // don't leave dangling result rows.
+      if (toDelete.length > 0) {
+        await db.results.where('examId').anyOf(toDelete).delete()
+        await db.exams.where('id').anyOf(toDelete).delete()
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <>
       <div className="panel-header">
         <div><span className="section-label">Labs</span><h3>Lab data</h3></div>
         <FlaskConical size={16} style={{ color: 'var(--accent-ink)' }} />
       </div>
+
+      {/* Duplicate scanner — surfaces dupes the user accumulated from
+          re-importing the same JSON backup multiple times. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+        <p className="muted-copy" style={{ margin: 0 }}>
+          {dupeExamCount === 0
+            ? 'No duplicate exams detected on this device.'
+            : `${dupeExamCount} duplicate exam${dupeExamCount === 1 ? '' : 's'} detected across ${dupeGroups.length} group${dupeGroups.length === 1 ? '' : 's'}. Same name + same date.`}
+        </p>
+        {dupeExamCount > 0 && (
+          <>
+            <button
+              type="button"
+              className="ghost-button"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={() => setScanShown((s) => !s)}
+            >
+              {scanShown ? 'Hide list' : `Show ${dupeGroups.length} duplicate group${dupeGroups.length === 1 ? '' : 's'}`}
+            </button>
+            {scanShown && (
+              <ul style={{ margin: 0, padding: '0 0 0 18px', fontSize: 12, color: 'var(--ink-dim)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {dupeGroups.slice(0, 12).map((g: LabExam[], i: number) => (
+                  <li key={i}>
+                    {g[0].name} · {format(parseISO(g[0].collectedAt), 'MMM d, yyyy')} · {g.length} copies
+                  </li>
+                ))}
+                {dupeGroups.length > 12 && <li>… and {dupeGroups.length - 12} more</li>}
+              </ul>
+            )}
+            <button
+              type="button"
+              className="primary-button"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={dedupeExams}
+              disabled={busy}
+            >
+              <Trash2 size={14} /> Remove {dupeExamCount} duplicate{dupeExamCount === 1 ? '' : 's'}
+            </button>
+          </>
+        )}
+      </div>
+
       <p className="muted-copy">
-        Remove all imported lab results and exams. Use this to fix duplicate data before re-importing from PDFs.
+        Or remove all imported lab results and exams to start clean.
       </p>
       <button
         type="button"
