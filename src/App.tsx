@@ -21,7 +21,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
-import { extractPdfText } from './lib/pdf'
+import { extractPdfText, extractMarkersFromText, type ExtractedMarker } from './lib/pdf'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { useInjectionReminders } from './lib/useInjectionReminders'
@@ -31,6 +31,7 @@ const QuickLog       = lazy(() => import('./components/QuickLog').then(m => ({ d
 const ProtocolWizard = lazy(() => import('./components/ProtocolWizard').then(m => ({ default: m.ProtocolWizard })))
 const ExportSheet      = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportSheet })))
 const DoseCalculator   = lazy(() => import('./components/DoseCalculator').then(m => ({ default: m.DoseCalculator })))
+const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
 import { SyncBanner } from './components/SyncBanner'
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
@@ -129,24 +130,87 @@ function Shell({
   const [calcOpen,   setCalcOpen]   = useState(false)
   const [menuOpen,   setMenuOpen]   = useState(false)
   const [protocolWizardOpen, setProtocolWizardOpen] = useState(false)
+  // PDF upload pipeline state — parsing overlay, review sheet, transient snackbar.
+  const [pdfParsingName, setPdfParsingName] = useState<string | null>(null)
+  const [pdfReviewFileId, setPdfReviewFileId] = useState<number | null>(null)
+  const [snackbar, setSnackbar] = useState<{ message: string; tone?: 'warn' | 'error' } | null>(null)
+
+  // Auto-dismiss snackbar
+  useEffect(() => {
+    if (!snackbar) return
+    const id = setTimeout(() => setSnackbar(null), 6000)
+    return () => clearTimeout(id)
+  }, [snackbar])
 
   async function handleLabPdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (!file) return
-    const extractedText = await extractPdfText(file)
-    await db.files.add({
-      name: file.name,
-      type: file.type || 'application/pdf',
-      size: file.size,
-      addedAt: new Date().toISOString(),
-      status: extractedText ? 'Needs review' : 'Stored',
-      extractedText,
-      blob: file,
-    })
     e.target.value = ''
-    // Switch to labs tab so the import banner shows
-    setActiveView('labs')
+    if (!file) return
+    setPdfParsingName(file.name)
+    try {
+      const extractedText = await extractPdfText(file)
+      const markers = extractedText ? extractMarkersFromText(extractedText) : []
+      const id = await db.files.add({
+        name: file.name,
+        type: file.type || 'application/pdf',
+        size: file.size,
+        addedAt: new Date().toISOString(),
+        status: markers.length > 0 ? 'Needs review' : 'Stored',
+        extractedText,
+        blob: file,
+      })
+      setActiveView('labs')
+      if (markers.length > 0) {
+        setPdfReviewFileId(id as number)
+      } else if (extractedText) {
+        setSnackbar({
+          tone: 'warn',
+          message: `Stored "${file.name}" but no recognized lab markers were found. You can add results manually under Add result.`,
+        })
+      } else {
+        setSnackbar({
+          tone: 'warn',
+          message: `Couldn't read text from "${file.name}" — it may be a scanned image. Add the results manually under Add result.`,
+        })
+      }
+    } catch (err) {
+      console.error('PDF upload failed', err)
+      setSnackbar({
+        tone: 'error',
+        message: `Couldn't read "${file.name}". Try a different PDF or add results manually.`,
+      })
+    } finally {
+      setPdfParsingName(null)
+    }
   }
+
+  const pdfReviewFile = useLiveQuery(
+    async () => (pdfReviewFileId == null ? null : (await db.files.get(pdfReviewFileId)) ?? null),
+    [pdfReviewFileId],
+    null,
+  )
+
+  async function commitPdfImport(items: ExtractedMarker[]) {
+    if (!pdfReviewFile?.id || items.length === 0) return
+    const examId = await db.exams.add({
+      name: pdfReviewFile.name.replace(/\.pdf$/i, ''),
+      collectedAt: new Date().toISOString(),
+      labName: 'PDF import',
+      sourceFileId: pdfReviewFile.id,
+    })
+    await db.results.bulkAdd(items.map((item) => ({
+      examId,
+      marker: item.marker,
+      value: item.value,
+      rawValue: String(item.value),
+      unit: item.unit,
+    })))
+    await db.files.update(pdfReviewFile.id, { status: 'Reviewed' })
+    setSnackbar({
+      message: `Imported ${items.length} marker${items.length === 1 ? '' : 's'} from ${pdfReviewFile.name}.`,
+    })
+  }
+
   const [editingProtocol, setEditingProtocol] = useState<(import('./lib/db').Protocol & { id: number }) | undefined>(undefined)
 
   function openQuickLog(tab: QuickLogTab, prefill?: QuickLogPrefill) {
@@ -191,6 +255,19 @@ function Shell({
     () => db.exams.orderBy('collectedAt').reverse().toArray(),
     [], [],
   )
+  // Duplicate detection: if an exam with the same source filename already
+  // exists, warn the user in the review sheet so they can decide whether
+  // to import. Depends on `exams` so it's declared after that live query.
+  const pdfDuplicateWarning = useMemo(() => {
+    if (!pdfReviewFile) return undefined
+    const base = pdfReviewFile.name.replace(/\.pdf$/i, '').toLowerCase()
+    const match = exams.find(
+      (e) => e.name.toLowerCase() === base && e.sourceFileId !== pdfReviewFile.id,
+    )
+    return match
+      ? `You already imported a PDF named "${pdfReviewFile.name}" on ${new Date(match.collectedAt).toLocaleDateString()}. Importing again will create a duplicate exam.`
+      : undefined
+  }, [pdfReviewFile, exams])
   const results = useLiveQuery(
     () => db.results.toArray(),
     [], [],
@@ -358,7 +435,7 @@ function Shell({
           {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} onOpenWizard={() => setProtocolWizardOpen(true)} onEditProtocol={(p) => { setEditingProtocol(p); setProtocolWizardOpen(true) }} />}
           {activeView === 'vitals' && <Vitals vitals={vitals} />}
           {activeView === 'labs' && (
-            <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} />
+            <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} onReviewFile={(id) => setPdfReviewFileId(id)} />
           )}
           {activeView === 'symptoms' && <Symptoms />}
           {activeView === 'targets' && <Targets />}
@@ -452,7 +529,37 @@ function Shell({
             onClose={() => setExportOpen(false)}
           />
         )}
+        {pdfReviewFile && (
+          <PdfReviewSheet
+            file={pdfReviewFile}
+            duplicateWarning={pdfDuplicateWarning}
+            onImport={commitPdfImport}
+            onClose={() => setPdfReviewFileId(null)}
+          />
+        )}
       </Suspense>
+
+      {pdfParsingName && (
+        <div className="pdf-parse-overlay" role="status" aria-live="polite">
+          <div className="pdf-parse-card">
+            <div className="pdf-parse-spinner" aria-hidden="true" />
+            <div className="pdf-parse-card-text">
+              <strong>Reading PDF…</strong>
+              <span>{pdfParsingName}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {snackbar && (
+        <div
+          className={snackbar.tone ? `snackbar ${snackbar.tone}` : 'snackbar'}
+          role={snackbar.tone === 'error' ? 'alert' : 'status'}
+        >
+          <span>{snackbar.message}</span>
+          <button type="button" onClick={() => setSnackbar(null)}>Dismiss</button>
+        </div>
+      )}
     </div>
   )
 }

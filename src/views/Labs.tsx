@@ -11,7 +11,7 @@ import {
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
-import { extractMarkersFromText, type ExtractedMarker } from '../lib/pdf'
+import { extractMarkersFromText } from '../lib/pdf'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
 import { EmptyState } from '../components/EmptyState'
@@ -300,6 +300,7 @@ export function Labs({
   files,
   addOpen,
   onAddClose,
+  onReviewFile,
   compounds: _c,
   injections: _i,
   vitals: _v,
@@ -312,6 +313,7 @@ export function Labs({
   files: Array<{ id?: number; name: string; status: string; extractedText?: string }>
   addOpen?: boolean
   onAddClose?: () => void
+  onReviewFile?: (id: number) => void
 }) {
   const { chart: colors } = useTheme()
   const markerTargets = useLiveQuery(() => db.markerTargets.toArray(), [], [])
@@ -440,21 +442,11 @@ export function Labs({
     setValue('')
   }
 
-  // PDF review
-  const latestFile = files.find(f => f.status === 'Needs review')
-  const extracted  = latestFile?.extractedText ? extractMarkersFromText(latestFile.extractedText) : []
-
-  async function saveExtracted(items: ExtractedMarker[]) {
-    if (!latestFile?.id || items.length === 0) return
-    const examId = await db.exams.add({
-      name: latestFile.name.replace(/\.pdf$/i, ''),
-      collectedAt: new Date().toISOString(),
-      labName: 'PDF import',
-      sourceFileId: latestFile.id,
-    })
-    await db.results.bulkAdd(items.map(item => ({ examId, marker: item.marker, value: item.value, rawValue: String(item.value), unit: item.unit })))
-    await db.files.update(latestFile.id, { status: 'Reviewed' })
-  }
+  // PDF review — the latest file flagged "Needs review" can be reopened from
+  // the banner. The actual review sheet is mounted up in App.tsx so it can
+  // share state with the upload pipeline; we just hand it the file id.
+  const latestFile = files.find(f => f.status === 'Needs review' && f.extractedText)
+  const extractedCount = latestFile?.extractedText ? extractMarkersFromText(latestFile.extractedText).length : 0
 
   const selectedSummary = selectedKey
     ? [...markersByPanel.values()].flat().find(s => s.key === selectedKey)
@@ -463,20 +455,24 @@ export function Labs({
   return (
     <div className="content-grid">
 
-      {/* ── PDF pending banner ── */}
-      {latestFile && extracted.length > 0 && (
+      {/* ── PDF pending banner — opens the review sheet ── */}
+      {latestFile && extractedCount > 0 && (
         <section className="surface col-12" style={{ background: 'var(--accent-soft)', borderColor: 'rgba(15,118,110,0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <FileText size={14} style={{ color: 'var(--accent-ink)', flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <strong style={{ fontSize: 13, color: 'var(--accent-ink)' }}>PDF ready to import</strong>
+              <strong style={{ fontSize: 13, color: 'var(--accent-ink)' }}>PDF ready to review</strong>
               <span style={{ display: 'block', fontSize: 11, color: 'var(--accent-ink)', opacity: 0.8 }}>
-                {latestFile.name} · {extracted.length} markers detected
+                {latestFile.name} · {extractedCount} marker{extractedCount === 1 ? '' : 's'} detected
               </span>
             </div>
-            <button type="button" className="primary-button" style={{ background: 'var(--accent)', height: 30, fontSize: 12 }}
-              onClick={() => saveExtracted(extracted)}>
-              Import {extracted.length} markers
+            <button
+              type="button"
+              className="primary-button"
+              style={{ background: 'var(--accent)', height: 30, fontSize: 12 }}
+              onClick={() => latestFile.id && onReviewFile?.(latestFile.id)}
+            >
+              Review markers
             </button>
           </div>
         </section>
