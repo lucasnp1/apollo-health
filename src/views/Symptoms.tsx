@@ -110,7 +110,7 @@ export function Symptoms() {
               <Tooltip contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, color: colors.tooltipText, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }} />
               <Line type="monotone" dataKey="libido" stroke="#c084fc" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="sleep" stroke="#60a5fa" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="mood" stroke="#0f766e" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="mood" stroke="#1a1611" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="energy" stroke="#f59e0b" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>

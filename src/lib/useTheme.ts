@@ -36,18 +36,23 @@ export function toggleTheme() {
  */
 export function getChartColors(dark: boolean) {
   return {
-    // Very faint grid — Apple Health barely shows grid lines
-    grid:          dark ? 'rgba(84,84,88,0.35)' : 'rgba(60,60,67,0.10)',
-    tick:          dark ? 'rgba(235,235,245,0.40)' : 'rgba(60,60,67,0.45)',
-    // Tooltip: Apple-style card with hairline border
-    tooltipBg:     dark ? '#1c1c1e' : '#ffffff',
-    tooltipBorder: dark ? 'rgba(84,84,88,0.60)' : 'rgba(60,60,67,0.18)',
-    tooltipText:   dark ? '#ffffff' : '#000000',
-    // Semantic colours (used by charts directly)
-    accent:        dark ? '#22d3ee' : '#0891b2',
-    good:          dark ? '#30d158' : '#34c759',
-    warn:          dark ? '#ff9f0a' : '#ff9500',
-    bad:           dark ? '#ff453a' : '#ff3b30',
+    // Warm faint grid — sits on cream surface in light mode, on warm
+    // brown-black in dark mode.
+    grid:          dark ? 'rgba(244,201,92,0.10)' : 'rgba(26,22,16,0.08)',
+    tick:          dark ? 'rgba(253,250,240,0.50)' : 'rgba(26,22,16,0.55)',
+    // Tooltip: matches surface tokens, warm hairline border
+    tooltipBg:     dark ? '#1f1a14' : '#fffcf5',
+    tooltipBorder: dark ? 'rgba(244,201,92,0.24)' : 'rgba(26,22,16,0.12)',
+    tooltipText:   dark ? '#fdfaf0' : '#1a1611',
+    // Primary chart stroke: deep warm ink (matches logo line art). The
+    // yellow accent is reserved for fills + emphasis, since a yellow
+    // line on cream is illegible.
+    accent:        dark ? '#fdfaf0' : '#1a1611',
+    // Accent fill used for area gradients — yellow that reads on cream.
+    accentFill:    dark ? '#f4c95c' : '#f4c95c',
+    good:          dark ? '#3eb874' : '#2f8b54',
+    warn:          dark ? '#e8a534' : '#c5821e',
+    bad:           dark ? '#e5594b' : '#c43c2f',
   }
 }
 

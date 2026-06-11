@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Activity, KeyRound, LogIn, UserPlus } from 'lucide-react'
+import { KeyRound, LogIn, UserPlus } from 'lucide-react'
+import { BrandMark } from '../components/BrandMark'
 import type { useAuth } from '../lib/useAuth'
 
 type AuthBundle = ReturnType<typeof useAuth>
@@ -35,7 +36,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
     <div className="lock-shell">
       <div className="lock-panel">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div className="brand-mark" style={{ background: 'var(--accent)' }}><Activity size={16} /></div>
+          <BrandMark size={44} />
           <div>
             <h1 style={{ margin: 0 }}>Apollo Health</h1>
             <p className="lock-copy" style={{ margin: '2px 0 0' }}>
@@ -97,7 +98,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
         </button>
 
         <p className="lock-copy">
-          {'Data syncs to your account on Cloudflare. Encrypted in transit; encrypted at rest. No third parties.'}
+          Data syncs to your account on Cloudflare over HTTPS. No third-party trackers or analytics.
         </p>
       </div>
     </div>

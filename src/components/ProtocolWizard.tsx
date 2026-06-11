@@ -12,7 +12,10 @@ import { PK_COMPOUND_NAMES, formsForCompound } from '../lib/pk'
 
 const UNITS: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const COLORS = ['#0891b2', '#6366f1', '#f59e0b', '#ec4899', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#0f766e', '#d97706']
+// Compound-differentiation palette — used for the colored left border on
+// protocol cards. Centred on the brand yellow plus complementary warm
+// hues that read well on cream surfaces.
+const COLORS = ['#f4c95c', '#c5821e', '#c43c2f', '#9b4ec2', '#2f8b54', '#2566c4', '#d97706', '#8b5cf6', '#1a1611', '#ec4899']
 const ESTERS: TestosteroneEster[] = ['Enanthate', 'Cypionate', 'Propionate', 'Undecanoate', 'Custom']
 
 export function ProtocolWizard({

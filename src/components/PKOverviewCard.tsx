@@ -194,7 +194,7 @@ function buildCycleData(
 
   return {
     pkName: pk.form ? `${pk.compound} ${pk.form}` : pk.compound,
-    color: compound.color ?? '#0f766e',
+    color: compound.color ?? '#1a1611',
     chartData,
     events,
     todayDayNum,

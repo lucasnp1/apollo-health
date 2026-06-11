@@ -65,7 +65,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   type DotProps = { cx?: number; cy?: number; payload?: { statusColor?: string } }
   const StatusDot = ({ cx, cy, payload }: DotProps) => {
     if (cx == null || cy == null) return <></>
-    return <circle cx={cx} cy={cy} r={3.5} fill={payload?.statusColor ?? '#0f766e'} stroke="var(--surface)" strokeWidth={1.5} />
+    return <circle cx={cx} cy={cy} r={3.5} fill={payload?.statusColor ?? '#1a1611'} stroke="var(--surface)" strokeWidth={1.5} />
   }
 
   const stats = useMemo(() => {
@@ -164,8 +164,8 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
             <AreaChart data={chart} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
               <defs>
                 <linearGradient id="sysFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0f766e" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#0f766e" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#1a1611" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#1a1611" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke={colors.grid} vertical={false} />
@@ -177,7 +177,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
               <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
               <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
               <Tooltip contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }} />
-              <Area type="monotone" dataKey="systolic" stroke="#0f766e" strokeWidth={2.5} fill="url(#sysFill)" dot={<StatusDot />} activeDot={{ r: 5 }} />
+              <Area type="monotone" dataKey="systolic" stroke="#1a1611" strokeWidth={2.5} fill="url(#sysFill)" dot={<StatusDot />} activeDot={{ r: 5 }} />
               <Line type="monotone" dataKey="diastolic" stroke="#98a2af" strokeWidth={2} dot={false} />
               <Line type="monotone" dataKey="pulse" stroke="#c084fc" strokeWidth={1.5} dot={false} />
             </AreaChart>

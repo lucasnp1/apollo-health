@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Activity, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
+import { BrandMark } from './BrandMark'
 
 type LockStateLike = {
   mode: 'loading' | 'setup' | 'locked' | 'unlocked'
@@ -53,7 +54,7 @@ export function LockScreen({ lockState }: { lockState: LockStateLike }) {
     <div className="lock-shell">
       <div className="lock-panel">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div className="brand-mark" style={{ background: '#0f766e' }}><Activity size={16} /></div>
+          <BrandMark size={36} />
           <div>
             <h1 style={{ margin: 0 }}>Apollo Health</h1>
             <p className="lock-copy" style={{ margin: '2px 0 0' }}>

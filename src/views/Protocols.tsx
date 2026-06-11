@@ -339,7 +339,7 @@ function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; inject
       chartData: rows,
       traces: traceData.map((t) => ({
         name: traceKey(t),
-        color: t.compound.color ?? '#0f766e',
+        color: t.compound.color ?? '#1a1611',
         halfLifeDays: t.pk.halfLifeDays,
         activeDosePct: t.pk.activeDosePct,
         form: t.pk.form,
@@ -452,7 +452,7 @@ function RetaChart({ compounds, injections }: { compounds: Compound[]; injection
           <YAxis yAxisId="dose" orientation="right" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
           <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 10, fontSize: 12 }} />
           <Bar yAxisId="dose" dataKey="dose" fill="#60a5fa" opacity={0.45} radius={[4, 4, 0, 0]} />
-          <Line yAxisId="weight" type="monotone" dataKey="weight" stroke="#0f766e" strokeWidth={2.5} dot={false} />
+          <Line yAxisId="weight" type="monotone" dataKey="weight" stroke="#1a1611" strokeWidth={2.5} dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </>

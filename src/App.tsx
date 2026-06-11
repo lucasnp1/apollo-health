@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
-  Activity,
   Brain,
   CalendarClock,
   FlaskConical,
@@ -18,6 +17,7 @@ import {
   Upload,
   X,
 } from 'lucide-react'
+import { BrandMark } from './components/BrandMark'
 import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
@@ -298,7 +298,7 @@ function Shell({
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="brand-row">
-            <div className="brand-mark"><Activity size={16} /></div>
+            <BrandMark size={32} />
             <div>
               <strong>Apollo</strong>
               <span>Health</span>
@@ -471,7 +471,7 @@ function Shell({
             {/* Drawer header */}
             <div className="mobile-drawer-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="brand-mark"><Activity size={14} /></div>
+                <BrandMark size={26} />
                 <strong style={{ fontSize: 15 }}>Apollo Health</strong>
               </div>
               <button type="button" className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Close menu">
