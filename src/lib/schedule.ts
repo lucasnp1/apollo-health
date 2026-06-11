@@ -17,9 +17,22 @@ export type SimpleScheduleItem = {
 export function simpleUpcomingSchedule(
   protocols: Protocol[],
   injections: InjectionLog[],
+  doses: ProtocolDose[] = [],
 ): SimpleScheduleItem[] {
   const now = Date.now()
   const results: SimpleScheduleItem[] = []
+
+  // Per-protocol set of scheduledAt ISO strings the user has already
+  // resolved (logged as done OR explicitly skipped). When computing
+  // "what's next?" we advance past these — otherwise hitting Skip would
+  // leave the same slot showing.
+  const consumedByProto = new Map<number, Set<string>>()
+  for (const d of doses) {
+    if (d.status !== 'done' && d.status !== 'skipped') continue
+    const set = consumedByProto.get(d.protocolId) ?? new Set<string>()
+    set.add(d.scheduledAt)
+    consumedByProto.set(d.protocolId, set)
+  }
 
   for (const p of protocols) {
     if (p.archived || p.cadence.kind === 'asNeeded') continue
@@ -31,8 +44,19 @@ export function simpleUpcomingSchedule(
       .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0]
     const lastDate = lastInj ? parseISO(lastInj.takenAt) : null
 
-    const nextDue = calcNextDue(p.cadence, lastDate, parseISO(p.startedAt))
+    let nextDue = calcNextDue(p.cadence, lastDate, parseISO(p.startedAt))
     if (!nextDue) continue
+
+    // Advance past doses the user has already resolved. Cap iterations as a
+    // safety net so a misconfigured cadence can't infinite-loop.
+    const consumed = consumedByProto.get(p.id ?? -1)
+    if (consumed) {
+      let safety = 60
+      while (nextDue && consumed.has(nextDue.toISOString()) && safety-- > 0) {
+        nextDue = calcNextDue(p.cadence, nextDue, parseISO(p.startedAt))
+      }
+      if (!nextDue) continue
+    }
 
     results.push({
       protocol: p,

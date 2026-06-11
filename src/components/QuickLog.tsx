@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronUp, Droplet, HeartPulse, Plus, X } from 'lucide-react'
 import { db, type Compound, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
-import { generateDoseInstants } from '../lib/schedule'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from './SiteCombobox'
 import { COMMON_SITES } from '../lib/sites'
@@ -248,56 +247,28 @@ function InjectionForm({
     try {
       const unit = compound.unit as Unit
       const activeVialId = vials ? pickActiveVial(vials, compound.id!)?.id : undefined
-      const injectionId = await logInjection({
-        compoundId: compound.id!,
-        takenAt: new Date().toISOString(),
-        dose: Number(dose),
-        unit,
-        route,
-        site,
-        notes: notes || undefined,
-        vialId: activeVialId,
-        weightKg: weightKg ? Number(weightKg) : undefined,
-      })
-      // Mark the scheduled dose as done — two paths:
-      //   a) "Mark taken" from Overview passes scheduledAt explicitly
-      //   b) "Log" from Protocols row omits scheduledAt → find nearest pending dose
-      if (prefill?.protocolId) {
-        if (prefill.scheduledAt) {
-          // Path a: explicit scheduled time
-          await db.protocolDoses.put({
-            protocolId: prefill.protocolId,
-            scheduledAt: prefill.scheduledAt,
-            status: 'done',
-            injectionId,
-          })
-        } else {
-          // Path b: find the most recent past dose for this protocol that isn't already done
-          try {
-            const proto = await db.protocols.get(prefill.protocolId)
-            if (proto) {
-              const lookback = new Date(Date.now() - 8 * 86_400_000) // 8 days back
-              const instants = generateDoseInstants(proto, lookback, new Date())
-              const done = await db.protocolDoses
-                .where('protocolId').equals(prefill.protocolId)
-                .toArray()
-              const doneSet = new Set(done.map(d => d.scheduledAt))
-              // Last pending instant (most recent first)
-              const pending = [...instants].reverse().find(d => !doneSet.has(d.toISOString()))
-              if (pending) {
-                await db.protocolDoses.put({
-                  protocolId: prefill.protocolId,
-                  scheduledAt: pending.toISOString(),
-                  status: 'done',
-                  injectionId,
-                })
-              }
-            }
-          } catch {
-            // Non-fatal — injection already saved
-          }
-        }
-      }
+      // Protocol-dose linking is centralized in logInjection:
+      //   - When `link` is provided (Overview "Mark taken" knows the exact
+      //     scheduled instant), that exact dose is marked done.
+      //   - Otherwise logInjection auto-matches the nearest pending dose for
+      //     any protocol on this compound within ±48h.
+      const link = prefill?.protocolId && prefill.scheduledAt
+        ? { protocolId: prefill.protocolId, scheduledAt: prefill.scheduledAt }
+        : undefined
+      await logInjection(
+        {
+          compoundId: compound.id!,
+          takenAt: new Date().toISOString(),
+          dose: Number(dose),
+          unit,
+          route,
+          site,
+          notes: notes || undefined,
+          vialId: activeVialId,
+          weightKg: weightKg ? Number(weightKg) : undefined,
+        },
+        link ? { link } : undefined,
+      )
       // Save symptom snapshot if any chips selected or notes written
       if (symptomChips.length > 0 || symptomNotes) {
         await db.symptoms.add({

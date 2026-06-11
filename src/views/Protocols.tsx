@@ -21,6 +21,7 @@ import {
   weightSummary,
 } from '../lib/insights'
 import { describeCadence, simpleUpcomingSchedule } from '../lib/schedule'
+import { skipScheduledDose } from '../lib/injections'
 import { deleteInjection } from '../lib/injections'
 import { findPKCompound, buildDailyReleaseCurve } from '../lib/pk'
 import { EmptyState } from '../components/EmptyState'
@@ -42,13 +43,14 @@ export function Protocols({
   onEditProtocol: (p: Protocol & { id: number }) => void
 }) {
   const protocols = useLiveQuery(() => db.protocols.toArray(), [], [])
+  const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
   const activeProtocols = useMemo(
     () => (protocols ?? []).filter(p => !p.archived),
     [protocols],
   )
   const schedule = useMemo(
-    () => simpleUpcomingSchedule(activeProtocols, injections),
-    [activeProtocols, injections],
+    () => simpleUpcomingSchedule(activeProtocols, injections, protocolDoses),
+    [activeProtocols, injections, protocolDoses],
   )
 
   return (
@@ -203,6 +205,19 @@ function CompoundCard({
           </div>
         )}
 
+        {/* Skip (only shown for overdue rows — lets the user clear an
+            already-missed dose without logging a fake injection) */}
+        {overdue && schedItem?.nextDue && protocol.id !== undefined && (
+          <button
+            type="button"
+            className="ghost-button"
+            style={{ height: 34, fontSize: 12, padding: '0 12px', flexShrink: 0 }}
+            onClick={() => skipScheduledDose(protocol.id!, schedItem.nextDue.toISOString())}
+            title="Mark this dose as skipped"
+          >
+            Skip
+          </button>
+        )}
         {/* Log button */}
         <button
           type="button"

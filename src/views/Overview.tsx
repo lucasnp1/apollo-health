@@ -11,6 +11,7 @@ import {
   type EnrichedResult,
 } from '../lib/insights'
 import { simpleUpcomingSchedule, timeUntil } from '../lib/schedule'
+import { skipScheduledDose } from '../lib/injections'
 import { Sparkline } from '../components/Sparkline'
 import { StatCard } from '../components/StatCard'
 import type { View } from '../app/views'
@@ -37,10 +38,11 @@ export function Overview({
 })
  {
   const protocols = useLiveQuery(() => db.protocols.filter((p) => !p.archived).toArray(), [], [])
+  const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
   const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id, c])), [compounds])
   const upcoming = useMemo(
-    () => simpleUpcomingSchedule(protocols, injections).slice(0, 5),
-    [protocols, injections],
+    () => simpleUpcomingSchedule(protocols, injections, protocolDoses).slice(0, 5),
+    [protocols, injections, protocolDoses],
   )
 
   const labFlags = flagLatestResults(results)
@@ -236,7 +238,7 @@ export function Overview({
               const isNext = idx === 0
               const overdue = item.isOverdue
               return (
-                <div className="row" key={item.protocol.id} style={{ gridTemplateColumns: 'auto minmax(0,1fr) auto auto' }}>
+                <div className="row" key={item.protocol.id} style={{ gridTemplateColumns: 'auto minmax(0,1fr) auto auto', alignItems: 'center' }}>
                   <CalendarClock size={13} style={{ color: overdue ? 'var(--bad)' : isNext ? 'var(--accent)' : 'var(--ink-mute)', flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>
                     <strong>{c?.name ?? 'Compound'}</strong>
@@ -250,14 +252,25 @@ export function Overview({
                   }}>
                     {overdue ? `${Math.round(Math.abs(item.daysUntil))}d overdue` : timeUntil(item.nextDue)}
                   </span>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    style={{ height: 26, fontSize: 11, padding: '0 10px', whiteSpace: 'nowrap', flexShrink: 0 }}
-                    onClick={() => onOpenQuickLog('injection', { compoundId: item.protocol.compoundId, dose: item.protocol.dose, unit: item.protocol.unit, protocolId: item.protocol.id, scheduledAt: item.nextDue.toISOString() })}
-                  >
-                    Log
-                  </button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      style={{ height: 26, fontSize: 11, padding: '0 8px', whiteSpace: 'nowrap' }}
+                      onClick={() => skipScheduledDose(item.protocol.id!, item.nextDue.toISOString())}
+                      title="Mark as skipped"
+                    >
+                      Skip
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      style={{ height: 26, fontSize: 11, padding: '0 10px', whiteSpace: 'nowrap' }}
+                      onClick={() => onOpenQuickLog('injection', { compoundId: item.protocol.compoundId, dose: item.protocol.dose, unit: item.protocol.unit, protocolId: item.protocol.id, scheduledAt: item.nextDue.toISOString() })}
+                    >
+                      Log
+                    </button>
+                  </div>
                 </div>
               )
             })}
