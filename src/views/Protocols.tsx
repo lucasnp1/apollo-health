@@ -22,6 +22,7 @@ import {
 } from '../lib/insights'
 import { describeCadence, simpleUpcomingSchedule } from '../lib/schedule'
 import { skipScheduledDose } from '../lib/injections'
+import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { deleteInjection } from '../lib/injections'
 import { findPKCompound, buildDailyReleaseCurve } from '../lib/pk'
 import { EmptyState } from '../components/EmptyState'
@@ -464,10 +465,20 @@ function RecentDoses({ injections, compounds }: { injections: InjectionLog[]; co
   const compoundMap = new Map(compounds.map((c) => [c.id, c]))
   const [confirmId, setConfirmId] = useState<number | null>(null)
   const [editEntry, setEditEntry] = useState<InjectionLog | null>(null)
+  const deleteWithUndo = useUndoableDelete()
 
   async function handleDelete(id: number) {
-    await deleteInjection(id)
+    const snapshot = await db.injections.get(id)
     setConfirmId(null)
+    if (!snapshot) return
+    void deleteWithUndo({
+      label: 'Injection deleted',
+      remove: () => deleteInjection(id),
+      // Restore: reinsert the original row. Note we don't restore the
+      // vial decrement reversal — vial volume self-corrects on next render
+      // because the InjectionLog row is back in the source data.
+      restore: () => db.injections.put(snapshot),
+    })
   }
 
   return (

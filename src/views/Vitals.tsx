@@ -16,6 +16,7 @@ import { format, parseISO } from 'date-fns'
 import { db, type VitalLog } from '../lib/db'
 import { TimeRangePicker } from '../components/TimeRangePicker'
 import { filterByRange, type TimeRange } from '../lib/timeRange'
+import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { EmptyState } from '../components/EmptyState'
 
 // ── BP classification — ranges calibrated for steroid/TRT users ─────────────
@@ -43,6 +44,7 @@ const BP_META: Record<BpStatus, { color: string; soft: string; label: string }> 
 
 export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   const { chart: colors } = useTheme()
+  const deleteWithUndo = useUndoableDelete()
   const [range, setRange] = useState<TimeRange>('3M')
   const [form, setForm] = useState({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
   const [editingVital, setEditingVital] = useState<VitalLog | null>(null)
@@ -237,7 +239,20 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
                 <button type="button" className="icon-button" style={{ width: 32, height: 32 }} onClick={() => startEditVital(v)} aria-label="Edit">
                   <Edit2 size={13} />
                 </button>
-                <button type="button" className="icon-button danger" style={{ width: 32, height: 32 }} onClick={() => db.vitals.delete(v.id!)} aria-label="Delete">
+                <button
+                  type="button"
+                  className="icon-button danger"
+                  style={{ width: 32, height: 32 }}
+                  onClick={() => {
+                    const snapshot = { ...v }
+                    void deleteWithUndo({
+                      label: 'Reading deleted',
+                      remove: () => db.vitals.delete(v.id!),
+                      restore: () => db.vitals.put(snapshot),
+                    })
+                  }}
+                  aria-label="Delete"
+                >
                   <Trash2 size={13} />
                 </button>
               </div>

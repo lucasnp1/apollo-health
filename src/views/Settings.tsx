@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, Sun, Trash2, Upload, UserCircle, X } from 'lucide-react'
+import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, RotateCcw, Sun, Trash2, Upload, UserCircle, X } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { wipeLocalDatabase } from '../lib/lock'
 import { useTheme } from '../lib/useTheme'
@@ -100,9 +101,99 @@ export function Settings({
       </section>
 
       <section className="surface col-12">
+        <TrashSettings compounds={compounds ?? []} />
+      </section>
+
+      <section className="surface col-12">
         <DangerSettings />
       </section>
     </div>
+  )
+}
+
+// ── Trash ────────────────────────────────────────────────────────────────
+// Lists soft-deleted injections (those with a sync tombstone set) so the
+// user can restore one before it's pushed to the server. Only injections
+// currently soft-delete on this app — other tables hard-delete, but the
+// undo toast catches those at the moment of deletion.
+function TrashSettings({ compounds }: { compounds: Compound[] }) {
+  const deleted = useLiveQuery(
+    () => db.injections
+      .filter((i) => i.deletedAtSync !== undefined && i.deletedAtSync !== null)
+      .toArray(),
+    [],
+    [],
+  )
+  const compoundMap = new Map(compounds.map((c) => [c.id, c]))
+  const sorted = [...deleted].sort((a, b) => (b.deletedAtSync ?? 0) - (a.deletedAtSync ?? 0))
+
+  async function restore(id: number) {
+    // Clear the tombstone + bump updatedAt so the sync engine pushes the
+    // restoration on the next tick. `.modify` removes the property cleanly
+    // (partial-update with undefined leaves the key in place).
+    await db.injections.where('id').equals(id).modify((row) => {
+      delete row.deletedAtSync
+      row.updatedAt = Date.now()
+      row.dirty = 1
+    })
+  }
+
+  async function purgeAll() {
+    if (!confirm('Permanently delete all trash? This cannot be undone.')) return
+    await db.injections.filter((i) => i.deletedAtSync !== undefined).delete()
+  }
+
+  return (
+    <>
+      <div className="panel-header">
+        <div>
+          <span className="section-label">Recently deleted</span>
+          <h3>Trash</h3>
+        </div>
+        {sorted.length > 0 && (
+          <button type="button" className="ghost-button" onClick={purgeAll}>
+            <Trash2 size={13} /> Empty trash
+          </button>
+        )}
+      </div>
+      {sorted.length === 0 ? (
+        <p style={{ margin: 0, color: 'var(--ink-mute)', fontSize: 13 }}>
+          No recently deleted injections. Items you delete appear here until they sync.
+        </p>
+      ) : (
+        <div className="stack">
+          {sorted.map((inj) => {
+            const c = compoundMap.get(inj.compoundId)
+            const deletedAt = inj.deletedAtSync ? new Date(inj.deletedAtSync) : null
+            return (
+              <div
+                key={inj.id}
+                className="row"
+                style={{ gridTemplateColumns: 'minmax(0,1fr) auto auto', alignItems: 'center' }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ fontSize: 13 }}>
+                    {c?.name ?? 'Unknown compound'} · {inj.dose}{inj.unit ? ` ${inj.unit}` : ''}
+                  </strong>
+                  <span className="sub">
+                    Logged {format(parseISO(inj.takenAt), 'MMM d, HH:mm')}
+                    {deletedAt && ` · Deleted ${format(deletedAt, 'MMM d, HH:mm')}`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="ghost-button"
+                  style={{ height: 28, fontSize: 11, padding: '0 10px' }}
+                  onClick={() => inj.id !== undefined && restore(inj.id)}
+                >
+                  <RotateCcw size={12} /> Restore
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </>
   )
 }
 

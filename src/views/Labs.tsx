@@ -12,6 +12,7 @@ import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
 import { extractMarkersFromText } from '../lib/pdf'
+import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
 import { EmptyState } from '../components/EmptyState'
@@ -316,6 +317,7 @@ export function Labs({
   onReviewFile?: (id: number) => void
 }) {
   const { chart: colors } = useTheme()
+  const deleteWithUndo = useUndoableDelete()
   const markerTargets = useLiveQuery(() => db.markerTargets.toArray(), [], [])
   const targetByKey   = useMemo(() => new Map((markerTargets ?? []).map(t => [t.marker, t])), [markerTargets])
 
@@ -546,7 +548,15 @@ export function Labs({
                 <MarkerHistoryPane
                   summary={selectedSummary}
                   onClose={() => setSelectedKey(null)}
-                  onDelete={(id) => void db.results.delete(id)}
+                  onDelete={async (id) => {
+                    const snapshot = await db.results.get(id)
+                    if (!snapshot) return
+                    void deleteWithUndo({
+                      label: 'Lab result deleted',
+                      remove: () => db.results.delete(id),
+                      restore: () => db.results.put(snapshot),
+                    })
+                  }}
                   onEditTarget={() => openTargetEdit(selectedSummary.key)}
                   hasPersonalTarget={targetByKey.has(selectedSummary.key)}
                   colors={colors}

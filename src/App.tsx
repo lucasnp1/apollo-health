@@ -22,6 +22,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
 import { extractPdfText, extractMarkersFromText, type ExtractedMarker } from './lib/pdf'
+import { ToastProvider, useToast } from './lib/toast'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { useInjectionReminders } from './lib/useInjectionReminders'
@@ -86,20 +87,26 @@ function App() {
   }
 
   if (auth.state.status === 'guest') {
-    return <SignIn auth={auth} />
+    return (
+      <ToastProvider>
+        <SignIn auth={auth} />
+      </ToastProvider>
+    )
   }
 
   // 'local' = user explicitly chose local-only mode — show full app, no sync
   // 'authed' = signed in — show full app with sync
 
   return (
-    <Shell
-      activeView={activeView}
-      setActiveView={setActiveView}
-      sidebarCollapsed={sidebarCollapsed}
-      setSidebarCollapsed={setSidebarCollapsed}
-      auth={auth}
-    />
+    <ToastProvider>
+      <Shell
+        activeView={activeView}
+        setActiveView={setActiveView}
+        sidebarCollapsed={sidebarCollapsed}
+        setSidebarCollapsed={setSidebarCollapsed}
+        auth={auth}
+      />
+    </ToastProvider>
   )
 }
 
@@ -130,17 +137,12 @@ function Shell({
   const [calcOpen,   setCalcOpen]   = useState(false)
   const [menuOpen,   setMenuOpen]   = useState(false)
   const [protocolWizardOpen, setProtocolWizardOpen] = useState(false)
-  // PDF upload pipeline state — parsing overlay, review sheet, transient snackbar.
+  // PDF upload pipeline state — parsing overlay + review sheet. Transient
+  // messages now route through the shared toast context (snackbar UI lives
+  // in ToastProvider so any view can fire one without prop drilling).
   const [pdfParsingName, setPdfParsingName] = useState<string | null>(null)
   const [pdfReviewFileId, setPdfReviewFileId] = useState<number | null>(null)
-  const [snackbar, setSnackbar] = useState<{ message: string; tone?: 'warn' | 'error' } | null>(null)
-
-  // Auto-dismiss snackbar
-  useEffect(() => {
-    if (!snackbar) return
-    const id = setTimeout(() => setSnackbar(null), 6000)
-    return () => clearTimeout(id)
-  }, [snackbar])
+  const { showToast } = useToast()
 
   async function handleLabPdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -163,19 +165,19 @@ function Shell({
       if (markers.length > 0) {
         setPdfReviewFileId(id as number)
       } else if (extractedText) {
-        setSnackbar({
+        showToast({
           tone: 'warn',
           message: `Stored "${file.name}" but no recognized lab markers were found. You can add results manually under Add result.`,
         })
       } else {
-        setSnackbar({
+        showToast({
           tone: 'warn',
           message: `Couldn't read text from "${file.name}" — it may be a scanned image. Add the results manually under Add result.`,
         })
       }
     } catch (err) {
       console.error('PDF upload failed', err)
-      setSnackbar({
+      showToast({
         tone: 'error',
         message: `Couldn't read "${file.name}". Try a different PDF or add results manually.`,
       })
@@ -206,7 +208,7 @@ function Shell({
       unit: item.unit,
     })))
     await db.files.update(pdfReviewFile.id, { status: 'Reviewed' })
-    setSnackbar({
+    showToast({
       message: `Imported ${items.length} marker${items.length === 1 ? '' : 's'} from ${pdfReviewFile.name}.`,
     })
   }
@@ -551,15 +553,7 @@ function Shell({
         </div>
       )}
 
-      {snackbar && (
-        <div
-          className={snackbar.tone ? `snackbar ${snackbar.tone}` : 'snackbar'}
-          role={snackbar.tone === 'error' ? 'alert' : 'status'}
-        >
-          <span>{snackbar.message}</span>
-          <button type="button" onClick={() => setSnackbar(null)}>Dismiss</button>
-        </div>
-      )}
+      {/* Snackbar UI lives in <ToastProvider> — see src/lib/toast.tsx */}
     </div>
   )
 }
