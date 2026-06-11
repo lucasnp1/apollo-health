@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ionic/react": "^8.8.7",
+    "@noble/hashes": "^2.2.0",
     "date-fns": "^4.2.1",
     "dexie": "^4.4.2",
     "dexie-react-hooks": "^4.4.0",

@@ -1,5 +1,5 @@
 import type { PagesFunction, Env } from '../../_lib/types'
-import { derivePasswordHash, randomSalt, randomToken, serializeSalt, uuid } from '../../_lib/crypto'
+import { deriveArgon2Hash, randomSalt, randomToken, serializeSalt, uuid } from '../../_lib/crypto'
 import { ipHash, jsonError, jsonOk, sessionCookie, sessionTtlMs } from '../../_lib/auth'
 import { wrap } from '../../_lib/handler'
 
@@ -66,17 +66,19 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
     .first<{ n: number }>()
   const isAdmin = userCountRow && userCountRow.n === 0 ? 1 : 0
 
-  // Create user
+  // Create user — Argon2id from day one. The `iterations` column is kept
+  // for legacy PBKDF2 row compatibility; for Argon2 rows it's set to 0
+  // and ignored by the verify path.
   const salt = randomSalt()
-  const hash = await derivePasswordHash(password, salt)
+  const hash = await deriveArgon2Hash(password, salt)
   const userId = uuid()
 
   await env.DB
     .prepare(
-      `INSERT INTO users (id, email, password_hash, password_salt, iterations, is_admin, display_name, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, email, password_hash, password_salt, iterations, is_admin, display_name, algorithm, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(userId, email, hash, serializeSalt(salt), 100000, isAdmin, displayName, now, now)
+    .bind(userId, email, hash, serializeSalt(salt), 0, isAdmin, displayName, 'argon2id', now, now)
     .run()
 
   // Atomically claim the invite code if one was provided. The WHERE clause

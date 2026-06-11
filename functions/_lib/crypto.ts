@@ -1,12 +1,30 @@
 // Password hashing + session token primitives.
-// Uses WebCrypto only — works inside the Workers runtime.
+//
+// Algorithms supported:
+//   - 'argon2id' — default for all new signups (Phase 3). Memory-hard,
+//     OWASP-recommended (m=19456 KiB, t=2, p=1, output 32 bytes).
+//   - 'pbkdf2'   — legacy. Existing users still authenticate via this
+//     path; on the next successful login we transparently rehash to
+//     Argon2id. Cloudflare Workers caps PBKDF2-SHA256 at 100k iterations
+//     so we can't simply bump it.
 
-// Cloudflare Workers caps PBKDF2-SHA256 at 100,000 iterations. Each user's
-// iteration count is stored on the row so we can raise it later without
-// breaking older accounts.
-const ITERATIONS = 100_000
-const HASH = 'SHA-256'
-const KEY_BITS = 256
+import { argon2idAsync } from '@noble/hashes/argon2.js'
+
+export type HashAlgorithm = 'pbkdf2' | 'argon2id'
+
+// PBKDF2 (legacy verification path only — new users use Argon2)
+const PBKDF2_ITERATIONS = 100_000
+const PBKDF2_HASH = 'SHA-256'
+const PBKDF2_KEY_BITS = 256
+
+// Argon2id parameters. Defaults follow OWASP 2024 guidance for
+// interactive logins. Tunable upward if CPU budget allows; bumping
+// these means a longer wait per signup/login.
+const ARGON2_T = 2
+const ARGON2_M = 19_456 // KiB (~19 MiB)
+const ARGON2_P = 1
+const ARGON2_DK_LEN = 32
+
 const SALT_BYTES = 16
 
 const encoder = new TextEncoder()
@@ -33,18 +51,54 @@ export function randomToken(byteLength = 32): string {
   return toBase64(bytes).replace(/[+/]/g, (c) => (c === '+' ? '-' : '_')).replace(/=+$/, '')
 }
 
-export async function derivePasswordHash(password: string, salt: Uint8Array, iterations = ITERATIONS): Promise<string> {
+// ── Argon2id (preferred) ────────────────────────────────────────────────
+
+export async function deriveArgon2Hash(password: string, salt: Uint8Array): Promise<string> {
+  const out = await argon2idAsync(password, salt, {
+    t: ARGON2_T,
+    m: ARGON2_M,
+    p: ARGON2_P,
+    dkLen: ARGON2_DK_LEN,
+  })
+  return toBase64(out)
+}
+
+// ── PBKDF2 (legacy verification only) ──────────────────────────────────
+
+export async function derivePbkdf2Hash(
+  password: string,
+  salt: Uint8Array,
+  iterations = PBKDF2_ITERATIONS,
+): Promise<string> {
   const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits'])
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: HASH, salt: salt as BufferSource, iterations },
+    { name: 'PBKDF2', hash: PBKDF2_HASH, salt: salt as BufferSource, iterations },
     keyMaterial,
-    KEY_BITS,
+    PBKDF2_KEY_BITS,
   )
   return toBase64(new Uint8Array(bits))
 }
 
-export async function verifyPassword(password: string, salt: string, expectedHash: string, iterations: number): Promise<boolean> {
-  const computed = await derivePasswordHash(password, fromBase64(salt), iterations)
+// Legacy export name kept so existing imports keep compiling. New code
+// should call deriveArgon2Hash directly.
+export const derivePasswordHash = derivePbkdf2Hash
+
+// ── Unified verify (dispatches on algorithm) ───────────────────────────
+
+export async function verifyPassword(
+  algorithm: HashAlgorithm,
+  password: string,
+  salt: string,
+  expectedHash: string,
+  iterations = PBKDF2_ITERATIONS,
+): Promise<boolean> {
+  const saltBytes = fromBase64(salt)
+  let computed: string
+  if (algorithm === 'argon2id') {
+    computed = await deriveArgon2Hash(password, saltBytes)
+  } else {
+    computed = await derivePbkdf2Hash(password, saltBytes, iterations)
+  }
   return timingSafeEqual(computed, expectedHash)
 }
 

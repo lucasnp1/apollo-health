@@ -1,5 +1,12 @@
 import type { PagesFunction, Env } from '../../_lib/types'
-import { randomToken, verifyPassword } from '../../_lib/crypto'
+import {
+  deriveArgon2Hash,
+  randomSalt,
+  randomToken,
+  serializeSalt,
+  verifyPassword,
+  type HashAlgorithm,
+} from '../../_lib/crypto'
 import { ipHash, jsonError, jsonOk, sessionCookie, sessionTtlMs } from '../../_lib/auth'
 import { wrap } from '../../_lib/handler'
 
@@ -43,7 +50,7 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
 
   const user = await env.DB
     .prepare(
-      `SELECT id, email, password_hash, password_salt, iterations, is_admin, display_name
+      `SELECT id, email, password_hash, password_salt, iterations, is_admin, display_name, algorithm
        FROM users WHERE email = ?`,
     )
     .bind(email)
@@ -55,12 +62,22 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
       iterations: number
       is_admin: number
       display_name: string | null
+      algorithm: string
     }>()
 
-  // Constant-time-ish: still attempt a verify even on missing user to avoid trivial timing oracle.
+  // Constant-time-ish: still attempt a verify even on missing user to avoid
+  // trivial timing oracle. We use a fixed PBKDF2 verify here intentionally —
+  // the timing differs from an Argon2id verify but the attacker can't
+  // observe the gap if they're throttled.
   const ok = user
-    ? await verifyPassword(password, user.password_salt, user.password_hash, user.iterations)
-    : (await verifyPassword(password, 'AAAAAAAAAAAAAAAAAAAAAA==', 'x', 1000), false)
+    ? await verifyPassword(
+        (user.algorithm as HashAlgorithm) ?? 'pbkdf2',
+        password,
+        user.password_salt,
+        user.password_hash,
+        user.iterations,
+      )
+    : (await verifyPassword('pbkdf2', password, 'AAAAAAAAAAAAAAAAAAAAAA==', 'x', 1000), false)
   if (!user || !ok) {
     // Record the failure for throttling. Don't reveal whether email exists.
     await env.DB
@@ -68,6 +85,27 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
       .bind(null, 'login_fail', null, iph, now)
       .run()
     return jsonError('Email or password incorrect', 401)
+  }
+
+  // Opportunistic rehash: if the user was created back when we only had
+  // PBKDF2, upgrade them to Argon2id now that we know the plaintext
+  // password (this is the only time we ever see it). Failure here is
+  // non-fatal — the login itself succeeded, we just stay on PBKDF2 for
+  // this user until the next attempt.
+  if (user.algorithm !== 'argon2id') {
+    try {
+      const newSalt = randomSalt()
+      const newHash = await deriveArgon2Hash(password, newSalt)
+      await env.DB
+        .prepare(
+          `UPDATE users SET password_hash = ?, password_salt = ?, algorithm = 'argon2id', iterations = 0, updated_at = ?
+           WHERE id = ?`,
+        )
+        .bind(newHash, serializeSalt(newSalt), now, user.id)
+        .run()
+    } catch (err) {
+      console.warn('Failed to rehash to Argon2id for user', user.id, err)
+    }
   }
 
   const token = randomToken()
