@@ -848,7 +848,18 @@ select {
 
 /* ---------- Tables ---------- */
 
-.table-wrap { overflow-x: auto; }
+/* table-wrap gives wide tables a horizontal scroll. The mask fade on the
+   right edge tells the user there's more content offscreen — without it
+   many users on mobile never realize they can swipe sideways. Using
+   mask-image instead of an absolute pseudo-element so the fade tracks
+   the viewport edge rather than scrolling away with the content. */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+}
 .table-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table-wrap th {
   text-align: left; padding: 10px 12px;
