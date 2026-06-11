@@ -450,12 +450,15 @@ time,
 .ghost-button:disabled,
 .text-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── Variant 1: PRIMARY — teal fill — main CTAs ── */
+/* ── Variant 1: PRIMARY — yellow fill — main CTAs.
+   Yellow accent needs DARK text for contrast (white-on-yellow fails
+   accessibility). Same in both themes — the yellow is consistent. */
 .primary-button {
   background: var(--accent);
-  color: #fff;
+  color: var(--ink);
+  font-weight: 600;
 }
-.primary-button:hover { filter: brightness(1.08); }
+.primary-button:hover { filter: brightness(0.96); }
 
 /* ── Variant 2: GHOST — grey fill — secondary actions ── */
 .ghost-button {
@@ -1735,7 +1738,7 @@ select {
 /* ── Dark-mode button adjustments ──────────────────────────────────────── */
 :root[data-theme="dark"] .primary-button {
   background: var(--accent);
-  color: #000;
+  color: #1a1611;
 }
 /* ghost-button dark: keep grey fill with subtle outline */
 :root[data-theme="dark"] .ghost-button {

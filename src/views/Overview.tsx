@@ -94,7 +94,7 @@ export function Overview({
                 <span className="sub">Set up your compound, dose schedule, and vial.</span>
               </div>
               {!hasProtocol && (
-                <button type="button" className="primary-button" style={{ fontSize: 12, height: 30, padding: '0 12px' }} onClick={onOpenWizard}>
+                <button type="button" className="ghost-button" style={{ fontSize: 12, height: 30, padding: '0 12px' }} onClick={onOpenWizard}>
                   <Plus size={12} /> Create
                 </button>
               )}
@@ -110,7 +110,7 @@ export function Overview({
                 <span className="sub">Record your dose, site, and how you feel.</span>
               </div>
               {!hasInjection && (
-                <button type="button" className="primary-button" style={{ fontSize: 12, height: 30, padding: '0 12px' }} onClick={() => onOpenQuickLog('injection')}>
+                <button type="button" className="ghost-button" style={{ fontSize: 12, height: 30, padding: '0 12px' }} onClick={() => onOpenQuickLog('injection')}>
                   <Plus size={12} /> Log
                 </button>
               )}
