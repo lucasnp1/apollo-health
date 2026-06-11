@@ -1975,6 +1975,174 @@ select {
   .pdf-review-footer { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
 }
 
+/* ── Install prompt ────────────────────────────────────────────────────── */
+.install-prompt {
+  position: fixed;
+  bottom: 70px;
+  left: 12px;
+  right: 12px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.18));
+}
+.install-prompt-icon { color: var(--accent-ink); flex-shrink: 0; }
+.install-prompt-body { flex: 1; min-width: 0; }
+.install-prompt-body strong { display: block; font-size: 13px; }
+.install-prompt-body span {
+  display: block;
+  color: var(--ink-dim);
+  font-size: 11px;
+  margin-top: 2px;
+}
+.install-prompt-inline-icon { vertical-align: -1px; }
+.install-prompt-install { height: 32px; padding: 0 14px; font-size: 12px; }
+@media (max-width: 760px) {
+  .install-prompt {
+    bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Dose calculator ───────────────────────────────────────────────────── */
+.dose-calc-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dose-calc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.dose-calc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.dose-calc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.dose-calc-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+.dose-calc-suffix {
+  font-weight: 400;
+  color: var(--ink-mute);
+  margin-left: 4px;
+}
+.dose-calc-segment {
+  display: flex;
+  gap: 8px;
+}
+.dose-calc-seg,
+.dose-calc-seg-on {
+  flex: 1;
+  padding: 9px 4px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--ink-dim);
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.dose-calc-seg:hover { background: var(--surface-3, var(--surface-2)); }
+.dose-calc-seg-on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.dose-calc-result {
+  background: var(--accent-soft);
+  border-radius: 14px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--accent);
+}
+.dose-calc-result.warn {
+  background: var(--bad-soft, rgba(185, 28, 28, 0.08));
+  color: var(--bad, #b91c1c);
+}
+.dose-calc-syringe {
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  align-self: center;
+}
+.dose-calc-result-numbers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dose-calc-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.dose-calc-result-row > span:first-child {
+  font-size: 13px;
+  font-weight: 600;
+}
+.dose-calc-result-row + .dose-calc-result-row {
+  border-top: 1px solid rgba(8, 145, 178, 0.18);
+  padding-top: 10px;
+}
+.dose-calc-result.warn .dose-calc-result-row + .dose-calc-result-row {
+  border-top-color: rgba(185, 28, 28, 0.18);
+}
+.dose-calc-mono {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.dose-calc-result-row:first-child .dose-calc-mono { font-size: 28px; letter-spacing: -0.03em; }
+.dose-calc-formula {
+  margin: 0;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.dose-calc-overdraw {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.dose-calc-empty {
+  background: var(--surface-2);
+  border-radius: 14px;
+  padding: 16px 20px;
+  text-align: center;
+  color: var(--ink-mute);
+  font-size: 13px;
+}
+.dose-calc-disclaimer {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ink-mute);
+  line-height: 1.5;
+}
+@media (max-width: 760px) {
+  .dose-calc-grid { grid-template-columns: 1fr; }
+  .dose-calc-result { padding: 14px 16px; }
+  .dose-calc-result-row:first-child .dose-calc-mono { font-size: 24px; }
+  .dose-calc-mono { font-size: 18px; }
+}
+
 /* Print — always light regardless of theme */
 /* ── Print report (screen: hidden; print: shown) ──────────────────────── */
 .print-report { display: none; }

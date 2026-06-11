@@ -65,40 +65,23 @@ export function InstallPrompt() {
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: 70,
-        left: 12,
-        right: 12,
-        zIndex: 6,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        padding: 14,
-        background: 'var(--surface)',
-        border: '1px solid var(--line)',
-        borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-lg)',
-      }}
-      role="region"
-      aria-label="Install Apollo Health"
-    >
-      <Smartphone size={18} style={{ color: 'var(--accent-ink)' }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <strong style={{ display: 'block', fontSize: 13 }}>Install Apollo on your phone</strong>
+    <div className="install-prompt" role="region" aria-label="Install Apollo Health">
+      <Smartphone size={18} className="install-prompt-icon" />
+      <div className="install-prompt-body">
+        <strong>Install Apollo on your phone</strong>
         {platform === 'ios' ? (
-          <span style={{ display: 'block', color: 'var(--ink-dim)', fontSize: 11, marginTop: 2 }}>
-            Tap <Share size={11} style={{ verticalAlign: -1 }} /> Share, then <strong>Add to Home Screen</strong>.
+          <span>
+            Tap <Share size={11} className="install-prompt-inline-icon" /> Share, then{' '}
+            <strong>Add to Home Screen</strong>.
           </span>
         ) : (
-          <span style={{ display: 'block', color: 'var(--ink-dim)', fontSize: 11, marginTop: 2 }}>
-            Tap install to add it as an app — works offline.
-          </span>
+          <span>Tap install to add it as an app — works offline.</span>
         )}
       </div>
       {deferredPrompt && (
-        <button type="button" className="primary-button" onClick={install}>Install</button>
+        <button type="button" className="primary-button install-prompt-install" onClick={install}>
+          Install
+        </button>
       )}
       <button type="button" className="icon-button" aria-label="Dismiss" onClick={dismiss}>
         <X size={14} />
