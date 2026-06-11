@@ -59,8 +59,10 @@ function rangePos(v: number, low?: number, high?: number): number | null {
   return Math.max(0, Math.min(1, (v - low) / range))
 }
 
-// ── Compact marker card ────────────────────────────────────────────────────────
-
+// ── Compact marker card (legacy — superseded by MarkerRow but kept around
+//    in case we want to surface a single marker as a card on Overview
+//    later). ─────────────────────────────────────────────────────────────
+// @ts-expect-error -- intentionally unused; preserved for future reuse
 function MarkerCard({
   summary,
   selected,
@@ -139,6 +141,115 @@ function MarkerCard({
         </div>
       )}
     </button>
+  )
+}
+
+// ── List-style marker row (new view). Replaces the dense card grid with a
+//    breathable horizontal row: name + value + range bar + status chip +
+//    date + chevron. Reads top-to-bottom like a portfolio statement, much
+//    easier to scan when you have 30+ markers. ───────────────────────────
+function MarkerRow({
+  summary,
+  selected,
+  onClick,
+}: {
+  summary: MarkerSummary
+  selected: boolean
+  onClick: () => void
+}) {
+  const latest = summary.entries[0]
+  const prev   = summary.entries[1]
+  const val    = latest?.value
+  const latestLow  = latest?.low
+  const latestHigh = latest?.high
+  const status = rangeStatus(val, latestLow, latestHigh)
+  const pos    = val !== undefined ? rangePos(val, latestLow, latestHigh) : null
+  const delta  = val !== undefined && prev?.value !== undefined ? val - prev.value : undefined
+
+  const badgeLabel =
+    status === 'good' ? 'OK'
+    : status === 'warn' && latestHigh !== undefined && val !== undefined && val > latestHigh ? 'HIGH'
+    : status === 'warn' ? 'LOW'
+    : null
+
+  return (
+    <button
+      type="button"
+      className={`marker-row${selected ? ' selected' : ''}${status === 'warn' ? ' out' : ''}`}
+      onClick={onClick}
+      aria-pressed={selected}
+      aria-label={`${summary.label}: ${latest?.rawValue ?? '—'}${summary.unit ? ' ' + summary.unit : ''}`}
+    >
+      <span className="marker-row-name">{summary.label}</span>
+
+      <span className="marker-row-value">
+        <span className="marker-row-num">{val !== undefined ? (latest.rawValue || String(val)) : '—'}</span>
+        {summary.unit && val !== undefined && <span className="marker-row-unit">{summary.unit}</span>}
+        {delta !== undefined && Math.abs(delta) > 0.05 && (
+          <span className={`marker-row-delta ${delta > 0 ? 'up' : 'down'}`}>
+            {delta > 0 ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
+          </span>
+        )}
+      </span>
+
+      <span className="marker-row-range" aria-hidden="true">
+        {pos !== null ? (
+          <span className="marker-row-range-bar">
+            <span className="marker-row-range-fill" style={{ width: `${pos * 100}%` }} />
+            <span className={`marker-row-range-dot ${status}`} style={{ left: `${pos * 100}%` }} />
+          </span>
+        ) : (
+          <span className="marker-row-range-empty" />
+        )}
+      </span>
+
+      <span className="marker-row-badge-cell">
+        {badgeLabel && <span className={`marker-row-badge ${status}`}>{badgeLabel}</span>}
+      </span>
+
+      <span className="marker-row-date">
+        {latest ? format(parseISO(latest.date), 'MMM d, yy') : '—'}
+      </span>
+
+      <span className="marker-row-chev" aria-hidden="true">
+        {selected ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </span>
+    </button>
+  )
+}
+
+// ── At-a-glance stats row across the top of the Labs view ────────────────
+function LabsStatusRow({
+  total,
+  inRange,
+  outOfRange,
+  lastTestDate,
+}: {
+  total: number
+  inRange: number
+  outOfRange: number
+  lastTestDate?: string
+}) {
+  return (
+    <section className="labs-stats" aria-label="Lab status summary">
+      <div className="labs-stat">
+        <span className="labs-stat-label">Markers tracked</span>
+        <span className="labs-stat-value">{total}</span>
+      </div>
+      <div className="labs-stat good">
+        <span className="labs-stat-label">In range</span>
+        <span className="labs-stat-value">{inRange}</span>
+      </div>
+      <div className={outOfRange > 0 ? 'labs-stat bad' : 'labs-stat'}>
+        <span className="labs-stat-label">Out of range</span>
+        <span className="labs-stat-value">{outOfRange}</span>
+      </div>
+      <div className="labs-stat">
+        <span className="labs-stat-label">Last test</span>
+        <span className="labs-stat-value">{lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : '—'}</span>
+      </div>
+    </section>
   )
 }
 
@@ -454,6 +565,25 @@ export function Labs({
     ? [...markersByPanel.values()].flat().find(s => s.key === selectedKey)
     : null
 
+  // Status summary at a glance: counts of in/out of range markers + the
+  // most recent test date. Built once per render — cheap enough.
+  const allSummaries = useMemo(
+    () => [...markersByPanel.values()].flat(),
+    [markersByPanel],
+  )
+  const outOfRangeSummaries = useMemo(
+    () => allSummaries.filter(s => rangeStatus(s.entries[0]?.value, s.entries[0]?.low, s.entries[0]?.high) === 'warn'),
+    [allSummaries],
+  )
+  const inRangeCount = useMemo(
+    () => allSummaries.filter(s => rangeStatus(s.entries[0]?.value, s.entries[0]?.low, s.entries[0]?.high) === 'good').length,
+    [allSummaries],
+  )
+  const lastTestDate = useMemo(
+    () => exams.length > 0 ? [...exams].sort((a, b) => b.collectedAt.localeCompare(a.collectedAt))[0]?.collectedAt : undefined,
+    [exams],
+  )
+
   return (
     <div className="content-grid">
 
@@ -480,8 +610,40 @@ export function Labs({
         </section>
       )}
 
+      {/* ── At-a-glance stats row ── */}
+      {hasData && (
+        <LabsStatusRow
+          total={allSummaries.length}
+          inRange={inRangeCount}
+          outOfRange={outOfRangeSummaries.length}
+          lastTestDate={lastTestDate}
+        />
+      )}
+
       {/* ── Health composites ── */}
       {hasData && <LabComposites results={results} exams={exams} />}
+
+      {/* ── Needs attention: surface out-of-range markers up front ── */}
+      {hasData && outOfRangeSummaries.length > 0 && (
+        <section className="surface col-12 labs-attention">
+          <div className="panel-header">
+            <div>
+              <span className="section-label">Needs attention</span>
+              <h3>{outOfRangeSummaries.length} out of range</h3>
+            </div>
+          </div>
+          <div className="marker-rows">
+            {outOfRangeSummaries.map(s => (
+              <MarkerRow
+                key={`attn-${s.key}`}
+                summary={s}
+                selected={selectedKey === s.key}
+                onClick={() => setSelectedKey(selectedKey === s.key ? null : s.key)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── No data empty state ── */}
       {!hasData && (
@@ -490,13 +652,13 @@ export function Labs({
         </section>
       )}
 
-      {/* ── Panel sections ── */}
+      {/* ── All markers, grouped by panel as a clean list ── */}
       {hasData && PANEL_ORDER.map(panel => {
         const summaries = markersByPanel.get(panel)
         if (!summaries || summaries.length === 0) return null
         const collapsed = collapsedPanels.has(panel)
 
-        // Count out-of-range markers
+        // Count out-of-range markers in this panel
         const outCount = summaries.filter(s => {
           const v = s.entries[0]?.value
           return rangeStatus(v, s.low, s.high) === 'warn'
@@ -507,19 +669,19 @@ export function Labs({
 
         return (
           <section key={panel} className="surface col-12">
-            {/* Panel header */}
+            {/* Panel header — clickable to collapse */}
             <div
               className="panel-header"
-              style={{ cursor: 'pointer', userSelect: 'none', marginBottom: collapsed ? 0 : 12 }}
+              style={{ cursor: 'pointer', userSelect: 'none', marginBottom: collapsed ? 0 : 8 }}
               onClick={() => togglePanel(panel)}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
                 {collapsed
                   ? <ChevronRight size={13} style={{ color: 'var(--ink-mute)' }} />
                   : <ChevronDown  size={13} style={{ color: 'var(--ink-mute)' }} />
                 }
-                <span className="section-label" style={{ margin: 0 }}>{panel}</span>
-                <span style={{ fontSize: 11, color: 'var(--ink-dim)' }}>{summaries.length} markers</span>
+                <h3 style={{ margin: 0 }}>{panel}</h3>
+                <span style={{ fontSize: 11, color: 'var(--ink-mute)' }}>· {summaries.length} marker{summaries.length === 1 ? '' : 's'}</span>
                 {outCount > 0 && (
                   <span className="chip" style={{ background: 'var(--bad-soft)', color: 'var(--bad)', fontSize: 10, height: 18 }}>
                     {outCount} out of range
@@ -528,11 +690,11 @@ export function Labs({
               </div>
             </div>
 
-            {/* Marker cards grid */}
+            {/* List-style marker rows */}
             {!collapsed && (
-              <div className="marker-grid">
+              <div className="marker-rows">
                 {summaries.map(s => (
-                  <MarkerCard
+                  <MarkerRow
                     key={s.key}
                     summary={s}
                     selected={selectedKey === s.key}

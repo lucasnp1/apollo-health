@@ -6,12 +6,15 @@
    the classical aesthetic without making body text feel old-fashioned. */
 
 :root {
-  /* Surfaces — warm cream instead of cool grey */
-  --bg:        #fbf6e9;   /* warm cream — slightly more saturated than surface */
-  --bg-soft:   #fdfaf0;
-  --surface:   #fffcf5;   /* near-white with the faintest yellow undertone */
-  --surface-2: #f5eedb;
-  --surface-3: #ece2c4;
+  /* Surfaces — almost-white with the faintest warm tone. Lighter than the
+     first pass; the brand yellow only appears as accent, not as the page
+     ground. Sidebar / cards / page all sit in a near-white range with
+     just enough offset to separate them visually. */
+  --bg:        #faf7ed;   /* page ground — barely warm */
+  --bg-soft:   #fcfaf3;
+  --surface:   #ffffff;   /* card / sidebar — clean white */
+  --surface-2: #f5efde;   /* warmer inset for empty states + inputs */
+  --surface-3: #ebe3cc;
 
   /* Lines — warm ink at low alpha (vs cool iOS grey) */
   --line:        rgba(26,22,16,0.10);
@@ -149,12 +152,12 @@ a:hover { color: var(--accent-ink); }
 
 h1, h2, h3, h4, p { margin: 0; }
 /* Large title — Apple Health hero number style */
-/* Page-level h1 gets the classical serif — pulls the medallion brand
-   feel up into typography without making body text feel old. h2/h3 stay
-   on the geometric sans for readability. */
-h1 { font-family: var(--font-display); font-size: 30px; line-height: 1.12; letter-spacing: -0.01em; font-weight: 600; }
-h2 { font-family: var(--font-ui); font-size: 20px; line-height: 1.2; letter-spacing: -0.01em; font-weight: 600; }
-h3 { font-family: var(--font-ui); font-size: 16px; line-height: 1.3; letter-spacing: -0.005em; font-weight: 600; }
+/* All headings use the classical serif — gives every page a consistent
+   typographic voice that echoes the medallion brand. Body type stays
+   sans (Inter) for paragraph readability and dense data. */
+h1 { font-family: var(--font-display); font-size: 30px; line-height: 1.12; letter-spacing: 0; font-weight: 600; }
+h2 { font-family: var(--font-display); font-size: 22px; line-height: 1.18; letter-spacing: 0; font-weight: 600; }
+h3 { font-family: var(--font-display); font-size: 18px; line-height: 1.25; letter-spacing: 0; font-weight: 600; }
 
 /* Tabular numerals wherever numbers appear */
 .num,
@@ -2173,6 +2176,383 @@ select {
   .dose-calc-result { padding: 14px 16px; }
   .dose-calc-result-row:first-child .dose-calc-mono { font-size: 24px; }
   .dose-calc-mono { font-size: 18px; }
+}
+
+/* ── Labs redesign ─────────────────────────────────────────────────────── */
+
+/* Stats row across the top — same vibe as the cash-flow reference: tall,
+   uncluttered, big numeric typography. */
+.labs-stats {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.labs-stat {
+  background: var(--surface);
+  border: 0.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.labs-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.labs-stat-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.labs-stat.good .labs-stat-value { color: var(--good); }
+.labs-stat.bad  .labs-stat-value { color: var(--bad);  }
+
+/* Needs-attention section: subtle warm red ribbon left-border to draw
+   the eye, otherwise sits as a regular card. */
+.labs-attention {
+  border-left: 3px solid var(--bad);
+}
+
+/* Marker rows: replaces the grid of cards. Reads like a portfolio
+   statement — name | value | range | chip | date | chevron. */
+.marker-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.marker-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.4fr)   /* name */
+    minmax(120px, auto) /* value */
+    minmax(120px, 1fr) /* range bar */
+    52px               /* badge */
+    72px               /* date */
+    16px;              /* chevron */
+  align-items: center;
+  gap: 14px;
+  padding: 12px 4px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 0.5px solid var(--line);
+  cursor: pointer;
+  transition: background 100ms;
+  color: var(--ink);
+}
+.marker-row:last-child { border-bottom: 0; }
+.marker-row:hover { background: var(--bg-soft); }
+.marker-row.selected { background: var(--bg-soft); }
+.marker-row.out .marker-row-name { color: var(--ink); }
+
+.marker-row-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.marker-row-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.marker-row-num {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.marker-row-unit {
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+.marker-row-delta {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+.marker-row-delta.up   { color: var(--ink-dim); }
+.marker-row-delta.down { color: var(--ink-dim); }
+
+.marker-row-range-bar {
+  position: relative;
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: visible;
+}
+.marker-row-range-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  background: linear-gradient(to right, var(--accent-soft), var(--accent));
+  opacity: 0.6;
+}
+.marker-row-range-dot {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--ink);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 0.5px var(--line);
+}
+.marker-row-range-dot.warn { background: var(--bad); }
+.marker-row-range-empty {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--surface-2),
+    var(--surface-2) 4px,
+    var(--bg) 4px,
+    var(--bg) 8px
+  );
+  opacity: 0.6;
+}
+
+.marker-row-badge-cell { display: flex; justify-content: center; }
+.marker-row-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+.marker-row-badge.good { background: var(--good-soft); color: var(--good); }
+.marker-row-badge.warn { background: var(--bad-soft);  color: var(--bad);  }
+
+.marker-row-date {
+  font-size: 11px;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.marker-row-chev {
+  display: flex;
+  justify-content: center;
+  color: var(--ink-mute);
+}
+.marker-row.selected .marker-row-chev { color: var(--ink); }
+
+@media (max-width: 760px) {
+  .labs-stats { grid-template-columns: repeat(2, 1fr); }
+  .marker-row {
+    grid-template-columns:
+      minmax(0, 1fr) auto;
+    gap: 4px 12px;
+  }
+  .marker-row-range,
+  .marker-row-badge-cell,
+  .marker-row-date,
+  .marker-row-chev {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+  .marker-row-range { order: 3; }
+  .marker-row-badge-cell { order: 4; }
+  .marker-row-date { order: 5; text-align: left; }
+  .marker-row-chev { display: none; }
+}
+
+/* ── Symptoms view (redesigned) ────────────────────────────────────────── */
+.symptom-checkin .panel-header { align-items: center; }
+.symptom-when {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border: 0.5px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+.symptom-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin: 14px 0 8px;
+}
+.symptom-rows {
+  display: grid;
+  gap: 6px;
+}
+.symptom-scale {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.5fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 0;
+}
+.symptom-scale-label {
+  font-size: 13px;
+  color: var(--ink);
+}
+.symptom-scale-chips {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.symptom-chip {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 0.5px solid var(--line);
+  background: var(--bg);
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms, transform 80ms;
+  font-variant-numeric: tabular-nums;
+}
+.symptom-chip:hover { background: var(--surface-2); color: var(--ink); }
+.symptom-chip.selected {
+  border-color: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  transform: translateY(-0.5px);
+  box-shadow: 0 1px 3px rgba(26,22,16,0.08);
+}
+.symptom-chip.selected.tone-good    { background: var(--good-soft); color: var(--good); }
+.symptom-chip.selected.tone-warn    { background: var(--warn-soft); color: var(--warn); }
+.symptom-chip.selected.tone-bad     { background: var(--bad-soft);  color: var(--bad);  }
+.symptom-chip.selected.tone-neutral { background: var(--accent-soft); color: var(--accent-ink); }
+
+.symptom-notes {
+  display: block;
+  margin-top: 18px;
+}
+.symptom-notes > span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-mute);
+  margin-bottom: 6px;
+}
+.symptom-notes textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 0.5px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  resize: vertical;
+}
+.symptom-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.symptom-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--line);
+}
+.symptom-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-mute);
+}
+.symptom-legend-item > span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.symptom-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.symptom-history li {
+  position: relative;
+  padding: 10px 36px 10px 0;
+  border-bottom: 0.5px solid var(--line);
+}
+.symptom-history li:last-child { border-bottom: 0; }
+.symptom-history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.symptom-history-head strong { font-size: 13px; }
+.symptom-history-head span { font-size: 11px; color: var(--ink-mute); }
+.symptom-history-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.symptom-history-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-2);
+  color: var(--ink-dim);
+}
+.symptom-history-chip.tone-good { background: var(--good-soft); color: var(--good); }
+.symptom-history-chip.tone-warn { background: var(--warn-soft); color: var(--warn); }
+.symptom-history-chip.tone-bad  { background: var(--bad-soft);  color: var(--bad);  }
+.symptom-history-notes {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+  line-height: 1.4;
+}
+.symptom-history-delete {
+  position: absolute;
+  top: 8px;
+  right: 0;
+  width: 28px;
+  height: 28px;
+}
+
+@media (max-width: 760px) {
+  .symptom-scale { grid-template-columns: 1fr; gap: 4px; }
+  .symptom-scale-chips { width: 100%; }
+  .symptom-chip { flex: 1; width: auto; }
+  .symptom-when { width: 100%; margin-top: 4px; }
+  .symptom-checkin .panel-header { flex-wrap: wrap; }
 }
 
 /* Print — always light regardless of theme */
