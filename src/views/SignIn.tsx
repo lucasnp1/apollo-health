@@ -57,9 +57,9 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
           <input
             id="password"
             type="password"
-            placeholder={mode === 'login' ? 'Password' : 'Password (≥ 8 characters)'}
+            placeholder={mode === 'login' ? 'Password' : 'Password (10+ chars, mixed case, a number)'}
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            minLength={8}
+            minLength={mode === 'signup' ? 10 : 8}
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -73,7 +73,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
                 type="password"
                 placeholder="Confirm password"
                 autoComplete="new-password"
-                minLength={8}
+                minLength={10}
                 required
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}

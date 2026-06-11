@@ -8,11 +8,11 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
 export function sessionCookie(token: string, maxAgeMs: number = SESSION_TTL_MS): string {
   const maxAge = Math.floor(maxAgeMs / 1000)
-  return `${COOKIE_NAME}=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`
+  return `${COOKIE_NAME}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`
 }
 
 export function expiredCookie(): string {
-  return `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`
+  return `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`
 }
 
 function readCookie(request: Request, name: string): string | null {

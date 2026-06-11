@@ -19,7 +19,13 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   // Validation errors are intentionally generic — never disclose whether an
   // email is already registered (prevents email enumeration via signup).
   if (!email || !email.includes('@')) return jsonError('Could not create account', 400)
-  if (password.length < 8) return jsonError('Password must be at least 8 characters', 400)
+  // Password rules: ≥10 chars + at least one lowercase + uppercase + digit.
+  // Kept dep-free; zxcvbn or similar can be layered on the client for a
+  // strength meter without changing the server contract.
+  if (password.length < 10) return jsonError('Password must be at least 10 characters', 400)
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
+    return jsonError('Password must include lowercase, uppercase, and a number', 400)
+  }
 
   const now = Date.now()
 

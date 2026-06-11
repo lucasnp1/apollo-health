@@ -17,6 +17,22 @@ const SECURITY_HEADERS: Record<string, string> = {
   'X-Frame-Options': 'DENY',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+  // Permissive CSP — blocks third-party scripts/iframes/fonts while still
+  // allowing inline styles (Ionic + many React libs ship inline styles) and
+  // blob/data URLs (PDF.js workers, image previews). Tighten further once
+  // we've removed inline styles entirely.
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "script-src 'self' 'wasm-unsafe-eval' blob:",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; '),
 }
 
 export const onRequest: PagesFunction = async ({ request, next }) => {
