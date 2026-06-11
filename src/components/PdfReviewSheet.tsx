@@ -71,12 +71,17 @@ export function PdfReviewSheet({
     // the user's lab record consistent across imports.
     const items: ExtractedMarker[] = (useAll ? rows : rows.filter((r) => r.include))
       .filter((r) => Number.isFinite(r.value) && r.marker.trim().length > 0)
-      .map(({ include: _i, marker, value, unit }) => {
+      .map(({ include: _i, marker, value, unit, low, high }) => {
         const canon = canonicalize(marker)
         return {
           marker: canon?.label ?? marker.trim(),
           value,
           unit: unit.trim(),
+          // Critical: forward the reference range from the extractor. The
+          // previous destructure left these off, so every PDF import landed
+          // in D1 with no low/high → Labs showed every row as "OK".
+          low,
+          high,
         }
       })
     if (items.length === 0) return

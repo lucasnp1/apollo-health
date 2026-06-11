@@ -206,6 +206,11 @@ function Shell({
       value: item.value,
       rawValue: String(item.value),
       unit: item.unit,
+      // Persist the reference range from the PDF so the Labs view can
+      // show HIGH/LOW status. Without these the row falls through to
+      // "no range known" and stops contributing OK / out-of-range counts.
+      low: item.low,
+      high: item.high,
     })))
     await db.files.update(pdfReviewFile.id, { status: 'Reviewed' })
     showToast({

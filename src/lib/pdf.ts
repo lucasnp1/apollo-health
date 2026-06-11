@@ -183,6 +183,12 @@ export type ExtractedMarker = {
   marker: string
   value: number
   unit: string
+  // Reference range from the source PDF, when present. Set whenever the
+  // lab's "(Range: ...)" parenthetical is parseable. Without these the
+  // Labs view can't tell whether a value is in range, and it'll display
+  // the row as "no range known" rather than falsely "OK".
+  low?: number
+  high?: number
 }
 
 export async function extractPdfText(file: File) {
@@ -246,6 +252,8 @@ export function extractMarkersFromText(text: string): ExtractedMarker[] {
     start: number
     end: number
     score: number
+    low?: number
+    high?: number
   }
 
   const accepted = new Map<string, Candidate>()
@@ -279,7 +287,10 @@ export function extractMarkersFromText(text: string): ExtractedMarker[] {
       if (unit && /^[0-9.]+$/.test(unit)) unit = ''
       const score = scoreCandidate(canonical, value, unit, start, end, normalized)
       if (score <= 0) continue
-      candidates.push({ canonical, value, unit, start, end, score })
+      // Try to also pull the reference range from a "(Range: ...)" or
+      // "Ref Low / Ref High" parenthetical immediately following.
+      const range = parseRangeNear(normalized, end)
+      candidates.push({ canonical, value, unit, start, end, score, low: range.low, high: range.high })
     }
 
     if (candidates.length === 0) continue
@@ -290,8 +301,32 @@ export function extractMarkersFromText(text: string): ExtractedMarker[] {
   }
 
   return Array.from(accepted.values())
-    .map(({ canonical, value, unit }) => ({ marker: canonical, value, unit }))
+    .map(({ canonical, value, unit, low, high }) => ({ marker: canonical, value, unit, low, high }))
     .slice(0, 64)
+}
+
+// Parse the reference range from a "(Range: 60 - 120)" / "(Range: < 22)" /
+// "(Range: > 1)" / "(Range: >= 60)" parenthetical that sits immediately
+// after the value+unit. Searches up to 80 chars past the unit so it
+// catches Medichecks-style "(Range: 60 - 120)" as well as "Range: < 45)"
+// without parens. Returns { low?, high? } — either, both, or neither.
+function parseRangeNear(text: string, from: number): { low?: number; high?: number } {
+  const window = text.slice(from, from + 80)
+  const m = window.match(/\bRange\s*[:=]\s*([^)\n]*?)(?:\)|$)/i)
+  if (!m) return {}
+  const body = m[1].trim()
+  // Form A: "60 - 120" (also accepts en/em dashes and " to ").
+  const range = body.match(/^(-?\d+(?:[.,]\d+)?)\s*(?:[-–—]|to)\s*(-?\d+(?:[.,]\d+)?)/i)
+  if (range) {
+    return { low: parseFloat(range[1].replace(',', '.')), high: parseFloat(range[2].replace(',', '.')) }
+  }
+  // Form B: "< 22" or "<= 22" — upper bound only.
+  const lt = body.match(/^[<≤]=?\s*(-?\d+(?:[.,]\d+)?)/)
+  if (lt) return { high: parseFloat(lt[1].replace(',', '.')) }
+  // Form C: "> 1" or ">= 60" — lower bound only.
+  const gt = body.match(/^[>≥]=?\s*(-?\d+(?:[.,]\d+)?)/)
+  if (gt) return { low: parseFloat(gt[1].replace(',', '.')) }
+  return {}
 }
 
 // Score a candidate match. Higher score = more likely to be the real

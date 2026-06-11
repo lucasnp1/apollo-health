@@ -305,10 +305,42 @@ const CATALOG: Array<MarkerMeta & { aliases: string[] }> = [
   },
 ]
 
+// Build a length-sorted alias index once. Critical: longer aliases must
+// match before shorter ones so "non-hdl cholesterol" beats "hdl", and
+// "free testosterone" beats "testosterone". The previous implementation
+// used a `.includes()` substring check inside catalog iteration order,
+// which collapsed "Non-HDL Cholesterol" into the HDL group and produced
+// false "TC/HDL ratio = TC/Non-HDL" values in the composites.
+type AliasIndex = { alias: string; entry: (typeof CATALOG)[number] }
+let ALIAS_INDEX: AliasIndex[] | null = null
+function ensureAliasIndex(): AliasIndex[] {
+  if (ALIAS_INDEX) return ALIAS_INDEX
+  const flat: AliasIndex[] = []
+  for (const entry of CATALOG) {
+    for (const alias of entry.aliases) flat.push({ alias, entry })
+  }
+  flat.sort((a, b) => b.alias.length - a.alias.length)
+  ALIAS_INDEX = flat
+  return flat
+}
+
+// Match an alias against the needle at a word boundary. Whole-word
+// matching prevents "hdl" from matching inside "non-hdl cholesterol"
+// and "ast" matching inside "fast" or "past".
+function matchesAsWord(needle: string, alias: string): boolean {
+  const i = needle.indexOf(alias)
+  if (i < 0) return false
+  const before = i === 0 ? '' : needle[i - 1]
+  const after = i + alias.length === needle.length ? '' : needle[i + alias.length]
+  const isWordChar = (c: string) => /[a-z0-9]/i.test(c)
+  return !isWordChar(before) && !isWordChar(after)
+}
+
 export function canonicalize(raw: string): MarkerMeta | undefined {
   const needle = raw.toLowerCase().trim()
-  for (const entry of CATALOG) {
-    if (entry.aliases.some((alias) => needle.includes(alias))) {
+  if (!needle) return undefined
+  for (const { alias, entry } of ensureAliasIndex()) {
+    if (needle === alias || matchesAsWord(needle, alias)) {
       const { aliases: _aliases, ...meta } = entry
       void _aliases
       return meta

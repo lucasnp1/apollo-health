@@ -46,17 +46,34 @@ type MarkerSummary = {
 
 function rangeStatus(v: number | undefined, low?: number, high?: number): 'good' | 'warn' | 'none' {
   if (v === undefined) return 'none'
+  // Without ANY reference range we can't say whether the value is in
+  // or out of range — return 'none' instead of falsely reporting 'good'.
+  // The previous behaviour made every PDF-imported marker (which had no
+  // range captured) show up as "OK" with a green pill on the Labs view.
+  if (low === undefined && high === undefined) return 'none'
   if (low !== undefined && v < low) return 'warn'
   if (high !== undefined && v > high) return 'warn'
   return 'good'
 }
 
-// Returns a 0–1 position for the value within [low, high], clamped
+// Returns a 0–1 position for the value within [low, high], clamped.
+// For single-bounded markers (only `high` like "< 5", or only `low` like
+// "> 1") we synthesise the missing bound so a meaningful dot still
+// renders. "< X" → treat 0..X as the band; "> X" → treat X..(X*2) so
+// values just above the threshold sit near the left edge of the band.
 function rangePos(v: number, low?: number, high?: number): number | null {
-  if (low === undefined || high === undefined) return null
-  const range = high - low
+  if (low === undefined && high === undefined) return null
+  let lo = low
+  let hi = high
+  if (lo === undefined && hi !== undefined) {
+    lo = hi >= 0 ? 0 : hi * 2
+  } else if (hi === undefined && lo !== undefined) {
+    hi = lo > 0 ? lo * 2 : lo / 2
+  }
+  if (lo === undefined || hi === undefined) return null
+  const range = hi - lo
   if (range <= 0) return null
-  return Math.max(0, Math.min(1, (v - low) / range))
+  return Math.max(0, Math.min(1, (v - lo) / range))
 }
 
 // ── Compact marker card (legacy — superseded by MarkerRow but kept around
@@ -472,7 +489,12 @@ export function Labs({
           key,
           label:   canon?.label ?? r.marker,
           panel:   canon?.panel ?? 'Other',
-          unit:    canon?.unit  ?? r.unit,
+          // The lab's actual unit on the row wins. Catalog unit is a
+          // last-resort fallback for markers where the lab didn't print
+          // one — overriding the row's unit causes false "mg/dL" display
+          // on results that came from UK labs reporting mmol/L (and
+          // vice-versa for US labs reporting ng/dL vs nmol/L).
+          unit:    r.unit ?? canon?.unit,
           low:     confirmedLow,
           high:    confirmedHigh,
           entries: [],
