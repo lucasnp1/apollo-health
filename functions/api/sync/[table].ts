@@ -6,8 +6,9 @@
 import type { PagesFunction, Env } from '../../_lib/types'
 import { jsonError, jsonOk, requireUser } from '../../_lib/auth'
 import { TABLES, rowToClient, type TableSpec } from '../../_lib/tables'
+import { wrap } from '../../_lib/handler'
 
-export const onRequestGet: PagesFunction<Env, 'table'> = async ({ env, request, params }) => {
+export const onRequestGet: PagesFunction<Env, 'table'> = wrap<Env, 'table'>(async ({ env, request, params }) => {
   const auth = await requireUser(env, request)
   if (auth instanceof Response) return auth
   const slug = String(params.table)
@@ -26,9 +27,9 @@ export const onRequestGet: PagesFunction<Env, 'table'> = async ({ env, request, 
   const results = (rows.results || []).map((row) => rowToClient(spec, row))
   const cursor = results.length > 0 ? results[results.length - 1].updatedAt : since
   return jsonOk({ rows: results, cursor, hasMore: results.length === limit })
-}
+})
 
-export const onRequestPost: PagesFunction<Env, 'table'> = async ({ env, request, params }) => {
+export const onRequestPost: PagesFunction<Env, 'table'> = wrap<Env, 'table'>(async ({ env, request, params }) => {
   const auth = await requireUser(env, request)
   if (auth instanceof Response) return auth
   const slug = String(params.table)
@@ -54,14 +55,18 @@ export const onRequestPost: PagesFunction<Env, 'table'> = async ({ env, request,
       conflicts.push({ id: '', reason: 'missing id' })
       continue
     }
-    const incomingUpdatedAt = Number(incoming.updatedAt || now)
 
-    // Last-write-wins: if server's row is newer, skip
+    // Last-write-wins is enforced using the SERVER clock. Clients never
+    // supply their own updated_at — earlier versions trusted it, which let
+    // a malicious client claim updated_at=Infinity to overwrite any server
+    // row. Now: if a row exists, we accept the write (it's newer by
+    // definition, because `now` is monotonically advancing here).
     const current = await env.DB
       .prepare(`SELECT updated_at FROM ${spec.table} WHERE id = ? AND user_id = ?`)
       .bind(id, auth.user.id)
       .first<{ updated_at: number }>()
-    if (current && current.updated_at > incomingUpdatedAt) {
+    if (current && current.updated_at > now) {
+      // Server clock somehow moved backwards (extremely rare). Skip.
       conflicts.push({ id, reason: 'server-newer' })
       continue
     }
@@ -83,7 +88,7 @@ export const onRequestPost: PagesFunction<Env, 'table'> = async ({ env, request,
   }
 
   return jsonOk({ written, conflicts, cursor: now })
-}
+})
 
 function buildInsertValues(
   spec: TableSpec,
@@ -98,6 +103,10 @@ function buildInsertValues(
 
   for (const [clientField, def] of Object.entries(spec.columns)) {
     if (!(clientField in incoming)) continue
+    // updated_at is ALWAYS server-stamped; ignore any client-supplied value.
+    // created_at is server-stamped too, both on insert and (importantly) NOT
+    // overwritten on update — see ON CONFLICT logic below.
+    if (def.col === 'updated_at' || def.col === 'created_at') continue
     let raw = incoming[clientField]
     if (raw === undefined) raw = null
     if (def.type === 'bool') raw = raw ? 1 : 0
@@ -112,14 +121,13 @@ function buildInsertValues(
     }
   }
 
-  // Force created_at / updated_at to sane values if missing.
-  if (!columns.includes('created_at')) {
-    columns.push('created_at'); placeholders.push('?'); values.push(now)
-  }
-  if (!columns.includes('updated_at')) {
-    columns.push('updated_at'); placeholders.push('?'); values.push(now)
-    updateSetParts.push('updated_at = excluded.updated_at')
-  }
+  // Server stamps created_at (on insert only) and updated_at (every write).
+  columns.push('created_at'); placeholders.push('?'); values.push(now)
+  columns.push('updated_at'); placeholders.push('?'); values.push(now)
+  // updated_at must be overwritten on conflict (last-write-wins); created_at
+  // must NOT be (preserve the original insert time).
+  updateSetParts.push('updated_at = excluded.updated_at')
+
   if (!columns.includes('id')) return null
 
   // Ensure the row belongs to the user (insert guards via user_id; update guards via WHERE in ON CONFLICT)

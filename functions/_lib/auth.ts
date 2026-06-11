@@ -73,10 +73,15 @@ export function jsonOk<T extends object>(body: T, init: ResponseInit = {}): Resp
   })
 }
 
-export function jsonError(message: string, status: number, extra: object = {}): Response {
+export function jsonError(
+  message: string,
+  status: number,
+  extra: object = {},
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify({ error: message, ...extra }), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
   })
 }
 
