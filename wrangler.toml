@@ -1,6 +1,6 @@
 name = "apollo-hq"
 pages_build_output_dir = "dist"
-compatibility_date = "2026-05-19"
+compatibility_date = "2026-06-11"
 compatibility_flags = ["nodejs_compat"]
 
 # Cloudflare D1 binding used by Pages Functions in `functions/`

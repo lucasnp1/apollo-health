@@ -95,7 +95,7 @@ export function LockScreen({ lockState }: { lockState: LockStateLike }) {
 
         <p className="lock-copy">
           {isSetup
-            ? 'Stored as a salted PBKDF2 hash in this browser only. There is no recovery if you forget it — losing the passphrase means clearing your local data and starting over.'
+            ? 'This is a convenience lock — it keeps someone glancing at your phone from opening the app. It does not encrypt your data, which still lives in this browser. Lose the passphrase and you must clear local data to start over. There is no recovery.'
             : `Auto-locks after ${lockState.idleMinutes} minute${lockState.idleMinutes === 1 ? '' : 's'} of inactivity. After 5 wrong tries, attempts pause for 30 seconds.`}
         </p>
       </div>

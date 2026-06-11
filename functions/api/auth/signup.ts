@@ -47,9 +47,17 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   }
 
   // Email uniqueness check. To avoid disclosing existence, we return the same
-  // generic error a malformed signup would produce.
+  // generic error a malformed signup would produce — but we DO log the
+  // conflict to the audit trail for after-the-fact abuse review.
   const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first()
-  if (existing) return jsonError('Could not create account', 400)
+  if (existing) {
+    const iph = await ipHash(request)
+    await env.DB
+      .prepare('INSERT INTO audit_log (user_id, action, meta, ip_hash, at) VALUES (?, ?, ?, ?, ?)')
+      .bind(null, 'signup_conflict', null, iph, now)
+      .run()
+    return jsonError('Could not create account', 400)
+  }
 
   // The very first user on a fresh database becomes admin automatically.
   // Everyone after needs to be promoted by an existing admin.

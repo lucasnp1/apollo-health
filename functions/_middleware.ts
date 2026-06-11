@@ -9,7 +9,10 @@
 
 import type { PagesFunction } from './_lib/types'
 
-const PROTECTED_HOST = 'apollo-health-5fe.pages.dev'
+// Canonical Pages project host for this app. /local-seed/* assets are only
+// served here; on every other host (preview deploys, custom domains in
+// flight) they 404 to keep accidentally-bundled seed data from leaking.
+const PROTECTED_HOST = 'apollo-hq.pages.dev'
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
