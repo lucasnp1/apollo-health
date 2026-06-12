@@ -1,12 +1,21 @@
 import { useMemo, useState } from 'react'
-import { useTheme } from '../lib/useTheme'
 import { Brain, Plus, Trash2 } from 'lucide-react'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Symptom } from '../lib/db'
-import { EmptyState } from '../components/EmptyState'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
+import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+
+const symptomChartConfig = {
+  mood:   { label: 'Mood',   color: 'var(--foreground)' },
+  energy: { label: 'Energy', color: '#c5821e' },
+  sleep:  { label: 'Sleep',  color: 'var(--chart-2)' },
+  libido: { label: 'Libido', color: '#9b4ec2' },
+} satisfies ChartConfig
 
 // Symptoms come in two flavours that need to render differently in the
 // check-in: positive symptoms (high = good — e.g. mood, energy) and
@@ -59,7 +68,6 @@ function todayIsoLocal(): string {
 }
 
 export function Symptoms() {
-  const { chart: colors } = useTheme()
   const symptoms = useLiveQuery(() => db.symptoms.orderBy('recordedAt').reverse().toArray(), [], [])
   const deleteWithUndo = useUndoableDelete()
   const [draft, setDraft] = useState<Partial<Symptom>>({ recordedAt: todayIsoLocal() })
@@ -112,120 +120,88 @@ export function Symptoms() {
   )
 
   return (
-    <div className="content-grid">
-      {/* ── Today's check-in ───────────────────────────────────────────── */}
-      <section className="surface col-12 symptom-checkin">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Today</span>
-            <h3>How are you feeling?</h3>
-          </div>
-          <input
+    <PageGrid>
+      {/* ── Today's check-in ── */}
+      <SectionCard
+        className="md:col-span-12"
+        eyebrow="Today"
+        title="How are you feeling?"
+        action={
+          <Input
             type="datetime-local"
-            className="symptom-when"
+            className="h-8 w-auto text-xs"
             value={draft.recordedAt}
             onChange={(e) => setDraft({ ...draft, recordedAt: e.target.value })}
             aria-label="When"
           />
-        </div>
-
-        <div className="symptom-group-label">Positive — higher is better</div>
+        }
+      >
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Positive — higher is better</p>
         <div className="symptom-rows">
           {POSITIVE.map((s) => (
-            <SymptomScale
-              key={s.key as string}
-              def={s}
-              value={draft[s.key] as number | undefined}
-              onChange={(v) => setDraft({ ...draft, [s.key]: v })}
-            />
+            <SymptomScale key={s.key as string} def={s} value={draft[s.key] as number | undefined} onChange={(v) => setDraft({ ...draft, [s.key]: v })} />
           ))}
         </div>
 
-        <div className="symptom-group-label">Side effects — higher is worse</div>
+        <p className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Side effects — higher is worse</p>
         <div className="symptom-rows">
           {NEGATIVE.map((s) => (
-            <SymptomScale
-              key={s.key as string}
-              def={s}
-              value={draft[s.key] as number | undefined}
-              onChange={(v) => setDraft({ ...draft, [s.key]: v })}
-            />
+            <SymptomScale key={s.key as string} def={s} value={draft[s.key] as number | undefined} onChange={(v) => setDraft({ ...draft, [s.key]: v })} />
           ))}
         </div>
 
-        <label className="symptom-notes">
-          <span>Notes (optional)</span>
+        <div className="mt-5 flex flex-col gap-1.5">
+          <label htmlFor="sym-notes" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Notes (optional)</label>
           <textarea
+            id="sym-notes"
             rows={2}
+            className="rounded-md border bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
             placeholder="What's affecting these today?"
             value={draft.notes ?? ''}
             onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
           />
-        </label>
-
-        <div className="symptom-actions">
-          <button
-            type="button"
-            className="primary-button"
-            onClick={save}
-            disabled={!hasAnyValue || saving}
-          >
-            <Plus size={14} /> {saving ? 'Saving…' : 'Save check-in'}
-          </button>
         </div>
-      </section>
 
-      {/* ── Trend ──────────────────────────────────────────────────────── */}
-      <section className="surface col-7">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Trend</span>
-            <h3>Core scores (last 30)</h3>
-          </div>
+        <div className="mt-4 flex justify-end">
+          <Button onClick={save} disabled={!hasAnyValue || saving}>
+            <Plus className="size-4" /> {saving ? 'Saving…' : 'Save check-in'}
+          </Button>
         </div>
+      </SectionCard>
+
+      {/* ── Trend ── */}
+      <SectionCard className="md:col-span-7" eyebrow="Trend" title="Core scores (last 30)">
         {chartData.length > 1 ? (
-          <ResponsiveContainer width="100%" height={280}>
+          <ChartContainer config={symptomChartConfig} className="h-[260px] w-full">
             <LineChart data={chartData} margin={{ top: 12, right: 12, bottom: 0, left: -12 }}>
-              <CartesianGrid stroke={colors.grid} vertical={false} />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
-              <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, color: colors.tooltipText, boxShadow: '0 8px 24px rgba(26,22,16,0.15)' }} />
-              <Line type="monotone" dataKey="mood"   stroke="#1a1611" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="energy" stroke="#c5821e" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="sleep"  stroke="#2566c4" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="libido" stroke="#9b4ec2" strokeWidth={2} dot={false} />
+              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} minTickGap={24} />
+              <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} tickLine={false} axisLine={false} width={20} tick={{ fontSize: 11 }} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Line type="monotone" dataKey="mood" stroke="var(--color-mood)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="energy" stroke="var(--color-energy)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="sleep" stroke="var(--color-sleep)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="libido" stroke="var(--color-libido)" strokeWidth={2} dot={false} />
             </LineChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         ) : (
-          <EmptyState icon={Brain} title="Need a few entries" detail="Log at least two days to see a trend." />
+          <EmptyHint icon={Brain} title="Need a few entries" detail="Log at least two days to see a trend." />
         )}
-        <div className="symptom-legend">
-          <LegendDot color="#1a1611" label="Mood" />
-          <LegendDot color="#c5821e" label="Energy" />
-          <LegendDot color="#2566c4" label="Sleep" />
-          <LegendDot color="#9b4ec2" label="Libido" />
-        </div>
-      </section>
+      </SectionCard>
 
-      {/* ── Recent entries ─────────────────────────────────────────────── */}
-      <section className="surface col-5">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">History</span>
-            <h3>Recent check-ins</h3>
-          </div>
-        </div>
+      {/* ── Recent entries ── */}
+      <SectionCard className="md:col-span-5" eyebrow="History" title="Recent check-ins">
         {symptoms.length === 0 ? (
-          <EmptyState icon={Brain} title="No check-ins yet" detail="Log how you feel above to start building a trend." />
+          <EmptyHint icon={Brain} title="No check-ins yet" detail="Log how you feel above to start a trend." />
         ) : (
-          <ul className="symptom-history">
-            {symptoms.slice(0, 8).map((s) => (
-              <li key={s.id}>
-                <div className="symptom-history-head">
-                  <strong>{format(parseISO(s.recordedAt), 'EEE MMM d')}</strong>
-                  <span>{formatDistanceToNow(parseISO(s.recordedAt), { addSuffix: true })}</span>
+          <ul className="flex flex-col">
+            {symptoms.slice(0, 8).map((s, i) => (
+              <li key={s.id} className={`relative py-2.5 pr-9 ${i > 0 ? 'border-t' : ''}`}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <strong className="text-sm">{format(parseISO(s.recordedAt), 'EEE MMM d')}</strong>
+                  <span className="text-xs text-muted-foreground">{formatDistanceToNow(parseISO(s.recordedAt), { addSuffix: true })}</span>
                 </div>
-                <div className="symptom-history-chips">
+                <div className="mt-1.5 flex flex-wrap gap-1">
                   {(['mood', 'energy', 'sleep', 'libido'] as const).map((k) => {
                     const v = s[k]
                     if (typeof v !== 'number') return null
@@ -236,28 +212,25 @@ export function Symptoms() {
                     )
                   })}
                 </div>
-                {s.notes && <p className="symptom-history-notes">{s.notes}</p>}
-                <button
-                  type="button"
-                  className="icon-button danger symptom-history-delete"
+                {s.notes && <p className="mt-1.5 text-xs text-muted-foreground">{s.notes}</p>}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-2 size-7 text-muted-foreground hover:text-destructive"
                   aria-label="Delete check-in"
                   onClick={() => {
                     const snapshot = { ...s }
-                    void deleteWithUndo({
-                      label: 'Check-in deleted',
-                      remove: () => db.symptoms.delete(s.id!),
-                      restore: () => db.symptoms.put(snapshot),
-                    })
+                    void deleteWithUndo({ label: 'Check-in deleted', remove: () => db.symptoms.delete(s.id!), restore: () => db.symptoms.put(snapshot) })
                   }}
                 >
-                  <Trash2 size={13} />
-                </button>
+                  <Trash2 className="size-3.5" />
+                </Button>
               </li>
             ))}
           </ul>
         )}
-      </section>
-    </div>
+      </SectionCard>
+    </PageGrid>
   )
 }
 
@@ -295,11 +268,3 @@ function SymptomScale({
   )
 }
 
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="symptom-legend-item">
-      <span style={{ background: color }} />
-      {label}
-    </span>
-  )
-}
