@@ -11,12 +11,13 @@ function applyTheme(t: Theme) {
   document.documentElement.setAttribute('data-theme', t)
 }
 
-// Apply synchronously before React paint
+// Apply synchronously before React paint. Dark is the DEFAULT look —
+// only an explicit 'light' preference opts out.
 const saved = localStorage.getItem(STORAGE_KEY) as Theme | null
-if (saved === 'dark') applyTheme('dark')
+if (saved !== 'light') applyTheme('dark')
 
 export function getTheme(): Theme {
-  return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'light'
+  return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'dark'
 }
 
 export function setTheme(t: Theme) {
