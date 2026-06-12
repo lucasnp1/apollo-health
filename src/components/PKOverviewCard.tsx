@@ -15,10 +15,12 @@
 
 import { useMemo } from 'react'
 import { parseISO, format, addDays } from 'date-fns'
+import { Area, AreaChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from 'recharts'
 import type { Compound, InjectionLog, LabExam, Protocol, ProtocolDose } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
 import { generateDoseInstants } from '../lib/schedule'
 import { PanelCard } from './dashboard/PanelCard'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 
 const MS_PER_DAY = 86_400_000
 const PTS_PER_DAY = 6  // 4-hour resolution for smooth sawtooth
@@ -258,17 +260,43 @@ export function PKOverviewCard({
           return `${abs.toFixed(1)}d`
         }
 
+        // Chart window: last 30 days + next 45, dayNum → date labels
+        const windowed = data.chartData
+          .filter((pt) => pt.dayNum >= data.todayDayNum - 30 && pt.dayNum <= data.todayDayNum + 45)
+          .map((pt) => ({ ...pt, date: format(new Date(startMs + pt.dayNum * MS_PER_DAY), 'MMM d') }))
+        const todayLabel = format(new Date(nowMs), 'MMM d')
+
         return (
-          <div
-            key={protocol.id}
-            className="flex flex-col gap-2 border-l-2 pl-3.5"
-            style={{ borderLeftColor: color }}
-          >
+          <div key={protocol.id} className="flex flex-col gap-2">
             {/* Compound name + dose */}
             <div className="flex items-baseline gap-2">
               <span className="text-sm font-semibold" style={{ color }}>{pkName}</span>
               <span className="text-xs text-muted-foreground">{protocol.dose} {protocol.unit}</span>
             </div>
+
+            {/* Release curve — solid past, dashed projection */}
+            {windowed.length > 1 && (
+              <ChartContainer
+                config={{ logged: { label: 'Released', color }, projected: { label: 'Projected', color } }}
+                className="h-[160px] w-full"
+              >
+                <AreaChart data={windowed} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+                  <defs>
+                    <linearGradient id={`fillPk${protocol.id}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={color} stopOpacity={0.25} />
+                      <stop offset="95%" stopColor={color} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} minTickGap={32} />
+                  <YAxis tickLine={false} axisLine={false} tickMargin={4} tick={{ fontSize: 11 }} width={32} />
+                  <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+                  <ReferenceLine x={todayLabel} stroke="var(--muted-foreground)" strokeDasharray="2 4" />
+                  <Area type="monotone" dataKey="logged" stroke="var(--color-logged)" strokeWidth={2} fill={`url(#fillPk${protocol.id})`} dot={false} activeDot={{ r: 4 }} />
+                  <Area type="monotone" dataKey="projected" stroke="var(--color-projected)" strokeWidth={1.5} strokeDasharray="4 4" fill="none" dot={false} />
+                </AreaChart>
+              </ChartContainer>
+            )}
             {/* Key stats — compact horizontal */}
             <div className="flex flex-wrap gap-x-6 gap-y-1.5">
               <div className="flex flex-col">

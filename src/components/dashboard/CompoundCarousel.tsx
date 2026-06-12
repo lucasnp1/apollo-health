@@ -1,10 +1,8 @@
 /**
- * CompoundCarousel — adaptation of ruixen-ui's gallery-hover-carousel for
- * compounds/protocols. Each compound renders as a tall rounded-3xl card
- * whose colored gradient header fills the card; on hover (or tap, on
- * touch devices) the header shrinks to the top half and a detail section
- * slides up beneath: dose · cadence, last injection, next due, and a
- * circular Log button (arrow rotates on hover, like the original).
+ * CompoundCarousel — compounds/protocols as tall rounded-3xl cards.
+ * The colored gradient header occupies the top half and the detail section
+ * (dose · cadence, last injection, next due, circular Log button) is always
+ * visible beneath it — no hover reveal.
  */
 import { useState } from 'react'
 import { ArrowUpRight, ChevronLeft, ChevronRight, Pencil } from 'lucide-react'
@@ -94,9 +92,6 @@ function CompoundCard({
   onLog: (tab: 'injection', prefill?: import('@/App').QuickLogPrefill) => void
   onEdit?: () => void
 }) {
-  // Tap-to-toggle for touch devices; hover handles pointer devices via group.
-  const [open, setOpen] = useState(false)
-
   const color = compound?.color ?? '#f4c95c'
   const lastInj = injections.find((i) => i.compoundId === protocol.compoundId)
   const hoursSince = lastInj ? differenceInHours(new Date(), parseISO(lastInj.takenAt)) : undefined
@@ -113,17 +108,10 @@ function CompoundCard({
     : format(schedItem.nextDue, 'EEE MMM d')
 
   return (
-    <div
-      className="group relative h-[340px] cursor-pointer overflow-hidden rounded-3xl border bg-card transition-shadow duration-300 hover:glow-primary"
-      onClick={() => setOpen((o) => !o)}
-      data-open={open || undefined}
-    >
-      {/* Gradient header — full height at rest, shrinks to top half on hover/tap */}
+    <div className="relative h-[340px] overflow-hidden rounded-3xl border bg-card">
+      {/* Gradient header — top half */}
       <div
-        className={cn(
-          'absolute inset-x-0 top-0 flex flex-col justify-end p-5 transition-[height] duration-500 ease-out',
-          'h-full group-hover:h-1/2 group-data-[open]:h-1/2',
-        )}
+        className="absolute inset-x-0 top-0 flex h-1/2 flex-col justify-end p-5"
         style={{ background: `linear-gradient(150deg, ${color}cc 0%, ${color}33 45%, transparent 100%)` }}
       >
         {overdue && (
@@ -142,13 +130,8 @@ function CompoundCard({
         </p>
       </div>
 
-      {/* Detail section — revealed beneath on hover/tap */}
-      <div
-        className={cn(
-          'absolute inset-x-0 bottom-0 flex h-1/2 flex-col justify-between p-5 opacity-0 transition-opacity delay-150 duration-300',
-          'group-hover:opacity-100 group-data-[open]:opacity-100',
-        )}
-      >
+      {/* Detail section */}
+      <div className="absolute inset-x-0 bottom-0 flex h-1/2 flex-col justify-between p-5">
         <div className="flex flex-col gap-1.5 text-sm">
           <p className="text-xs text-muted-foreground">{describeCadence(protocol.cadence)}</p>
           <p className="flex justify-between gap-2">

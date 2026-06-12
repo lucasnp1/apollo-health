@@ -16,6 +16,7 @@ import { StatCard } from '../components/dashboard/StatCard'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { HeroCard } from '../components/dashboard/HeroCard'
 import { CompoundCarousel } from '../components/dashboard/CompoundCarousel'
+import { SiteRotation } from '../components/SiteRotation'
 import { Button } from '@/components/ui/button'
 import type { View } from '../app/views'
 import type { QuickLogPrefill } from '../App'
@@ -248,19 +249,6 @@ export function Overview({
           )}
         </PanelCard>
 
-        {/* ── Compounds carousel ── */}
-        {protocols.length > 0 && (
-          <div className="md:col-span-2 xl:col-span-6">
-            <CompoundCarousel
-              protocols={protocols}
-              compounds={compounds}
-              injections={injections}
-              schedule={schedule}
-              onLog={onOpenQuickLog}
-            />
-          </div>
-        )}
-
         {/* ── PK release levels ── */}
         <div className="md:col-span-2 xl:col-span-3">
           <Suspense fallback={null}>
@@ -303,10 +291,17 @@ export function Overview({
           )}
         </PanelCard>
 
+        {/* ── Site rotation — quick pin-site check before logging ── */}
+        {injections.length > 0 && (
+          <PanelCard className="md:col-span-2 xl:col-span-3" title="Site rotation" subtitle="Red = used recently">
+            <SiteRotation injections={injections} compounds={compounds} />
+          </PanelCard>
+        )}
+
         {/* ── Lab flags ── */}
         {labFlags.length > 0 && (
           <PanelCard
-            className="md:col-span-2 xl:col-span-6"
+            className="md:col-span-2 xl:col-span-3"
             title="Lab flags"
             subtitle="Markers outside their reference range"
             action={
@@ -330,6 +325,19 @@ export function Overview({
               ))}
             </div>
           </PanelCard>
+        )}
+
+        {/* ── Compounds carousel — last ── */}
+        {protocols.length > 0 && (
+          <div className="md:col-span-2 xl:col-span-6">
+            <CompoundCarousel
+              protocols={protocols}
+              compounds={compounds}
+              injections={injections}
+              schedule={schedule}
+              onLog={onOpenQuickLog}
+            />
+          </div>
         )}
       </DashGrid>
     </div>

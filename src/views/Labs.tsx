@@ -500,14 +500,14 @@ export function Labs({
       <DashGrid>
       {/* ── Health composites ── */}
       {hasData && (
-        <div className="md:col-span-2 xl:col-span-3">
+        <div className="md:col-span-2 xl:col-span-6">
           <LabComposites results={results} exams={exams} />
         </div>
       )}
 
       {/* ── Needs attention ── */}
       {hasData && outOfRangeSummaries.length > 0 && (
-        <PanelCard className="md:col-span-2 xl:col-span-3 border-l-2 border-l-destructive" title={`${outOfRangeSummaries.length} out of range`} subtitle="Needs attention">
+        <PanelCard className="md:col-span-2 xl:col-span-6 border-l-2 border-l-destructive" title={`${outOfRangeSummaries.length} out of range`} subtitle="Needs attention">
           <div className="flex flex-col">
             {outOfRangeSummaries.map(s => (
               <MarkerRow
