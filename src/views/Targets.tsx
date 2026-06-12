@@ -6,21 +6,31 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Goal, type MarkerTarget } from '../lib/db'
 import { buildWeightDoseSeries, weightSummary } from '../lib/insights'
 import { allMarkerMeta, metaForKey } from '../lib/markers'
-import { EmptyState } from '../components/EmptyState'
 import { RangeBar } from '../components/RangeBar'
+import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
 export function Targets() {
   return (
-    <div className="content-grid">
-      <section className="surface col-12">
-        <GoalEditor />
-      </section>
-      <section className="surface col-12">
-        <MarkerTargetEditor />
-      </section>
-    </div>
+    <PageGrid>
+      <div className="md:col-span-12"><GoalEditor /></div>
+      <div className="md:col-span-12"><MarkerTargetEditor /></div>
+    </PageGrid>
   )
 }
+
+const TONE_BADGE: Record<string, string> = {
+  good: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
+  warn: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  bad: 'bg-destructive/12 text-destructive',
+  '': 'bg-secondary text-muted-foreground',
+}
+
+const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 // --- Goals (life-target) editor ---
 
@@ -54,89 +64,86 @@ function GoalEditor() {
   const bpLatest = vitals[0]
 
   return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Targets</span>
-          <h3>Goals</h3>
-        </div>
-        <span className="safety-chip">You set the bar</span>
-      </div>
-
+    <SectionCard
+      eyebrow="Targets"
+      title="Goals"
+      action={<Badge variant="secondary">You set the bar</Badge>}
+    >
       {goals.length > 0 ? (
-        <div className="stack">
-          {goals.map((g) => {
+        <div className="mb-4 flex flex-col">
+          {goals.map((g, i) => {
             const progress = computeProgress(g, { weight: weightLatest, bpSys: bpLatest?.systolic, results })
             return (
-              <div className="row" key={g.id} style={{ gridTemplateColumns: '24px 1fr auto auto auto' }}>
-                <Icon kind={g.kind} />
-                <div>
-                  <strong>{g.label}</strong>
-                  <span className="sub">
+              <div key={g.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
+                <span className="text-muted-foreground"><Icon kind={g.kind} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{g.label}</p>
+                  <p className="truncate text-xs text-muted-foreground">
                     Started {format(parseISO(g.startedAt), 'MMM d, yyyy')}
                     {g.achievedAt ? ` · achieved ${format(parseISO(g.achievedAt), 'MMM d')}` : ''}
-                  </span>
+                  </p>
                 </div>
-                <span className="num" style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-dim)' }}>
+                <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
                   {progress.currentLabel} → {progress.targetLabel}
                 </span>
-                <span className={`chip ${progress.tone}`}>{progress.headline}</span>
-                <div style={{ display: 'flex', gap: 4 }}>
+                <Badge variant="secondary" className={cn('shrink-0', TONE_BADGE[progress.tone])}>{progress.headline}</Badge>
+                <div className="flex shrink-0 gap-1">
                   {!g.achievedAt && progress.tone === 'good' && (
-                    <button
-                      type="button"
-                      className="icon-button"
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7"
                       aria-label="Mark achieved"
                       onClick={() => db.goals.update(g.id!, { achievedAt: new Date().toISOString() })}
                     >
-                      <Check size={14} />
-                    </button>
+                      <Check className="size-3.5" />
+                    </Button>
                   )}
-                  <button type="button" className="icon-button danger" aria-label="Delete goal" onClick={() => db.goals.delete(g.id!)}>
-                    <Trash2 size={14} />
-                  </button>
+                  <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Delete goal" onClick={() => db.goals.delete(g.id!)}>
+                    <Trash2 className="size-3.5" />
+                  </Button>
                 </div>
               </div>
             )
           })}
         </div>
       ) : (
-        <EmptyState icon={Target} title="No goals yet" detail="A goal turns into progress bars and remaining-delta callouts across the app." />
+        <EmptyHint icon={Target} title="No goals yet" detail="A goal turns into progress bars and remaining-delta callouts across the app." />
       )}
 
-      <div className="form-grid">
-        <label>
-          Kind
-          <select value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as Goal['kind'] })}>
+      <div className="grid grid-cols-2 gap-3 border-t pt-4">
+        <div className="flex flex-col gap-1.5">
+          <Label>Kind</Label>
+          <select className={selectClass} value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value as Goal['kind'] })}>
             <option value="weight">Body weight</option>
             <option value="bp">Blood pressure (systolic)</option>
             <option value="marker">Lab marker</option>
           </select>
-        </label>
+        </div>
         {draft.kind === 'marker' && (
-          <label>
-            Marker
-            <select value={draft.marker} onChange={(e) => setDraft({ ...draft, marker: e.target.value })}>
+          <div className="flex flex-col gap-1.5">
+            <Label>Marker</Label>
+            <select className={selectClass} value={draft.marker} onChange={(e) => setDraft({ ...draft, marker: e.target.value })}>
               <option value="">Select…</option>
               {allMarkerMeta().map((m) => (
                 <option key={m.key} value={m.key}>{m.label}</option>
               ))}
             </select>
-          </label>
+          </div>
         )}
-        <label>
-          Target value
-          <input inputMode="decimal" value={draft.target} onChange={(e) => setDraft({ ...draft, target: e.target.value })} />
-        </label>
-        <label className="wide-field">
-          Label (optional)
-          <input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder={defaultLabel(draft.kind, draft.marker)} />
-        </label>
-        <button type="button" className="primary-button wide-field" onClick={addGoal}>
-          <Plus size={15} /> Add goal
-        </button>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="goal-target">Target value</Label>
+          <Input id="goal-target" inputMode="decimal" value={draft.target} onChange={(e) => setDraft({ ...draft, target: e.target.value })} />
+        </div>
+        <div className="col-span-2 flex flex-col gap-1.5">
+          <Label htmlFor="goal-label">Label (optional)</Label>
+          <Input id="goal-label" value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder={defaultLabel(draft.kind, draft.marker)} />
+        </div>
+        <Button className="col-span-2" onClick={addGoal}>
+          <Plus className="size-4" /> Add goal
+        </Button>
       </div>
-    </>
+    </SectionCard>
   )
 }
 
@@ -236,51 +243,48 @@ function MarkerTargetEditor() {
   }
 
   return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Personal optimal</span>
-          <h3>Marker targets</h3>
-        </div>
-        <span className="safety-chip">Overrides catalog ranges in Labs</span>
-      </div>
-      <p className="panel-note">
+    <SectionCard
+      eyebrow="Personal optimal"
+      title="Marker targets"
+      action={<Badge variant="secondary">Overrides catalog ranges in Labs</Badge>}
+    >
+      <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
         Default ranges from the catalog (e.g. E2 20–40 pg/mL) are starting points. Override them here when you want a tighter
         or different personal goal range — the Labs view will use your numbers in range bars.
       </p>
 
       {targets.length > 0 ? (
-        <div>
-          {targets.map((t) => {
+        <div className="mb-4 flex flex-col">
+          {targets.map((t, i) => {
             const meta = metaForKey(t.marker)
             const label = meta?.label ?? t.marker
             return (
-              <div key={t.id} className="range-bar-row">
-                <div className="marker">
-                  {label}
-                  <small>{t.rationale || (meta?.unit ?? t.unit ?? '')}</small>
+              <div key={t.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{label}</p>
+                  <p className="truncate text-xs text-muted-foreground">{t.rationale || (meta?.unit ?? t.unit ?? '')}</p>
                 </div>
-                <RangeBar value={t.low !== undefined && t.high !== undefined ? (t.low + t.high) / 2 : undefined} low={t.low} high={t.high} />
-                <div className="value">
-                  <span className="range-pill">{t.low ?? '?'} – {t.high ?? '?'} {t.unit ?? meta?.unit ?? ''}</span>
+                <div className="w-28 shrink-0">
+                  <RangeBar value={t.low !== undefined && t.high !== undefined ? (t.low + t.high) / 2 : undefined} low={t.low} high={t.high} />
                 </div>
-                <div className="delta">
-                  <button type="button" className="icon-button danger" aria-label="Remove target" onClick={() => db.markerTargets.delete(t.id!)}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+                <Badge variant="secondary" className="shrink-0 font-mono tabular-nums">
+                  {t.low ?? '?'} – {t.high ?? '?'} {t.unit ?? meta?.unit ?? ''}
+                </Badge>
+                <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-destructive" aria-label="Remove target" onClick={() => db.markerTargets.delete(t.id!)}>
+                  <Trash2 className="size-3.5" />
+                </Button>
               </div>
             )
           })}
         </div>
       ) : (
-        <EmptyState icon={Target} title="No personal ranges" detail="Catalog defaults are used until you set your own." />
+        <EmptyHint icon={Target} title="No personal ranges" detail="Catalog defaults are used until you set your own." />
       )}
 
-      <div className="form-grid">
-        <label className="wide-field">
-          Marker
-          <select value={draft.marker} onChange={(e) => {
+      <div className="grid grid-cols-3 gap-3 border-t pt-4">
+        <div className="col-span-3 flex flex-col gap-1.5">
+          <Label>Marker</Label>
+          <select className={selectClass} value={draft.marker} onChange={(e) => {
             const key = e.target.value
             const existing = indexByKey.get(key)
             const meta = metaForKey(key)
@@ -297,27 +301,27 @@ function MarkerTargetEditor() {
               <option key={m.key} value={m.key}>{m.label}</option>
             ))}
           </select>
-        </label>
-        <label>
-          Low
-          <input inputMode="decimal" value={draft.low ?? ''} onChange={(e) => setDraft({ ...draft, low: e.target.value === '' ? undefined : Number(e.target.value) })} />
-        </label>
-        <label>
-          High
-          <input inputMode="decimal" value={draft.high ?? ''} onChange={(e) => setDraft({ ...draft, high: e.target.value === '' ? undefined : Number(e.target.value) })} />
-        </label>
-        <label>
-          Unit
-          <input value={draft.unit ?? ''} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} />
-        </label>
-        <label className="wide-field">
-          Rationale (optional)
-          <input value={draft.rationale ?? ''} onChange={(e) => setDraft({ ...draft, rationale: e.target.value })} placeholder="Why this range matters to me" />
-        </label>
-        <button type="button" className="primary-button wide-field" onClick={save}>
-          <Plus size={15} /> Save target
-        </button>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="mt-low">Low</Label>
+          <Input id="mt-low" inputMode="decimal" value={draft.low ?? ''} onChange={(e) => setDraft({ ...draft, low: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="mt-high">High</Label>
+          <Input id="mt-high" inputMode="decimal" value={draft.high ?? ''} onChange={(e) => setDraft({ ...draft, high: e.target.value === '' ? undefined : Number(e.target.value) })} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="mt-unit">Unit</Label>
+          <Input id="mt-unit" value={draft.unit ?? ''} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} />
+        </div>
+        <div className="col-span-3 flex flex-col gap-1.5">
+          <Label htmlFor="mt-rationale">Rationale (optional)</Label>
+          <Input id="mt-rationale" value={draft.rationale ?? ''} onChange={(e) => setDraft({ ...draft, rationale: e.target.value })} placeholder="Why this range matters to me" />
+        </div>
+        <Button className="col-span-3" onClick={save}>
+          <Plus className="size-4" /> Save target
+        </Button>
       </div>
-    </>
+    </SectionCard>
   )
 }

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { Share, Smartphone, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 const DISMISSED_KEY = 'apollo.installPrompt.dismissed'
 
@@ -65,27 +66,31 @@ export function InstallPrompt() {
   }
 
   return (
-    <div className="install-prompt" role="region" aria-label="Install Apollo Health">
-      <Smartphone size={18} className="install-prompt-icon" />
-      <div className="install-prompt-body">
-        <strong>Install Apollo on your phone</strong>
+    <div
+      className="fixed inset-x-3 bottom-[calc(70px+env(safe-area-inset-bottom))] z-40 flex items-center gap-3 rounded-xl border bg-card p-3.5 shadow-lg md:left-auto md:right-6 md:max-w-sm"
+      role="region"
+      aria-label="Install Apollo Health"
+    >
+      <Smartphone className="size-4.5 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <strong className="block text-[13px]">Install Apollo on your phone</strong>
         {platform === 'ios' ? (
-          <span>
-            Tap <Share size={11} className="install-prompt-inline-icon" /> Share, then{' '}
+          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+            Tap <Share className="inline size-3 align-[-1px]" /> Share, then{' '}
             <strong>Add to Home Screen</strong>.
           </span>
         ) : (
-          <span>Tap install to add it as an app — works offline.</span>
+          <span className="mt-0.5 block text-[11px] text-muted-foreground">Tap install to add it as an app — works offline.</span>
         )}
       </div>
       {deferredPrompt && (
-        <button type="button" className="primary-button install-prompt-install" onClick={install}>
+        <Button size="sm" className="h-8 shrink-0" onClick={install}>
           Install
-        </button>
+        </Button>
       )}
-      <button type="button" className="icon-button" aria-label="Dismiss" onClick={dismiss}>
-        <X size={14} />
-      </button>
+      <Button variant="ghost" size="icon" className="size-7 shrink-0" aria-label="Dismiss" onClick={dismiss}>
+        <X className="size-3.5" />
+      </Button>
     </div>
   )
 }

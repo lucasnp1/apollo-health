@@ -4,7 +4,9 @@ import { format, parseISO } from 'date-fns'
 import { db } from '../lib/db'
 import { extractPdfText } from '../lib/pdf'
 import { ensureBlobAvailable } from '../lib/fileSync'
-import { EmptyState } from '../components/EmptyState'
+import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 import type { HealthFile } from '../lib/db'
 type StoredFile = HealthFile
@@ -37,44 +39,40 @@ export function Files({
   }
 
   return (
-    <div className="content-grid">
-      <section className="surface col-5">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Local extraction</span>
-            <h3>Upload exam</h3>
-          </div>
-          <UploadCloud size={18} style={{ color: 'var(--ink-mute)' }} />
+    <PageGrid>
+      <SectionCard
+        className="md:col-span-5"
+        eyebrow="Local extraction"
+        title="Upload exam"
+        action={<UploadCloud className="size-4 text-muted-foreground" />}
+      >
+        <div className="flex flex-col gap-3">
+          <Button asChild className="self-start">
+            <label className="cursor-pointer">
+              <input type="file" accept="application/pdf,image/*" hidden onChange={(e) => onFileUpload(e.target.files)} />
+              {busy ? 'Reading…' : 'Choose PDF or image'}
+            </label>
+          </Button>
+          <p className="text-xs text-muted-foreground">PDF text extraction runs in your browser. Nothing is uploaded.</p>
         </div>
-        <label className="primary-button" style={{ display: 'inline-flex', justifyContent: 'center' }}>
-          <input type="file" accept="application/pdf,image/*" hidden onChange={(e) => onFileUpload(e.target.files)} />
-          {busy ? 'Reading…' : 'Choose PDF or image'}
-        </label>
-        <p className="panel-note">PDF text extraction runs in your browser. Nothing is uploaded.</p>
-      </section>
+      </SectionCard>
 
-      <section className="surface col-7">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Storage</span>
-            <h3>Local files</h3>
-          </div>
-        </div>
+      <SectionCard className="md:col-span-7" eyebrow="Storage" title="Local files">
         {files.length > 0 ? (
-          <div className="stack">
-            {files.map((f) => (
-              <FileRow file={f} key={f.id} />
+          <div className="flex flex-col">
+            {files.map((f, i) => (
+              <FileRow file={f} first={i === 0} key={f.id} />
             ))}
           </div>
         ) : (
-          <EmptyState icon={FileText} title="No files" detail="PDF lab reports get parsed and prepared for review." />
+          <EmptyHint icon={FileText} title="No files" detail="PDF lab reports get parsed and prepared for review." />
         )}
-      </section>
-    </div>
+      </SectionCard>
+    </PageGrid>
   )
 }
 
-function FileRow({ file }: { file: StoredFile }) {
+function FileRow({ file, first }: { file: StoredFile; first: boolean }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const hasLocal = Boolean(file.blob)
@@ -110,24 +108,24 @@ function FileRow({ file }: { file: StoredFile }) {
   }
 
   return (
-    <div className="row" style={{ gridTemplateColumns: 'auto 1fr auto auto auto' }}>
-      <FileText size={14} />
-      <div>
-        <strong>{file.name}</strong>
-        <span className="sub">
+    <div className={cn('flex items-center gap-3 py-2.5', !first && 'border-t')}>
+      <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{file.name}</p>
+        <p className="truncate text-xs text-muted-foreground">
           {Math.round(file.size / 1024)} KB · {file.status}
           {!hasLocal && hasRemote ? ' · in cloud' : ''}
           {hasLocal && !hasRemote ? ' · local only' : ''}
           {error ? ` · ${error}` : ''}
-        </span>
+        </p>
       </div>
-      <time>{format(parseISO(file.addedAt), 'MMM d')}</time>
-      <button type="button" className="ghost-button" disabled={!canOpen || busy} onClick={open}>
-        {busy ? '…' : hasLocal ? 'Open' : <><CloudDownload size={12} /> Fetch</>}
-      </button>
-      <button type="button" className="icon-button danger" onClick={remove} aria-label="Delete file">
-        <Trash2 size={14} />
-      </button>
+      <time className="shrink-0 text-xs text-muted-foreground">{format(parseISO(file.addedAt), 'MMM d')}</time>
+      <Button variant="outline" size="sm" className="h-7 shrink-0 px-2.5 text-xs" disabled={!canOpen || busy} onClick={open}>
+        {busy ? '…' : hasLocal ? 'Open' : <><CloudDownload className="size-3" /> Fetch</>}
+      </Button>
+      <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={remove} aria-label="Delete file">
+        <Trash2 className="size-3.5" />
+      </Button>
     </div>
   )
 }

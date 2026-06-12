@@ -461,7 +461,7 @@ function Shell({
             onOpenWizard={() => setProtocolWizardOpen(true)}
           />
         )}
-        <Suspense fallback={<div className="view-loading" />}>
+        <Suspense fallback={<div className="min-h-[40dvh]" />}>
           {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} onOpenWizard={() => setProtocolWizardOpen(true)} onEditProtocol={(p) => { setEditingProtocol(p); setProtocolWizardOpen(true) }} />}
           {activeView === 'vitals' && <Vitals vitals={vitals} />}
           {activeView === 'labs' && (

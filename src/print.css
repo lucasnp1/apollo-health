@@ -1,0 +1,38 @@
+/* ── Print report (screen: hidden; print: shown) ────────────────────────
+   Used by the PrintReport component in Settings — a clinical summary the
+   user prints via Settings → Print report. Everything else is hidden. */
+
+.print-report { display: none; }
+
+@media print {
+  /* Hide the app chrome + on-screen content */
+  aside, main > header, .install-prompt { display: none !important; }
+  main > div > .grid { display: none !important; }
+  main { padding: 0 !important; }
+
+  .print-report {
+    display: block !important;
+    font-family: 'Georgia', serif;
+    font-size: 11pt;
+    color: #000;
+    padding: 0;
+  }
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #000;
+    padding-bottom: 12pt;
+    margin-bottom: 16pt;
+  }
+  .print-header h1 { margin: 0; font-size: 16pt; }
+  .print-header p { margin: 4pt 0 0; font-size: 9pt; color: #444; }
+  .print-section { margin-bottom: 20pt; break-inside: avoid; }
+  .print-section h2 { font-size: 12pt; border-bottom: 1px solid #ccc; padding-bottom: 4pt; margin-bottom: 8pt; }
+  .print-stat { font-size: 10pt; color: #333; margin: 0 0 8pt; }
+  .print-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+  .print-table th { background: #f3f3f3; text-align: left; padding: 4pt 6pt; border: 1px solid #ccc; font-weight: 600; }
+  .print-table td { padding: 3pt 6pt; border: 1px solid #ddd; vertical-align: top; }
+  .print-table tr:nth-child(even) td { background: #fafafa; }
+  .print-footer { margin-top: 24pt; font-size: 8pt; color: #888; border-top: 1px solid #ddd; padding-top: 8pt; }
+}

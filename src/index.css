@@ -1,13 +1,6 @@
-/* Cascade layer order. `legacy` sits ABOVE Tailwind's base (so the old
-   stylesheet's class rules still beat preflight resets on un-migrated
-   views) but BELOW components/utilities (so shadcn component classes win
-   on everything we've migrated). This lets the two systems coexist
-   cleanly while we convert view-by-view. */
-@layer theme, base, legacy, components, utilities;
-
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "./legacy.css" layer(legacy);
+@import "./print.css";
 
 /* Dark mode is driven by the existing `data-theme="dark"` attribute on
    <html> (set by src/lib/useTheme.ts) so shadcn components and the
@@ -174,78 +167,4 @@
     letter-spacing: 0;
   }
 }
-
-/* ── Legacy theme bridge ──────────────────────────────────────────────────
-   Re-points the OLD stylesheet's design tokens at the new neutral+yellow
-   palette so every not-yet-structurally-migrated view immediately adopts
-   the shadcn look (neutral surfaces, hairline borders, yellow reserved for
-   accents) instead of the old cream theme. Unlayered, so it overrides the
-   legacy layer's :root values while legacy rules keep consuming them.
-   Deleted along with legacy.css once migration finishes. */
-:root {
-  --bg:        #f7f6f3;
-  --bg-soft:   #fbfaf8;
-  --surface:   #ffffff;
-  --surface-2: #f3f2ee;
-  --surface-3: #e8e6e0;
-  --line:        rgba(30,27,22,0.10);
-  --line-strong: rgba(30,27,22,0.17);
-  --ink:      #211e1a;
-  --ink-2:    #2c2823;
-  --ink-dim:  rgba(33,30,26,0.70);
-  --ink-mute: rgba(33,30,26,0.48);
-  /* Renamed from --accent to avoid colliding with shadcn's own --accent
-     (which is the neutral grey hover surface). --laccent is the legacy
-     brand yellow used by old primary buttons / accents. */
-  --laccent:     #f4c95c;
-  --accent-2:    #e6b945;
-  --accent-soft: rgba(244,201,92,0.18);
-  --accent-ink:  #6b4f0c;
-  --good: #2f8b54; --good-soft: rgba(47,139,84,0.12);
-  --warn: #b9831e; --warn-soft: rgba(185,131,30,0.14);
-  --bad:  #c4392c; --bad-soft:  rgba(196,57,44,0.12);
-  --info: #2566c4; --info-soft: rgba(37,102,196,0.12);
-  /* Borders, not shadows — soften the legacy drop shadows to near-nothing. */
-  --shadow-sm: 0 1px 2px rgba(30,27,22,0.04);
-  --shadow:    0 1px 2px rgba(30,27,22,0.05);
-  --shadow-lg: 0 4px 16px rgba(30,27,22,0.07);
-}
-:root[data-theme="dark"] {
-  --bg:        #18140f;
-  --bg-soft:   #1d1812;
-  --surface:   #221d16;
-  --surface-2: #2a241b;
-  --surface-3: #362f23;
-  --line:        rgba(255,255,255,0.12);
-  --line-strong: rgba(255,255,255,0.18);
-  --ink:      #f5f2ec;
-  --ink-2:    #e9e4db;
-  --ink-dim:  rgba(245,242,236,0.74);
-  --ink-mute: rgba(245,242,236,0.46);
-  --laccent:     #f4c95c;
-  --accent-2:    #ffd76d;
-  --accent-soft: rgba(244,201,92,0.16);
-  --accent-ink:  #f4c95c;
-  --good: #3eb874; --good-soft: rgba(62,184,116,0.16);
-  --warn: #e8a534; --warn-soft: rgba(232,165,52,0.16);
-  --bad:  #e5594b; --bad-soft:  rgba(229,89,75,0.18);
-  --info: #589dfc; --info-soft: rgba(88,157,252,0.16);
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow:    0 1px 2px rgba(0,0,0,0.35);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,0.45);
-}
-
-/* Tailwind v4 generates `.col-<n>` utilities (grid-column: n) that collide
-   with the legacy 12-column grid's `.col-N` span classes — and the
-   utilities layer outranks the legacy layer, so the legacy spans lose and
-   cards collapse to single tracks. Re-assert the legacy spans unlayered so
-   they win until those views are structurally migrated off the old grid. */
-.content-grid > .col-12 { grid-column: span 12 / span 12; }
-.content-grid > .col-9  { grid-column: span 9  / span 9;  }
-.content-grid > .col-8  { grid-column: span 8  / span 8;  }
-.content-grid > .col-7  { grid-column: span 7  / span 7;  }
-.content-grid > .col-6  { grid-column: span 6  / span 6;  }
-.content-grid > .col-5  { grid-column: span 5  / span 5;  }
-.content-grid > .col-4  { grid-column: span 4  / span 4;  }
-.content-grid > .col-3  { grid-column: span 3  / span 3;  }
 

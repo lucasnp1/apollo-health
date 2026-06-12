@@ -18,6 +18,7 @@ import { parseISO, format, addDays } from 'date-fns'
 import type { Compound, InjectionLog, LabExam, Protocol, ProtocolDose } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
 import { generateDoseInstants } from '../lib/schedule'
+import { SectionCard } from './Section'
 
 const MS_PER_DAY = 86_400_000
 const PTS_PER_DAY = 6  // 4-hour resolution for smooth sawtooth
@@ -234,14 +235,8 @@ export function PKOverviewCard({
   if (cycleInfos.length === 0) return null
 
   return (
-    <section className="surface col-12">
-      <div className="panel-header" style={{ marginBottom: 10 }}>
-        <div>
-          <span className="section-label">Active compounds</span>
-          <h3>Release levels</h3>
-        </div>
-      </div>
-      <div className="pk-compounds-list">
+    <SectionCard className="md:col-span-12" eyebrow="Active compounds" title="Release levels">
+      <div className="flex flex-col gap-3">
       {cycleInfos.map(({ protocol, data }) => {
         const {
           currentLevel, nextPeak, nextTrough,
@@ -266,43 +261,45 @@ export function PKOverviewCard({
         return (
           <div
             key={protocol.id}
-            className="pk-compound-row"
-            style={{ borderLeft: `3px solid ${color}` }}
+            className="flex flex-col gap-2 border-l-2 pl-3.5"
+            style={{ borderLeftColor: color }}
           >
             {/* Compound name + dose */}
-            <div className="pk-compound-info">
-              <span className="pk-compound-name" style={{ color }}>{pkName}</span>
-              <span className="pk-compound-dose">{protocol.dose} {protocol.unit}</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-semibold" style={{ color }}>{pkName}</span>
+              <span className="text-xs text-muted-foreground">{protocol.dose} {protocol.unit}</span>
             </div>
             {/* Key stats — compact horizontal */}
-            <div className="pk-compound-stats">
-              <div className="pk-stat">
-                <span className="pk-stat-label">Now</span>
-                <span className="pk-stat-value" style={{ color }}>{currentLevel.toFixed(1)}<small>mg/d</small></span>
+            <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Now</span>
+                <span className="font-mono text-sm font-medium tabular-nums" style={{ color }}>
+                  {currentLevel.toFixed(1)}<small className="ml-0.5 text-[10px] font-normal text-muted-foreground">mg/d</small>
+                </span>
               </div>
               {nextPeak && peakIn !== null && peakIn > 0 && (
-                <div className="pk-stat">
-                  <span className="pk-stat-label">Peak</span>
-                  <span className="pk-stat-value" style={{ color: 'var(--warn)' }}>in {relTime(peakIn)}</span>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Peak</span>
+                  <span className="font-mono text-sm font-medium tabular-nums text-amber-700 dark:text-amber-400">in {relTime(peakIn)}</span>
                 </div>
               )}
               {nextTrough && troughIn !== null && troughIn > 0 && (
-                <div className="pk-stat">
-                  <span className="pk-stat-label">Labs</span>
-                  <span className="pk-stat-value" style={{ color: 'var(--good)' }}>in {relTime(troughIn)}</span>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Labs</span>
+                  <span className="font-mono text-sm font-medium tabular-nums text-emerald-700 dark:text-emerald-400">in {relTime(troughIn)}</span>
                 </div>
               )}
               {protocolEndLabel && (
-                <div className="pk-stat">
-                  <span className="pk-stat-label">Ends</span>
-                  <span className="pk-stat-value">{protocolEndLabel}</span>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Ends</span>
+                  <span className="font-mono text-sm font-medium tabular-nums">{protocolEndLabel}</span>
                 </div>
               )}
             </div>
 
             {/* Bloodwork hint */}
             {nextTrough && troughIn !== null && troughIn > 0 && troughIn < 14 && (
-              <span className="pk-compound-note">
+              <span className="text-xs text-muted-foreground">
                 🩸 Best bloodwork window in {relTime(troughIn)}
               </span>
             )}
@@ -310,6 +307,6 @@ export function PKOverviewCard({
         )
       })}
       </div>
-    </section>
+    </SectionCard>
   )
 }

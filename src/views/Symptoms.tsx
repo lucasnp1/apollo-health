@@ -137,14 +137,14 @@ export function Symptoms() {
         }
       >
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Positive — higher is better</p>
-        <div className="symptom-rows">
+        <div className="flex flex-col">
           {POSITIVE.map((s) => (
             <SymptomScale key={s.key as string} def={s} value={draft[s.key] as number | undefined} onChange={(v) => setDraft({ ...draft, [s.key]: v })} />
           ))}
         </div>
 
         <p className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Side effects — higher is worse</p>
-        <div className="symptom-rows">
+        <div className="flex flex-col">
           {NEGATIVE.map((s) => (
             <SymptomScale key={s.key as string} def={s} value={draft[s.key] as number | undefined} onChange={(v) => setDraft({ ...draft, [s.key]: v })} />
           ))}
@@ -206,7 +206,17 @@ export function Symptoms() {
                     const v = s[k]
                     if (typeof v !== 'number') return null
                     return (
-                      <span key={k} className={`symptom-history-chip tone-${chipTone(v, 'positive')}`}>
+                      <span
+                        key={k}
+                        className={[
+                          'rounded-full px-2 py-0.5 text-[11px] tabular-nums',
+                          chipTone(v, 'positive') === 'good'
+                            ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400'
+                            : chipTone(v, 'positive') === 'bad'
+                              ? 'bg-destructive/12 text-destructive'
+                              : 'bg-secondary text-muted-foreground',
+                        ].join(' ')}
+                      >
                         {k[0].toUpperCase() + k.slice(1)} {v}
                       </span>
                     )
@@ -234,6 +244,13 @@ export function Symptoms() {
   )
 }
 
+const SCALE_TONE: Record<'good' | 'warn' | 'bad' | 'neutral', string> = {
+  good: 'border-emerald-500 bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
+  warn: 'border-amber-500 bg-amber-500/12 text-amber-700 dark:text-amber-400',
+  bad: 'border-destructive bg-destructive/12 text-destructive',
+  neutral: 'border-foreground bg-accent text-foreground',
+}
+
 function SymptomScale({
   def,
   value,
@@ -244,9 +261,9 @@ function SymptomScale({
   onChange: (v: number) => void
 }) {
   return (
-    <div className="symptom-scale">
-      <span className="symptom-scale-label">{def.label}</span>
-      <div className="symptom-scale-chips" role="radiogroup" aria-label={def.label}>
+    <div className="grid grid-cols-[minmax(140px,1.5fr)_auto] items-center gap-4 py-1.5 max-md:grid-cols-1 max-md:gap-1">
+      <span className="text-sm">{def.label}</span>
+      <div className="flex gap-1 max-md:w-full" role="radiogroup" aria-label={def.label}>
         {[1, 2, 3, 4, 5].map((n) => {
           const selected = value === n
           const tone = selected ? chipTone(n, def.direction) : 'neutral'
@@ -256,7 +273,12 @@ function SymptomScale({
               type="button"
               role="radio"
               aria-checked={selected}
-              className={selected ? `symptom-chip selected tone-${tone}` : 'symptom-chip'}
+              className={[
+                'size-8 rounded-md border font-mono text-[13px] tabular-nums transition-colors max-md:flex-1',
+                selected
+                  ? `font-semibold ${SCALE_TONE[tone]}`
+                  : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground',
+              ].join(' ')}
               onClick={() => onChange(n)}
             >
               {n}

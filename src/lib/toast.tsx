@@ -64,13 +64,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {toast && (
         <div
-          className={toast.tone && toast.tone !== 'info' ? `snackbar ${toast.tone}` : 'snackbar'}
+          className={[
+            'fixed bottom-6 left-1/2 z-[80] flex w-max max-w-[min(440px,calc(100vw-32px))] -translate-x-1/2 items-start gap-3 rounded-lg px-4 py-3 text-sm leading-snug shadow-lg',
+            toast.tone === 'error'
+              ? 'bg-destructive text-white'
+              : toast.tone === 'warn'
+                ? 'bg-amber-600 text-white'
+                : 'bg-foreground text-background',
+          ].join(' ')}
           role={toast.tone === 'error' ? 'alert' : 'status'}
         >
           <span>{toast.message}</span>
           {toast.action ? (
             <button
               type="button"
+              className="shrink-0 text-xs font-semibold underline-offset-2 hover:underline"
               onClick={async () => {
                 const fn = toast.action!.onClick
                 dismissToast()
@@ -80,7 +88,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               {toast.action.label}
             </button>
           ) : (
-            <button type="button" onClick={dismissToast}>Dismiss</button>
+            <button type="button" className="shrink-0 text-xs font-semibold opacity-80 hover:opacity-100" onClick={dismissToast}>Dismiss</button>
           )}
         </div>
       )}
