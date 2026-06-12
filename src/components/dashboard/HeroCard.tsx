@@ -65,7 +65,7 @@ export function HeroCard({
       </div>
 
       <motion.p
-        className="mt-4 font-display text-4xl font-semibold leading-[1.05] text-gradient-gold"
+        className="mt-4 font-display text-4xl font-bold leading-[1.05] text-gradient-gold"
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15, duration: 0.45 }}

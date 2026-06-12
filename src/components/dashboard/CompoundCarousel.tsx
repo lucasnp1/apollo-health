@@ -131,7 +131,7 @@ function CompoundCard({
             Overdue
           </span>
         )}
-        <p className="font-display text-3xl font-semibold leading-[1.05] text-gradient-gold">
+        <p className="font-display text-2xl font-bold leading-[1.1] text-gradient-gold">
           {compound?.name ?? protocol.name}
         </p>
         {compound?.ester && (
