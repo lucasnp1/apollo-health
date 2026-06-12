@@ -7,7 +7,12 @@
  * the number before drawing.
  */
 import { useState } from 'react'
-import { Calculator, X } from 'lucide-react'
+import { Calculator } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { cn } from '@/lib/utils'
 
 type SyringeKind = '100' | '40' | '0'
 
@@ -36,101 +41,97 @@ export function DoseCalculator({ onClose }: { onClose: () => void }) {
   const overdraw = ml !== null && ml > 1
 
   return (
-    <div
-      className="sheet-overlay"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="sheet">
-        <div className="sheet-handle" />
-        <div className="sheet-header">
-          <h3 className="dose-calc-title">
-            <Calculator size={18} /> Dose calculator
-          </h3>
-          <button type="button" className="icon-button" onClick={onClose}><X size={16} /></button>
-        </div>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calculator className="size-4" /> Dose calculator
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="sheet-body dose-calc-body">
-
+        <div className="flex flex-col gap-4">
           {/* Inputs */}
-          <div className="dose-calc-grid">
-            <label className="dose-calc-field">
-              <span className="dose-calc-label">
-                Vial concentration <span className="dose-calc-suffix">mg/mL</span>
-              </span>
-              <input
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="dc-conc">
+                Vial concentration <span className="font-normal text-muted-foreground">mg/mL</span>
+              </Label>
+              <Input
+                id="dc-conc"
                 inputMode="decimal"
                 value={concentration}
                 onChange={e => setConcentration(e.target.value)}
                 placeholder="e.g. 300"
               />
-            </label>
-            <label className="dose-calc-field">
-              <span className="dose-calc-label">
-                Dose needed <span className="dose-calc-suffix">mg</span>
-              </span>
-              <input
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="dc-dose">
+                Dose needed <span className="font-normal text-muted-foreground">mg</span>
+              </Label>
+              <Input
+                id="dc-dose"
                 inputMode="decimal"
                 value={dose}
                 onChange={e => setDose(e.target.value)}
                 placeholder="e.g. 200"
               />
-            </label>
+            </div>
           </div>
 
           {/* Syringe type */}
-          <div className="dose-calc-field">
-            <span className="dose-calc-label">Syringe markings</span>
-            <div className="dose-calc-segment">
-              {SYRINGE_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setSyringeUnits(opt.value)}
-                  className={syringeUnits === opt.value ? 'dose-calc-seg-on' : 'dose-calc-seg'}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Syringe markings</Label>
+            <Tabs value={syringeUnits} onValueChange={(v) => setSyringeUnits(v as SyringeKind)}>
+              <TabsList className="w-full">
+                {SYRINGE_OPTIONS.map(opt => (
+                  <TabsTrigger key={opt.value} value={opt.value} className="flex-1 text-xs">
+                    {opt.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
           </div>
 
           {/* Result */}
           {valid && ml !== null ? (
-            <div className={overdraw ? 'dose-calc-result warn' : 'dose-calc-result'}>
+            <div className={cn(
+              'flex flex-col gap-3 rounded-lg border-l-2 bg-muted/50 px-4 py-3.5',
+              overdraw ? 'border-l-destructive' : 'border-l-primary',
+            )}>
               <SyringeIllustration fillFraction={fillFraction} units={units ?? 0} syringe={syringeUnits} overdraw={overdraw} />
-              <div className="dose-calc-result-numbers">
-                <div className="dose-calc-result-row">
-                  <span>Volume to draw</span>
-                  <span className="dose-calc-mono">{ml.toFixed(3)} mL</span>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-medium">Volume to draw</span>
+                  <span className="font-mono text-2xl font-semibold tabular-nums">{ml.toFixed(3)} mL</span>
                 </div>
                 {syringeUnits !== '0' && units !== null && (
-                  <div className="dose-calc-result-row">
-                    <span>On {syringeUnits}u syringe</span>
-                    <span className="dose-calc-mono">{units.toFixed(1)} units</span>
+                  <div className="flex items-baseline justify-between gap-3 border-t pt-2">
+                    <span className="text-sm font-medium">On {syringeUnits}u syringe</span>
+                    <span className="font-mono text-xl font-semibold tabular-nums">{units.toFixed(1)} units</span>
                   </div>
                 )}
-                <p className="dose-calc-formula">
+                <p className="text-[11px] text-muted-foreground">
                   {doseN}mg ÷ {conc}mg/mL = {ml.toFixed(3)}mL
                 </p>
                 {overdraw && (
-                  <p className="dose-calc-overdraw">
+                  <p className="text-xs font-medium text-destructive">
                     This dose needs more than 1mL — split across two syringes or use a larger barrel.
                   </p>
                 )}
               </div>
             </div>
           ) : (
-            <div className="dose-calc-empty">
+            <div className="rounded-lg bg-muted/50 px-4 py-5 text-center text-sm text-muted-foreground">
               Enter concentration and dose to calculate
             </div>
           )}
 
-          <p className="dose-calc-disclaimer">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
             Always double-check calculations before injecting. When in doubt, consult your prescribing physician.
           </p>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

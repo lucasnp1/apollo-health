@@ -37,8 +37,12 @@ export function SiteCombobox({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <select value={selectValue} onChange={handleSelect} style={{ width: '100%' }}>
+    <div className="flex flex-col gap-1.5">
+      <select
+        value={selectValue}
+        onChange={handleSelect}
+        className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
         <option value="">— Select site —</option>
         {recents.length > 0 && (
           <optgroup label="Recent">
@@ -70,7 +74,7 @@ export function SiteCombobox({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           autoFocus
-          style={{ width: '100%' }}
+          className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
       )}
     </div>

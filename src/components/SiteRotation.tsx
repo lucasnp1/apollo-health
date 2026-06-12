@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { format, parseISO } from 'date-fns'
 import { X } from 'lucide-react'
 import type { Compound, InjectionLog } from '../lib/db'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 type RouteGroup = 'IM' | 'SubQ' | 'Other'
 
@@ -16,8 +18,15 @@ type SiteEntry = {
 const ROUTE_LABEL: Record<RouteGroup, string> = {
   IM: 'Intramuscular', SubQ: 'Subcutaneous', Other: 'Other',
 }
-const ROUTE_COLOR: Record<RouteGroup, string> = {
-  IM: 'var(--accent)', SubQ: 'var(--info, #3b82f6)', Other: 'var(--ink-mute)',
+const ROUTE_TEXT: Record<RouteGroup, string> = {
+  IM: 'text-amber-700 dark:text-amber-400',
+  SubQ: 'text-blue-600 dark:text-blue-400',
+  Other: 'text-muted-foreground',
+}
+const ROUTE_DOT: Record<RouteGroup, string> = {
+  IM: 'bg-amber-500',
+  SubQ: 'bg-blue-500',
+  Other: 'bg-muted-foreground',
 }
 
 export function SiteRotation({
@@ -64,11 +73,12 @@ export function SiteRotation({
       .sort((a, b) => b.lastMs - a.lastMs)
   }, [injections, now])
 
+  // Recency tint — hotter = used more recently (avoid re-injecting there).
   function recencyClass(daysAgo: number) {
-    if (daysAgo < 1.5) return 'recent-1'
-    if (daysAgo < 3.5) return 'recent-3'
-    if (daysAgo < 7)   return 'recent-7'
-    return ''
+    if (daysAgo < 1.5) return 'border-destructive/50 bg-destructive/10 text-destructive'
+    if (daysAgo < 3.5) return 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+    if (daysAgo < 7)   return 'border-amber-500/30 bg-amber-500/5'
+    return 'border-border bg-secondary/50'
   }
 
   function daysLabel(daysAgo: number): string {
@@ -85,10 +95,11 @@ export function SiteRotation({
   if (siteEntries.length === 0) {
     return (
       <>
-        <div className="panel-header">
-          <div><span className="section-label">Rotation</span><h3>Site history</h3></div>
+        <div className="mb-1 space-y-0.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rotation</p>
+          <h3 className="font-display text-lg font-semibold">Site history</h3>
         </div>
-        <p className="panel-note">Log injections to track site rotation.</p>
+        <p className="text-sm text-muted-foreground">Log injections to track site rotation.</p>
       </>
     )
   }
@@ -96,23 +107,26 @@ export function SiteRotation({
   function RouteSection({ group, sites }: { group: RouteGroup; sites: SiteEntry[] }) {
     if (sites.length === 0) return null
     return (
-      <div className="site-route-group">
-        <div className="site-route-label" style={{ color: ROUTE_COLOR[group] }}>
-          <span className="site-route-dot" style={{ background: ROUTE_COLOR[group] }} />
+      <div>
+        <div className={cn('mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider', ROUTE_TEXT[group])}>
+          <span className={cn('size-1.5 rounded-full', ROUTE_DOT[group])} />
           {ROUTE_LABEL[group]}
         </div>
-        <div className="body-diagram">
+        <div className="flex flex-wrap gap-1.5">
           {sites.map((entry) => (
             <button
               key={`${entry.site}-${entry.route}`}
               type="button"
-              className={`body-cell ${recencyClass(entry.daysAgo)}`}
+              className={cn(
+                'flex items-baseline gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors hover:brightness-95',
+                recencyClass(entry.daysAgo),
+              )}
               onClick={() => setSelectedSite(
                 selectedSite === entry.site + '||' + entry.route ? null : entry.site + '||' + entry.route
               )}
             >
               {entry.site}
-              <small>{daysLabel(entry.daysAgo)}</small>
+              <small className="text-[10px] font-normal opacity-70">{daysLabel(entry.daysAgo)}</small>
             </button>
           ))}
         </div>
@@ -122,11 +136,12 @@ export function SiteRotation({
 
   return (
     <>
-      <div className="panel-header">
-        <div><span className="section-label">Rotation</span><h3>Site history</h3></div>
+      <div className="mb-3 space-y-0.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rotation</p>
+        <h3 className="font-display text-lg font-semibold">Site history</h3>
       </div>
 
-      <div className="site-rotation-body">
+      <div className="flex flex-col gap-3">
         <RouteSection group="IM"    sites={imSites} />
         <RouteSection group="SubQ"  sites={subqSites} />
         <RouteSection group="Other" sites={otherSites} />
@@ -134,31 +149,31 @@ export function SiteRotation({
 
       {/* Injection detail panel */}
       {selectedEntry && (
-        <div style={{ marginTop: 10, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>
+        <div className="mt-3 rounded-lg border bg-muted/40 px-3 py-2.5">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold">
               {selectedEntry.site} · last {selectedEntry.injections.length} injection{selectedEntry.injections.length !== 1 ? 's' : ''}
             </span>
-            <button type="button" className="icon-button" style={{ width: 24, height: 24 }} onClick={() => setSelectedSite(null)} aria-label="Close">
-              <X size={12} />
-            </button>
+            <Button variant="ghost" size="icon" className="size-6" onClick={() => setSelectedSite(null)} aria-label="Close">
+              <X className="size-3" />
+            </Button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div className="flex flex-col gap-1">
             {selectedEntry.injections.slice(0, 5).map(inj => {
               const compound = compoundMap.get(inj.compoundId)
               return (
-                <div key={inj.id} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12 }}>
-                  <span style={{ color: 'var(--ink-mute)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <div key={inj.id} className="flex items-baseline gap-2 text-xs">
+                  <span className="shrink-0 whitespace-nowrap text-muted-foreground">
                     {format(parseISO(inj.takenAt), 'MMM d')}
                   </span>
-                  <span style={{ fontWeight: 600, color: compound?.color ?? 'var(--accent)', whiteSpace: 'nowrap' }}>
+                  <span className="whitespace-nowrap font-semibold" style={{ color: compound?.color ?? 'inherit' }}>
                     {compound?.name ?? '—'}
                   </span>
-                  <span style={{ color: 'var(--ink-dim)', whiteSpace: 'nowrap' }}>
+                  <span className="whitespace-nowrap text-muted-foreground">
                     {inj.dose} {inj.unit}
                   </span>
                   {inj.route && (
-                    <span style={{ color: 'var(--ink-mute)', fontSize: 10 }}>{inj.route}</span>
+                    <span className="text-[10px] text-muted-foreground">{inj.route}</span>
                   )}
                 </div>
               )
@@ -167,7 +182,7 @@ export function SiteRotation({
         </div>
       )}
 
-      <p className="panel-note" style={{ marginTop: 6 }}>
+      <p className="mt-2 text-xs text-muted-foreground">
         Red = used recently. Tap a site for details.
       </p>
     </>

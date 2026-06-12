@@ -4,13 +4,22 @@
 // Weight is a field on the injection form.
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronUp, Droplet, HeartPulse, Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Droplet, HeartPulse, Plus } from 'lucide-react'
 import { db, type Compound, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from './SiteCombobox'
 import { COMMON_SITES } from '../lib/sites'
 import type { QuickLogPrefill } from '../App'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 type Tab = 'injection' | 'bp'
 
@@ -73,46 +82,49 @@ function SymptomsChipPicker({
     onChangeSelected(next)
   }
 
-  const summary = selected.length > 0
-    ? selected.join(' · ')
-    : open ? '' : 'No symptoms logged'
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div className="flex flex-col gap-2">
       <button
         type="button"
-        className="symptom-section-toggle"
+        className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
       >
-        {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        <span style={{ flex: 1, textAlign: 'left' }}>
+        {open ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+        <span className="flex-1 text-left">
           How do you feel?
           {!open && selected.length > 0 && (
-            <span style={{ color: 'var(--accent-ink)', marginLeft: 6, fontWeight: 600 }}>
-              {summary}
-            </span>
+            <span className="ml-1.5 font-medium text-foreground">{selected.join(' · ')}</span>
           )}
         </span>
       </button>
       {open && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div className="symptom-chips">
-            {CHIPS.map(({ label }) => (
-              <button
-                key={label}
-                type="button"
-                className={`symptom-chip${selected.includes(label) ? ' selected' : ''}`}
-                onClick={() => toggle(label)}
-              >
-                {label}
-              </button>
-            ))}
+        <div className="flex flex-col gap-2.5">
+          <div className="flex flex-wrap gap-1.5">
+            {CHIPS.map(({ label }) => {
+              const active = selected.includes(label)
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => toggle(label)}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1 text-xs transition-colors',
+                    active
+                      ? 'border-foreground bg-foreground text-background'
+                      : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
-          <input
+          <Input
             placeholder="Notes (optional)"
             value={notes}
             onChange={(e) => onChangeNotes(e.target.value)}
-            style={{ width: '100%', fontSize: 13 }}
+            className="text-sm"
           />
         </div>
       )}
@@ -141,45 +153,23 @@ export function QuickLog({
     if (open) setTab(initialTab)
   }, [open, initialTab])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    if (open) window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-
   return (
-    <div
-      className="sheet-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-      role="dialog"
-      aria-modal
-    >
-      <div className="sheet" style={{ maxWidth: 540 }}>
-        <div className="sheet-handle" />
-        {/* Header — tab switcher + close */}
-        <div className="sheet-header">
-          <div className="pill-tabs" role="tablist">
-            <button type="button" role="tab" className={tab === 'injection' ? 'active' : undefined} onClick={() => setTab('injection')}>
-              <Droplet size={12} /> Injection
-            </button>
-            <button type="button" role="tab" className={tab === 'bp' ? 'active' : undefined} onClick={() => setTab('bp')}>
-              <HeartPulse size={12} /> BP
-            </button>
-          </div>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
-        </div>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="sr-only">Quick log</DialogTitle>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+            <TabsList>
+              <TabsTrigger value="injection"><Droplet className="size-3.5" /> Injection</TabsTrigger>
+              <TabsTrigger value="bp"><HeartPulse className="size-3.5" /> BP</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </DialogHeader>
 
-        {/* Body */}
-        <div className="sheet-body">
-          {tab === 'injection' && <InjectionForm compounds={compounds} prefill={prefill} onSaved={onClose} />}
-          {tab === 'bp' && <BPForm onSaved={onClose} />}
-        </div>
-      </div>
-    </div>
+        {tab === 'injection' && <InjectionForm compounds={compounds} prefill={prefill} onSaved={onClose} />}
+        {tab === 'bp' && <BPForm onSaved={onClose} />}
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -284,47 +274,53 @@ function InjectionForm({
   }
 
   if (compounds.length === 0) {
-    return <p className="panel-note">Add a compound first in the Protocols page.</p>
+    return <p className="text-sm text-muted-foreground">Add a compound first in the Protocols page.</p>
   }
 
   return (
-    <div className="form-grid">
-      <label className="wide-field">
-        Compound
-        <select value={compoundId} onChange={(e) => setCompoundId(Number(e.target.value))}>
-          {compounds.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      </label>
-      <label>
-        Dose ({compound?.unit ?? 'mg'})
-        <input inputMode="decimal" placeholder={String(compound?.defaultDose ?? '')} value={dose} onChange={(e) => setDose(e.target.value)} />
-      </label>
-      <label className="wide-field">
-        Route
-        <div className="pill-tabs" role="group" style={{ marginTop: 6 }}>
-          {(['IM', 'SubQ', 'Oral', 'Other'] as const).map((r) => (
-            <button key={r} type="button" role="radio" aria-checked={route === r} className={route === r ? 'active' : undefined} onClick={() => setRoute(r)}>{r}</button>
-          ))}
-        </div>
-      </label>
-      <label>
-        Site
+    <div className="grid grid-cols-2 gap-3">
+      <div className="col-span-2 flex flex-col gap-1.5">
+        <Label>Compound</Label>
+        <Select value={String(compoundId)} onValueChange={(v) => setCompoundId(Number(v))}>
+          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {compounds.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="ql-dose">Dose ({compound?.unit ?? 'mg'})</Label>
+        <Input id="ql-dose" inputMode="decimal" placeholder={String(compound?.defaultDose ?? '')} value={dose} onChange={(e) => setDose(e.target.value)} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Route</Label>
+        <Tabs value={route} onValueChange={(v) => setRoute(v as typeof route)}>
+          <TabsList className="h-9 w-full">
+            {(['IM', 'SubQ', 'Oral', 'Other'] as const).map((r) => (
+              <TabsTrigger key={r} value={r} className="px-1.5 text-xs">{r}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label>Site</Label>
         <SiteCombobox value={site} onChange={setSite} recentSites={recentSites} />
-      </label>
-      <label>
-        Weight (kg)
-        <input
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="ql-weight">Weight (kg)</Label>
+        <Input
+          id="ql-weight"
           inputMode="decimal"
           placeholder={lastWeightKg !== undefined ? `${lastWeightKg} (last)` : 'e.g. 82.5'}
           value={weightKg}
           onChange={(e) => setWeightKg(e.target.value)}
         />
-      </label>
-      <label className="wide-field">
-        Notes (optional)
-        <input value={notes} onChange={(e) => setNotes(e.target.value)} />
-      </label>
-      <div className="wide-field" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+      </div>
+      <div className="col-span-2 flex flex-col gap-1.5">
+        <Label htmlFor="ql-notes">Notes (optional)</Label>
+        <Input id="ql-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
+      <div className="col-span-2 border-t pt-3">
         <SymptomsChipPicker
           selected={symptomChips}
           notes={symptomNotes}
@@ -332,9 +328,9 @@ function InjectionForm({
           onChangeNotes={setSymptomNotes}
         />
       </div>
-      <button type="button" className="primary-button wide-field" onClick={save} disabled={busy || !dose}>
-        <Plus size={14} /> {busy ? 'Saving…' : 'Log injection'}
-      </button>
+      <Button className="col-span-2" onClick={save} disabled={busy || !dose}>
+        <Plus className="size-4" /> {busy ? 'Saving…' : 'Log injection'}
+      </Button>
     </div>
   )
 }
@@ -373,20 +369,20 @@ function BPForm({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <div className="form-grid">
-      <label>
-        Systolic
-        <input inputMode="numeric" placeholder="120" value={sys} onChange={(e) => setSys(e.target.value)} autoFocus />
-      </label>
-      <label>
-        Diastolic
-        <input inputMode="numeric" placeholder="80" value={dia} onChange={(e) => setDia(e.target.value)} />
-      </label>
-      <label className="wide-field">
-        Pulse (bpm)
-        <input inputMode="numeric" placeholder="65" value={pulse} onChange={(e) => setPulse(e.target.value)} />
-      </label>
-      <div className="wide-field" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="bp-sys">Systolic</Label>
+        <Input id="bp-sys" inputMode="numeric" placeholder="120" value={sys} onChange={(e) => setSys(e.target.value)} autoFocus />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="bp-dia">Diastolic</Label>
+        <Input id="bp-dia" inputMode="numeric" placeholder="80" value={dia} onChange={(e) => setDia(e.target.value)} />
+      </div>
+      <div className="col-span-2 flex flex-col gap-1.5">
+        <Label htmlFor="bp-pulse">Pulse (bpm)</Label>
+        <Input id="bp-pulse" inputMode="numeric" placeholder="65" value={pulse} onChange={(e) => setPulse(e.target.value)} />
+      </div>
+      <div className="col-span-2 border-t pt-3">
         <SymptomsChipPicker
           selected={symptomChips}
           notes={symptomNotes}
@@ -394,9 +390,9 @@ function BPForm({ onSaved }: { onSaved: () => void }) {
           onChangeNotes={setSymptomNotes}
         />
       </div>
-      <button type="button" className="primary-button wide-field" onClick={save} disabled={busy || !sys || !dia}>
-        <Plus size={14} /> {busy ? 'Saving…' : 'Save reading'}
-      </button>
+      <Button className="col-span-2" onClick={save} disabled={busy || !sys || !dia}>
+        <Plus className="size-4" /> {busy ? 'Saving…' : 'Save reading'}
+      </Button>
     </div>
   )
 }

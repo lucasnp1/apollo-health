@@ -13,9 +13,13 @@
 
 import { useMemo, useState } from 'react'
 import { format, parseISO, subMonths } from 'date-fns'
-import { FileText, X } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import type { Compound, InjectionLog, LabExam, VitalLog } from '../lib/db'
 import type { EnrichedResult } from '../lib/insights'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
 type DateRange = '1M' | '3M' | '6M' | '1Y' | 'ALL'
 
@@ -291,37 +295,29 @@ export function ExportSheet({
   }
 
   return (
-    <div
-      className="sheet-overlay"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="sheet">
-        <div className="sheet-handle" />
-        <div className="sheet-header">
-          <h3>Share with doctor</h3>
-          <button type="button" className="icon-button" onClick={onClose}><X size={16} /></button>
-        </div>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Share with doctor</DialogTitle>
+        </DialogHeader>
 
-        <div className="sheet-body" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-
+        <div className="flex flex-col gap-5">
           {/* Date range */}
           <div>
-            <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: 'var(--ink-dim)' }}>Date range</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Date range</p>
+            <div className="grid grid-cols-3 gap-1.5">
               {(Object.entries(RANGE_LABELS) as [DateRange, string][]).map(([k, label]) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => setRange(k)}
-                  style={{
-                    padding: '9px 6px',
-                    borderRadius: 10,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    background: range === k ? 'var(--accent-soft)' : 'var(--surface-2)',
-                    color: range === k ? 'var(--accent)' : 'var(--ink-dim)',
-                    border: range === k ? '1.5px solid var(--accent)' : '1.5px solid transparent',
-                  }}
+                  aria-pressed={range === k}
+                  className={cn(
+                    'rounded-md border px-1.5 py-2 text-xs font-medium transition-colors',
+                    range === k
+                      ? 'border-foreground bg-accent text-foreground'
+                      : 'border-border text-muted-foreground hover:bg-accent/60',
+                  )}
                 >
                   {label}
                 </button>
@@ -331,78 +327,71 @@ export function ExportSheet({
 
           {/* What to include */}
           <div>
-            <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 600, color: 'var(--ink-dim)' }}>Include</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* Injections toggle + compound filter */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 12, cursor: 'pointer' }}>
-                <input type="checkbox" checked={inclInjections} onChange={e => setInclInjections(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent)', flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <strong style={{ fontSize: 14 }}>Injection history</strong>
-                  <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-mute)', marginTop: 1 }}>All logged doses</span>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Include</p>
+            <div className="flex flex-col gap-2">
+              <label className="flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-3">
+                <Checkbox checked={inclInjections} onCheckedChange={(v) => setInclInjections(v === true)} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">Injection history</p>
+                  <p className="text-xs text-muted-foreground">All logged doses</p>
                 </div>
               </label>
 
               {/* Compound filter (shown when injections is checked) */}
               {inclInjections && compoundsWithHistory.length > 0 && (
-                <div style={{ paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span style={{ fontSize: 11, color: 'var(--ink-mute)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Filter by compound</span>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {compoundsWithHistory.map(c => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => toggleCompound(c.id!)}
-                        style={{
-                          padding: '5px 12px',
-                          borderRadius: 100,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          background: selectedCompounds.includes(c.id!) ? (c.color ?? 'var(--accent)') : 'var(--surface-3)',
-                          color: selectedCompounds.includes(c.id!) ? '#fff' : 'var(--ink-dim)',
-                          border: 'none',
-                        }}
-                      >
-                        {c.name}{c.ester ? ` (${c.ester})` : ''}
-                      </button>
-                    ))}
+                <div className="flex flex-col gap-1.5 pl-4">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Filter by compound</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {compoundsWithHistory.map(c => {
+                      const on = selectedCompounds.includes(c.id!)
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => toggleCompound(c.id!)}
+                          aria-pressed={on}
+                          className={cn(
+                            'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                            on ? 'border-transparent text-white' : 'border-border text-muted-foreground hover:bg-accent',
+                          )}
+                          style={on ? { background: c.color ?? 'var(--primary)' } : undefined}
+                        >
+                          {c.name}{c.ester ? ` (${c.ester})` : ''}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 12, cursor: 'pointer' }}>
-                <input type="checkbox" checked={inclLabs} onChange={e => setInclLabs(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent)', flexShrink: 0 }} />
+              <label className="flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-3">
+                <Checkbox checked={inclLabs} onCheckedChange={(v) => setInclLabs(v === true)} />
                 <div>
-                  <strong style={{ fontSize: 14 }}>Lab results</strong>
-                  <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-mute)', marginTop: 1 }}>{exams.length} panel{exams.length !== 1 ? 's' : ''} on file</span>
+                  <p className="text-sm font-medium">Lab results</p>
+                  <p className="text-xs text-muted-foreground">{exams.length} panel{exams.length !== 1 ? 's' : ''} on file</p>
                 </div>
               </label>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 12, cursor: 'pointer' }}>
-                <input type="checkbox" checked={inclBP} onChange={e => setInclBP(e.target.checked)} style={{ width: 18, height: 18, accentColor: 'var(--accent)', flexShrink: 0 }} />
+              <label className="flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-3">
+                <Checkbox checked={inclBP} onCheckedChange={(v) => setInclBP(v === true)} />
                 <div>
-                  <strong style={{ fontSize: 14 }}>Blood pressure log</strong>
-                  <span style={{ display: 'block', fontSize: 12, color: 'var(--ink-mute)', marginTop: 1 }}>{vitals.length} reading{vitals.length !== 1 ? 's' : ''} on file</span>
+                  <p className="text-sm font-medium">Blood pressure log</p>
+                  <p className="text-xs text-muted-foreground">{vitals.length} reading{vitals.length !== 1 ? 's' : ''} on file</p>
                 </div>
               </label>
             </div>
           </div>
 
           {/* Export button */}
-          <button
-            type="button"
-            className="primary-button"
-            style={{ width: '100%', justifyContent: 'center', height: 50, fontSize: 16 }}
-            onClick={openExport}
-            disabled={!inclInjections && !inclLabs && !inclBP}
-          >
-            <FileText size={17} /> Open for printing / PDF
-          </button>
+          <Button size="lg" className="w-full" onClick={openExport} disabled={!inclInjections && !inclLabs && !inclBP}>
+            <FileText className="size-4" /> Open for printing / PDF
+          </Button>
 
-          <p style={{ margin: '0', fontSize: 11, color: 'var(--ink-mute)', textAlign: 'center', lineHeight: 1.5 }}>
+          <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
             Opens a clean document in a new tab. Use your browser's <strong>Print → Save as PDF</strong> to save or share.
           </p>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

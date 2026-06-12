@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, FileText, Plus, Trash2, X } from 'lucide-react'
+import { Check, FileText, Plus, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { extractMarkersFromText, type ExtractedMarker } from '../lib/pdf'
 import { db, type HealthFile } from '../lib/db'
 import { canonicalize } from '../lib/markers'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 
 type Row = ExtractedMarker & { include: boolean }
 
@@ -95,43 +101,20 @@ export function PdfReviewSheet({
   }
 
   return (
-    <div className="sheet-overlay" onClick={onClose}>
-      <div className="sheet pdf-review-sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Review extracted markers">
-        <header className="pdf-review-header">
-          <div className="pdf-review-title">
-            <FileText size={14} />
-            <div>
-              <strong>{file.name.replace(/\.pdf$/i, '')}</strong>
-              <span>
-                {rows.length} marker{rows.length === 1 ? '' : 's'}
-                {' · '}
-                {selectedCount} selected
-              </span>
-            </div>
-          </div>
-          <div className="pdf-review-actions">
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => commitImport(true)}
-              disabled={rows.length === 0 || saving}
-            >
-              <Check size={14} /> Approve all &amp; import
-            </button>
-            <button
-              type="button"
-              className="icon-button"
-              onClick={onClose}
-              aria-label="Close"
-              disabled={saving}
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </header>
+    <Dialog open onOpenChange={(o) => { if (!o && !saving) onClose() }}>
+      <DialogContent className="max-h-[88dvh] sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{file.name.replace(/\.pdf$/i, '')}</span>
+          </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            {rows.length} marker{rows.length === 1 ? '' : 's'} · {selectedCount} selected
+          </p>
+        </DialogHeader>
 
         {duplicateWarning && (
-          <div className="pdf-review-warning" role="alert">
+          <div className="rounded-md border-l-2 border-l-amber-500 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:text-amber-300" role="alert">
             {duplicateWarning}
           </div>
         )}
@@ -144,111 +127,108 @@ export function PdfReviewSheet({
           {(suggestions ?? []).map((s) => <option key={s} value={s} />)}
         </datalist>
 
-        <div className="pdf-review-body">
-          {rows.length === 0 ? (
-            <div className="pdf-review-empty-wrap">
-              <p className="pdf-review-empty">
-                We didn't find any known lab markers in this PDF. Add markers
-                manually with the button below.
-              </p>
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={addRow}
-                style={{ alignSelf: 'center', marginTop: 12 }}
+        {rows.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <p className="max-w-xs text-sm text-muted-foreground">
+              We didn't find any known lab markers in this PDF. Add markers manually with the button below.
+            </p>
+            <Button variant="outline" size="sm" onClick={addRow}>
+              <Plus className="size-3.5" /> Add a marker
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRows((prev) => prev.map((r) => ({ ...r, include: !allSelected })))}
               >
-                <Plus size={13} /> Add a marker
-              </button>
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </Button>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {selectedCount} of {rows.length} selected
+              </span>
             </div>
-          ) : (
-            <>
-              <div className="pdf-review-toolbar">
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => setRows((prev) => prev.map((r) => ({ ...r, include: !allSelected })))}
-                >
-                  {allSelected ? 'Deselect all' : 'Select all'}
-                </button>
-                <span className="pdf-review-count">
-                  {selectedCount} of {rows.length} selected
-                </span>
-              </div>
-              <ul className="pdf-review-list">
+
+            <ScrollArea className="-mx-1 max-h-[42dvh] px-1">
+              <ul className="flex flex-col">
                 {rows.map((r, i) => (
-                  <li key={i} className={r.include ? 'pdf-review-row' : 'pdf-review-row off'}>
-                    <input
-                      type="checkbox"
-                      className="pdf-review-row-check"
+                  <li
+                    key={i}
+                    className={cn(
+                      'grid grid-cols-[16px_minmax(0,1.8fr)_88px_72px_28px] items-center gap-2 border-b py-2 last:border-b-0',
+                      !r.include && 'opacity-45',
+                    )}
+                  >
+                    <Checkbox
                       checked={r.include}
-                      onChange={(e) => updateRow(i, { include: e.target.checked })}
+                      onCheckedChange={(v) => updateRow(i, { include: v === true })}
                       aria-label="Include this row"
                     />
-                    <input
+                    <Input
                       type="text"
-                      className="pdf-review-name"
+                      className="h-8 text-xs font-medium"
                       value={r.marker}
                       onChange={(e) => updateRow(i, { marker: e.target.value })}
                       list="marker-suggestions"
                       placeholder="Marker name"
                       aria-label="Marker name"
                     />
-                    <input
+                    <Input
                       type="number"
                       step="any"
-                      className="pdf-review-value"
+                      className="h-8 font-mono text-xs tabular-nums"
                       value={Number.isFinite(r.value) ? r.value : ''}
                       onChange={(e) => updateRow(i, { value: Number(e.target.value) })}
                       placeholder="value"
                       aria-label={`${r.marker || 'marker'} value`}
                     />
-                    <input
+                    <Input
                       type="text"
-                      className="pdf-review-unit"
+                      className="h-8 font-mono text-xs"
                       value={r.unit}
                       onChange={(e) => updateRow(i, { unit: e.target.value })}
                       placeholder="unit"
                       aria-label={`${r.marker || 'marker'} unit`}
                     />
-                    <button
-                      type="button"
-                      className="icon-button danger pdf-review-row-del"
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-muted-foreground hover:text-destructive"
                       onClick={() => removeRow(i)}
                       aria-label={`Remove ${r.marker}`}
                       title="Remove row"
                     >
-                      <Trash2 size={13} />
-                    </button>
+                      <Trash2 className="size-3.5" />
+                    </Button>
                   </li>
                 ))}
               </ul>
-              <button
-                type="button"
-                className="ghost-button pdf-review-add"
-                onClick={addRow}
-              >
-                <Plus size={13} /> Add a marker
-              </button>
-            </>
-          )}
-        </div>
+            </ScrollArea>
 
-        {rows.length > 0 && (
-          <footer className="pdf-review-footer">
-            <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => commitImport(false)}
-              disabled={selectedCount === 0 || saving}
-            >
-              Import {selectedCount} {selectedCount === 1 ? 'marker' : 'markers'}
-            </button>
-          </footer>
+            <Button variant="outline" size="sm" className="self-start" onClick={addRow}>
+              <Plus className="size-3.5" /> Add a marker
+            </Button>
+
+            <DialogFooter className="gap-2 border-t pt-3 sm:gap-0">
+              <Button variant="outline" onClick={onClose} disabled={saving}>
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => commitImport(false)}
+                disabled={selectedCount === 0 || saving}
+              >
+                Import {selectedCount} selected
+              </Button>
+              <Button onClick={() => commitImport(true)} disabled={rows.length === 0 || saving}>
+                <Check className="size-4" /> Approve all &amp; import
+              </Button>
+            </DialogFooter>
+          </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

@@ -5,16 +5,25 @@
  * No vials, no multi-step pagination.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search, X } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { db, type Compound, type Protocol, type ProtocolCadence, type TestosteroneEster, type Unit } from '../lib/db'
 import { esterProfiles } from '../lib/insights'
 import { PK_COMPOUND_NAMES, formsForCompound } from '../lib/pk'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 
 const UNITS: Unit[] = ['mg', 'mcg', 'iu', 'ml', 'tablet', 'capsule']
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 // Compound-differentiation palette — used for the colored left border on
-// protocol cards. Centred on the brand yellow plus complementary warm
-// hues that read well on cream surfaces.
+// protocol rows. Brand yellow first, then complementary hues.
 const COLORS = ['#f4c95c', '#c5821e', '#c43c2f', '#9b4ec2', '#2f8b54', '#2566c4', '#d97706', '#8b5cf6', '#1a1611', '#ec4899']
 const ESTERS: TestosteroneEster[] = ['Enanthate', 'Cypionate', 'Propionate', 'Undecanoate', 'Custom']
 
@@ -91,16 +100,6 @@ export function ProtocolWizard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editProtocol?.id])
 
-  // Escape key
-  useEffect(() => {
-    if (!open) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [open, onClose])
-
-  if (!open) return null
-
   const selectedCompound = compounds.find(c => String(c.id) === selectedCompoundId)
   const isTRT = compoundMode === 'new'
     ? cCategory === 'TRT'
@@ -157,91 +156,70 @@ export function ProtocolWizard({
   }
 
   return (
-    <div
-      className="sheet-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="sheet" style={{ maxWidth: 560 }}>
-        <div className="sheet-handle" />
-        <div className="sheet-header">
-          <h3>{isEdit ? 'Edit protocol' : 'New protocol'}</h3>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="max-h-[88dvh] sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Edit protocol' : 'New protocol'}</DialogTitle>
+        </DialogHeader>
 
-        <div className="sheet-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <ScrollArea className="-mx-1 max-h-[64dvh] px-1">
+        <div className="flex flex-col gap-6 py-0.5">
 
           {/* ── Compound section ── */}
           {!isEdit && (
             <section>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-dim)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Compound</span>
+              <div className="mb-2.5 flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Compound</span>
                 {compounds.length > 0 && (
-                  <div style={{ display: 'flex', background: 'var(--surface-2)', borderRadius: 8, padding: 2, gap: 1 }}>
-                    {(['existing', 'new'] as const).map(m => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setCompoundMode(m)}
-                        style={{
-                          padding: '4px 12px',
-                          borderRadius: 6,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          background: compoundMode === m ? 'var(--surface)' : 'transparent',
-                          color: compoundMode === m ? 'var(--ink)' : 'var(--ink-mute)',
-                          boxShadow: compoundMode === m ? 'var(--shadow-sm)' : 'none',
-                        }}
-                      >
-                        {m === 'existing' ? 'Existing' : 'New'}
-                      </button>
-                    ))}
-                  </div>
+                  <Tabs value={compoundMode} onValueChange={(v) => setCompoundMode(v as 'existing' | 'new')}>
+                    <TabsList className="h-8">
+                      <TabsTrigger value="existing" className="px-3 text-xs">Existing</TabsTrigger>
+                      <TabsTrigger value="new" className="px-3 text-xs">New</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 )}
               </div>
 
               {compoundMode === 'existing' ? (
-                <select
+                <Select
                   value={selectedCompoundId}
-                  onChange={e => {
-                    setSelectedCompoundId(e.target.value)
-                    const c = compounds.find(x => String(x.id) === e.target.value)
+                  onValueChange={(v) => {
+                    setSelectedCompoundId(v)
+                    const c = compounds.find(x => String(x.id) === v)
                     if (c && !pDose) { setPDose(String(c.defaultDose)); setPUnit(c.unit) }
                   }}
-                  style={{ width: '100%' }}
                 >
-                  <option value="">Select compound…</option>
-                  {compounds.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}{c.ester ? ` (${c.ester})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Select compound…" /></SelectTrigger>
+                  <SelectContent>
+                    {compounds.map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}{c.ester ? ` (${c.ester})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="flex flex-col gap-3">
                   {/* Preset search */}
-                  <div style={{ position: 'relative' }}>
-                    <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-mute)', pointerEvents: 'none' }} />
-                    <input
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
                       value={presetQuery}
                       onChange={e => { setPresetQuery(e.target.value); if (!e.target.value) setPresetForm('') }}
                       placeholder="Search compound (e.g. Testosterone)…"
-                      style={{ paddingLeft: 34, width: '100%' }}
+                      className="pl-9"
                     />
                     {filteredPresets.length > 0 && (
-                      <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, marginTop: 4, overflow: 'hidden', boxShadow: 'var(--shadow)' }}>
+                      <div className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-md border bg-popover shadow-md">
                         {filteredPresets.map(name => (
                           <button
                             key={name}
                             type="button"
-                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 14, fontWeight: 500, color: 'var(--ink)', borderBottom: '1px solid var(--line)' }}
+                            className="block w-full border-b px-3.5 py-2.5 text-left text-sm font-medium last:border-b-0 hover:bg-accent"
                             onClick={() => {
                               setCName(name)
                               setPresetQuery(name)
                               setPresetForm('')
-                              if (filteredPresets.length) setPresetQuery('')
-                              // Clear dropdown
                               setTimeout(() => setPresetQuery(''), 0)
                               const forms = formsForCompound(name)
                               if (forms.length === 1) setPresetForm(forms[0])
@@ -256,57 +234,63 @@ export function ProtocolWizard({
 
                   {/* Manual name if no preset selected */}
                   {!filteredPresets.length && (
-                    <input
+                    <Input
                       value={cName}
                       onChange={e => setCName(e.target.value)}
                       placeholder="Compound name"
-                      style={{ width: '100%' }}
                     />
                   )}
 
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Category</span>
-                      <select value={cCategory} onChange={e => setCCategory(e.target.value as Compound['category'])}>
-                        {(['TRT', 'Ancillary', 'Peptide', 'Supplement', 'Other'] as Compound['category'][]).map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                  <div className="flex gap-3">
+                    <div className="flex flex-1 flex-col gap-1.5">
+                      <Label>Category</Label>
+                      <Select value={cCategory} onValueChange={(v) => setCCategory(v as Compound['category'])}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {(['TRT', 'Ancillary', 'Peptide', 'Supplement', 'Other'] as Compound['category'][]).map(c => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    {isTRT && formOptions.length > 0 && (
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Ester</span>
-                        <select value={presetForm || cEster} onChange={e => { setPresetForm(e.target.value); setCEster(e.target.value as TestosteroneEster) }}>
-                          {formOptions.map(f => <option key={f} value={f}>{f}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {isTRT && formOptions.length === 0 && (
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Ester</span>
-                        <select value={cEster} onChange={e => setCEster(e.target.value as TestosteroneEster)}>
-                          {ESTERS.map(e => <option key={e}>{e}</option>)}
-                        </select>
+                    {isTRT && (
+                      <div className="flex flex-1 flex-col gap-1.5">
+                        <Label>Ester</Label>
+                        {formOptions.length > 0 ? (
+                          <Select value={presetForm || cEster} onValueChange={(v) => { setPresetForm(v); setCEster(v as TestosteroneEster) }}>
+                            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {formOptions.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Select value={cEster} onValueChange={(v) => setCEster(v as TestosteroneEster)}>
+                            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {ESTERS.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
                     )}
                   </div>
 
                   {/* Color swatches */}
                   <div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)', display: 'block', marginBottom: 8 }}>Colour</span>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <Label className="mb-2 block">Colour</Label>
+                    <div className="flex flex-wrap gap-2">
                       {COLORS.map(c => (
                         <button
                           key={c}
                           type="button"
                           onClick={() => setCColor(c)}
                           aria-label={c}
-                          style={{
-                            width: 28, height: 28, borderRadius: '50%', background: c, flexShrink: 0,
-                            outline: cColor === c ? `3px solid ${c}` : 'none',
-                            outlineOffset: 2,
-                            boxShadow: cColor === c ? `0 0 0 2px var(--surface), 0 0 0 4px ${c}` : 'none',
-                          }}
+                          aria-pressed={cColor === c}
+                          className={cn(
+                            'size-7 shrink-0 rounded-full transition-shadow',
+                            cColor === c && 'ring-2 ring-foreground ring-offset-2 ring-offset-background',
+                          )}
+                          style={{ background: c }}
                         />
                       ))}
                     </div>
@@ -318,35 +302,41 @@ export function ProtocolWizard({
 
           {/* ── Schedule section ── */}
           <section>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-dim)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 10 }}>
+            <span className="mb-2.5 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Schedule
             </span>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="flex flex-col gap-3.5">
 
               {/* Dose row */}
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Dose</span>
-                  <input inputMode="decimal" value={pDose} onChange={e => setPDose(e.target.value)} placeholder="200" />
+              <div className="flex gap-3">
+                <div className="flex flex-[2] flex-col gap-1.5">
+                  <Label htmlFor="pw-dose">Dose</Label>
+                  <Input id="pw-dose" inputMode="decimal" value={pDose} onChange={e => setPDose(e.target.value)} placeholder="200" />
                 </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Unit</span>
-                  <select value={pUnit} onChange={e => setPUnit(e.target.value as Unit)}>
-                    {UNITS.map(u => <option key={u}>{u}</option>)}
-                  </select>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label>Unit</Label>
+                  <Select value={pUnit} onValueChange={(v) => setPUnit(v as Unit)}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Phase</span>
-                  <select value={pPhase} onChange={e => setPPhase(e.target.value as Protocol['phase'])}>
-                    {['TRT', 'Blast', 'Cruise', 'PCT', 'Maintenance', 'Bridge', 'Trial'].map(p => <option key={p}>{p}</option>)}
-                  </select>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label>Phase</Label>
+                  <Select value={pPhase} onValueChange={(v) => setPPhase(v as Protocol['phase'])}>
+                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['TRT', 'Blast', 'Cruise', 'PCT', 'Maintenance', 'Bridge', 'Trial'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               {/* Frequency */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Frequency</span>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div className="flex flex-col gap-1.5">
+                <Label>Frequency</Label>
+                <div className="grid grid-cols-2 gap-1.5">
                   {([
                     { kind: 'everyNDays', label: 'Every N days' },
                     { kind: 'weekly',     label: 'Days of week' },
@@ -357,17 +347,13 @@ export function ProtocolWizard({
                       key={opt.kind}
                       type="button"
                       onClick={() => setPKind(opt.kind)}
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 10,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        textAlign: 'left',
-                        background: pKind === opt.kind ? 'var(--accent-soft)' : 'var(--surface-2)',
-                        color: pKind === opt.kind ? 'var(--accent)' : 'var(--ink-dim)',
-                        border: pKind === opt.kind ? '1.5px solid var(--accent)' : '1.5px solid transparent',
-                        transition: 'all 120ms',
-                      }}
+                      aria-pressed={pKind === opt.kind}
+                      className={cn(
+                        'rounded-md border px-3 py-2.5 text-left text-[13px] font-medium transition-colors',
+                        pKind === opt.kind
+                          ? 'border-foreground bg-accent text-foreground'
+                          : 'border-border text-muted-foreground hover:bg-accent/60',
+                      )}
                     >
                       {opt.label}
                     </button>
@@ -376,28 +362,26 @@ export function ProtocolWizard({
 
                 {/* Cadence detail */}
                 {pKind === 'everyNDays' && (
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
-                    <span style={{ fontSize: 13, color: 'var(--ink-dim)', whiteSpace: 'nowrap' }}>Every</span>
-                    <input inputMode="decimal" value={pN} onChange={e => setPN(e.target.value)} style={{ width: 72 }} />
-                    <span style={{ fontSize: 13, color: 'var(--ink-dim)', whiteSpace: 'nowrap' }}>days</span>
+                  <div className="mt-1 flex items-center gap-2.5">
+                    <span className="whitespace-nowrap text-[13px] text-muted-foreground">Every</span>
+                    <Input inputMode="decimal" value={pN} onChange={e => setPN(e.target.value)} className="w-20" />
+                    <span className="whitespace-nowrap text-[13px] text-muted-foreground">days</span>
                   </div>
                 )}
                 {pKind === 'weekly' && (
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
                     {DOW.map((d, i) => (
                       <button
                         key={d}
                         type="button"
                         onClick={() => setPDow(cur => cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i].sort())}
-                        style={{
-                          width: 40, height: 40,
-                          borderRadius: '50%',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          background: pDow.includes(i) ? 'var(--accent)' : 'var(--surface-2)',
-                          color: pDow.includes(i) ? '#fff' : 'var(--ink-dim)',
-                          transition: 'all 120ms',
-                        }}
+                        aria-pressed={pDow.includes(i)}
+                        className={cn(
+                          'size-10 rounded-full text-xs font-bold transition-colors',
+                          pDow.includes(i)
+                            ? 'bg-foreground text-background'
+                            : 'bg-secondary text-muted-foreground hover:bg-accent',
+                        )}
                       >
                         {d}
                       </button>
@@ -405,17 +389,18 @@ export function ProtocolWizard({
                   </div>
                 )}
                 {pKind !== 'asNeeded' && (
-                  <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
-                    <span style={{ fontSize: 13, color: 'var(--ink-dim)' }}>Time</span>
-                    <input type="time" value={pTime} onChange={e => setPTime(e.target.value)} style={{ width: 120 }} />
+                  <div className="mt-1 flex items-center gap-2.5">
+                    <span className="text-[13px] text-muted-foreground">Time</span>
+                    <Input type="time" value={pTime} onChange={e => setPTime(e.target.value)} className="w-32" />
                   </div>
                 )}
               </div>
 
               {/* Optional protocol name */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-dim)' }}>Label <span style={{ fontWeight: 400, color: 'var(--ink-mute)' }}>(optional)</span></span>
-                <input
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="pw-label">Label <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                <Input
+                  id="pw-label"
                   value={pName}
                   onChange={e => setPName(e.target.value)}
                   placeholder={compoundMode === 'new' ? cName || 'e.g. Test E 200mg' : selectedCompound?.name || 'e.g. Test E 200mg'}
@@ -423,19 +408,14 @@ export function ProtocolWizard({
               </div>
             </div>
           </section>
-
-          {/* Save */}
-          <button
-            type="button"
-            className="primary-button"
-            style={{ width: '100%', justifyContent: 'center', height: 50, fontSize: 16 }}
-            onClick={save}
-            disabled={!canSave || saving}
-          >
-            <Plus size={16} /> {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add protocol'}
-          </button>
         </div>
-      </div>
-    </div>
+        </ScrollArea>
+
+        {/* Save */}
+        <Button className="w-full" size="lg" onClick={save} disabled={!canSave || saving}>
+          <Plus className="size-4" /> {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add protocol'}
+        </Button>
+      </DialogContent>
+    </Dialog>
   )
 }
