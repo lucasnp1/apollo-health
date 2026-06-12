@@ -4,7 +4,8 @@ import { format, parseISO } from 'date-fns'
 import { db } from '../lib/db'
 import { extractPdfText } from '../lib/pdf'
 import { ensureBlobAvailable } from '../lib/fileSync'
-import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { DashGrid } from '../components/dashboard/Grid'
+import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -39,10 +40,10 @@ export function Files({
   }
 
   return (
-    <PageGrid>
-      <SectionCard
-        className="md:col-span-5"
-        eyebrow="Local extraction"
+    <DashGrid>
+      <PanelCard
+        className="md:col-span-2 xl:col-span-2"
+        subtitle="Local extraction"
         title="Upload exam"
         action={<UploadCloud className="size-4 text-muted-foreground" />}
       >
@@ -55,9 +56,9 @@ export function Files({
           </Button>
           <p className="text-xs text-muted-foreground">PDF text extraction runs in your browser. Nothing is uploaded.</p>
         </div>
-      </SectionCard>
+      </PanelCard>
 
-      <SectionCard className="md:col-span-7" eyebrow="Storage" title="Local files">
+      <PanelCard className="md:col-span-2 xl:col-span-4" subtitle="Storage" title="Local files">
         {files.length > 0 ? (
           <div className="flex flex-col">
             {files.map((f, i) => (
@@ -65,10 +66,10 @@ export function Files({
             ))}
           </div>
         ) : (
-          <EmptyHint icon={FileText} title="No files" detail="PDF lab reports get parsed and prepared for review." />
+          <PanelEmpty icon={FileText} title="No files" detail="PDF lab reports get parsed and prepared for review." />
         )}
-      </SectionCard>
-    </PageGrid>
+      </PanelCard>
+    </DashGrid>
   )
 }
 

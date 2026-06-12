@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react'
 import { format, parseISO, startOfDay, startOfWeek, differenceInCalendarDays, isThisWeek, isToday, isYesterday } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
-import { SectionCard } from '../components/Section'
+import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -241,8 +241,8 @@ export function Timeline({
   }
 
   return (
-    <SectionCard
-      eyebrow="All activity"
+    <PanelCard
+      subtitle="All activity"
       title="Timeline"
       action={activeType && (
         <Button variant="ghost" size="sm" onClick={() => { setActiveType(null); setActiveCompoundId(null) }}>
@@ -307,6 +307,6 @@ export function Timeline({
       ) : (
         <TimelineGrouped events={filtered} />
       )}
-    </SectionCard>
+    </PanelCard>
   )
 }

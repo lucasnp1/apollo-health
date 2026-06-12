@@ -48,14 +48,14 @@ export function StatCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
       whileHover={{ y: -2 }}
-      className={cn('flex items-center gap-4 rounded-2xl border bg-card px-5 py-4', className)}
+      className={cn('flex items-center gap-3 rounded-2xl border bg-card px-4 py-4 md:gap-4 md:px-5', className)}
     >
-      <span className={cn('grid size-12 shrink-0 place-items-center rounded-full', TONE_CIRCLE[tone])}>
-        <Icon className="size-5" />
+      <span className={cn('grid size-10 shrink-0 place-items-center rounded-full md:size-12', TONE_CIRCLE[tone])}>
+        <Icon className="size-4 md:size-5" />
       </span>
       <div className="min-w-0">
         <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
-        <p className={cn('truncate font-mono text-xl font-semibold tabular-nums leading-tight', colorValue ? TONE_VALUE[tone] : 'text-foreground')}>
+        <p className={cn('truncate font-mono text-lg font-semibold tabular-nums leading-tight md:text-xl', colorValue ? TONE_VALUE[tone] : 'text-foreground')}>
           {value}
         </p>
         {sub && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</p>}

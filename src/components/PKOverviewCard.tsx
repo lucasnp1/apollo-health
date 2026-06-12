@@ -18,7 +18,7 @@ import { parseISO, format, addDays } from 'date-fns'
 import type { Compound, InjectionLog, LabExam, Protocol, ProtocolDose } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
 import { generateDoseInstants } from '../lib/schedule'
-import { SectionCard } from './Section'
+import { PanelCard } from './dashboard/PanelCard'
 
 const MS_PER_DAY = 86_400_000
 const PTS_PER_DAY = 6  // 4-hour resolution for smooth sawtooth
@@ -235,7 +235,7 @@ export function PKOverviewCard({
   if (cycleInfos.length === 0) return null
 
   return (
-    <SectionCard className="md:col-span-12" eyebrow="Active compounds" title="Release levels">
+    <PanelCard className="h-full" title="Release levels" subtitle="Active compounds">
       <div className="flex flex-col gap-3">
       {cycleInfos.map(({ protocol, data }) => {
         const {
@@ -307,6 +307,6 @@ export function PKOverviewCard({
         )
       })}
       </div>
-    </SectionCard>
+    </PanelCard>
   )
 }

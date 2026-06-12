@@ -338,14 +338,17 @@ function Shell({
                 type="button"
                 onClick={() => setActiveView(item.id)}
                 className={cn(
-                  'flex h-9 items-center gap-2.5 rounded-md px-3 text-sm transition-colors',
+                  'relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm transition-colors',
                   active
-                    ? 'bg-accent font-medium text-foreground'
+                    ? 'bg-accent font-semibold text-primary'
                     : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
                   sidebarCollapsed && 'justify-center px-0',
                 )}
                 title={sidebarCollapsed ? item.label : undefined}
               >
+                {active && !sidebarCollapsed && (
+                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                )}
                 <item.icon className="size-4 shrink-0" />
                 {!sidebarCollapsed && <span>{item.label}</span>}
               </button>

@@ -7,7 +7,8 @@ import { db, type Goal, type MarkerTarget } from '../lib/db'
 import { buildWeightDoseSeries, weightSummary } from '../lib/insights'
 import { allMarkerMeta, metaForKey } from '../lib/markers'
 import { RangeBar } from '../components/RangeBar'
-import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { DashGrid } from '../components/dashboard/Grid'
+import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -16,10 +17,10 @@ import { cn } from '@/lib/utils'
 
 export function Targets() {
   return (
-    <PageGrid>
-      <div className="md:col-span-12"><GoalEditor /></div>
-      <div className="md:col-span-12"><MarkerTargetEditor /></div>
-    </PageGrid>
+    <DashGrid>
+      <div className="md:col-span-2 xl:col-span-6"><GoalEditor /></div>
+      <div className="md:col-span-2 xl:col-span-6"><MarkerTargetEditor /></div>
+    </DashGrid>
   )
 }
 
@@ -64,8 +65,8 @@ function GoalEditor() {
   const bpLatest = vitals[0]
 
   return (
-    <SectionCard
-      eyebrow="Targets"
+    <PanelCard
+      subtitle="Targets"
       title="Goals"
       action={<Badge variant="secondary">You set the bar</Badge>}
     >
@@ -108,7 +109,7 @@ function GoalEditor() {
           })}
         </div>
       ) : (
-        <EmptyHint icon={Target} title="No goals yet" detail="A goal turns into progress bars and remaining-delta callouts across the app." />
+        <PanelEmpty icon={Target} title="No goals yet" detail="A goal turns into progress bars and remaining-delta callouts across the app." />
       )}
 
       <div className="grid grid-cols-2 gap-3 border-t pt-4">
@@ -143,7 +144,7 @@ function GoalEditor() {
           <Plus className="size-4" /> Add goal
         </Button>
       </div>
-    </SectionCard>
+    </PanelCard>
   )
 }
 
@@ -243,8 +244,8 @@ function MarkerTargetEditor() {
   }
 
   return (
-    <SectionCard
-      eyebrow="Personal optimal"
+    <PanelCard
+      subtitle="Personal optimal"
       title="Marker targets"
       action={<Badge variant="secondary">Overrides catalog ranges in Labs</Badge>}
     >
@@ -278,7 +279,7 @@ function MarkerTargetEditor() {
           })}
         </div>
       ) : (
-        <EmptyHint icon={Target} title="No personal ranges" detail="Catalog defaults are used until you set your own." />
+        <PanelEmpty icon={Target} title="No personal ranges" detail="Catalog defaults are used until you set your own." />
       )}
 
       <div className="grid grid-cols-3 gap-3 border-t pt-4">
@@ -322,6 +323,6 @@ function MarkerTargetEditor() {
           <Plus className="size-4" /> Save target
         </Button>
       </div>
-    </SectionCard>
+    </PanelCard>
   )
 }

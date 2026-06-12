@@ -8,7 +8,8 @@ import { useTheme } from '../lib/useTheme'
 import { describeCadence } from '../lib/schedule'
 import type { useAuth } from '../lib/useAuth'
 import type { Compound, InjectionLog, LabExam, Protocol, VitalLog } from '../lib/db'
-import { SectionCard, PageGrid } from '../components/Section'
+import { DashGrid } from '../components/dashboard/Grid'
+import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -81,11 +82,11 @@ export function Settings({
   protocols?: Protocol[]
 }) {
   return (
-    <PageGrid>
-      <div className="md:col-span-6"><AccountSettings auth={auth} /></div>
-      <div className="md:col-span-6"><AppearanceSettings /></div>
-      <div className="md:col-span-6"><NotificationSettings /></div>
-      <div className="md:col-span-6">
+    <DashGrid>
+      <div className="md:col-span-1 xl:col-span-3"><AccountSettings auth={auth} /></div>
+      <div className="md:col-span-1 xl:col-span-3"><AppearanceSettings /></div>
+      <div className="md:col-span-1 xl:col-span-3"><NotificationSettings /></div>
+      <div className="md:col-span-1 xl:col-span-3">
         <BackupSettings
           compounds={compounds}
           injections={injections}
@@ -94,10 +95,10 @@ export function Settings({
           protocols={protocols}
         />
       </div>
-      <div className="md:col-span-12"><LabDataSettings /></div>
-      <div className="md:col-span-12"><TrashSettings compounds={compounds ?? []} /></div>
-      <div className="md:col-span-12"><DangerSettings /></div>
-    </PageGrid>
+      <div className="md:col-span-2 xl:col-span-6"><LabDataSettings /></div>
+      <div className="md:col-span-2 xl:col-span-6"><TrashSettings compounds={compounds ?? []} /></div>
+      <div className="md:col-span-2 xl:col-span-6"><DangerSettings /></div>
+    </DashGrid>
   )
 }
 
@@ -134,8 +135,8 @@ function TrashSettings({ compounds }: { compounds: Compound[] }) {
   }
 
   return (
-    <SectionCard
-      eyebrow="Recently deleted"
+    <PanelCard
+      subtitle="Recently deleted"
       title="Trash"
       action={sorted.length > 0 && (
         <Button variant="outline" size="sm" onClick={purgeAll}>
@@ -171,16 +172,16 @@ function TrashSettings({ compounds }: { compounds: Compound[] }) {
           })}
         </div>
       )}
-    </SectionCard>
+    </PanelCard>
   )
 }
 
 function AccountSettings({ auth }: { auth: AuthBundle }) {
   const user = auth.state.status === 'authed' ? auth.state.user : null
   return (
-    <SectionCard
+    <PanelCard
       className="h-full"
-      eyebrow="Account"
+      subtitle="Account"
       title={user ? user.email : 'Guest mode'}
       action={<UserCircle className="size-4 text-muted-foreground" />}
     >
@@ -198,7 +199,7 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
           You are using local-only mode. Data lives in this browser. Sign in to sync across devices.
         </p>
       )}
-    </SectionCard>
+    </PanelCard>
   )
 }
 
@@ -206,9 +207,9 @@ function AppearanceSettings() {
   const { theme, toggle } = useTheme()
   const isDark = theme === 'dark'
   return (
-    <SectionCard
+    <PanelCard
       className="h-full"
-      eyebrow="Display"
+      subtitle="Display"
       title="Appearance"
       action={isDark ? <Moon className="size-4 text-muted-foreground" /> : <Sun className="size-4 text-muted-foreground" />}
     >
@@ -218,7 +219,7 @@ function AppearanceSettings() {
           {isDark ? <><Sun className="size-3.5" /> Switch to light mode</> : <><Moon className="size-3.5" /> Switch to dark mode</>}
         </Button>
       </div>
-    </SectionCard>
+    </PanelCard>
   )
 }
 
@@ -249,9 +250,9 @@ function NotificationSettings() {
   const blocked = permission === 'denied'
 
   return (
-    <SectionCard
+    <PanelCard
       className="h-full"
-      eyebrow="Alerts"
+      subtitle="Alerts"
       title="Notifications"
       action={enabled && !blocked ? <Bell className="size-4 text-muted-foreground" /> : <BellOff className="size-4 text-muted-foreground" />}
     >
@@ -278,7 +279,7 @@ function NotificationSettings() {
           </Button>
         </div>
       )}
-    </SectionCard>
+    </PanelCard>
   )
 }
 
@@ -315,7 +316,7 @@ function BackupSettings({
   }
 
   return (
-    <SectionCard className="h-full" eyebrow="Backup &amp; export" title="Data export / import">
+    <PanelCard className="h-full" subtitle="Backup &amp; export" title="Data export / import">
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
           Download a full JSON backup to transfer between devices, or import a backup file.
@@ -337,7 +338,7 @@ function BackupSettings({
       </div>
       {/* Hidden print-only report — rendered in DOM, visible only when printing */}
       <PrintReport compounds={compounds} injections={injections} vitals={vitals} exams={exams} protocols={protocols} />
-    </SectionCard>
+    </PanelCard>
   )
 }
 
@@ -549,8 +550,8 @@ function LabDataSettings() {
   }
 
   return (
-    <SectionCard
-      eyebrow="Labs"
+    <PanelCard
+      subtitle="Labs"
       title="Lab data"
       action={<FlaskConical className="size-4 text-muted-foreground" />}
     >
@@ -596,7 +597,7 @@ function LabDataSettings() {
       >
         <Trash2 className="size-3.5" /> {done ? 'Cleared ✓' : busy ? 'Clearing…' : 'Clear all lab data'}
       </Button>
-    </SectionCard>
+    </PanelCard>
   )
 }
 
@@ -624,8 +625,8 @@ function DangerSettings() {
   }
 
   return (
-    <SectionCard
-      eyebrow="Danger zone"
+    <PanelCard
+      subtitle="Danger zone"
       title="Reset device"
       action={<AlertTriangle className="size-4 text-destructive" />}
     >
@@ -672,6 +673,6 @@ function DangerSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SectionCard>
+    </PanelCard>
   )
 }
