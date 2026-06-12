@@ -1,14 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Edit2, HeartPulse, Trash2, X } from 'lucide-react'
-import { useTheme } from '../lib/useTheme'
+import { Edit2, HeartPulse, Trash2 } from 'lucide-react'
 import {
   Area,
   AreaChart,
   CartesianGrid,
   Line,
   ReferenceArea,
-  ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
@@ -17,13 +14,16 @@ import { db, type VitalLog } from '../lib/db'
 import { TimeRangePicker } from '../components/TimeRangePicker'
 import { filterByRange, type TimeRange } from '../lib/timeRange'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
-import { EmptyState } from '../components/EmptyState'
+import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 
 // ── BP classification — ranges calibrated for steroid/TRT users ─────────────
-// Standard clinical cutoffs are designed for untrained, non-medicated adults.
-// Athletes on anabolic compounds typically run higher baseline BP due to
-// increased cardiac output, haematocrit, and fluid retention.
-// These ranges reflect community consensus from sports medicine and PED forums.
 type BpStatus = 'optimal' | 'good' | 'monitor' | 'high' | 'danger'
 
 function classifyBp(systolic: number, diastolic: number): BpStatus {
@@ -34,19 +34,32 @@ function classifyBp(systolic: number, diastolic: number): BpStatus {
   return 'optimal'
 }
 
-const BP_META: Record<BpStatus, { color: string; soft: string; label: string }> = {
-  optimal: { color: 'var(--good)', soft: 'var(--good-soft)', label: 'Optimal' },
-  good:    { color: 'var(--good)', soft: 'var(--good-soft)', label: 'Good' },
-  monitor: { color: 'var(--warn)', soft: 'var(--warn-soft)', label: 'Monitor' },
-  high:    { color: 'var(--bad)',  soft: 'var(--bad-soft)',  label: 'High' },
-  danger:  { color: 'var(--bad)',  soft: 'var(--bad-soft)',  label: 'Action' },
+const BP_META: Record<BpStatus, { label: string; variant: 'good' | 'warn' | 'bad' }> = {
+  optimal: { label: 'Optimal', variant: 'good' },
+  good:    { label: 'Good',    variant: 'good' },
+  monitor: { label: 'Monitor', variant: 'warn' },
+  high:    { label: 'High',    variant: 'bad' },
+  danger:  { label: 'Action',  variant: 'bad' },
 }
 
+const TONE_CLASS: Record<'good' | 'warn' | 'bad', string> = {
+  good: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
+  warn: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  bad:  'bg-destructive/12 text-destructive',
+}
+
+const chartConfig = {
+  systolic:  { label: 'Systolic',  color: 'var(--foreground)' },
+  diastolic: { label: 'Diastolic', color: 'var(--muted-foreground)' },
+  pulse:     { label: 'Pulse',     color: 'var(--chart-2)' },
+} satisfies ChartConfig
+
+const emptyForm = () => ({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
+
 export function Vitals({ vitals }: { vitals: VitalLog[] }) {
-  const { chart: colors } = useTheme()
   const deleteWithUndo = useUndoableDelete()
   const [range, setRange] = useState<TimeRange>('3M')
-  const [form, setForm] = useState({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
+  const [form, setForm] = useState(emptyForm)
   const [editingVital, setEditingVital] = useState<VitalLog | null>(null)
 
   const filtered = useMemo(
@@ -58,27 +71,14 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
     systolic: v.systolic,
     diastolic: v.diastolic,
     pulse: v.pulse,
-    statusColor: BP_META[classifyBp(v.systolic, v.diastolic)].color,
   }))
-
-  // Custom dot — coloured by that reading's BP status
-  type DotProps = { cx?: number; cy?: number; payload?: { statusColor?: string } }
-  const StatusDot = ({ cx, cy, payload }: DotProps) => {
-    if (cx == null || cy == null) return <></>
-    return <circle cx={cx} cy={cy} r={3.5} fill={payload?.statusColor ?? '#1a1611'} stroke="var(--surface)" strokeWidth={1.5} />
-  }
 
   const stats = useMemo(() => {
     if (filtered.length === 0) return undefined
     const sys = filtered.map((v) => v.systolic)
     const dia = filtered.map((v) => v.diastolic)
     const avg = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length
-    return {
-      meanSys: avg(sys),
-      meanDia: avg(dia),
-      pctElevated: (sys.filter((s) => s >= 130).length / sys.length) * 100,
-      n: filtered.length,
-    }
+    return { meanSys: avg(sys), meanDia: avg(dia), n: filtered.length }
   }, [filtered])
 
   function startEditVital(v: VitalLog) {
@@ -92,12 +92,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
     })
   }
 
-  function cancelEdit() {
-    setEditingVital(null)
-    setForm({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
-  }
-
-  async function add() {
+  async function save() {
     if (!form.systolic || !form.diastolic) return
     const data = {
       measuredAt: new Date(form.measuredAt).toISOString(),
@@ -108,161 +103,178 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
     }
     if (editingVital?.id !== undefined) {
       await db.vitals.update(editingVital.id, data)
-      setEditingVital(null)
-    } else {
-      await db.vitals.add(data)
     }
-    setForm({ systolic: '', diastolic: '', pulse: '', measuredAt: new Date().toISOString().slice(0, 16), notes: '' })
+    setEditingVital(null)
+    setForm(emptyForm())
   }
 
+  const meanStatus = stats ? classifyBp(Math.round(stats.meanSys), Math.round(stats.meanDia)) : undefined
+  const insight = stats && meanStatus ? bpInsight(meanStatus, stats.meanSys, stats.meanDia) : undefined
 
   return (
-    <div className="content-grid">
-
-      {/* ── Edit BP bottom sheet ── */}
-      {editingVital && (
-        <div
-          className="sheet-overlay"
-          onClick={(e) => { if (e.target === e.currentTarget) cancelEdit() }}
-        >
-          <div className="sheet" style={{ maxWidth: 480 }}>
-            <div className="sheet-handle" />
-            <div className="sheet-header">
-              <h3>Edit reading</h3>
-              <button type="button" className="icon-button" onClick={cancelEdit}><X size={16} /></button>
-            </div>
-            <div className="form-grid sheet-body">
-              <label>Systolic<input inputMode="numeric" value={form.systolic} onChange={(e) => setForm({ ...form, systolic: e.target.value })} /></label>
-              <label>Diastolic<input inputMode="numeric" value={form.diastolic} onChange={(e) => setForm({ ...form, diastolic: e.target.value })} /></label>
-              <label>Pulse<input inputMode="numeric" value={form.pulse} onChange={(e) => setForm({ ...form, pulse: e.target.value })} /></label>
-              <label>Measured at<input type="datetime-local" value={form.measuredAt} onChange={(e) => setForm({ ...form, measuredAt: e.target.value })} /></label>
-              <label className="wide-field">Notes<input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
-              <button type="button" className="primary-button wide-field" style={{ height: 50, fontSize: 16 }} onClick={add} disabled={!form.systolic || !form.diastolic}>
-                <Edit2 size={16} /> Save changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── BP trend — full width ── */}
-      <section className="surface col-12">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Blood pressure</span>
-            <h3>Trend
-              {stats && <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-dim)', marginLeft: 8 }}>
-                mean {stats.meanSys.toFixed(0)}/{stats.meanDia.toFixed(0)}
-
-              </span>}
-            </h3>
-          </div>
-          <TimeRangePicker value={range} onChange={setRange} />
-        </div>
+    <PageGrid>
+      {/* ── BP trend ── */}
+      <SectionCard
+        className="md:col-span-12"
+        eyebrow="Blood pressure"
+        title={stats ? `Trend · mean ${stats.meanSys.toFixed(0)}/${stats.meanDia.toFixed(0)}` : 'Trend'}
+        action={<TimeRangePicker value={range} onChange={setRange} />}
+      >
         {chart.length > 0 ? (
-          <ResponsiveContainer width="100%" height={180}>
+          <ChartContainer config={chartConfig} className="h-[220px] w-full">
             <AreaChart data={chart} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
               <defs>
-                <linearGradient id="sysFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#1a1611" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#1a1611" stopOpacity={0} />
+                <linearGradient id="fillSys" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--color-systolic)" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="var(--color-systolic)" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke={colors.grid} vertical={false} />
-              {/* BP bands — thresholds for steroid users (not general population) */}
-              <ReferenceArea y1={160} y2={200} fill="rgba(255,59,48,0.10)" />
-              <ReferenceArea y1={145} y2={160} fill="rgba(255,59,48,0.06)" />
-              <ReferenceArea y1={135} y2={145} fill="rgba(255,149,0,0.07)" />
-              <ReferenceArea y1={60}  y2={135} fill="rgba(52,199,89,0.04)" />
-              <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
-              <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
-              <Tooltip contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }} />
-              <Area type="monotone" dataKey="systolic" stroke="#1a1611" strokeWidth={2.5} fill="url(#sysFill)" dot={<StatusDot />} activeDot={{ r: 5 }} />
-              <Line type="monotone" dataKey="diastolic" stroke="#98a2af" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="pulse" stroke="#c084fc" strokeWidth={1.5} dot={false} />
+              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+              <ReferenceArea y1={160} y2={200} fill="var(--destructive)" fillOpacity={0.07} />
+              <ReferenceArea y1={145} y2={160} fill="var(--destructive)" fillOpacity={0.04} />
+              <ReferenceArea y1={135} y2={145} fill="#c5821e" fillOpacity={0.05} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} minTickGap={24} />
+              <YAxis domain={[60, 180]} tickLine={false} axisLine={false} tickMargin={4} tick={{ fontSize: 11 }} width={32} />
+              <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+              <Area type="monotone" dataKey="systolic" stroke="var(--color-systolic)" strokeWidth={2} fill="url(#fillSys)" dot={false} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="diastolic" stroke="var(--color-diastolic)" strokeWidth={1.5} dot={false} />
+              <Line type="monotone" dataKey="pulse" stroke="var(--color-pulse)" strokeWidth={1.5} dot={false} />
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         ) : (
-          <EmptyState icon={HeartPulse} title="No readings in this range" detail="Use the + button above to log." />
+          <EmptyHint icon={HeartPulse} title="No readings in this range" detail="Use Log reading above to add one." />
         )}
 
-        {/* TRT-aware BP insight — testosterone is a common cause of raised BP */}
-        {stats && (() => {
-          const meanStatus = classifyBp(Math.round(stats.meanSys), Math.round(stats.meanDia))
-          if (meanStatus === 'optimal' || meanStatus === 'good') {
-            return (
-              <p className="panel-note" style={{ marginTop: 8, color: 'var(--good)' }}>
-                ✓ BP is well controlled ({stats.meanSys.toFixed(0)}/{stats.meanDia.toFixed(0)} avg). Keep logging — anabolics can push it up over time.
-              </p>
-            )
-          }
-          const m = BP_META[meanStatus]
-          return (
-            <div style={{ marginTop: 10, padding: '10px 12px', background: m.soft, borderRadius: 10, borderLeft: `3px solid ${m.color}` }}>
-              <strong style={{ fontSize: 13, color: m.color }}>
-                {meanStatus === 'danger' ? '⚠ Action needed' : meanStatus === 'high' ? 'BP is high' : 'BP needs monitoring'}
-                {' '}— avg {stats.meanSys.toFixed(0)}/{stats.meanDia.toFixed(0)}
-              </strong>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--ink-dim)', lineHeight: 1.5 }}>
-                {meanStatus === 'danger'
-                  ? 'This is too high on-cycle. Consider a blast break, reduce dose/compound count, add cardio, and see a doctor. Check haematocrit ASAP.'
-                  : meanStatus === 'high'
-                  ? 'Common on high-dose blasts or compounds like Tren, Anadrol, or Deca. Reduce sodium, increase cardio, consider an AI or dose cut. Check haematocrit next bloods.'
-                  : 'Expected on anabolic protocols. Stay hydrated, manage sodium, log readings consistently. If climbing, review your compound selection or dose.'}
-              </p>
-            </div>
-          )
-        })()}
-      </section>
-
-      {/* ── Row 2: Recent readings (full width) ── */}
-      <section className="surface col-12">
-        <div className="panel-header">
-          <div><span className="section-label">History</span><h3>Recent readings</h3></div>
-        </div>
-        {filtered.length > 0 ? (
-          <div className="stack">
-            {filtered.slice().reverse().slice(0, 20).map((v) => {
-              const status = classifyBp(v.systolic, v.diastolic)
-              const meta = BP_META[status]
-              return (
-              <div className="row" key={v.id} style={{ gridTemplateColumns: 'auto minmax(0,1fr) auto auto auto', alignItems: 'center' }}>
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: meta.color, flexShrink: 0 }} />
-                <div style={{ minWidth: 0 }}>
-                  <strong style={{ color: meta.color }}>
-                    {v.systolic}/{v.diastolic}
-                    <span className="chip hide-mobile" style={{ background: meta.soft, color: meta.color, fontSize: 10, marginLeft: 8, verticalAlign: 'middle' }}>{meta.label}</span>
-                  </strong>
-                  <span className="sub">{meta.label} · {v.pulse ? `${v.pulse} bpm` : 'no pulse'}{v.notes ? ` · ${v.notes}` : ''}</span>
-                </div>
-                <time style={{ whiteSpace: 'nowrap' }}>{format(parseISO(v.measuredAt), 'MMM d HH:mm')}</time>
-                <button type="button" className="icon-button" style={{ width: 32, height: 32 }} onClick={() => startEditVital(v)} aria-label="Edit">
-                  <Edit2 size={13} />
-                </button>
-                <button
-                  type="button"
-                  className="icon-button danger"
-                  style={{ width: 32, height: 32 }}
-                  onClick={() => {
-                    const snapshot = { ...v }
-                    void deleteWithUndo({
-                      label: 'Reading deleted',
-                      remove: () => db.vitals.delete(v.id!),
-                      restore: () => db.vitals.put(snapshot),
-                    })
-                  }}
-                  aria-label="Delete"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            )})}
+        {insight && (
+          <div className={`mt-4 rounded-lg border-l-2 px-3.5 py-2.5 ${insight.cls}`}>
+            <p className="text-sm font-medium">{insight.title} — avg {stats!.meanSys.toFixed(0)}/{stats!.meanDia.toFixed(0)}</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{insight.body}</p>
           </div>
-        ) : (
-          <EmptyState icon={HeartPulse} title="No readings yet" detail="Tap the + button above to log your first reading." />
         )}
-      </section>
+      </SectionCard>
 
-    </div>
+      {/* ── Recent readings ── */}
+      <SectionCard className="md:col-span-12" eyebrow="History" title="Recent readings">
+        {filtered.length > 0 ? (
+          <Table>
+            <TableBody>
+              {filtered.slice().reverse().slice(0, 20).map((v) => {
+                const meta = BP_META[classifyBp(v.systolic, v.diastolic)]
+                return (
+                  <TableRow key={v.id}>
+                    <TableCell className="w-px py-3">
+                      <span className={`inline-block size-2 rounded-full ${meta.variant === 'good' ? 'bg-emerald-500' : meta.variant === 'warn' ? 'bg-amber-500' : 'bg-destructive'}`} />
+                    </TableCell>
+                    <TableCell className="py-3 font-mono tabular-nums font-medium">
+                      {v.systolic}/{v.diastolic}
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Badge variant="secondary" className={TONE_CLASS[meta.variant]}>{meta.label}</Badge>
+                    </TableCell>
+                    <TableCell className="py-3 text-sm text-muted-foreground">
+                      {v.pulse ? `${v.pulse} bpm` : '—'}{v.notes ? ` · ${v.notes}` : ''}
+                    </TableCell>
+                    <TableCell className="py-3 text-right text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+                      {format(parseISO(v.measuredAt), 'MMM d, HH:mm')}
+                    </TableCell>
+                    <TableCell className="w-px py-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="size-8" onClick={() => startEditVital(v)} aria-label="Edit">
+                          <Edit2 className="size-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 text-muted-foreground hover:text-destructive"
+                          aria-label="Delete"
+                          onClick={() => {
+                            const snapshot = { ...v }
+                            void deleteWithUndo({
+                              label: 'Reading deleted',
+                              remove: () => db.vitals.delete(v.id!),
+                              restore: () => db.vitals.put(snapshot),
+                            })
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        ) : (
+          <EmptyHint icon={HeartPulse} title="No readings yet" detail="Tap Log reading above to add your first." />
+        )}
+      </SectionCard>
+
+      {/* ── Edit reading dialog ── */}
+      <Dialog open={!!editingVital} onOpenChange={(o) => { if (!o) { setEditingVital(null); setForm(emptyForm()) } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit reading</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="sys">Systolic</Label>
+              <Input id="sys" inputMode="numeric" value={form.systolic} onChange={(e) => setForm({ ...form, systolic: e.target.value })} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="dia">Diastolic</Label>
+              <Input id="dia" inputMode="numeric" value={form.diastolic} onChange={(e) => setForm({ ...form, diastolic: e.target.value })} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pulse">Pulse</Label>
+              <Input id="pulse" inputMode="numeric" value={form.pulse} onChange={(e) => setForm({ ...form, pulse: e.target.value })} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="when">Measured at</Label>
+              <Input id="when" type="datetime-local" value={form.measuredAt} onChange={(e) => setForm({ ...form, measuredAt: e.target.value })} />
+            </div>
+            <div className="col-span-2 flex flex-col gap-1.5">
+              <Label htmlFor="notes">Notes</Label>
+              <Input id="notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={save} disabled={!form.systolic || !form.diastolic}>
+              <Edit2 className="size-4" /> Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </PageGrid>
   )
+}
+
+function bpInsight(status: BpStatus, _sys: number, _dia: number): { title: string; body: string; cls: string } {
+  void _sys; void _dia
+  if (status === 'optimal' || status === 'good') {
+    return {
+      title: '✓ BP well controlled',
+      body: 'Keep logging — anabolics can push it up over time.',
+      cls: 'border-emerald-500 bg-emerald-500/8',
+    }
+  }
+  if (status === 'danger') {
+    return {
+      title: '⚠ Action needed',
+      body: 'This is too high on-cycle. Consider a blast break, reduce dose/compound count, add cardio, and see a doctor. Check haematocrit ASAP.',
+      cls: 'border-destructive bg-destructive/8',
+    }
+  }
+  if (status === 'high') {
+    return {
+      title: 'BP is high',
+      body: 'Common on high-dose blasts or compounds like Tren, Anadrol, or Deca. Reduce sodium, increase cardio, consider an AI or dose cut. Check haematocrit next bloods.',
+      cls: 'border-destructive bg-destructive/8',
+    }
+  }
+  return {
+    title: 'BP needs monitoring',
+    body: 'Expected on anabolic protocols. Stay hydrated, manage sodium, log consistently. If climbing, review compound selection or dose.',
+    cls: 'border-amber-500 bg-amber-500/8',
+  }
 }
