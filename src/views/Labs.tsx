@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useTheme } from '../lib/useTheme'
 import {
   ChevronDown, ChevronRight, ChevronUp,
   Edit2, FileText, FlaskConical, Plus, Trash2, X,
 } from 'lucide-react'
-import {
-  CartesianGrid, Line, LineChart, ResponsiveContainer,
-  Tooltip, XAxis, YAxis, ReferenceLine,
-} from 'recharts'
+import { CartesianGrid, Line, LineChart, XAxis, YAxis, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
@@ -15,8 +11,16 @@ import { extractMarkersFromText } from '../lib/pdf'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
-import { EmptyState } from '../components/EmptyState'
 import { LabComposites } from '../components/LabComposites'
+import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { cn } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,21 +50,15 @@ type MarkerSummary = {
 
 function rangeStatus(v: number | undefined, low?: number, high?: number): 'good' | 'warn' | 'none' {
   if (v === undefined) return 'none'
-  // Without ANY reference range we can't say whether the value is in
-  // or out of range — return 'none' instead of falsely reporting 'good'.
-  // The previous behaviour made every PDF-imported marker (which had no
-  // range captured) show up as "OK" with a green pill on the Labs view.
+  // Without ANY reference range we can't claim in/out of range.
   if (low === undefined && high === undefined) return 'none'
   if (low !== undefined && v < low) return 'warn'
   if (high !== undefined && v > high) return 'warn'
   return 'good'
 }
 
-// Returns a 0–1 position for the value within [low, high], clamped.
-// For single-bounded markers (only `high` like "< 5", or only `low` like
-// "> 1") we synthesise the missing bound so a meaningful dot still
-// renders. "< X" → treat 0..X as the band; "> X" → treat X..(X*2) so
-// values just above the threshold sit near the left edge of the band.
+// 0–1 position within [low, high]; synthesises a band for single-bounded
+// ranges ("< 5" → 0..5, "> 1" → 1..2) so the dot still renders sensibly.
 function rangePos(v: number, low?: number, high?: number): number | null {
   if (low === undefined && high === undefined) return null
   let lo = low
@@ -76,95 +74,7 @@ function rangePos(v: number, low?: number, high?: number): number | null {
   return Math.max(0, Math.min(1, (v - lo) / range))
 }
 
-// ── Compact marker card (legacy — superseded by MarkerRow but kept around
-//    in case we want to surface a single marker as a card on Overview
-//    later). ─────────────────────────────────────────────────────────────
-// @ts-expect-error -- intentionally unused; preserved for future reuse
-function MarkerCard({
-  summary,
-  selected,
-  onClick,
-}: {
-  summary: MarkerSummary
-  selected: boolean
-  onClick: () => void
-}) {
-  const latest  = summary.entries[0]
-  const prev    = summary.entries[1]
-  const val     = latest?.value
-  // Use the LATEST entry's own confirmed range for the badge.
-  // This means: if latest test has no lab range → no HIGH/LOW badge.
-  // Never use summary-level catalog ranges for badges (avoids unit-mismatch false alarms).
-  const latestLow  = latest?.low
-  const latestHigh = latest?.high
-  const status  = rangeStatus(val, latestLow, latestHigh)
-  const pos     = val !== undefined ? rangePos(val, latestLow, latestHigh) : null
-  const delta   = val !== undefined && prev?.value !== undefined ? val - prev.value : undefined
-
-  return (
-    <button
-      type="button"
-      className={`marker-card${selected ? ' selected' : ''}${status === 'warn' ? ' out' : ''}`}
-      onClick={onClick}
-      aria-pressed={selected}
-    >
-      {/* Top row: name + status badge — name truncates, badge never clips */}
-      <div className="mc-top">
-        <span className="mc-name">{summary.label}</span>
-        {val !== undefined && status !== 'none' && (
-          <span className={`mc-badge ${status}`}>
-            {status === 'good' ? 'OK' : latestHigh !== undefined && val !== undefined && val > latestHigh ? 'HIGH' : 'LOW'}
-          </span>
-        )}
-      </div>
-
-      {/* Main value + delta */}
-      <div className="mc-value-row">
-        <span className="mc-value">
-          {val !== undefined ? (latest.rawValue || String(val)) : '—'}
-        </span>
-        {summary.unit && val !== undefined && (
-          <span className="mc-unit">{summary.unit}</span>
-        )}
-        {delta !== undefined && Math.abs(delta) > 0.05 && (
-          <span className={`mc-delta ${delta > 0 ? 'up' : 'down'}`}>
-            {delta > 0 ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-            {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
-          </span>
-        )}
-      </div>
-
-      {/* Range bar */}
-      {pos !== null && (
-        <div className="mc-range-bar">
-          <div className="mc-range-fill" style={{ width: `${pos * 100}%` }} />
-          <div className={`mc-range-dot ${status}`} style={{ left: `${pos * 100}%` }} />
-        </div>
-      )}
-      {latestLow !== undefined && latestHigh !== undefined && (
-        <div className="mc-range-labels">
-          <span>{latestLow}</span>
-          <span>{latestHigh}</span>
-        </div>
-      )}
-
-      {/* Exam date */}
-      {latest && (
-        <div className="mc-date">
-          {format(parseISO(latest.date), 'MMM d, yyyy')}
-          {summary.entries.length > 1 && (
-            <span className="mc-count">· {summary.entries.length} tests</span>
-          )}
-        </div>
-      )}
-    </button>
-  )
-}
-
-// ── List-style marker row (new view). Replaces the dense card grid with a
-//    breathable horizontal row: name + value + range bar + status chip +
-//    date + chevron. Reads top-to-bottom like a portfolio statement, much
-//    easier to scan when you have 30+ markers. ───────────────────────────
+// ── Marker row — portfolio-statement style line item ─────────────────────
 function MarkerRow({
   summary,
   selected,
@@ -177,100 +87,88 @@ function MarkerRow({
   const latest = summary.entries[0]
   const prev   = summary.entries[1]
   const val    = latest?.value
-  const latestLow  = latest?.low
-  const latestHigh = latest?.high
-  const status = rangeStatus(val, latestLow, latestHigh)
-  const pos    = val !== undefined ? rangePos(val, latestLow, latestHigh) : null
+  const status = rangeStatus(val, latest?.low, latest?.high)
+  const pos    = val !== undefined ? rangePos(val, latest?.low, latest?.high) : null
   const delta  = val !== undefined && prev?.value !== undefined ? val - prev.value : undefined
 
   const badgeLabel =
     status === 'good' ? 'OK'
-    : status === 'warn' && latestHigh !== undefined && val !== undefined && val > latestHigh ? 'HIGH'
+    : status === 'warn' && latest?.high !== undefined && val !== undefined && val > latest.high ? 'HIGH'
     : status === 'warn' ? 'LOW'
     : null
 
   return (
     <button
       type="button"
-      className={`marker-row${selected ? ' selected' : ''}${status === 'warn' ? ' out' : ''}`}
       onClick={onClick}
       aria-pressed={selected}
       aria-label={`${summary.label}: ${latest?.rawValue ?? '—'}${summary.unit ? ' ' + summary.unit : ''}`}
+      className={cn(
+        'grid w-full grid-cols-[minmax(0,1.4fr)_minmax(110px,auto)_minmax(110px,1fr)_52px_64px_16px] items-center gap-3.5 border-b py-3 text-left transition-colors last:border-b-0 hover:bg-accent/50',
+        'max-md:grid-cols-[minmax(0,1fr)_auto] max-md:gap-x-3 max-md:gap-y-1.5',
+        selected && 'bg-accent/50',
+      )}
     >
-      <span className="marker-row-name">{summary.label}</span>
+      <span className="truncate text-sm font-medium">{summary.label}</span>
 
-      <span className="marker-row-value">
-        <span className="marker-row-num">{val !== undefined ? (latest.rawValue || String(val)) : '—'}</span>
-        {summary.unit && val !== undefined && <span className="marker-row-unit">{summary.unit}</span>}
+      <span className="flex items-baseline gap-1.5 tabular-nums">
+        <span className="font-mono text-[15px] font-medium">{val !== undefined ? (latest.rawValue || String(val)) : '—'}</span>
+        {summary.unit && val !== undefined && <span className="text-[11px] text-muted-foreground">{summary.unit}</span>}
         {delta !== undefined && Math.abs(delta) > 0.05 && (
-          <span className={`marker-row-delta ${delta > 0 ? 'up' : 'down'}`}>
-            {delta > 0 ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          <span className="ml-1 inline-flex items-center text-[11px] font-semibold text-muted-foreground">
+            {delta > 0 ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
             {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
           </span>
         )}
       </span>
 
-      <span className="marker-row-range" aria-hidden="true">
+      <span aria-hidden="true" className="max-md:col-span-2 max-md:order-3">
         {pos !== null ? (
-          <span className="marker-row-range-bar">
-            <span className="marker-row-range-fill" style={{ width: `${pos * 100}%` }} />
-            <span className={`marker-row-range-dot ${status}`} style={{ left: `${pos * 100}%` }} />
+          <span className="relative block h-1.5 rounded-full bg-secondary">
+            <span className="absolute inset-y-0 left-0 rounded-full bg-primary/55" style={{ width: `${pos * 100}%` }} />
+            <span
+              className={cn(
+                'absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card shadow-sm',
+                status === 'warn' ? 'bg-destructive' : 'bg-foreground',
+              )}
+              style={{ left: `${pos * 100}%` }}
+            />
           </span>
         ) : (
-          <span className="marker-row-range-empty" />
+          <span className="block h-1.5 rounded-full bg-secondary/60" />
         )}
       </span>
 
-      <span className="marker-row-badge-cell">
-        {badgeLabel && <span className={`marker-row-badge ${status}`}>{badgeLabel}</span>}
+      <span className="flex justify-center max-md:order-4 max-md:justify-start">
+        {badgeLabel && (
+          <Badge
+            variant="secondary"
+            className={cn(
+              'px-2 text-[10px] font-bold tracking-wide',
+              status === 'good' ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400' : 'bg-destructive/12 text-destructive',
+            )}
+          >
+            {badgeLabel}
+          </Badge>
+        )}
       </span>
 
-      <span className="marker-row-date">
+      <span className="text-right text-[11px] tabular-nums text-muted-foreground max-md:order-5 max-md:text-left">
         {latest ? format(parseISO(latest.date), 'MMM d, yy') : '—'}
       </span>
 
-      <span className="marker-row-chev" aria-hidden="true">
-        {selected ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      <span aria-hidden="true" className="text-muted-foreground max-md:hidden">
+        {selected ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
       </span>
     </button>
   )
 }
 
-// ── At-a-glance stats row across the top of the Labs view ────────────────
-function LabsStatusRow({
-  total,
-  inRange,
-  outOfRange,
-  lastTestDate,
-}: {
-  total: number
-  inRange: number
-  outOfRange: number
-  lastTestDate?: string
-}) {
-  return (
-    <section className="labs-stats" aria-label="Lab status summary">
-      <div className="labs-stat">
-        <span className="labs-stat-label">Markers tracked</span>
-        <span className="labs-stat-value">{total}</span>
-      </div>
-      <div className="labs-stat good">
-        <span className="labs-stat-label">In range</span>
-        <span className="labs-stat-value">{inRange}</span>
-      </div>
-      <div className={outOfRange > 0 ? 'labs-stat bad' : 'labs-stat'}>
-        <span className="labs-stat-label">Out of range</span>
-        <span className="labs-stat-value">{outOfRange}</span>
-      </div>
-      <div className="labs-stat">
-        <span className="labs-stat-label">Last test</span>
-        <span className="labs-stat-value">{lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : '—'}</span>
-      </div>
-    </section>
-  )
-}
+// ── History pane (shown below a panel when a marker is selected) ──────────
 
-// ── History pane (shown below a panel when a marker is selected) ───────────────
+const historyChartConfig = {
+  value: { label: 'Value', color: 'var(--chart-1)' },
+} satisfies ChartConfig
 
 function MarkerHistoryPane({
   summary,
@@ -278,23 +176,18 @@ function MarkerHistoryPane({
   onDelete,
   onEditTarget,
   hasPersonalTarget,
-  colors,
 }: {
   summary: MarkerSummary
   onClose: () => void
   onDelete: (resultId: number) => void
   onEditTarget: () => void
   hasPersonalTarget: boolean
-  colors: ReturnType<typeof useTheme>['chart']
 }) {
   const meta = metaForKey(summary.key)
   const chartData = [...summary.entries]
     .filter(e => e.value !== undefined)
-    .reverse()  // oldest → newest for chart
-    .map(e => ({
-      date: format(parseISO(e.date), 'MMM d yy'),
-      value: e.value,
-    }))
+    .reverse()
+    .map(e => ({ date: format(parseISO(e.date), 'MMM d yy'), value: e.value }))
 
   const min = Math.min(...chartData.map(d => d.value!))
   const max = Math.max(...chartData.map(d => d.value!))
@@ -303,71 +196,50 @@ function MarkerHistoryPane({
   const yMax = Math.ceil(max + pad)
 
   return (
-    <div className="marker-history-pane">
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10, gap: 12 }}>
-        <div>
-          <span className="section-label" style={{ display: 'block' }}>
-            {summary.panel} · all tests
-          </span>
-          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{summary.panel} · all tests</p>
+          <h3 className="flex items-baseline gap-2 font-display text-lg font-semibold">
             {summary.label}
-            {summary.unit && <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ink-dim)' }}>{summary.unit}</span>}
+            {summary.unit && <span className="text-sm font-normal text-muted-foreground">{summary.unit}</span>}
           </h3>
         </div>
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
-          <button
-            type="button"
-            className="ghost-button"
-            style={{ fontSize: 12, height: 30 }}
-            onClick={onEditTarget}
-          >
-            <Edit2 size={11} /> {hasPersonalTarget ? 'Edit range' : 'Set range'}
-          </button>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close">
-            <X size={14} />
-          </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button variant="outline" size="sm" onClick={onEditTarget}>
+            <Edit2 className="size-3" /> {hasPersonalTarget ? 'Edit range' : 'Set range'}
+          </Button>
+          <Button variant="ghost" size="icon" className="size-8" onClick={onClose} aria-label="Close">
+            <X className="size-4" />
+          </Button>
         </div>
       </div>
 
-      {/* Optimal range note */}
       {meta?.optimal?.note && (
-        <p className="panel-note" style={{ marginBottom: 8 }}>{meta.optimal.note}</p>
+        <p className="mb-3 text-xs text-muted-foreground">{meta.optimal.note}</p>
       )}
 
-      {/* Line chart */}
       {chartData.length > 1 ? (
-        <ResponsiveContainer width="100%" height={160}>
+        <ChartContainer config={historyChartConfig} className="h-[170px] w-full">
           <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
-            <CartesianGrid stroke={colors.grid} vertical={false} />
-            <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
-            <YAxis domain={[yMin, yMax]} tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 10 }} />
-            <Tooltip
-              contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }}
-              formatter={(v) => [`${v} ${summary.unit ?? ''}`.trim(), summary.label]}
-            />
+            <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />
+            <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 10 }} minTickGap={24} />
+            <YAxis domain={[yMin, yMax]} tickLine={false} axisLine={false} width={36} tick={{ fontSize: 10 }} />
+            <ChartTooltip content={<ChartTooltipContent />} />
             {summary.low !== undefined && (
-              <ReferenceLine y={summary.low} stroke="var(--warn)" strokeDasharray="3 3" strokeWidth={1} />
+              <ReferenceLine y={summary.low} stroke="#c5821e" strokeDasharray="3 3" strokeWidth={1} />
             )}
             {summary.high !== undefined && (
-              <ReferenceLine y={summary.high} stroke="var(--warn)" strokeDasharray="3 3" strokeWidth={1} />
+              <ReferenceLine y={summary.high} stroke="#c5821e" strokeDasharray="3 3" strokeWidth={1} />
             )}
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke="var(--accent)"
-              strokeWidth={2.5}
-              dot={{ r: 4, fill: 'var(--accent)', strokeWidth: 0 }}
-              activeDot={{ r: 5 }}
-            />
+            <Line type="monotone" dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={{ r: 3.5 }} activeDot={{ r: 5 }} />
           </LineChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       ) : (
-        <p className="panel-note">Need at least 2 tests to show a trend.</p>
+        <p className="text-xs text-muted-foreground">Need at least 2 tests to show a trend.</p>
       )}
 
-      {/* All tests list */}
-      <div className="history-list" style={{ marginTop: 12 }}>
+      <div className="mt-3 flex flex-col">
         {summary.entries.map((entry, i) => {
           const status = rangeStatus(entry.value, summary.low, summary.high)
           const nextEntry = summary.entries[i + 1]
@@ -377,42 +249,46 @@ function MarkerHistoryPane({
           return (
             <div
               key={entry.resultId ?? i}
-              className={`history-row${status === 'warn' ? ' out' : ''}`}
+              className={cn('group flex items-center gap-3 border-t py-2.5 first:border-t-0', status === 'warn' && 'rounded-sm bg-destructive/4 px-1.5')}
             >
-              <div className="history-row-date">
-                <span>{format(parseISO(entry.date), 'MMM d, yyyy')}</span>
-                <span className="history-exam-name">{entry.examName}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm">{format(parseISO(entry.date), 'MMM d, yyyy')}</p>
+                <p className="truncate text-[11px] text-muted-foreground">{entry.examName}</p>
               </div>
-              <div className="history-row-val">
-                <span className={`history-val-num ${status === 'warn' ? 'bad' : 'good'}`}>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className={cn('font-mono text-sm font-medium tabular-nums', status === 'warn' && 'text-destructive')}>
                   {entry.rawValue}
-                  {entry.unit && <span style={{ fontSize: 11, fontWeight: 400, marginLeft: 3, color: 'var(--ink-dim)' }}>{entry.unit}</span>}
+                  {entry.unit && <span className="ml-1 text-[11px] font-normal text-muted-foreground">{entry.unit}</span>}
                 </span>
                 {delta !== undefined && Math.abs(delta) > 0.05 && (
-                  <span className={`mc-delta ${delta > 0 ? 'up' : 'down'}`} style={{ fontSize: 11 }}>
+                  <span className="text-[11px] font-semibold text-muted-foreground">
                     {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
                   </span>
                 )}
                 {status !== 'none' && (
-                  <span className={`mc-badge ${status}`} style={{ fontSize: 10 }}>
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      'px-1.5 text-[10px] font-bold',
+                      status === 'good' ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400' : 'bg-destructive/12 text-destructive',
+                    )}
+                  >
                     {status === 'good' ? 'OK' : entry.value !== undefined && summary.high !== undefined && entry.value > summary.high ? 'HIGH' : 'LOW'}
-                  </span>
+                  </Badge>
+                )}
+                {entry.resultId !== undefined && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-6 text-muted-foreground opacity-40 hover:text-destructive group-hover:opacity-100"
+                    title="Delete this result"
+                    aria-label="Delete result"
+                    onClick={() => onDelete(entry.resultId!)}
+                  >
+                    <Trash2 className="size-3" />
+                  </Button>
                 )}
               </div>
-              {entry.resultId !== undefined && (
-                <button
-                  type="button"
-                  className="icon-button danger"
-                  style={{ width: 22, height: 22, opacity: 0.4 }}
-                  title="Delete this result"
-                  onClick={() => onDelete(entry.resultId!)}
-                  onMouseOver={e => (e.currentTarget.style.opacity = '1')}
-                  onMouseOut={e => (e.currentTarget.style.opacity = '0.4')}
-                  aria-label="Delete result"
-                >
-                  <Trash2 size={11} />
-                </button>
-              )}
             </div>
           )
         })}
@@ -444,7 +320,6 @@ export function Labs({
   onAddClose?: () => void
   onReviewFile?: (id: number) => void
 }) {
-  const { chart: colors } = useTheme()
   const deleteWithUndo = useUndoableDelete()
   const markerTargets = useLiveQuery(() => db.markerTargets.toArray(), [], [])
   const targetByKey   = useMemo(() => new Map((markerTargets ?? []).map(t => [t.marker, t])), [markerTargets])
@@ -457,7 +332,6 @@ export function Labs({
     const keyOrder: string[] = []
     const summaryMap = new Map<string, MarkerSummary>()
 
-    // Sort results by exam date newest → oldest
     const sorted = [...results].sort((a, b) => {
       const ea = examById.get(a.examId)
       const eb = examById.get(b.examId)
@@ -473,14 +347,12 @@ export function Labs({
       const personal = canon ? targetByKey.get(canon.key) : undefined
 
       // Confirmed range: lab-provided or user personal only — NEVER catalog.
-      // Using catalog ranges causes false HIGH/LOW when units differ between labs.
       const confirmedLow  = personal?.low  ?? r.low
       const confirmedHigh = personal?.high ?? r.high
 
-      // Sanitize rawValue: strip reference range text like "[80.0 - 98.0]; Outside..."
       const cleanRaw = r.rawValue
-        ?.replace(/\s*[\[\(][0-9].*$/, '')  // strip [range] notation
-        ?.replace(/\s*;.*$/, '')             // strip ; comments
+        ?.replace(/\s*[\[\(][0-9].*$/, '')
+        ?.replace(/\s*;.*$/, '')
         ?.trim()
 
       if (!summaryMap.has(key)) {
@@ -489,11 +361,7 @@ export function Labs({
           key,
           label:   canon?.label ?? r.marker,
           panel:   canon?.panel ?? 'Other',
-          // The lab's actual unit on the row wins. Catalog unit is a
-          // last-resort fallback for markers where the lab didn't print
-          // one — overriding the row's unit causes false "mg/dL" display
-          // on results that came from UK labs reporting mmol/L (and
-          // vice-versa for US labs reporting ng/dL vs nmol/L).
+          // Row's actual lab unit wins; catalog only fills gaps.
           unit:    r.unit ?? canon?.unit,
           low:     confirmedLow,
           high:    confirmedHigh,
@@ -517,17 +385,14 @@ export function Labs({
       })
     }
 
-    // Group by panel in PANEL_ORDER order
     const grouped = new Map<LabPanel, MarkerSummary[]>()
     for (const panel of PANEL_ORDER) grouped.set(panel, [])
-
     for (const key of keyOrder) {
       const s = summaryMap.get(key)!
       const list = grouped.get(s.panel) ?? []
       list.push(s)
       grouped.set(s.panel, list)
     }
-
     return grouped
   }, [exams, results, targetByKey])
 
@@ -545,7 +410,8 @@ export function Labs({
   function togglePanel(panel: LabPanel) {
     setCollapsedPanels(prev => {
       const next = new Set(prev)
-      next.has(panel) ? next.delete(panel) : next.add(panel)
+      if (next.has(panel)) next.delete(panel)
+      else next.add(panel)
       return next
     })
   }
@@ -560,7 +426,8 @@ export function Labs({
   async function saveTarget(key: string, unit?: string) {
     const data = { marker: key, low: targetLow ? Number(targetLow) : undefined, high: targetHigh ? Number(targetHigh) : undefined, unit }
     const existing = targetByKey.get(key)
-    existing?.id ? await db.markerTargets.update(existing.id, data) : await db.markerTargets.add(data)
+    if (existing?.id) await db.markerTargets.update(existing.id, data)
+    else await db.markerTargets.add(data)
     setEditingTargetKey(null); setTargetLow(''); setTargetHigh('')
   }
 
@@ -577,9 +444,6 @@ export function Labs({
     setValue('')
   }
 
-  // PDF review — the latest file flagged "Needs review" can be reopened from
-  // the banner. The actual review sheet is mounted up in App.tsx so it can
-  // share state with the upload pipeline; we just hand it the file id.
   const latestFile = files.find(f => f.status === 'Needs review' && f.extractedText)
   const extractedCount = latestFile?.extractedText ? extractMarkersFromText(latestFile.extractedText).length : 0
 
@@ -587,8 +451,6 @@ export function Labs({
     ? [...markersByPanel.values()].flat().find(s => s.key === selectedKey)
     : null
 
-  // Status summary at a glance: counts of in/out of range markers + the
-  // most recent test date. Built once per render — cheap enough.
   const allSummaries = useMemo(
     () => [...markersByPanel.values()].flat(),
     [markersByPanel],
@@ -606,55 +468,58 @@ export function Labs({
     [exams],
   )
 
+  const stats: Array<{ label: string; value: string; tone?: 'good' | 'bad' }> = [
+    { label: 'Markers tracked', value: String(allSummaries.length) },
+    { label: 'In range', value: String(inRangeCount), tone: 'good' },
+    { label: 'Out of range', value: String(outOfRangeSummaries.length), tone: outOfRangeSummaries.length > 0 ? 'bad' : undefined },
+    { label: 'Last test', value: lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : '—' },
+  ]
+
   return (
-    <div className="content-grid">
-
-      {/* ── PDF pending banner — opens the review sheet ── */}
+    <PageGrid>
+      {/* ── PDF pending banner ── */}
       {latestFile && extractedCount > 0 && (
-        <section className="surface col-12" style={{ background: 'var(--accent-soft)', borderColor: 'rgba(15,118,110,0.2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <FileText size={14} style={{ color: 'var(--accent-ink)', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <strong style={{ fontSize: 13, color: 'var(--accent-ink)' }}>PDF ready to review</strong>
-              <span style={{ display: 'block', fontSize: 11, color: 'var(--accent-ink)', opacity: 0.8 }}>
+        <SectionCard className="md:col-span-12 border-l-2 border-l-primary">
+          <div className="flex flex-wrap items-center gap-3">
+            <FileText className="size-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">PDF ready to review</p>
+              <p className="truncate text-xs text-muted-foreground">
                 {latestFile.name} · {extractedCount} marker{extractedCount === 1 ? '' : 's'} detected
-              </span>
+              </p>
             </div>
-            <button
-              type="button"
-              className="primary-button"
-              style={{ background: 'var(--accent)', height: 30, fontSize: 12 }}
-              onClick={() => latestFile.id && onReviewFile?.(latestFile.id)}
-            >
+            <Button size="sm" onClick={() => latestFile.id && onReviewFile?.(latestFile.id)}>
               Review markers
-            </button>
+            </Button>
           </div>
-        </section>
+        </SectionCard>
       )}
 
-      {/* ── At-a-glance stats row ── */}
+      {/* ── At-a-glance stats ── */}
       {hasData && (
-        <LabsStatusRow
-          total={allSummaries.length}
-          inRange={inRangeCount}
-          outOfRange={outOfRangeSummaries.length}
-          lastTestDate={lastTestDate}
-        />
+        <div className="grid grid-cols-2 gap-4 md:col-span-12 md:grid-cols-4">
+          {stats.map((s) => (
+            <Card key={s.label} className="gap-1 px-4 py-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{s.label}</p>
+              <p className={cn(
+                'font-mono text-2xl font-medium tabular-nums',
+                s.tone === 'good' && 'text-emerald-600 dark:text-emerald-400',
+                s.tone === 'bad' && 'text-destructive',
+              )}>
+                {s.value}
+              </p>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {/* ── Health composites ── */}
+      {/* ── Health composites (renders its own card internals) ── */}
       {hasData && <LabComposites results={results} exams={exams} />}
 
-      {/* ── Needs attention: surface out-of-range markers up front ── */}
+      {/* ── Needs attention ── */}
       {hasData && outOfRangeSummaries.length > 0 && (
-        <section className="surface col-12 labs-attention">
-          <div className="panel-header">
-            <div>
-              <span className="section-label">Needs attention</span>
-              <h3>{outOfRangeSummaries.length} out of range</h3>
-            </div>
-          </div>
-          <div className="marker-rows">
+        <SectionCard className="md:col-span-12 border-l-2 border-l-destructive" eyebrow="Needs attention" title={`${outOfRangeSummaries.length} out of range`}>
+          <div className="flex flex-col">
             {outOfRangeSummaries.map(s => (
               <MarkerRow
                 key={`attn-${s.key}`}
@@ -664,57 +529,51 @@ export function Labs({
               />
             ))}
           </div>
-        </section>
+        </SectionCard>
       )}
 
-      {/* ── No data empty state ── */}
+      {/* ── No data ── */}
       {!hasData && (
-        <section className="surface col-12">
-          <EmptyState icon={FlaskConical} title="No lab results yet" detail="Upload a PDF or add markers manually using the buttons in the top right." />
-        </section>
+        <SectionCard className="md:col-span-12">
+          <EmptyHint icon={FlaskConical} title="No lab results yet" detail="Upload a PDF or add markers manually using the buttons in the top right." />
+        </SectionCard>
       )}
 
-      {/* ── All markers, grouped by panel as a clean list ── */}
+      {/* ── All markers, grouped by panel ── */}
       {hasData && PANEL_ORDER.map(panel => {
         const summaries = markersByPanel.get(panel)
         if (!summaries || summaries.length === 0) return null
         const collapsed = collapsedPanels.has(panel)
 
-        // Count out-of-range markers in this panel
         const outCount = summaries.filter(s => {
           const v = s.entries[0]?.value
           return rangeStatus(v, s.low, s.high) === 'warn'
         }).length
 
-        // Is the selected marker in this panel?
         const selectedInPanel = selectedSummary?.panel === panel
 
         return (
-          <section key={panel} className="surface col-12">
-            {/* Panel header — clickable to collapse */}
-            <div
-              className="panel-header"
-              style={{ cursor: 'pointer', userSelect: 'none', marginBottom: collapsed ? 0 : 8 }}
+          <SectionCard key={panel} className="md:col-span-12">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 text-left"
               onClick={() => togglePanel(panel)}
+              aria-expanded={!collapsed}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-                {collapsed
-                  ? <ChevronRight size={13} style={{ color: 'var(--ink-mute)' }} />
-                  : <ChevronDown  size={13} style={{ color: 'var(--ink-mute)' }} />
-                }
-                <h3 style={{ margin: 0 }}>{panel}</h3>
-                <span style={{ fontSize: 11, color: 'var(--ink-mute)' }}>· {summaries.length} marker{summaries.length === 1 ? '' : 's'}</span>
-                {outCount > 0 && (
-                  <span className="chip" style={{ background: 'var(--bad-soft)', color: 'var(--bad)', fontSize: 10, height: 18 }}>
-                    {outCount} out of range
-                  </span>
-                )}
-              </div>
-            </div>
+              {collapsed
+                ? <ChevronRight className="size-3.5 text-muted-foreground" />
+                : <ChevronDown className="size-3.5 text-muted-foreground" />}
+              <h3 className="font-display text-lg font-semibold">{panel}</h3>
+              <span className="text-[11px] text-muted-foreground">· {summaries.length} marker{summaries.length === 1 ? '' : 's'}</span>
+              {outCount > 0 && (
+                <Badge variant="secondary" className="bg-destructive/12 text-[10px] text-destructive">
+                  {outCount} out of range
+                </Badge>
+              )}
+            </button>
 
-            {/* List-style marker rows */}
             {!collapsed && (
-              <div className="marker-rows">
+              <div className="mt-2 flex flex-col">
                 {summaries.map(s => (
                   <MarkerRow
                     key={s.key}
@@ -726,9 +585,8 @@ export function Labs({
               </div>
             )}
 
-            {/* History pane — shown inline when a marker in this panel is selected */}
             {!collapsed && selectedInPanel && selectedSummary && (
-              <div style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 16 }}>
+              <div className="mt-4 border-t pt-4">
                 <MarkerHistoryPane
                   summary={selectedSummary}
                   onClose={() => setSelectedKey(null)}
@@ -743,81 +601,73 @@ export function Labs({
                   }}
                   onEditTarget={() => openTargetEdit(selectedSummary.key)}
                   hasPersonalTarget={targetByKey.has(selectedSummary.key)}
-                  colors={colors}
                 />
-                {/* Inline target editor */}
                 {editingTargetKey === selectedSummary.key && (
-                  <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--accent-soft)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent-ink)' }}>
-                      Personal range for {selectedSummary.label}:
-                    </span>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
-                      Low
-                      <input inputMode="decimal" placeholder="e.g. 700" value={targetLow}
-                        onChange={e => setTargetLow(e.target.value)} style={{ width: 80, fontSize: 12 }} />
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
-                      High
-                      <input inputMode="decimal" placeholder="e.g. 1000" value={targetHigh}
-                        onChange={e => setTargetHigh(e.target.value)} style={{ width: 80, fontSize: 12 }} />
-                    </label>
-                    <button type="button" className="primary-button" style={{ height: 28, fontSize: 11, padding: '0 10px' }}
-                      onClick={() => void saveTarget(selectedSummary.key, selectedSummary.unit)}>
-                      Save
-                    </button>
+                  <div className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border bg-muted/50 p-3">
+                    <p className="w-full text-xs font-medium">Personal range for {selectedSummary.label}</p>
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor="t-low" className="text-[11px]">Low</Label>
+                      <Input id="t-low" inputMode="decimal" placeholder="e.g. 700" className="h-8 w-24 text-xs" value={targetLow} onChange={e => setTargetLow(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Label htmlFor="t-high" className="text-[11px]">High</Label>
+                      <Input id="t-high" inputMode="decimal" placeholder="e.g. 1000" className="h-8 w-24 text-xs" value={targetHigh} onChange={e => setTargetHigh(e.target.value)} />
+                    </div>
+                    <Button size="sm" className="h-8" onClick={() => void saveTarget(selectedSummary.key, selectedSummary.unit)}>Save</Button>
                     {targetByKey.has(selectedSummary.key) && (
-                      <button type="button" className="ghost-button" style={{ height: 28, fontSize: 11, color: 'var(--bad)' }}
-                        onClick={() => { void db.markerTargets.where('marker').equals(selectedSummary.key).delete(); setEditingTargetKey(null) }}>
+                      <Button variant="ghost" size="sm" className="h-8 text-destructive" onClick={() => { void db.markerTargets.where('marker').equals(selectedSummary.key).delete(); setEditingTargetKey(null) }}>
                         Remove custom
-                      </button>
+                      </Button>
                     )}
-                    <button type="button" className="icon-button" onClick={() => setEditingTargetKey(null)}>
-                      <X size={13} />
-                    </button>
+                    <Button variant="ghost" size="icon" className="size-8" onClick={() => setEditingTargetKey(null)} aria-label="Close range editor">
+                      <X className="size-3.5" />
+                    </Button>
                   </div>
                 )}
               </div>
             )}
-          </section>
+          </SectionCard>
         )
       })}
 
-      {/* ── Manual add form ── */}
-      {showAddForm && (
-        <section className="surface col-6">
-          <div className="panel-header">
-            <div><span className="section-label">Manual entry</span><h3>Add result</h3></div>
-            <button type="button" className="text-button" onClick={() => setShowAddForm(false)}>Close</button>
+      {/* ── Manual add dialog ── */}
+      <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add result</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 flex flex-col gap-1.5">
+              <Label htmlFor="m-exam">Exam / panel name</Label>
+              <Input id="m-exam" value={examName} onChange={e => setExamName(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="m-date">Date</Label>
+              <Input id="m-date" type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="m-marker">Marker</Label>
+              <Input id="m-marker" value={marker} onChange={e => setMarker(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="m-value">Value</Label>
+              <Input id="m-value" inputMode="decimal" value={value} onChange={e => setValue(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="m-unit">Unit</Label>
+              <Input id="m-unit" value={unit} onChange={e => setUnit(e.target.value)} />
+            </div>
           </div>
-          <div className="form-grid">
-            <label className="wide-field">
-              Exam / panel name
-              <input value={examName} onChange={e => setExamName(e.target.value)} />
-            </label>
-            <label>
-              Date
-              <input type="date" value={manualDate} onChange={e => setManualDate(e.target.value)} />
-            </label>
-            <label>
-              Marker
-              <input value={marker} onChange={e => setMarker(e.target.value)} />
-            </label>
-            <label>
-              Value
-              <input inputMode="decimal" value={value} onChange={e => setValue(e.target.value)} />
-            </label>
-            <label>
-              Unit
-              <input value={unit} onChange={e => setUnit(e.target.value)} />
-            </label>
-            <button type="button" className="primary-button wide-field"
+          <DialogFooter>
+            <Button
               onClick={async () => { await addManual(); setShowAddForm(false) }}
-              disabled={!value}>
-              <Plus size={14} /> Save marker
-            </button>
-          </div>
-        </section>
-      )}
-    </div>
+              disabled={!value}
+            >
+              <Plus className="size-4" /> Save marker
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </PageGrid>
   )
 }

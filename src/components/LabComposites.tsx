@@ -10,6 +10,9 @@ import type { LabExam } from '../lib/db'
 import { canonicalize } from '../lib/markers'
 import type { EnrichedResult } from '../lib/insights'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { SectionCard } from './Section'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 type Status = 'good' | 'warn' | 'bad' | 'none'
 type MarkerVal = { label: string; display: string; status: Status }
@@ -301,82 +304,83 @@ function buildHpta(map: Map<string, EnrichedResult>): CompositePanel {
   return { id: 'hpta', icon: '🧠', label: 'HPTA status', status, pills, note, recommendations: recs }
 }
 
-// ── Compact composite card ─────────────────────────────────────────────────
-function CompositeCard({ panel, expanded, onToggle }: {
+// ── Status → Tailwind class maps ───────────────────────────────────────────
+const STATUS_BORDER: Record<Status, string> = {
+  good: 'border-l-emerald-500',
+  warn: 'border-l-amber-500',
+  bad:  'border-l-destructive',
+  none: 'border-l-border',
+}
+const STATUS_TEXT: Record<Status, string> = {
+  good: 'text-emerald-700 dark:text-emerald-400',
+  warn: 'text-amber-700 dark:text-amber-400',
+  bad:  'text-destructive',
+  none: 'text-muted-foreground',
+}
+const STATUS_BADGE: Record<Status, string> = {
+  good: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
+  warn: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  bad:  'bg-destructive/12 text-destructive',
+  none: 'bg-secondary text-muted-foreground',
+}
+const STATUS_LABEL: Record<Status, string> = {
+  good: '✓ Good',
+  warn: '~ Monitor',
+  bad:  '! Action',
+  none: 'No data',
+}
+
+// ── Flat composite row — border-left status, expands inline ────────────────
+function CompositeRow({ panel, expanded, onToggle, first }: {
   panel: CompositePanel
   expanded: boolean
   onToggle: () => void
+  first: boolean
 }) {
-  const statusColor = panel.status === 'good' ? 'var(--good)'
-    : panel.status === 'warn' ? 'var(--warn)'
-    : panel.status === 'bad'  ? 'var(--bad)'
-    : 'var(--ink-mute)'
-
-  const statusBg = panel.status === 'good' ? 'var(--good-soft)'
-    : panel.status === 'warn' ? 'var(--warn-soft)'
-    : panel.status === 'bad'  ? 'var(--bad-soft)'
-    : 'var(--surface-2)'
-
-  const statusText = panel.status === 'good' ? '✓ Good'
-    : panel.status === 'warn' ? '~ Monitor'
-    : panel.status === 'bad'  ? '! Action'
-    : 'No data'
-
-  const hasDetail = panel.note || panel.recommendations.length > 0
+  const hasDetail = Boolean(panel.note) || panel.recommendations.length > 0
 
   return (
-    <button
-      type="button"
-      className="composite-card"
-      style={{ borderLeft: `3px solid ${statusColor}` }}
-      onClick={hasDetail ? onToggle : undefined}
-    >
-      {/* Header row: icon + name (left) · badge + chevron (right) */}
-      <div className="composite-head">
-        <span className="composite-icon">{panel.icon}</span>
-        <span className="composite-label">{panel.label}</span>
-        <span className="composite-badge" style={{ background: statusBg, color: statusColor }}>
-          {statusText}
+    <div className={cn('border-l-2 pl-3.5', STATUS_BORDER[panel.status], !first && 'mt-3')}>
+      <button
+        type="button"
+        className="flex w-full flex-col gap-1.5 text-left"
+        onClick={hasDetail ? onToggle : undefined}
+        aria-expanded={expanded}
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-sm">{panel.icon}</span>
+          <span className="text-sm font-medium">{panel.label}</span>
+          <Badge variant="secondary" className={cn('ml-auto px-2 text-[10px] font-semibold', STATUS_BADGE[panel.status])}>
+            {STATUS_LABEL[panel.status]}
+          </Badge>
+          {hasDetail && (
+            <span className="text-muted-foreground" aria-hidden>
+              {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            </span>
+          )}
         </span>
-        {hasDetail && (
-          <span className="composite-toggle" aria-hidden>
-            {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </span>
-        )}
-      </div>
+        <span className="flex flex-wrap gap-x-4 gap-y-1">
+          {panel.pills.map(p => (
+            <span key={p.label} className="flex items-baseline gap-1.5 font-mono text-xs tabular-nums">
+              <span className="text-muted-foreground">{p.label}</span>
+              <span className={cn('font-medium', STATUS_TEXT[p.status])}>{p.display}</span>
+            </span>
+          ))}
+        </span>
+      </button>
 
-      {/* Pills row — wraps freely on its own line, never collides with badge */}
-      <div className="composite-pills">
-        {panel.pills.map(p => (
-          <span
-            key={p.label}
-            className="composite-pill"
-            style={{
-              color: p.status === 'good' ? 'var(--good)'
-                : p.status === 'warn' ? 'var(--warn)'
-                : p.status === 'bad'  ? 'var(--bad)'
-                : 'var(--ink-dim)',
-            }}
-          >
-            <span className="composite-pill-label">{p.label}</span>
-            <span className="composite-pill-val">{p.display}</span>
-          </span>
-        ))}
-      </div>
-
-      {/* Expandable detail */}
       {expanded && hasDetail && (
-        <div className="composite-detail">
-          <p className="composite-note">{panel.note}</p>
+        <div className="mt-2 flex flex-col gap-2 pb-1">
+          <p className="text-xs leading-relaxed text-muted-foreground">{panel.note}</p>
           {panel.recommendations.map((rec, i) => (
-            <div key={i} className="composite-rec">
-              <span className="composite-rec-text">{rec.text}</span>
-              <span className="composite-rec-source">Source: {rec.source}</span>
+            <div key={i} className="rounded-md bg-muted/60 px-3 py-2">
+              <p className="text-xs leading-relaxed">{rec.text}</p>
+              <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">Source: {rec.source}</p>
             </div>
           ))}
         </div>
       )}
-    </button>
+    </div>
   )
 }
 
@@ -402,27 +406,26 @@ export function LabComposites({ results, exams }: { results: EnrichedResult[]; e
   const monitorCount = panels.filter(p => p.status === 'warn').length
 
   return (
-    <section className="surface col-12">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-        <div>
-          <span className="section-label">Smart analysis</span>
-          <h3 style={{ margin: 0 }}>Composites</h3>
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          {actionCount  > 0 && <span className="chip" style={{ background: 'var(--bad-soft)',  color: 'var(--bad)'  }}>{actionCount} action</span>}
-          {monitorCount > 0 && <span className="chip" style={{ background: 'var(--warn-soft)', color: 'var(--warn)' }}>{monitorCount} monitor</span>}
-        </div>
-      </div>
-      <div className="composite-list">
-        {panels.map(panel => (
-          <CompositeCard
-            key={panel.id}
-            panel={panel}
-            expanded={expanded === panel.id}
-            onToggle={() => setExpanded(expanded === panel.id ? null : panel.id)}
-          />
-        ))}
-      </div>
-    </section>
+    <SectionCard
+      className="md:col-span-12"
+      eyebrow="Smart analysis"
+      title="Composites"
+      action={
+        <span className="flex gap-1.5">
+          {actionCount > 0 && <Badge variant="secondary" className={STATUS_BADGE.bad}>{actionCount} action</Badge>}
+          {monitorCount > 0 && <Badge variant="secondary" className={STATUS_BADGE.warn}>{monitorCount} monitor</Badge>}
+        </span>
+      }
+    >
+      {panels.map((panel, i) => (
+        <CompositeRow
+          key={panel.id}
+          panel={panel}
+          first={i === 0}
+          expanded={expanded === panel.id}
+          onToggle={() => setExpanded(expanded === panel.id ? null : panel.id)}
+        />
+      ))}
+    </SectionCard>
   )
 }

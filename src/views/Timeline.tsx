@@ -4,6 +4,9 @@ import type { LucideIcon } from 'lucide-react'
 import { format, parseISO, startOfDay, startOfWeek, differenceInCalendarDays, isThisWeek, isToday, isYesterday } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
+import { SectionCard } from '../components/Section'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 type EventType = 'injection' | 'bp' | 'lab' | 'file' | 'symptom'
 
@@ -90,26 +93,26 @@ function TimelineGrouped({ events }: { events: TimelineEvent[] }) {
   const groups = useMemo(() => groupEvents(events), [events])
 
   return (
-    <div className="timeline-groups">
+    <div className="flex flex-col gap-6">
       {groups.map((group, gi) => (
-        <div key={gi} className="timeline-group">
-          {/* Day/week header */}
-          <div className="timeline-group-header">
-            <span className="timeline-group-label">{group.label}</span>
+        <div key={gi}>
+          <div className="mb-2 flex items-baseline gap-2">
+            <span className="text-sm font-semibold">{group.label}</span>
             {group.subLabel && (
-              <span className="timeline-group-sub">{group.subLabel}</span>
+              <span className="text-xs text-muted-foreground">{group.subLabel}</span>
             )}
           </div>
-          {/* Events within this day/week */}
-          <div className="timeline-list">
-            {group.events.map((e) => (
-              <div className="timeline-item" key={e.id}>
-                <div className="timeline-icon"><e.icon size={13} /></div>
-                <div>
-                  <strong>{e.title}</strong>
-                  <span>{e.detail}</span>
+          <div className="flex flex-col">
+            {group.events.map((e, i) => (
+              <div key={e.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground">
+                  <e.icon className="size-3.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{e.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">{e.detail}</p>
                 </div>
-                <time>{format(e.date, 'HH:mm')}</time>
+                <time className="shrink-0 text-xs tabular-nums text-muted-foreground">{format(e.date, 'HH:mm')}</time>
               </div>
             ))}
           </div>
@@ -238,21 +241,17 @@ export function Timeline({
   }
 
   return (
-    <section className="surface" style={{ maxWidth: '100%' }}>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">All activity</span>
-          <h3>Timeline</h3>
-        </div>
-        {activeType && (
-          <button type="button" className="text-button" onClick={() => { setActiveType(null); setActiveCompoundId(null) }}>
-            Clear filter
-          </button>
-        )}
-      </div>
-
+    <SectionCard
+      eyebrow="All activity"
+      title="Timeline"
+      action={activeType && (
+        <Button variant="ghost" size="sm" onClick={() => { setActiveType(null); setActiveCompoundId(null) }}>
+          Clear filter
+        </Button>
+      )}
+    >
       {/* Type filter chips */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+      <div className="mb-4 flex flex-wrap gap-1.5">
         {(Object.keys(TYPE_LABELS) as EventType[]).filter((t) => counts[t] > 0).map((t) => {
           const Icon = TYPE_ICONS[t]
           const active = activeType === t
@@ -261,22 +260,19 @@ export function Timeline({
               key={t}
               type="button"
               onClick={() => toggleType(t)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '5px 10px', borderRadius: 999, fontSize: 12, fontWeight: 500,
-                border: `1px solid ${active ? 'var(--accent)' : 'var(--line)'}`,
-                background: active ? 'var(--accent-soft)' : 'transparent',
-                color: active ? 'var(--accent-ink)' : 'var(--ink-dim)',
-                cursor: 'pointer', transition: 'all 150ms',
-              }}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                active
+                  ? 'border-foreground bg-foreground text-background'
+                  : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+              )}
             >
-              <Icon size={11} />
+              <Icon className="size-3" />
               {TYPE_LABELS[t]}
-              <span style={{
-                background: active ? 'var(--accent)' : 'var(--line)',
-                color: active ? '#fff' : 'var(--ink-mute)',
-                borderRadius: 999, padding: '0 5px', fontSize: 10, fontWeight: 700, lineHeight: '16px',
-              }}>{counts[t]}</span>
+              <span className={cn(
+                'rounded-full px-1.5 text-[10px] font-bold leading-4 tabular-nums',
+                active ? 'bg-background/20 text-background' : 'bg-secondary text-muted-foreground',
+              )}>{counts[t]}</span>
             </button>
           )
         })}
@@ -284,8 +280,8 @@ export function Timeline({
 
       {/* Compound sub-filter (only when Injections active + multiple compounds) */}
       {activeType === 'injection' && injectionCompounds.length > 1 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-mute)', alignSelf: 'center', marginRight: 2 }}>Compound:</span>
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[11px] text-muted-foreground">Compound:</span>
           {injectionCompounds.map((c) => {
             const active = activeCompoundId === c.id
             return (
@@ -293,16 +289,12 @@ export function Timeline({
                 key={c.id}
                 type="button"
                 onClick={() => setActiveCompoundId(active ? null : c.id!)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '4px 10px', borderRadius: 999, fontSize: 11,
-                  border: `1px solid ${active ? c.color ?? 'var(--accent)' : 'var(--line)'}`,
-                  background: active ? (c.color ?? 'var(--accent)') + '18' : 'transparent',
-                  color: active ? (c.color ?? 'var(--accent-ink)') : 'var(--ink-dim)',
-                  cursor: 'pointer',
-                }}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors',
+                  active ? 'border-foreground bg-accent text-foreground' : 'border-border text-muted-foreground hover:bg-accent',
+                )}
               >
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: c.color ?? 'var(--accent)', flexShrink: 0 }} />
+                <span className="size-1.5 shrink-0 rounded-full" style={{ background: c.color ?? 'var(--primary)' }} />
                 {c.name}
               </button>
             )
@@ -311,10 +303,10 @@ export function Timeline({
       )}
 
       {filtered.length === 0 ? (
-        <p className="panel-note">No events match the current filter.</p>
+        <p className="text-sm text-muted-foreground">No events match the current filter.</p>
       ) : (
         <TimelineGrouped events={filtered} />
       )}
-    </section>
+    </SectionCard>
   )
 }

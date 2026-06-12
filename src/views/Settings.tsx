@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, RotateCcw, Sun, Trash2, Upload, UserCircle, X } from 'lucide-react'
+import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, RotateCcw, Sun, Trash2, Upload, UserCircle } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -8,6 +8,14 @@ import { useTheme } from '../lib/useTheme'
 import { describeCadence } from '../lib/schedule'
 import type { useAuth } from '../lib/useAuth'
 import type { Compound, InjectionLog, LabExam, Protocol, VitalLog } from '../lib/db'
+import { SectionCard, PageGrid } from '../components/Section'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
 type AuthBundle = ReturnType<typeof useAuth>
 
@@ -73,20 +81,11 @@ export function Settings({
   protocols?: Protocol[]
 }) {
   return (
-    <div className="content-grid">
-      <section className="surface col-6">
-        <AccountSettings auth={auth} />
-      </section>
-
-      <section className="surface col-6">
-        <AppearanceSettings />
-      </section>
-
-      <section className="surface col-6">
-        <NotificationSettings />
-      </section>
-
-      <section className="surface col-6">
+    <PageGrid>
+      <div className="md:col-span-6"><AccountSettings auth={auth} /></div>
+      <div className="md:col-span-6"><AppearanceSettings /></div>
+      <div className="md:col-span-6"><NotificationSettings /></div>
+      <div className="md:col-span-6">
         <BackupSettings
           compounds={compounds}
           injections={injections}
@@ -94,20 +93,11 @@ export function Settings({
           exams={exams}
           protocols={protocols}
         />
-      </section>
-
-      <section className="surface col-6">
-        <LabDataSettings />
-      </section>
-
-      <section className="surface col-12">
-        <TrashSettings compounds={compounds ?? []} />
-      </section>
-
-      <section className="surface col-12">
-        <DangerSettings />
-      </section>
-    </div>
+      </div>
+      <div className="md:col-span-12"><LabDataSettings /></div>
+      <div className="md:col-span-12"><TrashSettings compounds={compounds ?? []} /></div>
+      <div className="md:col-span-12"><DangerSettings /></div>
+    </PageGrid>
   )
 }
 
@@ -144,85 +134,71 @@ function TrashSettings({ compounds }: { compounds: Compound[] }) {
   }
 
   return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Recently deleted</span>
-          <h3>Trash</h3>
-        </div>
-        {sorted.length > 0 && (
-          <button type="button" className="ghost-button" onClick={purgeAll}>
-            <Trash2 size={13} /> Empty trash
-          </button>
-        )}
-      </div>
+    <SectionCard
+      eyebrow="Recently deleted"
+      title="Trash"
+      action={sorted.length > 0 && (
+        <Button variant="outline" size="sm" onClick={purgeAll}>
+          <Trash2 className="size-3.5" /> Empty trash
+        </Button>
+      )}
+    >
       {sorted.length === 0 ? (
-        <p style={{ margin: 0, color: 'var(--ink-mute)', fontSize: 13 }}>
+        <p className="text-sm text-muted-foreground">
           No recently deleted injections. Items you delete appear here until they sync.
         </p>
       ) : (
-        <div className="stack">
-          {sorted.map((inj) => {
+        <div className="flex flex-col">
+          {sorted.map((inj, i) => {
             const c = compoundMap.get(inj.compoundId)
             const deletedAt = inj.deletedAtSync ? new Date(inj.deletedAtSync) : null
             return (
-              <div
-                key={inj.id}
-                className="row"
-                style={{ gridTemplateColumns: 'minmax(0,1fr) auto auto', alignItems: 'center' }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <strong style={{ fontSize: 13 }}>
+              <div key={inj.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
                     {c?.name ?? 'Unknown compound'} · {inj.dose}{inj.unit ? ` ${inj.unit}` : ''}
-                  </strong>
-                  <span className="sub">
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
                     Logged {format(parseISO(inj.takenAt), 'MMM d, HH:mm')}
                     {deletedAt && ` · Deleted ${format(deletedAt, 'MMM d, HH:mm')}`}
-                  </span>
+                  </p>
                 </div>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  style={{ height: 28, fontSize: 11, padding: '0 10px' }}
-                  onClick={() => inj.id !== undefined && restore(inj.id)}
-                >
-                  <RotateCcw size={12} /> Restore
-                </button>
+                <Button variant="outline" size="sm" className="h-7 shrink-0 px-2.5 text-xs" onClick={() => inj.id !== undefined && restore(inj.id)}>
+                  <RotateCcw className="size-3" /> Restore
+                </Button>
               </div>
             )
           })}
         </div>
       )}
-    </>
+    </SectionCard>
   )
 }
 
 function AccountSettings({ auth }: { auth: AuthBundle }) {
   const user = auth.state.status === 'authed' ? auth.state.user : null
   return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Account</span>
-          <h3>{user ? user.email : 'Guest mode'}</h3>
-        </div>
-        <UserCircle size={18} style={{ color: 'var(--ink-mute)' }} />
-      </div>
+    <SectionCard
+      className="h-full"
+      eyebrow="Account"
+      title={user ? user.email : 'Guest mode'}
+      action={<UserCircle className="size-4 text-muted-foreground" />}
+    >
       {user ? (
-        <>
-          <p className="muted-copy">
-            Signed in as <strong>{user.display_name || user.email}</strong>.
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            Signed in as <strong className="text-foreground">{user.display_name || user.email}</strong>.
           </p>
-          <button type="button" className="ghost-button" onClick={() => auth.logout()} style={{ alignSelf: 'flex-start' }}>
-            <LogOut size={14} /> Sign out
-          </button>
-        </>
+          <Button variant="outline" size="sm" className="self-start" onClick={() => auth.logout()}>
+            <LogOut className="size-3.5" /> Sign out
+          </Button>
+        </div>
       ) : (
-        <p className="muted-copy">
+        <p className="text-sm text-muted-foreground">
           You are using local-only mode. Data lives in this browser. Sign in to sync across devices.
         </p>
       )}
-    </>
+    </SectionCard>
   )
 }
 
@@ -230,21 +206,19 @@ function AppearanceSettings() {
   const { theme, toggle } = useTheme()
   const isDark = theme === 'dark'
   return (
-    <>
-      <div className="panel-header">
-        <div><span className="section-label">Display</span><h3>Appearance</h3></div>
-        {isDark ? <Moon size={16} style={{ color: 'var(--accent-ink)' }} /> : <Sun size={16} style={{ color: 'var(--warn)' }} />}
+    <SectionCard
+      className="h-full"
+      eyebrow="Display"
+      title="Appearance"
+      action={isDark ? <Moon className="size-4 text-muted-foreground" /> : <Sun className="size-4 text-muted-foreground" />}
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">Switch between light and dark theme. Your preference is saved locally.</p>
+        <Button variant="outline" size="sm" className="self-start" onClick={toggle}>
+          {isDark ? <><Sun className="size-3.5" /> Switch to light mode</> : <><Moon className="size-3.5" /> Switch to dark mode</>}
+        </Button>
       </div>
-      <p className="muted-copy">Switch between light and dark theme. Your preference is saved locally.</p>
-      <button
-        type="button"
-        className="ghost-button"
-        style={{ alignSelf: 'flex-start' }}
-        onClick={toggle}
-      >
-        {isDark ? <><Sun size={14} /> Switch to light mode</> : <><Moon size={14} /> Switch to dark mode</>}
-      </button>
-    </>
+    </SectionCard>
   )
 }
 
@@ -275,35 +249,36 @@ function NotificationSettings() {
   const blocked = permission === 'denied'
 
   return (
-    <>
-      <div className="panel-header">
-        <div><span className="section-label">Alerts</span><h3>Notifications</h3></div>
-        {enabled && !blocked ? <Bell size={16} style={{ color: 'var(--accent)' }} /> : <BellOff size={16} style={{ color: 'var(--ink-mute)' }} />}
-      </div>
+    <SectionCard
+      className="h-full"
+      eyebrow="Alerts"
+      title="Notifications"
+      action={enabled && !blocked ? <Bell className="size-4 text-muted-foreground" /> : <BellOff className="size-4 text-muted-foreground" />}
+    >
       {blocked ? (
-        <p className="muted-copy" style={{ color: 'var(--warn)' }}>
+        <p className="text-sm text-amber-700 dark:text-amber-400">
           Notifications are blocked in your browser settings. To re-enable, open your browser's site permissions for this page.
         </p>
       ) : permission === 'granted' ? (
-        <>
-          <p className="muted-copy">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
             {enabled ? "You'll receive a notification before each scheduled injection." : 'Notifications are disabled. Enable to get injection reminders.'}
           </p>
-          <button type="button" className="ghost-button" style={{ alignSelf: 'flex-start' }} onClick={toggle}>
-            {enabled ? <><BellOff size={14} /> Disable reminders</> : <><Bell size={14} /> Enable reminders</>}
-          </button>
-        </>
+          <Button variant="outline" size="sm" className="self-start" onClick={toggle}>
+            {enabled ? <><BellOff className="size-3.5" /> Disable reminders</> : <><Bell className="size-3.5" /> Enable reminders</>}
+          </Button>
+        </div>
       ) : (
-        <>
-          <p className="muted-copy">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
             Allow Apollo to send you a notification when your next injection is due — even if the tab is in the background.
           </p>
-          <button type="button" className="primary-button" style={{ alignSelf: 'flex-start' }} onClick={requestPermission}>
-            <Bell size={14} /> Allow notifications
-          </button>
-        </>
+          <Button size="sm" className="self-start" onClick={requestPermission}>
+            <Bell className="size-3.5" /> Allow notifications
+          </Button>
+        </div>
       )}
-    </>
+    </SectionCard>
   )
 }
 
@@ -340,31 +315,29 @@ function BackupSettings({
   }
 
   return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Backup &amp; export</span>
-          <h3>Data export / import</h3>
+    <SectionCard className="h-full" eyebrow="Backup &amp; export" title="Data export / import">
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          Download a full JSON backup to transfer between devices, or import a backup file.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={exportJson}>
+            <Download className="size-3.5" /> Download JSON
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <label className="cursor-pointer">
+              <input type="file" accept="application/json" hidden onChange={handleImport} disabled={importing} />
+              <Upload className="size-3.5" /> {importDone ? 'Imported ✓' : importing ? 'Importing…' : 'Import JSON'}
+            </label>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="size-3.5" /> Print report
+          </Button>
         </div>
-      </div>
-      <p className="muted-copy">
-        Download a full JSON backup to transfer between devices, or import a backup file.
-      </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button type="button" className="primary-button" style={{ alignSelf: 'flex-start' }} onClick={exportJson}>
-          <Download size={14} /> Download JSON
-        </button>
-        <label className="ghost-button" style={{ cursor: 'pointer', alignSelf: 'flex-start' }}>
-          <input type="file" accept="application/json" hidden onChange={handleImport} disabled={importing} />
-          <Upload size={14} /> {importDone ? 'Imported ✓' : importing ? 'Importing…' : 'Import JSON'}
-        </label>
-        <button type="button" className="ghost-button" style={{ alignSelf: 'flex-start' }} onClick={() => window.print()}>
-          <Printer size={14} /> Print report
-        </button>
       </div>
       {/* Hidden print-only report — rendered in DOM, visible only when printing */}
       <PrintReport compounds={compounds} injections={injections} vitals={vitals} exams={exams} protocols={protocols} />
-    </>
+    </SectionCard>
   )
 }
 
@@ -576,32 +549,26 @@ function LabDataSettings() {
   }
 
   return (
-    <>
-      <div className="panel-header">
-        <div><span className="section-label">Labs</span><h3>Lab data</h3></div>
-        <FlaskConical size={16} style={{ color: 'var(--accent-ink)' }} />
-      </div>
-
+    <SectionCard
+      eyebrow="Labs"
+      title="Lab data"
+      action={<FlaskConical className="size-4 text-muted-foreground" />}
+    >
       {/* Duplicate scanner — surfaces dupes the user accumulated from
           re-importing the same JSON backup multiple times. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-        <p className="muted-copy" style={{ margin: 0 }}>
+      <div className="mb-4 flex flex-col gap-2.5">
+        <p className="text-sm text-muted-foreground">
           {dupeExamCount === 0
             ? 'No duplicate exams detected on this device.'
             : `${dupeExamCount} duplicate exam${dupeExamCount === 1 ? '' : 's'} detected across ${dupeGroups.length} group${dupeGroups.length === 1 ? '' : 's'}. Same name + same date.`}
         </p>
         {dupeExamCount > 0 && (
           <>
-            <button
-              type="button"
-              className="ghost-button"
-              style={{ alignSelf: 'flex-start' }}
-              onClick={() => setScanShown((s) => !s)}
-            >
+            <Button variant="outline" size="sm" className="self-start" onClick={() => setScanShown((s) => !s)}>
               {scanShown ? 'Hide list' : `Show ${dupeGroups.length} duplicate group${dupeGroups.length === 1 ? '' : 's'}`}
-            </button>
+            </Button>
             {scanShown && (
-              <ul style={{ margin: 0, padding: '0 0 0 18px', fontSize: 12, color: 'var(--ink-dim)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <ul className="ml-4 flex list-disc flex-col gap-1 text-xs text-muted-foreground">
                 {dupeGroups.slice(0, 12).map((g: LabExam[], i: number) => (
                   <li key={i}>
                     {g[0].name} · {format(parseISO(g[0].collectedAt), 'MMM d, yyyy')} · {g.length} copies
@@ -610,32 +577,26 @@ function LabDataSettings() {
                 {dupeGroups.length > 12 && <li>… and {dupeGroups.length - 12} more</li>}
               </ul>
             )}
-            <button
-              type="button"
-              className="primary-button"
-              style={{ alignSelf: 'flex-start' }}
-              onClick={dedupeExams}
-              disabled={busy}
-            >
-              <Trash2 size={14} /> Remove {dupeExamCount} duplicate{dupeExamCount === 1 ? '' : 's'}
-            </button>
+            <Button size="sm" className="self-start" onClick={dedupeExams} disabled={busy}>
+              <Trash2 className="size-3.5" /> Remove {dupeExamCount} duplicate{dupeExamCount === 1 ? '' : 's'}
+            </Button>
           </>
         )}
       </div>
 
-      <p className="muted-copy">
+      <p className="mb-3 text-sm text-muted-foreground">
         Or remove all imported lab results and exams to start clean.
       </p>
-      <button
-        type="button"
-        className="ghost-button"
-        style={{ alignSelf: 'flex-start', color: 'var(--warn)', borderColor: 'rgba(245,158,11,0.3)' }}
+      <Button
+        variant="outline"
+        size="sm"
+        className="self-start text-amber-700 dark:text-amber-400"
         onClick={clearLabs}
         disabled={busy}
       >
-        <Trash2 size={14} /> {done ? 'Cleared ✓' : busy ? 'Clearing…' : 'Clear all lab data'}
-      </button>
-    </>
+        <Trash2 className="size-3.5" /> {done ? 'Cleared ✓' : busy ? 'Clearing…' : 'Clear all lab data'}
+      </Button>
+    </SectionCard>
   )
 }
 
@@ -662,103 +623,55 @@ function DangerSettings() {
     setConfirmText('')
   }
 
-  // Close on Escape
-  useEffect(() => {
-    if (!modalOpen) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [modalOpen])
-
   return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Danger zone</span>
-          <h3>Reset device</h3>
-        </div>
-        <AlertTriangle size={18} style={{ color: 'var(--bad)' }} />
+    <SectionCard
+      eyebrow="Danger zone"
+      title="Reset device"
+      action={<AlertTriangle className="size-4 text-destructive" />}
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          Wipes every local table — compounds, injections, vitals, labs, files, protocols, vials, symptoms,
+          targets, body metrics, and your passphrase. <strong className="text-foreground">Cannot be undone.</strong>
+        </p>
+        <Button variant="outline" size="sm" className="self-start text-destructive" onClick={() => setModalOpen(true)}>
+          <Trash2 className="size-3.5" /> Wipe all local data…
+        </Button>
       </div>
-      <p className="muted-copy">
-        Wipes every local table — compounds, injections, vitals, labs, files, protocols, vials, symptoms,
-        targets, body metrics, and your passphrase. <strong>Cannot be undone.</strong>
-      </p>
-      <button
-        type="button"
-        className="ghost-button"
-        style={{ alignSelf: 'flex-start', color: 'var(--bad)', borderColor: 'var(--bad-soft)' }}
-        onClick={() => setModalOpen(true)}
-      >
-        <Trash2 size={14} /> Wipe all local data…
-      </button>
 
-      {/* Confirmation modal */}
-      {modalOpen && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 60,
-            background: 'rgba(10,10,10,0.55)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 24,
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}
-          role="dialog"
-          aria-modal
-        >
-          <div style={{
-            background: 'var(--surface)',
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: 'var(--shadow-lg)',
-            width: '100%', maxWidth: 420,
-            padding: 28,
-            display: 'flex', flexDirection: 'column', gap: 16,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <AlertTriangle size={20} style={{ color: 'var(--bad)', flexShrink: 0 }} />
-                <h3 style={{ margin: 0, fontSize: 16 }}>Wipe all local data?</h3>
-              </div>
-              <button type="button" className="icon-button" onClick={closeModal} aria-label="Cancel"><X size={14} /></button>
-            </div>
-
-            <p style={{ fontSize: 13, color: 'var(--ink-dim)', margin: 0, lineHeight: 1.6 }}>
+      <Dialog open={modalOpen} onOpenChange={(o) => { if (!o) closeModal() }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-4 text-destructive" /> Wipe all local data?
+            </DialogTitle>
+            <DialogDescription>
               This will permanently delete every injection, vital, lab result, protocol, compound, file, and
-              symptom stored on this device. <strong style={{ color: 'var(--bad)' }}>There is no undo.</strong>
+              symptom stored on this device. <strong className="text-destructive">There is no undo.</strong>
               {' '}If you are synced, your data remains on the server.
-            </p>
-
-            <label style={{ fontSize: 13, fontWeight: 600 }}>
-              Type <code style={{ background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 4 }}>RESET</code> to confirm
-              <input
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                placeholder="RESET"
-                autoFocus
-                style={{ marginTop: 6, fontFamily: 'var(--font-mono)', letterSpacing: '0.08em' }}
-              />
-            </label>
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" className="ghost-button" onClick={closeModal} disabled={busy}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                style={{
-                  background: confirmed ? 'var(--bad)' : 'var(--line)',
-                  color: confirmed ? '#fff' : 'var(--ink-mute)',
-                  cursor: confirmed ? 'pointer' : 'not-allowed',
-                }}
-                onClick={wipe}
-                disabled={!confirmed || busy}
-              >
-                <Trash2 size={14} /> {busy ? 'Wiping…' : 'Wipe everything'}
-              </button>
-            </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="wipe-confirm">
+              Type <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">RESET</code> to confirm
+            </Label>
+            <Input
+              id="wipe-confirm"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="RESET"
+              autoFocus
+              className="font-mono tracking-widest"
+            />
           </div>
-        </div>
-      )}
-    </>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeModal} disabled={busy}>Cancel</Button>
+            <Button variant="destructive" onClick={wipe} disabled={!confirmed || busy}>
+              <Trash2 className="size-3.5" /> {busy ? 'Wiping…' : 'Wipe everything'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </SectionCard>
   )
 }

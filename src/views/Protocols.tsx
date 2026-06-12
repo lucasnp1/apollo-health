@@ -1,34 +1,25 @@
 import { useMemo, useState } from 'react'
 import type { SimpleScheduleItem } from '../lib/schedule'
-import { useTheme } from '../lib/useTheme'
-import {
-  Archive, CheckCircle2, Clock, Pencil, Plus, Syringe, Trash2, X,
-} from 'lucide-react'
-import { differenceInHours, format, parseISO, subDays } from 'date-fns'
-import {
-  Bar, CartesianGrid, ComposedChart,
-  Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
-} from 'recharts'
+import { Archive, CheckCircle2, Clock, Pencil, Plus, Syringe, Trash2 } from 'lucide-react'
+import { differenceInHours, format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
-import {
-  db,
-  type Compound,
-  type InjectionLog,
-  type Protocol,
-} from '../lib/db'
-import {
-  buildWeightDoseSeries,
-  weightSummary,
-} from '../lib/insights'
+import { db, type Compound, type InjectionLog, type Protocol } from '../lib/db'
 import { describeCadence, simpleUpcomingSchedule } from '../lib/schedule'
-import { skipScheduledDose } from '../lib/injections'
+import { skipScheduledDose, deleteInjection } from '../lib/injections'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
-import { deleteInjection } from '../lib/injections'
-import { findPKCompound, buildDailyReleaseCurve } from '../lib/pk'
-import { EmptyState } from '../components/EmptyState'
 import { SiteCombobox } from '../components/SiteCombobox'
-import { TimeRangePicker } from '../components/TimeRangePicker'
-import type { TimeRange } from '../lib/timeRange'
+import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 
 export function Protocols({
   compounds,
@@ -55,23 +46,17 @@ export function Protocols({
   )
 
   return (
-    <div className="content-grid">
-
-      {/* ── 1. MY COMPOUNDS ──────────────────────────────────────────────── */}
-      <section className="surface col-12">
-        <div className="panel-header">
-          <div>
-            <span className="section-label">Active</span>
-            <h3>My compounds</h3>
-          </div>
-        </div>
+    <PageGrid>
+      {/* ── My compounds ── */}
+      <SectionCard className="md:col-span-12" eyebrow="Active" title="My compounds">
         {activeProtocols.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {activeProtocols.map((p) => {
+          <div className="flex flex-col">
+            {activeProtocols.map((p, i) => {
               const schedItem = schedule.find(s => s.protocol.id === p.id)
               return (
-                <CompoundCard
+                <CompoundRow
                   key={p.id}
+                  first={i === 0}
                   protocol={p}
                   compounds={compounds}
                   injections={injections}
@@ -83,35 +68,33 @@ export function Protocols({
             })}
           </div>
         ) : (
-          <div className="empty">
-            <Syringe size={22} />
-            <strong>Nothing set up yet</strong>
-            <span>Add a compound to track your schedule and doses.</span>
-            <button type="button" className="primary-button" onClick={onOpenWizard}>
-              <Plus size={14} /> Add compound
-            </button>
-          </div>
+          <EmptyHint
+            icon={Syringe}
+            title="Nothing set up yet"
+            detail="Add a compound to track your schedule and doses."
+            action={<Button onClick={onOpenWizard}><Plus className="size-4" /> Add compound</Button>}
+          />
         )}
-      </section>
+      </SectionCard>
 
-      {/* ── 2. RECENT DOSES ─────────────────────────────────────────────── */}
-      <section className="surface col-12">
+      {/* ── Recent doses ── */}
+      <SectionCard className="md:col-span-12" eyebrow="History" title="Recent doses">
         <RecentDoses injections={injections} compounds={compounds} />
-      </section>
-
-    </div>
+      </SectionCard>
+    </PageGrid>
   )
 }
 
-// ── Compound card — shows next due, last injection, Log button ─────────────
+// ── Compound row — flat line item, colored left edge per compound ──────────
 
-function CompoundCard({
+function CompoundRow({
   protocol,
   compounds,
   injections,
   schedItem,
   onLog,
   onEdit,
+  first,
 }: {
   protocol: Protocol
   compounds: Compound[]
@@ -119,9 +102,10 @@ function CompoundCard({
   schedItem?: SimpleScheduleItem
   onLog: (tab: 'injection', prefill?: import('../App').QuickLogPrefill) => void
   onEdit?: () => void
+  first: boolean
 }) {
   const compound = compounds.find(c => c.id === protocol.compoundId)
-  const color = compound?.color ?? 'var(--accent)'
+  const color = compound?.color ?? 'var(--primary)'
   const lastInj = injections.find(i => i.compoundId === protocol.compoundId)
   const hoursSince = lastInj ? differenceInHours(new Date(), parseISO(lastInj.takenAt)) : undefined
 
@@ -139,91 +123,70 @@ function CompoundCard({
       : `Due ${format(schedItem.nextDue, 'EEE MMM d')}`
 
   return (
-    <div style={{
-      background: 'var(--surface-2)',
-      borderRadius: 'var(--radius)',
-      border: `1.5px solid ${overdue ? 'var(--bad)' : 'var(--line)'}`,
-      borderLeft: `4px solid ${color}`,
-      padding: '14px 16px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 10,
-    }}>
-      {/* Top row: name + actions */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', letterSpacing: -0.01 }}>
+    <div
+      className={cn('border-l-2 py-3.5 pl-4', !first && 'border-t')}
+      style={{ borderLeftColor: color }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold leading-tight">
             {compound?.name ?? protocol.name}
-            {compound?.ester && <span style={{ fontWeight: 400, color: 'var(--ink-mute)', marginLeft: 6, fontSize: 13 }}>{compound.ester}</span>}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--ink-dim)', marginTop: 2 }}>
+            {compound?.ester && <span className="ml-1.5 text-[13px] font-normal text-muted-foreground">{compound.ester}</span>}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
             {protocol.dose} {protocol.unit} · {describeCadence(protocol.cadence)}
-          </div>
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+        <div className="flex shrink-0 items-center gap-1">
           {onEdit && (
-            <button type="button" className="icon-button" style={{ width: 30, height: 30 }} onClick={onEdit} aria-label="Edit">
-              <Pencil size={13} />
-            </button>
+            <Button variant="ghost" size="icon" className="size-8" onClick={onEdit} aria-label="Edit">
+              <Pencil className="size-3.5" />
+            </Button>
           )}
-          <button
-            type="button"
-            className="icon-button"
-            style={{ width: 30, height: 30 }}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
             onClick={() => protocol.id !== undefined && db.protocols.update(protocol.id, { archived: true })}
             aria-label="Archive"
           >
-            <Archive size={13} />
-          </button>
+            <Archive className="size-3.5" />
+          </Button>
         </div>
       </div>
 
-      {/* Bottom row: last injection + next due + Log button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* Last injection */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <CheckCircle2 size={13} style={{ color: hoursSince !== undefined ? 'var(--good)' : 'var(--ink-mute)', flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: 'var(--ink-mute)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {lastLabel}
-          </span>
-        </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground">
+          <CheckCircle2 className={cn('size-3.5 shrink-0', hoursSince !== undefined ? 'text-emerald-500' : 'text-muted-foreground')} />
+          <span className="truncate">{lastLabel}</span>
+        </span>
 
-        {/* Next due */}
         {nextLabel && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-            <Clock size={12} style={{ color: overdue ? 'var(--bad)' : 'var(--accent)', flexShrink: 0 }} />
-            <span style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: overdue ? 'var(--bad)' : 'var(--accent)',
-              background: overdue ? 'var(--bad-soft)' : 'var(--accent-soft)',
-              padding: '2px 8px',
-              borderRadius: 999,
-              whiteSpace: 'nowrap',
-            }}>
-              {nextLabel}
-            </span>
-          </div>
+          <Badge
+            variant="secondary"
+            className={cn(
+              'shrink-0 gap-1 tabular-nums',
+              overdue ? 'bg-destructive/12 text-destructive' : 'bg-secondary text-foreground',
+            )}
+          >
+            <Clock className="size-3" /> {nextLabel}
+          </Badge>
         )}
 
-        {/* Skip (only shown for overdue rows — lets the user clear an
-            already-missed dose without logging a fake injection) */}
         {overdue && schedItem?.nextDue && protocol.id !== undefined && (
-          <button
-            type="button"
-            className="ghost-button"
-            style={{ height: 34, fontSize: 12, padding: '0 12px', flexShrink: 0 }}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 shrink-0 px-2.5 text-xs"
             onClick={() => skipScheduledDose(protocol.id!, schedItem.nextDue.toISOString())}
             title="Mark this dose as skipped"
           >
             Skip
-          </button>
+          </Button>
         )}
-        {/* Log button */}
-        <button
-          type="button"
-          className="primary-button"
-          style={{ height: 34, fontSize: 13, padding: '0 16px', background: color, flexShrink: 0 }}
+        <Button
+          size="sm"
+          className="h-8 shrink-0"
           onClick={() => onLog('injection', {
             compoundId: protocol.compoundId,
             dose: protocol.dose,
@@ -233,229 +196,9 @@ function CompoundCard({
           })}
         >
           Log
-        </button>
+        </Button>
       </div>
     </div>
-  )
-}
-
-// ── Site rotation heatmap (compact) ───────────────────────────────────────
-
-// ── Multi-compound PK curve chart ─────────────────────────────────────────
-
-function PKCurvePanel({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
-  const { chart: colors } = useTheme()
-  const [range, setRange] = useState<TimeRange>('3M')
-
-  // Determine window: past N days + 30-day clearance tail
-  const windowDays = range === '1M' ? 30 : range === '3M' ? 90 : range === '6M' ? 180 : 365
-  const tailDays = 30
-  const totalDays = windowDays + tailDays
-  const startDate = useMemo(() => subDays(new Date(), windowDays), [windowDays])
-
-  // Group injections by compoundId — only those within a relevant lookback (5 half-lives before start)
-  const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id!, c])), [compounds])
-
-  // Build chart data: one row per day, one key per compound
-  const { chartData, traces } = useMemo(() => {
-    const startMs = startDate.getTime()
-
-    // Find unique compounds that have injection logs
-    const usedIds = [...new Set(injections.map((i) => i.compoundId))]
-    const usedCompounds = usedIds.map((id) => compoundMap.get(id)).filter(Boolean) as Compound[]
-
-    if (usedCompounds.length === 0) return { chartData: [], traces: [] }
-
-    // Group by resolved PK compound (compound + form key).
-    // Multiple user compounds that map to the same PK profile are MERGED into one
-    // trace — their injections are pooled and their release curves are summed.
-    // This prevents duplicate stat-cards/lines when the user has e.g. both a
-    // "Testosterone E" and an older "Test E" compound that both resolve to
-    // Testosterone Enanthate.
-    type MergeEntry = {
-      compound: Compound                           // first compound found (for display)
-      pk: NonNullable<ReturnType<typeof findPKCompound>>
-      compoundIds: number[]                        // all compound ids contributing
-      injList: Array<{ takenAt: string; dose: number }>
-    }
-    const pkKey = (pk: NonNullable<ReturnType<typeof findPKCompound>>) =>
-      `${pk.compound}|${pk.form}`
-    const mergedMap = new Map<string, MergeEntry>()
-
-    for (const c of usedCompounds) {
-      const pk = findPKCompound(c.name, c.ester ?? undefined)
-      if (!pk) continue
-      const key = pkKey(pk)
-      if (!mergedMap.has(key)) {
-        mergedMap.set(key, { compound: c, pk, compoundIds: [], injList: [] })
-      }
-      const entry = mergedMap.get(key)!
-      entry.compoundIds.push(c.id!)
-      const cInj = injections
-        .filter((i) => i.compoundId === c.id && i.dose !== undefined && !i.deletedAtSync)
-        .map((i) => ({ takenAt: i.takenAt, dose: i.dose! }))
-      entry.injList.push(...cInj)
-    }
-
-    // Build a curve per merged group
-    const traceData: {
-      compound: Compound
-      pk: NonNullable<ReturnType<typeof findPKCompound>>
-      compoundIds: number[]
-      values: number[]
-    }[] = []
-
-    for (const { compound, pk, compoundIds, injList } of mergedMap.values()) {
-      if (injList.length === 0) continue
-      const lookback = pk.halfLifeDays * 5
-      const raw = buildDailyReleaseCurve(
-        pk, injList,
-        startMs - lookback * 86_400_000,
-        totalDays + Math.ceil(lookback),
-      )
-      const offset = Math.ceil(lookback)
-      traceData.push({ compound, pk, compoundIds, values: raw.slice(offset, offset + totalDays) })
-    }
-
-    // Assign stable chart-key using the PK compound label (e.g. "Testosterone · Enanthate")
-    // so that even if two user compounds merge, the key is unique and stable.
-    const traceKey = (t: (typeof traceData)[0]) =>
-      t.pk.form ? `${t.pk.compound} · ${t.pk.form}` : t.pk.compound
-
-    // Merge into chart format
-    const rows: Record<string, number | string>[] = []
-    for (let d = 0; d < totalDays; d++) {
-      const row: Record<string, number | string> = {
-        date: format(new Date(startMs + d * 86_400_000), 'MMM d'),
-        dayOffset: d - windowDays,
-      }
-      for (const t of traceData) {
-        row[traceKey(t)] = parseFloat((t.values[d] ?? 0).toFixed(2))
-      }
-      rows.push(row)
-    }
-
-    return {
-      chartData: rows,
-      traces: traceData.map((t) => ({
-        name: traceKey(t),
-        color: t.compound.color ?? '#1a1611',
-        halfLifeDays: t.pk.halfLifeDays,
-        activeDosePct: t.pk.activeDosePct,
-        form: t.pk.form,
-        activeNow: parseFloat((t.values[windowDays - 1] ?? 0).toFixed(1)),
-        lastInj: injections
-          .filter((i) => t.compoundIds.includes(i.compoundId) && !i.deletedAtSync)
-          .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0],
-      })),
-    }
-  }, [injections, compoundMap, startDate, windowDays, totalDays])
-
-  const todayLabel = format(new Date(), 'MMM d')
-
-  if (traces.length === 0) return null
-
-  return (
-    <section className="surface col-12">
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Pharmacokinetics</span>
-          <h3>Release rate — all compounds</h3>
-        </div>
-        <TimeRangePicker value={range} onChange={setRange} />
-      </div>
-
-      {/* Stats row — one card per active compound */}
-      <div className="stat-grid" style={{ marginBottom: 12 }}>
-        {traces.map((t) => (
-          <div className="stat" key={t.name} style={{ borderLeft: `3px solid ${t.color}`, paddingLeft: 10 }}>
-            <span className="stat-label">{t.name}{t.form ? ` · ${t.form}` : ''}</span>
-            <span className="stat-value" style={{ color: t.color }}>{t.activeNow > 0 ? `${t.activeNow} mg/d` : '—'}</span>
-            <span className="stat-detail">
-              t½ {t.halfLifeDays}d · {t.activeDosePct}% active
-              {t.lastInj ? ` · last ${format(parseISO(t.lastInj.takenAt), 'MMM d')}` : ''}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={chartData} margin={{ top: 4, right: 10, bottom: 0, left: -12 }}>
-          <CartesianGrid stroke={colors.grid} vertical={false} />
-          <XAxis
-            dataKey="date"
-            tickLine={false}
-            axisLine={false}
-            tick={{ fill: colors.tick, fontSize: 10 }}
-            interval={Math.floor(totalDays / 8)}
-          />
-          <YAxis tickLine={false} axisLine={false} tick={{ fill: '#a8a29e', fontSize: 10 }} unit=" mg/d" width={56} />
-          <Tooltip
-            contentStyle={{ background: colors.tooltipBg, border: `1px solid ${colors.tooltipBorder}`, borderRadius: 10, fontSize: 12, color: colors.tooltipText }}
-            formatter={(v: unknown, name: unknown) => [`${Number(v).toFixed(1)} mg/day`, String(name)]}
-          />
-          <ReferenceLine
-            x={todayLabel}
-            stroke="#94a3b8"
-            strokeDasharray="4 3"
-            label={{ value: 'Today', position: 'insideTopRight', fill: '#94a3b8', fontSize: 10 }}
-          />
-          {traces.map((t) => (
-            <Line
-              key={t.name}
-              type="monotone"
-              dataKey={t.name}
-              stroke={t.color}
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
-
-      <p className="panel-note">
-        Release(t) = Dose × active% × e<sup>−t×λ</sup> × λ &nbsp;·&nbsp; λ = ln 2 / t½ &nbsp;·&nbsp; Source: Behre &amp; Nieschlag 1998
-      </p>
-    </section>
-  )
-}
-
-// ── Weight / dose chart ────────────────────────────────────────────────────
-
-function RetaChart({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
-  const { chart: colors } = useTheme()
-  const series = buildWeightDoseSeries(compounds, injections)
-  const stats = weightSummary(series)
-  const chartData = series.filter((p) => p.weight !== undefined || p.dose !== undefined).slice(-24)
-  if (chartData.length === 0) return null
-
-  return (
-    <>
-      <div className="panel-header">
-        <div>
-          <span className="section-label">Peptide</span>
-          <h3>Dose vs weight</h3>
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {stats.latest && <span className="chip">{stats.latest.toFixed(1)} kg</span>}
-          {stats.delta !== undefined && (
-            <span className={`chip ${stats.delta < 0 ? 'good' : ''}`}>{stats.delta.toFixed(1)} kg</span>
-          )}
-        </div>
-      </div>
-      <ResponsiveContainer width="100%" height={160}>
-        <ComposedChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -12 }}>
-          <CartesianGrid stroke={colors.grid} vertical={false} />
-          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
-          <YAxis yAxisId="weight" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
-          <YAxis yAxisId="dose" orientation="right" tickLine={false} axisLine={false} tick={{ fill: colors.tick, fontSize: 11 }} />
-          <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 10, fontSize: 12 }} />
-          <Bar yAxisId="dose" dataKey="dose" fill="#60a5fa" opacity={0.45} radius={[4, 4, 0, 0]} />
-          <Line yAxisId="weight" type="monotone" dataKey="weight" stroke="#1a1611" strokeWidth={2.5} dot={false} />
-        </ComposedChart>
-      </ResponsiveContainer>
-    </>
   )
 }
 
@@ -474,97 +217,74 @@ function RecentDoses({ injections, compounds }: { injections: InjectionLog[]; co
     void deleteWithUndo({
       label: 'Injection deleted',
       remove: () => deleteInjection(id),
-      // Restore: reinsert the original row. Note we don't restore the
-      // vial decrement reversal — vial volume self-corrects on next render
-      // because the InjectionLog row is back in the source data.
+      // Vial volume self-corrects on next render once the row is back.
       restore: () => db.injections.put(snapshot),
     })
   }
 
   return (
     <>
-      {confirmId !== null && (
-        <ConfirmDialog
-          message="Delete this injection log?"
-          onConfirm={() => handleDelete(confirmId)}
-          onCancel={() => setConfirmId(null)}
-        />
-      )}
+      {/* Delete confirm */}
+      <Dialog open={confirmId !== null} onOpenChange={(o) => { if (!o) setConfirmId(null) }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Are you sure?</DialogTitle>
+            <DialogDescription>Delete this injection log?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => confirmId !== null && handleDelete(confirmId)}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {editEntry && (
-        <EditInjectionModal
+        <EditInjectionDialog
           entry={editEntry}
           compounds={compounds}
           onClose={() => setEditEntry(null)}
         />
       )}
-      <div className="panel-header">
-        <div>
-          <span className="section-label">History</span>
-          <h3>Recent doses</h3>
-        </div>
-      </div>
+
       {injections.length > 0 ? (
-        <div className="stack">
-          {injections.slice(0, 10).map((entry) => {
+        <div className="flex flex-col">
+          {injections.slice(0, 10).map((entry, i) => {
             const c = compoundMap.get(entry.compoundId)
             return (
-              <div className="row" key={entry.id} style={{ gridTemplateColumns: 'auto minmax(0,1fr) auto auto auto' }}>
-                <span className="dot" style={{ background: c?.color ?? 'var(--accent)' }} />
-                <div style={{ minWidth: 0 }}>
-                  <strong>{c?.name ?? 'Unknown'}</strong>
-                  <span className="sub">
+              <div key={entry.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
+                <span className="size-2 shrink-0 rounded-full" style={{ background: c?.color ?? 'var(--primary)' }} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{c?.name ?? 'Unknown'}</p>
+                  <p className="truncate text-xs text-muted-foreground">
                     {entry.rawDose ?? `${entry.dose ?? ''} ${entry.unit}`}
                     {entry.site ? ` · ${entry.site}` : ''}
                     {entry.weightKg !== undefined ? ` · ${entry.weightKg} kg` : ''}
                     {entry.notes ? ` · ${entry.notes}` : ''}
-                  </span>
+                  </p>
                 </div>
-                <time>{format(parseISO(entry.takenAt), 'MMM d HH:mm')}</time>
-                <button type="button" className="icon-button" onClick={() => setEditEntry(entry)} aria-label="Edit">
-                  <Pencil size={13} />
-                </button>
-                <button type="button" className="icon-button danger" onClick={() => setConfirmId(entry.id!)} aria-label="Delete">
-                  <Trash2 size={13} />
-                </button>
+                <time className="shrink-0 text-xs tabular-nums text-muted-foreground">{format(parseISO(entry.takenAt), 'MMM d HH:mm')}</time>
+                <div className="flex shrink-0 gap-1">
+                  <Button variant="ghost" size="icon" className="size-8" onClick={() => setEditEntry(entry)} aria-label="Edit">
+                    <Pencil className="size-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive" onClick={() => setConfirmId(entry.id!)} aria-label="Delete">
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
               </div>
             )
           })}
         </div>
       ) : (
-        <EmptyState icon={Syringe} title="No injections logged" detail="Tap Log on a protocol row or use Quick Log in the sidebar." />
+        <EmptyHint icon={Syringe} title="No injections logged" detail="Tap Log on a protocol row or use Quick Log in the sidebar." />
       )}
     </>
   )
 }
 
-// ── Confirm dialog ─────────────────────────────────────────────────────────
+// ── Edit injection dialog ───────────────────────────────────────────────────
 
-function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(10,10,10,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-      onClick={onCancel}
-    >
-      <div
-        style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', padding: '24px', maxWidth: 360, width: '100%', display: 'flex', flexDirection: 'column', gap: 20 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div>
-          <strong style={{ fontSize: 15, display: 'block', marginBottom: 6 }}>Are you sure?</strong>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-dim)' }}>{message}</p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" className="ghost-button" onClick={onCancel}>Cancel</button>
-          <button type="button" className="primary-button" style={{ background: 'var(--bad)' }} onClick={onConfirm}>Delete</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Edit injection modal ───────────────────────────────────────────────────
-
-function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog; compounds: Compound[]; onClose: () => void }) {
+function EditInjectionDialog({ entry, compounds, onClose }: { entry: InjectionLog; compounds: Compound[]; onClose: () => void }) {
   const [compoundId, setCompoundId] = useState(entry.compoundId)
   const [dose, setDose] = useState(String(entry.dose ?? ''))
   const [route, setRoute] = useState<'IM' | 'SubQ' | 'Oral' | 'Other'>(entry.route ?? 'IM')
@@ -574,7 +294,6 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
   const [busy, setBusy] = useState(false)
   const compound = compounds.find((c) => c.id === compoundId)
 
-  // Recent sites for the combobox
   const recentInjections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().limit(30).toArray(), [], [])
   const recentSites = useMemo(() => {
     const seen = new Set<string>()
@@ -606,55 +325,54 @@ function EditInjectionModal({ entry, compounds, onClose }: { entry: InjectionLog
   }
 
   return (
-    <div className="sheet-overlay" onClick={onClose}>
-      <div className="sheet" style={{ maxWidth: 540 }} onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-handle" />
-        <div className="sheet-header">
-          <h3>Edit injection</h3>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={14} /></button>
-        </div>
-        <div className="sheet-body">
-          <div className="form-grid">
-            <label className="wide-field">
-              Compound
-              <select value={compoundId} onChange={(e) => setCompoundId(Number(e.target.value))}>
-                {compounds.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </label>
-            <label>
-              Dose ({compound?.unit ?? entry.unit})
-              <input inputMode="decimal" value={dose} onChange={(e) => setDose(e.target.value)} />
-            </label>
-            <label>
-              Route
-              <select value={route} onChange={(e) => setRoute(e.target.value as typeof route)}>
-                <option value="IM">IM (Intramuscular)</option>
-                <option value="SubQ">SubQ (Subcutaneous)</option>
-                <option value="Oral">Oral</option>
-                <option value="Other">Other</option>
-              </select>
-            </label>
-            <label>
-              Site
-              <SiteCombobox value={site} onChange={setSite} recentSites={recentSites} />
-            </label>
-            <label className="wide-field">
-              Date &amp; time
-              <input type="datetime-local" value={takenAt} onChange={(e) => setTakenAt(e.target.value)} />
-            </label>
-            <label className="wide-field">
-              Notes
-              <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="optional" />
-            </label>
-            <button type="button" className="primary-button wide-field" onClick={save} disabled={busy}>
-              {busy ? 'Saving…' : 'Save changes'}
-            </button>
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit injection</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 flex flex-col gap-1.5">
+            <Label>Compound</Label>
+            <Select value={String(compoundId)} onValueChange={(v) => setCompoundId(Number(v))}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {compounds.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="ei-dose">Dose ({compound?.unit ?? entry.unit})</Label>
+            <Input id="ei-dose" inputMode="decimal" value={dose} onChange={(e) => setDose(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Route</Label>
+            <Select value={route} onValueChange={(v) => setRoute(v as typeof route)}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="IM">IM (Intramuscular)</SelectItem>
+                <SelectItem value="SubQ">SubQ (Subcutaneous)</SelectItem>
+                <SelectItem value="Oral">Oral</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 flex flex-col gap-1.5">
+            <Label>Site</Label>
+            <SiteCombobox value={site} onChange={setSite} recentSites={recentSites} />
+          </div>
+          <div className="col-span-2 flex flex-col gap-1.5">
+            <Label htmlFor="ei-when">Date &amp; time</Label>
+            <Input id="ei-when" type="datetime-local" value={takenAt} onChange={(e) => setTakenAt(e.target.value)} />
+          </div>
+          <div className="col-span-2 flex flex-col gap-1.5">
+            <Label htmlFor="ei-notes">Notes</Label>
+            <Input id="ei-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="optional" />
           </div>
         </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
-
-// Retained for future use — not currently rendered
-void PKCurvePanel; void RetaChart
