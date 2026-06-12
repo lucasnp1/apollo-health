@@ -194,7 +194,10 @@
   --ink-2:    #2c2823;
   --ink-dim:  rgba(33,30,26,0.70);
   --ink-mute: rgba(33,30,26,0.48);
-  --accent:      #f4c95c;
+  /* Renamed from --accent to avoid colliding with shadcn's own --accent
+     (which is the neutral grey hover surface). --laccent is the legacy
+     brand yellow used by old primary buttons / accents. */
+  --laccent:     #f4c95c;
   --accent-2:    #e6b945;
   --accent-soft: rgba(244,201,92,0.18);
   --accent-ink:  #6b4f0c;
@@ -219,7 +222,7 @@
   --ink-2:    #e9e4db;
   --ink-dim:  rgba(245,242,236,0.74);
   --ink-mute: rgba(245,242,236,0.46);
-  --accent:      #f4c95c;
+  --laccent:     #f4c95c;
   --accent-2:    #ffd76d;
   --accent-soft: rgba(244,201,92,0.16);
   --accent-ink:  #f4c95c;

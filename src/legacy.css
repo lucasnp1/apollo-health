@@ -147,7 +147,7 @@ button, a, [role="button"], .nav-item, .mobile-tab {
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; background: none; border: 0; padding: 0; }
 button:disabled { cursor: not-allowed; opacity: 0.55; }
-a { color: var(--accent); text-decoration: none; }
+a { color: var(--laccent); text-decoration: none; }
 a:hover { color: var(--accent-ink); }
 
 h1, h2, h3, h4, p { margin: 0; }
@@ -208,7 +208,7 @@ time,
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  background: var(--accent);
+  background: var(--laccent);
 }
 .brand-mark img {
   display: block;
@@ -237,7 +237,7 @@ time,
 }
 .nav-item:hover { color: var(--ink); background: var(--surface-2); }
 .nav-item.active {
-  color: var(--accent);
+  color: var(--laccent);
   background: var(--accent-soft);
   font-weight: 600;
 }
@@ -457,7 +457,7 @@ time,
    Yellow accent needs DARK text for contrast (white-on-yellow fails
    accessibility). Same in both themes — the yellow is consistent. */
 .primary-button {
-  background: var(--accent);
+  background: var(--laccent);
   color: var(--ink);
   font-weight: 600;
 }
@@ -509,7 +509,7 @@ time,
   color: var(--ink-dim); font-size: 13px; font-weight: 600;
   padding: 0; cursor: pointer;
 }
-.link-button:hover { color: var(--accent); }
+.link-button:hover { color: var(--laccent); }
 
 /* ---------- Surface / panels ---------- */
 
@@ -855,7 +855,7 @@ input, select, textarea {
 textarea { height: auto; padding: 12px 14px; min-height: 72px; resize: vertical; line-height: 1.5; }
 input:focus, select:focus, textarea:focus {
   outline: 0;
-  border-color: var(--accent);
+  border-color: var(--laccent);
   box-shadow: 0 0 0 3px var(--accent-soft);
   background: var(--surface);
 }
@@ -996,7 +996,7 @@ select {
 }
 .symptom-cell input[type='range'] {
   width: 100%;
-  accent-color: var(--accent);
+  accent-color: var(--laccent);
   height: 22px;
   background: transparent;
   border: 0;
@@ -1025,7 +1025,7 @@ select {
 .symptom-chip:hover { border-color: var(--line-strong); color: var(--ink); }
 .symptom-chip.selected {
   background: var(--accent-soft);
-  border-color: var(--accent);
+  border-color: var(--laccent);
   color: var(--accent-ink);
   font-weight: 600;
 }
@@ -1106,7 +1106,7 @@ select {
     transition: background 100ms, color 100ms;
   }
   .mobile-drawer-item.active {
-    color: var(--accent);
+    color: var(--laccent);
     background: var(--accent-soft);
     font-weight: 600;
   }
@@ -1287,7 +1287,7 @@ select {
 .vial-bar > span {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--laccent);
   border-radius: 999px;
 }
 .vial-bar.low > span { background: var(--warn); }
@@ -1448,8 +1448,8 @@ select {
   transition: border-color 120ms, box-shadow 120ms, transform 120ms;
   min-width: 0;
 }
-.marker-card:hover  { border-color: var(--accent); box-shadow: var(--shadow); transform: translateY(-1px); }
-.marker-card.selected { border-color: var(--accent); background: var(--accent-soft); }
+.marker-card:hover  { border-color: var(--laccent); box-shadow: var(--shadow); transform: translateY(-1px); }
+.marker-card.selected { border-color: var(--laccent); background: var(--accent-soft); }
 .marker-card.out    { border-color: var(--bad); }
 .marker-card.out.selected { background: color-mix(in srgb, var(--bad) 8%, var(--surface)); }
 
@@ -1525,7 +1525,7 @@ select {
 .mc-range-fill {
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  background: var(--accent);
+  background: var(--laccent);
   border-radius: 2px;
   opacity: 0.35;
   min-width: 4px;
@@ -1677,7 +1677,7 @@ select {
   padding: 10px 12px;
   background: var(--accent-soft);
   border-radius: 10px;
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid var(--laccent);
 }
 .composite-rec-text   { font-size: 13px; color: var(--ink); line-height: 1.5; }
 .composite-rec-source { font-size: 11px; color: var(--ink-mute); font-style: italic; }
@@ -1740,7 +1740,7 @@ select {
 
 /* ── Dark-mode button adjustments ──────────────────────────────────────── */
 :root[data-theme="dark"] .primary-button {
-  background: var(--accent);
+  background: var(--laccent);
   color: #1a1611;
 }
 /* ghost-button dark: keep grey fill with subtle outline */
@@ -1792,7 +1792,7 @@ select {
 }
 .pdf-review-title > svg {
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--laccent);
 }
 .pdf-review-title strong {
   display: block;
@@ -1876,7 +1876,7 @@ select {
 .pdf-review-row-check {
   width: 16px;
   height: 16px;
-  accent-color: var(--accent);
+  accent-color: var(--laccent);
   flex-shrink: 0;
 }
 .pdf-review-name,
@@ -1903,7 +1903,7 @@ select {
 .pdf-review-name:focus,
 .pdf-review-value:focus,
 .pdf-review-unit:focus {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--laccent);
   outline-offset: -1px;
   border-color: transparent;
 }
@@ -1960,7 +1960,7 @@ select {
   width: 22px;
   height: 22px;
   border: 2.5px solid var(--line);
-  border-top-color: var(--accent);
+  border-top-color: var(--laccent);
   border-radius: 50%;
   animation: pdf-spin 700ms linear infinite;
   flex-shrink: 0;
@@ -2119,8 +2119,8 @@ select {
 .dose-calc-seg:hover { background: var(--surface-3, var(--surface-2)); }
 .dose-calc-seg-on {
   background: var(--accent-soft);
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--laccent);
+  border-color: var(--laccent);
 }
 .dose-calc-result {
   background: var(--accent-soft);
@@ -2129,7 +2129,7 @@ select {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  color: var(--accent);
+  color: var(--laccent);
 }
 .dose-calc-result.warn {
   background: var(--bad-soft, rgba(185, 28, 28, 0.08));
@@ -2324,7 +2324,7 @@ select {
   position: absolute;
   inset: 0;
   border-radius: 3px;
-  background: linear-gradient(to right, var(--accent-soft), var(--accent));
+  background: linear-gradient(to right, var(--accent-soft), var(--laccent));
   opacity: 0.6;
 }
 .marker-row-range-dot {

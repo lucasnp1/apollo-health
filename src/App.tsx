@@ -19,6 +19,8 @@ import {
 } from 'lucide-react'
 import { BrandMark } from './components/BrandMark'
 import type { LucideIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
 import { extractPdfText, extractMarkersFromText, type ExtractedMarker } from './lib/pdf'
@@ -33,7 +35,6 @@ const ProtocolWizard = lazy(() => import('./components/ProtocolWizard').then(m =
 const ExportSheet      = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportSheet })))
 const DoseCalculator   = lazy(() => import('./components/DoseCalculator').then(m => ({ default: m.DoseCalculator })))
 const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
-import { SyncBanner } from './components/SyncBanner'
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
 // Overview is eager (first screen) — everything else is lazy
@@ -80,8 +81,8 @@ function App() {
 
   if (auth.state.status === 'loading') {
     return (
-      <div className="lock-shell">
-        <div className="lock-panel"><p className="lock-copy">Loading…</p></div>
+      <div className="grid min-h-dvh place-items-center bg-background">
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     )
   }
@@ -299,133 +300,155 @@ function Shell({
   )
 
   return (
-    <div className={sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
-      <aside className="sidebar">
-        <div className="sidebar-top">
-          <div className="brand-row">
+    <div
+      className={cn(
+        'grid min-h-dvh grid-cols-1',
+        sidebarCollapsed ? 'md:grid-cols-[72px_minmax(0,1fr)]' : 'md:grid-cols-[240px_minmax(0,1fr)]',
+      )}
+    >
+      {/* ── Sidebar (desktop) ── */}
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-5 border-r bg-sidebar px-3 py-5 md:flex">
+        <div className="flex items-center justify-between px-1.5">
+          <div className="flex min-w-0 items-center gap-2.5">
             <BrandMark size={32} />
-            <div>
-              <strong>Apollo</strong>
-              <span>Health</span>
-            </div>
+            {!sidebarCollapsed && (
+              <div className="leading-tight">
+                <div className="font-display text-base font-semibold">Apollo</div>
+                <div className="text-xs text-muted-foreground">Health</div>
+              </div>
+            )}
           </div>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label={sidebarCollapsed ? 'Expand' : 'Collapse'}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0 text-muted-foreground"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             onClick={() => setSidebarCollapsed((c) => !c)}
           >
-            {sidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
-          </button>
+            {sidebarCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+          </Button>
         </div>
 
-        <nav className="nav-list" aria-label="Primary">
-          {NAV.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={activeView === item.id ? 'nav-item active' : 'nav-item'}
-              onClick={() => setActiveView(item.id)}
-            >
-              <item.icon size={15} />
-              <span>{item.label}</span>
-            </button>
-          ))}
+        <nav className="flex flex-col gap-0.5" aria-label="Primary">
+          {NAV.map((item) => {
+            const active = activeView === item.id
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveView(item.id)}
+                className={cn(
+                  'flex h-9 items-center gap-2.5 rounded-md px-3 text-sm transition-colors',
+                  active
+                    ? 'bg-accent font-medium text-foreground'
+                    : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                  sidebarCollapsed && 'justify-center px-0',
+                )}
+                title={sidebarCollapsed ? item.label : undefined}
+              >
+                <item.icon className="size-4 shrink-0" />
+                {!sidebarCollapsed && <span>{item.label}</span>}
+              </button>
+            )
+          })}
         </nav>
 
-        <div className="quick-actions">
-          <strong>Quick log</strong>
-          <button type="button" onClick={() => openQuickLog('injection')}>
-            <Plus size={13} /><span>Injection</span>
-          </button>
-          <button type="button" onClick={() => openQuickLog('bp')}>
-            <Plus size={13} /><span>Blood pressure</span>
-          </button>
-        </div>
+        <div className="mt-auto flex flex-col gap-4">
+          {!sidebarCollapsed && (
+            <div className="flex flex-col gap-1.5">
+              <div className="px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Quick log
+              </div>
+              <Button variant="outline" size="sm" className="justify-start" onClick={() => openQuickLog('injection')}>
+                <Plus className="size-3.5" /> Injection
+              </Button>
+              <Button variant="outline" size="sm" className="justify-start" onClick={() => openQuickLog('bp')}>
+                <Plus className="size-3.5" /> Blood pressure
+              </Button>
+            </div>
+          )}
 
-        <div className="sidebar-footer">
-          <SyncBanner syncing={sync.state === 'syncing'} />
-          {isAuthed ? (
-            <span className="sidebar-sync-pill" title={sync.lastError || ''}>
-              <span className={`sidebar-sync-dot ${sync.state === 'error' ? 'error' : 'ok'}`} />
-              <span className="sidebar-sync-label">
-                {sync.state === 'error' ? 'Sync error' : 'Synced'}
-                {sync.lastRunAt && sync.state === 'idle'
-                  ? ` · ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                  : ''}
-              </span>
-            </span>
-          ) : (
-            <span className="sidebar-sync-pill">
-              <Lock size={11} />
-              <span className="sidebar-sync-label">Local only</span>
-            </span>
+          {!sidebarCollapsed && (
+            <div className="flex items-center gap-2 px-1.5 text-xs text-muted-foreground" title={isAuthed ? sync.lastError || '' : ''}>
+              {isAuthed ? (
+                <>
+                  <span className={cn('size-1.5 rounded-full', sync.state === 'error' ? 'bg-destructive' : 'bg-emerald-500')} />
+                  <span>
+                    {sync.state === 'syncing' ? 'Syncing…' : sync.state === 'error' ? 'Sync error' : 'Synced'}
+                    {sync.lastRunAt && sync.state === 'idle'
+                      ? ` · ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                      : ''}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Lock className="size-3" />
+                  <span>Local only</span>
+                </>
+              )}
+            </div>
           )}
         </div>
       </aside>
 
-      <main className="main-panel">
-        <header className="topbar">
-          {/* Hamburger sits as a direct topbar flex-child so it aligns with the gear on the right */}
-          <button
-            type="button"
-            className="icon-button show-mobile-only"
+      {/* ── Main panel ── */}
+      <main className="min-w-0">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur md:px-6">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
             onClick={() => setMenuOpen(true)}
             aria-label="Open menu"
           >
-            <Menu size={18} />
-          </button>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <p className="eyeline">Personal health record</p>
-            <h1>{titleFor(activeView)}</h1>
-          </div>
-          <div className="topbar-actions">
-            {/* Dose calculator — Protocols page only */}
+            <Menu className="size-5" />
+          </Button>
+          <h1 className="flex-1 truncate font-display text-xl font-semibold md:text-2xl">{titleFor(activeView)}</h1>
+          <div className="flex items-center gap-2">
             {activeView === 'meds' && (
-              <button type="button" className="icon-button" onClick={() => setCalcOpen(true)} aria-label="Dose calculator" title="Dose calculator">
-                <Calculator size={15} />
-              </button>
+              <Button variant="ghost" size="icon" onClick={() => setCalcOpen(true)} aria-label="Dose calculator" title="Dose calculator">
+                <Calculator className="size-4" />
+              </Button>
             )}
-            {/* Share/export — shown on data-rich views */}
             {(activeView === 'meds' || activeView === 'labs' || activeView === 'vitals') && (
-              <button type="button" className="icon-button" onClick={() => setExportOpen(true)} aria-label="Export for doctor" title="Share with doctor">
-                <Share2 size={15} />
-              </button>
+              <Button variant="ghost" size="icon" onClick={() => setExportOpen(true)} aria-label="Export for doctor" title="Share with doctor">
+                <Share2 className="size-4" />
+              </Button>
             )}
 
-            {/* Labs actions — Upload PDF + Add result (icon-only on mobile) */}
-            {activeView === 'labs' && (<>
-              <label className="ghost-button topbar-labelled" style={{ cursor: 'pointer' }} title="Upload PDF">
-                <input type="file" accept="application/pdf" hidden onChange={handleLabPdfUpload} />
-                <Upload size={14} /> <span className="btn-label">Upload</span>
-              </label>
-              <button type="button" className="primary-button topbar-labelled" onClick={() => setLabAddOpen(true)} title="Add result">
-                <Plus size={14} /> <span className="btn-label">Add result</span>
-              </button>
-            </>)}
+            {activeView === 'labs' && (
+              <>
+                <Button asChild variant="outline" size="sm">
+                  <label className="cursor-pointer" title="Upload PDF">
+                    <input type="file" accept="application/pdf" hidden onChange={handleLabPdfUpload} />
+                    <Upload className="size-4" /> <span className="hidden sm:inline">Upload</span>
+                  </label>
+                </Button>
+                <Button size="sm" onClick={() => setLabAddOpen(true)} title="Add result">
+                  <Plus className="size-4" /> <span className="hidden sm:inline">Add result</span>
+                </Button>
+              </>
+            )}
 
-            {/* Create protocol — Protocols page */}
             {activeView === 'meds' && (
-              <button type="button" className="primary-button topbar-labelled" onClick={() => setProtocolWizardOpen(true)} title="Create protocol">
-                <Plus size={14} /> <span className="btn-label">New protocol</span>
-              </button>
+              <Button size="sm" onClick={() => setProtocolWizardOpen(true)} title="Create protocol">
+                <Plus className="size-4" /> <span className="hidden sm:inline">New protocol</span>
+              </Button>
             )}
 
-            {/* Generic quick-log Add — skipped on Labs, Meds, Settings */}
             {activeView !== 'labs' && activeView !== 'meds' && activeView !== 'settings' && (
-              <button
-                type="button"
-                className="primary-button topbar-labelled"
+              <Button
+                size="sm"
                 onClick={() => openQuickLog(activeView === 'vitals' ? 'bp' : 'injection')}
                 title={activeView === 'vitals' ? 'Log reading' : 'Add'}
               >
-                <Plus size={14} /> <span className="btn-label">{activeView === 'vitals' ? 'Log reading' : 'Add'}</span>
-              </button>
+                <Plus className="size-4" /> <span className="hidden sm:inline">{activeView === 'vitals' ? 'Log reading' : 'Add'}</span>
+              </Button>
             )}
-            {/* Settings is accessible via the hamburger menu — no duplicate icon needed */}
           </div>
         </header>
 
+        <div className="px-4 py-5 pb-24 md:px-6">
         {activeView === 'overview' && (
           <Overview
             compounds={compounds}
@@ -460,48 +483,54 @@ function Shell({
             />
           )}
         </Suspense>
+        </div>
       </main>
 
       {/* Mobile hamburger drawer — replaces bottom tabs */}
       {menuOpen && (
         <div
-          className="mobile-drawer-overlay"
+          className="fixed inset-0 z-50 flex bg-black/45 backdrop-blur-sm md:hidden"
           onClick={() => setMenuOpen(false)}
         >
           <nav
-            className="mobile-drawer"
-            onClick={e => e.stopPropagation()}
+            className="flex h-full w-72 max-w-[80%] flex-col gap-4 border-r bg-sidebar p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
             aria-label="Mobile navigation"
           >
-            {/* Drawer header */}
-            <div className="mobile-drawer-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <BrandMark size={26} />
-                <strong style={{ fontSize: 15 }}>Apollo Health</strong>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <BrandMark size={28} />
+                <strong className="font-display text-base">Apollo Health</strong>
               </div>
-              <button type="button" className="icon-button" onClick={() => setMenuOpen(false)} aria-label="Close menu">
-                <X size={16} />
-              </button>
+              <Button variant="ghost" size="icon" onClick={() => setMenuOpen(false)} aria-label="Close menu">
+                <X className="size-4" />
+              </Button>
             </div>
-            {/* Nav items — all pages */}
-            <div className="mobile-drawer-nav">
-              {NAV.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={activeView === item.id ? 'mobile-drawer-item active' : 'mobile-drawer-item'}
-                  onClick={() => { setActiveView(item.id); setMenuOpen(false) }}
-                >
-                  <item.icon size={18} />
-                  <span>{item.label}</span>
-                </button>
-              ))}
+            <div className="flex flex-col gap-0.5">
+              {NAV.map((item) => {
+                const active = activeView === item.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => { setActiveView(item.id); setMenuOpen(false) }}
+                    className={cn(
+                      'flex h-11 items-center gap-3 rounded-md px-3 text-[15px] transition-colors',
+                      active
+                        ? 'bg-accent font-medium text-foreground'
+                        : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                    )}
+                  >
+                    <item.icon className="size-[18px] shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                )
+              })}
             </div>
-            {/* Quick actions at bottom of drawer */}
-            <div className="mobile-drawer-footer">
-              <button type="button" className="primary-button" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { openQuickLog('injection'); setMenuOpen(false) }}>
-                <Plus size={14} /> Log injection
-              </button>
+            <div className="mt-auto">
+              <Button className="w-full" onClick={() => { openQuickLog('injection'); setMenuOpen(false) }}>
+                <Plus className="size-4" /> Log injection
+              </Button>
             </div>
           </nav>
         </div>
