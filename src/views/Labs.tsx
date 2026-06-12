@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ChevronDown, ChevronRight, ChevronUp,
+  AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
   Edit2, FileText, FlaskConical, Plus, Trash2, X,
 } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, ReferenceLine } from 'recharts'
@@ -12,12 +12,13 @@ import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
 import { LabComposites } from '../components/LabComposites'
-import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { DashGrid, StatRow } from '../components/dashboard/Grid'
+import { StatCard } from '../components/dashboard/StatCard'
+import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { cn } from '@/lib/utils'
@@ -468,57 +469,45 @@ export function Labs({
     [exams],
   )
 
-  const stats: Array<{ label: string; value: string; tone?: 'good' | 'bad' }> = [
-    { label: 'Markers tracked', value: String(allSummaries.length) },
-    { label: 'In range', value: String(inRangeCount), tone: 'good' },
-    { label: 'Out of range', value: String(outOfRangeSummaries.length), tone: outOfRangeSummaries.length > 0 ? 'bad' : undefined },
-    { label: 'Last test', value: lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : '—' },
-  ]
-
   return (
-    <PageGrid>
+    <div className="flex flex-col gap-5">
       {/* ── PDF pending banner ── */}
       {latestFile && extractedCount > 0 && (
-        <SectionCard className="md:col-span-12 border-l-2 border-l-primary">
-          <div className="flex flex-wrap items-center gap-3">
-            <FileText className="size-4 shrink-0 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">PDF ready to review</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {latestFile.name} · {extractedCount} marker{extractedCount === 1 ? '' : 's'} detected
-              </p>
-            </div>
-            <Button size="sm" onClick={() => latestFile.id && onReviewFile?.(latestFile.id)}>
-              Review markers
-            </Button>
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3">
+          <FileText className="size-4 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">PDF ready to review</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {latestFile.name} · {extractedCount} marker{extractedCount === 1 ? '' : 's'} detected
+            </p>
           </div>
-        </SectionCard>
-      )}
-
-      {/* ── At-a-glance stats ── */}
-      {hasData && (
-        <div className="grid grid-cols-2 gap-4 md:col-span-12 md:grid-cols-4">
-          {stats.map((s) => (
-            <Card key={s.label} className="gap-1 px-4 py-3.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{s.label}</p>
-              <p className={cn(
-                'font-mono text-2xl font-medium tabular-nums',
-                s.tone === 'good' && 'text-emerald-600 dark:text-emerald-400',
-                s.tone === 'bad' && 'text-destructive',
-              )}>
-                {s.value}
-              </p>
-            </Card>
-          ))}
+          <Button size="sm" onClick={() => latestFile.id && onReviewFile?.(latestFile.id)}>
+            Review markers
+          </Button>
         </div>
       )}
 
-      {/* ── Health composites (renders its own card internals) ── */}
-      {hasData && <LabComposites results={results} exams={exams} />}
+      {/* ── KPI row ── */}
+      {hasData && (
+        <StatRow className="md:grid-cols-4 2xl:grid-cols-4">
+          <StatCard icon={FlaskConical} label="Markers tracked" value={allSummaries.length} tone="primary" />
+          <StatCard icon={CheckCircle2} label="In range" value={inRangeCount} tone="good" colorValue />
+          <StatCard icon={AlertTriangle} label="Out of range" value={outOfRangeSummaries.length} tone={outOfRangeSummaries.length > 0 ? 'bad' : 'neutral'} colorValue={outOfRangeSummaries.length > 0} />
+          <StatCard icon={CalendarDays} label="Last test" value={lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : '—'} tone="info" />
+        </StatRow>
+      )}
+
+      <DashGrid>
+      {/* ── Health composites ── */}
+      {hasData && (
+        <div className="md:col-span-2 xl:col-span-3">
+          <LabComposites results={results} exams={exams} />
+        </div>
+      )}
 
       {/* ── Needs attention ── */}
       {hasData && outOfRangeSummaries.length > 0 && (
-        <SectionCard className="md:col-span-12 border-l-2 border-l-destructive" eyebrow="Needs attention" title={`${outOfRangeSummaries.length} out of range`}>
+        <PanelCard className="md:col-span-2 xl:col-span-3 border-l-2 border-l-destructive" title={`${outOfRangeSummaries.length} out of range`} subtitle="Needs attention">
           <div className="flex flex-col">
             {outOfRangeSummaries.map(s => (
               <MarkerRow
@@ -529,14 +518,14 @@ export function Labs({
               />
             ))}
           </div>
-        </SectionCard>
+        </PanelCard>
       )}
 
       {/* ── No data ── */}
       {!hasData && (
-        <SectionCard className="md:col-span-12">
-          <EmptyHint icon={FlaskConical} title="No lab results yet" detail="Upload a PDF or add markers manually using the buttons in the top right." />
-        </SectionCard>
+        <PanelCard className="md:col-span-2 xl:col-span-6">
+          <PanelEmpty icon={FlaskConical} title="No lab results yet" detail="Upload a PDF or add markers manually using the buttons in the top right." />
+        </PanelCard>
       )}
 
       {/* ── All markers, grouped by panel ── */}
@@ -553,7 +542,7 @@ export function Labs({
         const selectedInPanel = selectedSummary?.panel === panel
 
         return (
-          <SectionCard key={panel} className="md:col-span-12">
+          <PanelCard key={panel} className="md:col-span-2 xl:col-span-6">
             <button
               type="button"
               className="flex w-full items-center gap-2 text-left"
@@ -626,9 +615,10 @@ export function Labs({
                 )}
               </div>
             )}
-          </SectionCard>
+          </PanelCard>
         )
       })}
+      </DashGrid>
 
       {/* ── Manual add dialog ── */}
       <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
@@ -668,6 +658,6 @@ export function Labs({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PageGrid>
+    </div>
   )
 }

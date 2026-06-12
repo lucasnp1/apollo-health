@@ -5,7 +5,9 @@ import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Symptom } from '../lib/db'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
-import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { DashGrid } from '../components/dashboard/Grid'
+import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
+import { ChartCard } from '../components/dashboard/ChartCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
@@ -120,12 +122,12 @@ export function Symptoms() {
   )
 
   return (
-    <PageGrid>
+    <DashGrid>
       {/* ── Today's check-in ── */}
-      <SectionCard
-        className="md:col-span-12"
-        eyebrow="Today"
+      <PanelCard
+        className="md:col-span-2 xl:col-span-3"
         title="How are you feeling?"
+        subtitle="Today's check-in"
         action={
           <Input
             type="datetime-local"
@@ -167,10 +169,10 @@ export function Symptoms() {
             <Plus className="size-4" /> {saving ? 'Saving…' : 'Save check-in'}
           </Button>
         </div>
-      </SectionCard>
+      </PanelCard>
 
       {/* ── Trend ── */}
-      <SectionCard className="md:col-span-7" eyebrow="Trend" title="Core scores (last 30)">
+      <ChartCard className="md:col-span-2 xl:col-span-3" title="Core scores" subtitle="Last 30 check-ins">
         {chartData.length > 1 ? (
           <ChartContainer config={symptomChartConfig} className="h-[260px] w-full">
             <LineChart data={chartData} margin={{ top: 12, right: 12, bottom: 0, left: -12 }}>
@@ -185,14 +187,14 @@ export function Symptoms() {
             </LineChart>
           </ChartContainer>
         ) : (
-          <EmptyHint icon={Brain} title="Need a few entries" detail="Log at least two days to see a trend." />
+          <PanelEmpty icon={Brain} title="Need a few entries" detail="Log at least two days to see a trend." />
         )}
-      </SectionCard>
+      </ChartCard>
 
       {/* ── Recent entries ── */}
-      <SectionCard className="md:col-span-5" eyebrow="History" title="Recent check-ins">
+      <PanelCard className="md:col-span-2 xl:col-span-6" title="Recent check-ins">
         {symptoms.length === 0 ? (
-          <EmptyHint icon={Brain} title="No check-ins yet" detail="Log how you feel above to start a trend." />
+          <PanelEmpty icon={Brain} title="No check-ins yet" detail="Log how you feel above to start a trend." />
         ) : (
           <ul className="flex flex-col">
             {symptoms.slice(0, 8).map((s, i) => (
@@ -239,8 +241,8 @@ export function Symptoms() {
             ))}
           </ul>
         )}
-      </SectionCard>
-    </PageGrid>
+      </PanelCard>
+    </DashGrid>
   )
 }
 

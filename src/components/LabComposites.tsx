@@ -10,7 +10,7 @@ import type { LabExam } from '../lib/db'
 import { canonicalize } from '../lib/markers'
 import type { EnrichedResult } from '../lib/insights'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { SectionCard } from './Section'
+import { PanelCard } from './dashboard/PanelCard'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -406,10 +406,10 @@ export function LabComposites({ results, exams }: { results: EnrichedResult[]; e
   const monitorCount = panels.filter(p => p.status === 'warn').length
 
   return (
-    <SectionCard
-      className="md:col-span-12"
-      eyebrow="Smart analysis"
+    <PanelCard
+      className="h-full"
       title="Composites"
+      subtitle="Smart analysis"
       action={
         <span className="flex gap-1.5">
           {actionCount > 0 && <Badge variant="secondary" className={STATUS_BADGE.bad}>{actionCount} action</Badge>}
@@ -426,6 +426,6 @@ export function LabComposites({ results, exams }: { results: EnrichedResult[]; e
           onToggle={() => setExpanded(expanded === panel.id ? null : panel.id)}
         />
       ))}
-    </SectionCard>
+    </PanelCard>
   )
 }

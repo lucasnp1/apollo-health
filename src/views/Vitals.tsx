@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Edit2, HeartPulse, Trash2 } from 'lucide-react'
+import { Activity, Edit2, HeartPulse, Trash2 } from 'lucide-react'
 import {
   Area,
   AreaChart,
@@ -14,7 +14,10 @@ import { db, type VitalLog } from '../lib/db'
 import { TimeRangePicker } from '../components/TimeRangePicker'
 import { filterByRange, type TimeRange } from '../lib/timeRange'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
-import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { DashGrid, StatRow } from '../components/dashboard/Grid'
+import { StatCard } from '../components/dashboard/StatCard'
+import { ChartCard } from '../components/dashboard/ChartCard'
+import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -111,13 +114,42 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   const meanStatus = stats ? classifyBp(Math.round(stats.meanSys), Math.round(stats.meanDia)) : undefined
   const insight = stats && meanStatus ? bpInsight(meanStatus, stats.meanSys, stats.meanDia) : undefined
 
+  const latest = vitals[0]
+
   return (
-    <PageGrid>
+    <div className="flex flex-col gap-5">
+      {/* ── KPI row ── */}
+      {stats && latest && (
+        <StatRow className="md:grid-cols-3 2xl:grid-cols-3">
+          <StatCard
+            icon={HeartPulse}
+            label="Latest reading"
+            value={`${latest.systolic}/${latest.diastolic}`}
+            sub={format(parseISO(latest.measuredAt), 'MMM d, HH:mm')}
+            tone={BP_META[classifyBp(latest.systolic, latest.diastolic)].variant === 'bad' ? 'bad' : BP_META[classifyBp(latest.systolic, latest.diastolic)].variant === 'warn' ? 'primary' : 'good'}
+          />
+          <StatCard
+            icon={Activity}
+            label={`Mean (${stats.n} readings)`}
+            value={`${stats.meanSys.toFixed(0)}/${stats.meanDia.toFixed(0)}`}
+            sub={meanStatus ? BP_META[meanStatus].label : undefined}
+            tone={meanStatus && (meanStatus === 'high' || meanStatus === 'danger') ? 'bad' : meanStatus === 'monitor' ? 'primary' : 'good'}
+          />
+          <StatCard
+            icon={HeartPulse}
+            label="Pulse"
+            value={latest.pulse ? `${latest.pulse} bpm` : '—'}
+            tone="info"
+          />
+        </StatRow>
+      )}
+
+      <DashGrid>
       {/* ── BP trend ── */}
-      <SectionCard
-        className="md:col-span-12"
-        eyebrow="Blood pressure"
-        title={stats ? `Trend · mean ${stats.meanSys.toFixed(0)}/${stats.meanDia.toFixed(0)}` : 'Trend'}
+      <ChartCard
+        className="md:col-span-2 xl:col-span-6"
+        title="Blood pressure trend"
+        subtitle={stats ? `Mean ${stats.meanSys.toFixed(0)}/${stats.meanDia.toFixed(0)} over ${stats.n} readings` : undefined}
         action={<TimeRangePicker value={range} onChange={setRange} />}
       >
         {chart.length > 0 ? (
@@ -142,7 +174,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
             </AreaChart>
           </ChartContainer>
         ) : (
-          <EmptyHint icon={HeartPulse} title="No readings in this range" detail="Use Log reading above to add one." />
+          <PanelEmpty icon={HeartPulse} title="No readings in this range" detail="Use Log reading above to add one." />
         )}
 
         {insight && (
@@ -151,10 +183,10 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{insight.body}</p>
           </div>
         )}
-      </SectionCard>
+      </ChartCard>
 
       {/* ── Recent readings ── */}
-      <SectionCard className="md:col-span-12" eyebrow="History" title="Recent readings">
+      <PanelCard className="md:col-span-2 xl:col-span-6" title="Recent readings">
         {filtered.length > 0 ? (
           <Table>
             <TableBody>
@@ -206,9 +238,10 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
             </TableBody>
           </Table>
         ) : (
-          <EmptyHint icon={HeartPulse} title="No readings yet" detail="Tap Log reading above to add your first." />
+          <PanelEmpty icon={HeartPulse} title="No readings yet" detail="Tap Log reading above to add your first." />
         )}
-      </SectionCard>
+      </PanelCard>
+      </DashGrid>
 
       {/* ── Edit reading dialog ── */}
       <Dialog open={!!editingVital} onOpenChange={(o) => { if (!o) { setEditingVital(null); setForm(emptyForm()) } }}>
@@ -245,7 +278,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PageGrid>
+    </div>
   )
 }
 
