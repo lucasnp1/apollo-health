@@ -13,6 +13,7 @@
    carry a faint warm tint so the app still feels related to the logo without
    washing every surface in cream. */
 :root {
+  color-scheme: light;
   --radius: 0.625rem;
 
   --background: oklch(0.994 0.004 95);   /* warm near-white page */
@@ -66,6 +67,7 @@
    neutral background, slightly lifted cards with hairline borders,
    brand yellow as the single accent. */
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --background: oklch(0.145 0.004 70);   /* near-black, faint warm tint */
   --foreground: oklch(0.96 0.006 92);
 

@@ -92,16 +92,9 @@ export function SiteRotation({
   const otherSites = siteEntries.filter(e => e.route === 'Other')
   const selectedEntry = selectedSite ? siteEntries.find(e => e.site + '||' + e.route === selectedSite) : null
 
+  // Headerless — the parent card supplies the title.
   if (siteEntries.length === 0) {
-    return (
-      <>
-        <div className="mb-1 space-y-0.5">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rotation</p>
-          <h3 className="font-display text-lg font-semibold">Site history</h3>
-        </div>
-        <p className="text-sm text-muted-foreground">Log injections to track site rotation.</p>
-      </>
-    )
+    return <p className="text-sm text-muted-foreground">Log injections to track site rotation.</p>
   }
 
   function RouteSection({ group, sites }: { group: RouteGroup; sites: SiteEntry[] }) {
@@ -136,11 +129,6 @@ export function SiteRotation({
 
   return (
     <>
-      <div className="mb-3 space-y-0.5">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rotation</p>
-        <h3 className="font-display text-lg font-semibold">Site history</h3>
-      </div>
-
       <div className="flex flex-col gap-3">
         <RouteSection group="IM"    sites={imSites} />
         <RouteSection group="SubQ"  sites={subqSites} />

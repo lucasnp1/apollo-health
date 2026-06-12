@@ -1,16 +1,17 @@
 import { useMemo, useState } from 'react'
-import type { SimpleScheduleItem } from '../lib/schedule'
-import { Archive, CheckCircle2, Clock, Pencil, Plus, Syringe, Trash2 } from 'lucide-react'
-import { differenceInHours, format, parseISO } from 'date-fns'
+import { Pencil, Plus, Syringe, Trash2 } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type Protocol } from '../lib/db'
-import { describeCadence, simpleUpcomingSchedule } from '../lib/schedule'
-import { skipScheduledDose, deleteInjection } from '../lib/injections'
+import { simpleUpcomingSchedule } from '../lib/schedule'
+import { deleteInjection } from '../lib/injections'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { SiteCombobox } from '../components/SiteCombobox'
-import { SectionCard, PageGrid, EmptyHint } from '../components/Section'
+import { SiteRotation } from '../components/SiteRotation'
+import { DashGrid } from '../components/dashboard/Grid'
+import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
+import { CompoundCarousel } from '../components/dashboard/CompoundCarousel'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -46,158 +47,39 @@ export function Protocols({
   )
 
   return (
-    <PageGrid>
-      {/* ── My compounds ── */}
-      <SectionCard className="md:col-span-12" eyebrow="Active" title="My compounds">
-        {activeProtocols.length > 0 ? (
-          <div className="flex flex-col">
-            {activeProtocols.map((p, i) => {
-              const schedItem = schedule.find(s => s.protocol.id === p.id)
-              return (
-                <CompoundRow
-                  key={p.id}
-                  first={i === 0}
-                  protocol={p}
-                  compounds={compounds}
-                  injections={injections}
-                  schedItem={schedItem}
-                  onLog={onOpenQuickLog}
-                  onEdit={p.id !== undefined ? () => onEditProtocol(p as Protocol & { id: number }) : undefined}
-                />
-              )
-            })}
-          </div>
-        ) : (
-          <EmptyHint
+    <div className="flex flex-col gap-5">
+      {/* ── Compounds carousel hero ── */}
+      {activeProtocols.length > 0 ? (
+        <CompoundCarousel
+          protocols={activeProtocols}
+          compounds={compounds}
+          injections={injections}
+          schedule={schedule}
+          onLog={onOpenQuickLog}
+          onEdit={onEditProtocol}
+        />
+      ) : (
+        <PanelCard>
+          <PanelEmpty
             icon={Syringe}
             title="Nothing set up yet"
             detail="Add a compound to track your schedule and doses."
             action={<Button onClick={onOpenWizard}><Plus className="size-4" /> Add compound</Button>}
           />
-        )}
-      </SectionCard>
+        </PanelCard>
+      )}
 
-      {/* ── Recent doses ── */}
-      <SectionCard className="md:col-span-12" eyebrow="History" title="Recent doses">
-        <RecentDoses injections={injections} compounds={compounds} />
-      </SectionCard>
-    </PageGrid>
-  )
-}
+      <DashGrid>
+        {/* ── Recent doses ── */}
+        <PanelCard className="md:col-span-2 xl:col-span-4" title="Recent doses" subtitle="Latest logged injections">
+          <RecentDoses injections={injections} compounds={compounds} />
+        </PanelCard>
 
-// ── Compound row — flat line item, colored left edge per compound ──────────
-
-function CompoundRow({
-  protocol,
-  compounds,
-  injections,
-  schedItem,
-  onLog,
-  onEdit,
-  first,
-}: {
-  protocol: Protocol
-  compounds: Compound[]
-  injections: InjectionLog[]
-  schedItem?: SimpleScheduleItem
-  onLog: (tab: 'injection', prefill?: import('../App').QuickLogPrefill) => void
-  onEdit?: () => void
-  first: boolean
-}) {
-  const compound = compounds.find(c => c.id === protocol.compoundId)
-  const color = compound?.color ?? 'var(--primary)'
-  const lastInj = injections.find(i => i.compoundId === protocol.compoundId)
-  const hoursSince = lastInj ? differenceInHours(new Date(), parseISO(lastInj.takenAt)) : undefined
-
-  const lastLabel = hoursSince === undefined ? 'Never injected'
-    : hoursSince < 1   ? 'Just now'
-    : hoursSince < 24  ? `${Math.round(hoursSince)}h ago`
-    : `${Math.round(hoursSince / 24)}d ago`
-
-  const overdue = schedItem?.isOverdue ?? false
-  const nextLabel = !schedItem ? null
-    : overdue
-      ? `${Math.round(Math.abs(schedItem.daysUntil))}d overdue`
-      : schedItem.daysUntil < 0.5 ? 'Due now'
-      : schedItem.daysUntil < 1   ? 'Due today'
-      : `Due ${format(schedItem.nextDue, 'EEE MMM d')}`
-
-  return (
-    <div
-      className={cn('border-l-2 py-3.5 pl-4', !first && 'border-t')}
-      style={{ borderLeftColor: color }}
-    >
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold leading-tight">
-            {compound?.name ?? protocol.name}
-            {compound?.ester && <span className="ml-1.5 text-[13px] font-normal text-muted-foreground">{compound.ester}</span>}
-          </p>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            {protocol.dose} {protocol.unit} · {describeCadence(protocol.cadence)}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {onEdit && (
-            <Button variant="ghost" size="icon" className="size-8" onClick={onEdit} aria-label="Edit">
-              <Pencil className="size-3.5" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            onClick={() => protocol.id !== undefined && db.protocols.update(protocol.id, { archived: true })}
-            aria-label="Archive"
-          >
-            <Archive className="size-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground">
-          <CheckCircle2 className={cn('size-3.5 shrink-0', hoursSince !== undefined ? 'text-emerald-500' : 'text-muted-foreground')} />
-          <span className="truncate">{lastLabel}</span>
-        </span>
-
-        {nextLabel && (
-          <Badge
-            variant="secondary"
-            className={cn(
-              'shrink-0 gap-1 tabular-nums',
-              overdue ? 'bg-destructive/12 text-destructive' : 'bg-secondary text-foreground',
-            )}
-          >
-            <Clock className="size-3" /> {nextLabel}
-          </Badge>
-        )}
-
-        {overdue && schedItem?.nextDue && protocol.id !== undefined && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 shrink-0 px-2.5 text-xs"
-            onClick={() => skipScheduledDose(protocol.id!, schedItem.nextDue.toISOString())}
-            title="Mark this dose as skipped"
-          >
-            Skip
-          </Button>
-        )}
-        <Button
-          size="sm"
-          className="h-8 shrink-0"
-          onClick={() => onLog('injection', {
-            compoundId: protocol.compoundId,
-            dose: protocol.dose,
-            unit: protocol.unit,
-            protocolId: protocol.id,
-            scheduledAt: schedItem?.nextDue.toISOString(),
-          })}
-        >
-          Log
-        </Button>
-      </div>
+        {/* ── Site rotation ── */}
+        <PanelCard className="md:col-span-2 xl:col-span-2" title="Site rotation" subtitle="Red = used recently">
+          <SiteRotation injections={injections} compounds={compounds} />
+        </PanelCard>
+      </DashGrid>
     </div>
   )
 }
@@ -276,7 +158,7 @@ function RecentDoses({ injections, compounds }: { injections: InjectionLog[]; co
           })}
         </div>
       ) : (
-        <EmptyHint icon={Syringe} title="No injections logged" detail="Tap Log on a protocol row or use Quick Log in the sidebar." />
+        <PanelEmpty icon={Syringe} title="No injections logged" detail="Tap Log on a compound card or use Quick Log in the sidebar." />
       )}
     </>
   )
