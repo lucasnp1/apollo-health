@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { KeyRound, LogIn, UserPlus } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { useAuth } from '../lib/useAuth'
 
 type AuthBundle = ReturnType<typeof useAuth>
@@ -33,71 +37,78 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
   }
 
   return (
-    <div className="lock-shell">
-      <div className="lock-panel">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+    <div className="min-h-dvh grid place-items-center bg-background px-4">
+      <div className="w-full max-w-sm rounded-xl border bg-card p-6 shadow-sm">
+        <div className="flex items-center gap-3">
           <BrandMark size={44} />
           <div>
-            <h1 style={{ margin: 0 }}>Apollo Health</h1>
-            <p className="lock-copy" style={{ margin: '2px 0 0' }}>
+            <h1 className="font-display text-2xl font-semibold leading-none">Apollo Health</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">
               {mode === 'login' ? 'Sign in to sync across devices.' : 'Create a free account.'}
             </p>
           </div>
         </div>
 
-        <div className="pill-tabs" role="tablist" style={{ alignSelf: 'flex-start' }}>
-          <button type="button" role="tab" className={mode === 'login' ? 'active' : undefined} onClick={() => setMode('login')}>Sign in</button>
-          <button type="button" role="tab" className={mode === 'signup' ? 'active' : undefined} onClick={() => setMode('signup')}>Sign up</button>
-        </div>
+        <Tabs value={mode} onValueChange={(v) => setMode(v as 'login' | 'signup')} className="mt-5">
+          <TabsList className="w-full">
+            <TabsTrigger value="login" className="flex-1">Sign in</TabsTrigger>
+            <TabsTrigger value="signup" className="flex-1">Sign up</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        <form className="lock-form" onSubmit={submit}>
-          <label className="visually-hidden" htmlFor="email">Email</label>
-          <input id="email" type="email" placeholder="Email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <form className="mt-4 flex flex-col gap-3" onSubmit={submit}>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="email" className="sr-only">Email</Label>
+            <Input id="email" type="email" placeholder="Email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
 
-          <label className="visually-hidden" htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            placeholder={mode === 'login' ? 'Password' : 'Password (10+ chars, mixed case, a number)'}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            minLength={mode === 'signup' ? 10 : 8}
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="password" className="sr-only">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder={mode === 'login' ? 'Password' : 'Password (10+ chars, mixed case, a number)'}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              minLength={mode === 'signup' ? 10 : 8}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
 
           {mode === 'signup' && (
             <>
-              <label className="visually-hidden" htmlFor="confirm">Confirm password</label>
-              <input
-                id="confirm"
-                type="password"
-                placeholder="Confirm password"
-                autoComplete="new-password"
-                minLength={10}
-                required
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-              />
-              <label className="visually-hidden" htmlFor="display">Display name</label>
-              <input id="display" type="text" placeholder="Display name (optional)" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="confirm" className="sr-only">Confirm password</Label>
+                <Input id="confirm" type="password" placeholder="Confirm password" autoComplete="new-password" minLength={10} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="display" className="sr-only">Display name</Label>
+                <Input id="display" type="text" placeholder="Display name (optional)" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+              </div>
             </>
           )}
 
-          {auth.error && <p className="form-error">{auth.error}</p>}
+          {auth.error && <p className="text-sm text-destructive">{auth.error}</p>}
 
-          <button type="submit" className="primary-button" disabled={busy}>
-            {mode === 'login' ? <LogIn size={14} /> : <UserPlus size={14} />}
+          <Button type="submit" disabled={busy} className="w-full">
+            {mode === 'login' ? <LogIn className="size-4" /> : <UserPlus className="size-4" />}
             {busy ? 'Working…' : mode === 'login' ? 'Sign in' : 'Create account'}
-          </button>
+          </Button>
         </form>
 
-        <button type="button" className="link-button" onClick={() => auth.continueAsGuest()}>
-          <KeyRound size={12} style={{ verticalAlign: -1, marginRight: 4 }} />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="mt-3 w-full text-muted-foreground"
+          onClick={() => auth.continueAsGuest()}
+        >
+          <KeyRound className="size-3.5" />
           Continue without an account (local-only)
-        </button>
+        </Button>
 
-        <p className="lock-copy">
+        <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
           Data syncs to your account on Cloudflare over HTTPS. No third-party trackers or analytics.
         </p>
       </div>
