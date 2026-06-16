@@ -10,6 +10,7 @@ import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { ChartCard } from '../components/dashboard/ChartCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 
 const symptomChartConfig = {
@@ -196,50 +197,67 @@ export function Symptoms() {
         {symptoms.length === 0 ? (
           <PanelEmpty icon={Brain} title="No check-ins yet" detail="Log how you feel above to start a trend." />
         ) : (
-          <ul className="flex flex-col">
-            {symptoms.slice(0, 8).map((s, i) => (
-              <li key={s.id} className={`relative py-2.5 pr-9 ${i > 0 ? 'border-t' : ''}`}>
-                <div className="flex items-baseline justify-between gap-2">
-                  <strong className="text-sm">{format(parseISO(s.recordedAt), 'EEE MMM d')}</strong>
-                  <span className="text-xs text-muted-foreground">{formatDistanceToNow(parseISO(s.recordedAt), { addSuffix: true })}</span>
-                </div>
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {(['mood', 'energy', 'sleep', 'libido'] as const).map((k) => {
-                    const v = s[k]
-                    if (typeof v !== 'number') return null
-                    return (
-                      <span
-                        key={k}
-                        className={[
-                          'rounded-full px-2 py-0.5 text-[11px] tabular-nums',
-                          chipTone(v, 'positive') === 'good'
-                            ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400'
-                            : chipTone(v, 'positive') === 'bad'
-                              ? 'bg-destructive/12 text-destructive'
-                              : 'bg-secondary text-muted-foreground',
-                        ].join(' ')}
-                      >
-                        {k[0].toUpperCase() + k.slice(1)} {v}
-                      </span>
-                    )
-                  })}
-                </div>
-                {s.notes && <p className="mt-1.5 text-xs text-muted-foreground">{s.notes}</p>}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-2 size-7 text-muted-foreground hover:text-destructive"
-                  aria-label="Delete check-in"
-                  onClick={() => {
-                    const snapshot = { ...s }
-                    void deleteWithUndo({ label: 'Check-in deleted', remove: () => db.symptoms.delete(s.id!), restore: () => db.symptoms.put(snapshot) })
-                  }}
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </li>
-            ))}
-          </ul>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[140px]">Date</TableHead>
+                <TableHead>Scores</TableHead>
+                <TableHead className="hidden md:table-cell">Notes</TableHead>
+                <TableHead className="hidden w-[100px] md:table-cell">When</TableHead>
+                <TableHead className="w-[44px] text-right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {symptoms.slice(0, 8).map((s) => (
+                <TableRow key={s.id}>
+                  <TableCell className="font-medium">{format(parseISO(s.recordedAt), 'EEE MMM d')}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {(['mood', 'energy', 'sleep', 'libido'] as const).map((k) => {
+                        const v = s[k]
+                        if (typeof v !== 'number') return null
+                        return (
+                          <span
+                            key={k}
+                            className={[
+                              'rounded-full px-2 py-0.5 text-[11px] tabular-nums',
+                              chipTone(v, 'positive') === 'good'
+                                ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400'
+                                : chipTone(v, 'positive') === 'bad'
+                                  ? 'bg-destructive/12 text-destructive'
+                                  : 'bg-secondary text-muted-foreground',
+                            ].join(' ')}
+                          >
+                            {k[0].toUpperCase() + k.slice(1)} {v}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
+                    {s.notes ?? '—'}
+                  </TableCell>
+                  <TableCell className="hidden font-mono text-xs tabular-nums text-muted-foreground md:table-cell">
+                    {formatDistanceToNow(parseISO(s.recordedAt), { addSuffix: true })}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-muted-foreground hover:text-destructive"
+                      aria-label="Delete check-in"
+                      onClick={() => {
+                        const snapshot = { ...s }
+                        void deleteWithUndo({ label: 'Check-in deleted', remove: () => db.symptoms.delete(s.id!), restore: () => db.symptoms.put(snapshot) })
+                      }}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </PanelCard>
     </DashGrid>

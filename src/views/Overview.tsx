@@ -285,20 +285,35 @@ export function Overview({
               </Button>
             }
           >
-            <div className="flex flex-col">
-              {labFlags.slice(0, 6).map((result, i) => (
-                <div key={result.id} className={`flex items-center gap-3 py-2.5 ${i > 0 ? 'border-t' : ''}`}>
-                  <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{result.marker}</p>
-                    <p className="truncate text-xs text-muted-foreground">{result.rawValue} {result.unit ?? ''} · ref {result.low ?? '?'}–{result.high ?? '?'}</p>
-                  </div>
-                  <span className="shrink-0 rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-bold uppercase text-destructive">
-                    {labStatusLabel(result)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Marker</TableHead>
+                  <TableHead>Value</TableHead>
+                  <TableHead className="hidden md:table-cell">Reference</TableHead>
+                  <TableHead className="w-[60px] text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {labFlags.slice(0, 6).map((result) => (
+                  <TableRow key={result.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
+                        <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                        <span className="truncate font-medium">{result.marker}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono tabular-nums">{result.rawValue} {result.unit ?? ''}</TableCell>
+                    <TableCell className="hidden font-mono text-xs tabular-nums text-muted-foreground md:table-cell">{result.low ?? '?'}–{result.high ?? '?'}</TableCell>
+                    <TableCell className="text-right">
+                      <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-[10px] font-bold uppercase text-destructive">
+                        {labStatusLabel(result)}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </PanelCard>
         )}
       </DashGrid>

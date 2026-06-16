@@ -7,7 +7,7 @@ import { ensureBlobAvailable } from '../lib/fileSync'
 import { DashGrid } from '../components/dashboard/Grid'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import type { HealthFile } from '../lib/db'
 type StoredFile = HealthFile
@@ -60,11 +60,20 @@ export function Files({
 
       <PanelCard className="md:col-span-2 xl:col-span-4" subtitle="Storage" title="Local files">
         {files.length > 0 ? (
-          <div className="flex flex-col">
-            {files.map((f, i) => (
-              <FileRow file={f} first={i === 0} key={f.id} />
-            ))}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Name</TableHead>
+                <TableHead className="hidden md:table-cell">Size</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">Added</TableHead>
+                <TableHead className="w-[120px] text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {files.map((f) => <FileRow file={f} key={f.id} />)}
+            </TableBody>
+          </Table>
         ) : (
           <PanelEmpty icon={FileText} title="No files" detail="PDF lab reports get parsed and prepared for review." />
         )}
@@ -73,12 +82,13 @@ export function Files({
   )
 }
 
-function FileRow({ file, first }: { file: StoredFile; first: boolean }) {
+function FileRow({ file }: { file: StoredFile }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const hasLocal = Boolean(file.blob)
   const hasRemote = Boolean(file.r2Key)
   const canOpen = hasLocal || hasRemote
+  const location = !hasLocal && hasRemote ? 'in cloud' : hasLocal && !hasRemote ? 'local only' : null
 
   async function open() {
     setError(null)
@@ -109,24 +119,29 @@ function FileRow({ file, first }: { file: StoredFile; first: boolean }) {
   }
 
   return (
-    <div className={cn('flex items-center gap-3 py-2.5', !first && 'border-t')}>
-      <FileText className="size-3.5 shrink-0 text-muted-foreground" />
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{file.name}</p>
-        <p className="truncate text-xs text-muted-foreground">
-          {Math.round(file.size / 1024)} KB · {file.status}
-          {!hasLocal && hasRemote ? ' · in cloud' : ''}
-          {hasLocal && !hasRemote ? ' · local only' : ''}
-          {error ? ` · ${error}` : ''}
-        </p>
-      </div>
-      <time className="shrink-0 text-xs text-muted-foreground">{format(parseISO(file.addedAt), 'MMM d')}</time>
-      <Button variant="outline" size="sm" className="h-7 shrink-0 px-2.5 text-xs" disabled={!canOpen || busy} onClick={open}>
-        {busy ? '…' : hasLocal ? 'Open' : <><CloudDownload className="size-3" /> Fetch</>}
-      </Button>
-      <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={remove} aria-label="Delete file">
-        <Trash2 className="size-3.5" />
-      </Button>
-    </div>
+    <TableRow>
+      <TableCell>
+        <div className="flex items-center gap-2.5">
+          <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate font-medium">{file.name}</span>
+        </div>
+        {error && <p className="mt-0.5 text-xs text-destructive">{error}</p>}
+      </TableCell>
+      <TableCell className="hidden font-mono text-xs tabular-nums text-muted-foreground md:table-cell">{Math.round(file.size / 1024)} KB</TableCell>
+      <TableCell className="text-xs text-muted-foreground">
+        {file.status}{location ? ` · ${location}` : ''}
+      </TableCell>
+      <TableCell className="hidden font-mono text-xs tabular-nums text-muted-foreground md:table-cell">{format(parseISO(file.addedAt), 'MMM d')}</TableCell>
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-1">
+          <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" disabled={!canOpen || busy} onClick={open}>
+            {busy ? '…' : hasLocal ? 'Open' : <><CloudDownload className="size-3" /> Fetch</>}
+          </Button>
+          <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" onClick={remove} aria-label="Delete file">
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
   )
 }

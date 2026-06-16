@@ -20,7 +20,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 export function Protocols({
   compounds,
@@ -129,34 +129,53 @@ function RecentDoses({ injections, compounds }: { injections: InjectionLog[]; co
       )}
 
       {injections.length > 0 ? (
-        <div className="flex flex-col">
-          {injections.slice(0, 10).map((entry, i) => {
-            const c = compoundMap.get(entry.compoundId)
-            return (
-              <div key={entry.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
-                <span className="size-2 shrink-0 rounded-full" style={{ background: c?.color ?? 'var(--primary)' }} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{c?.name ?? 'Unknown'}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {entry.rawDose ?? `${entry.dose ?? ''} ${entry.unit}`}
-                    {entry.site ? ` · ${entry.site}` : ''}
-                    {entry.weightKg !== undefined ? ` · ${entry.weightKg} kg` : ''}
-                    {entry.notes ? ` · ${entry.notes}` : ''}
-                  </p>
-                </div>
-                <time className="shrink-0 text-xs tabular-nums text-muted-foreground">{format(parseISO(entry.takenAt), 'MMM d HH:mm')}</time>
-                <div className="flex shrink-0 gap-1">
-                  <Button variant="ghost" size="icon" className="size-8" onClick={() => setEditEntry(entry)} aria-label="Edit">
-                    <Pencil className="size-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive" onClick={() => setConfirmId(entry.id!)} aria-label="Delete">
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Compound</TableHead>
+              <TableHead>Dose</TableHead>
+              <TableHead className="hidden md:table-cell">Route</TableHead>
+              <TableHead className="hidden md:table-cell">Site</TableHead>
+              <TableHead>When</TableHead>
+              <TableHead className="w-[80px] text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {injections.slice(0, 10).map((entry) => {
+              const c = compoundMap.get(entry.compoundId)
+              return (
+                <TableRow key={entry.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2.5">
+                      <span className="size-2.5 shrink-0 rounded-full" style={{ background: c?.color ?? 'var(--primary)' }} />
+                      <span className="truncate font-medium">{c?.name ?? 'Unknown'}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono tabular-nums">{entry.rawDose ?? `${entry.dose ?? ''} ${entry.unit}`}</TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {entry.route && (
+                      <span className="rounded-full border border-border bg-secondary/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {entry.route}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="hidden text-muted-foreground md:table-cell">{entry.site ?? '—'}</TableCell>
+                  <TableCell className="font-mono text-xs tabular-nums text-muted-foreground">{format(parseISO(entry.takenAt), 'MMM d HH:mm')}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-0.5">
+                      <Button variant="ghost" size="icon" className="size-7" onClick={() => setEditEntry(entry)} aria-label="Edit">
+                        <Pencil className="size-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" onClick={() => setConfirmId(entry.id!)} aria-label="Delete">
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
       ) : (
         <PanelEmpty icon={Syringe} title="No injections logged" detail="Tap Log on a compound card or use Quick Log in the sidebar." />
       )}

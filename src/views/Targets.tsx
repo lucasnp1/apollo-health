@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 export function Targets() {
@@ -71,42 +72,61 @@ function GoalEditor() {
       action={<Badge variant="secondary">You set the bar</Badge>}
     >
       {goals.length > 0 ? (
-        <div className="mb-4 flex flex-col">
-          {goals.map((g, i) => {
-            const progress = computeProgress(g, { weight: weightLatest, bpSys: bpLatest?.systolic, results })
-            return (
-              <div key={g.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
-                <span className="text-muted-foreground"><Icon kind={g.kind} /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{g.label}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    Started {format(parseISO(g.startedAt), 'MMM d, yyyy')}
-                    {g.achievedAt ? ` · achieved ${format(parseISO(g.achievedAt), 'MMM d')}` : ''}
-                  </p>
-                </div>
-                <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-                  {progress.currentLabel} → {progress.targetLabel}
-                </span>
-                <Badge variant="secondary" className={cn('shrink-0', TONE_BADGE[progress.tone])}>{progress.headline}</Badge>
-                <div className="flex shrink-0 gap-1">
-                  {!g.achievedAt && progress.tone === 'good' && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      aria-label="Mark achieved"
-                      onClick={() => db.goals.update(g.id!, { achievedAt: new Date().toISOString() })}
-                    >
-                      <Check className="size-3.5" />
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Delete goal" onClick={() => db.goals.delete(g.id!)}>
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
-              </div>
-            )
-          })}
+        <div className="mb-4">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Goal</TableHead>
+                <TableHead className="hidden md:table-cell">Started</TableHead>
+                <TableHead>Progress</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-[80px] text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {goals.map((g) => {
+                const progress = computeProgress(g, { weight: weightLatest, bpSys: bpLatest?.systolic, results })
+                return (
+                  <TableRow key={g.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-muted-foreground"><Icon kind={g.kind} /></span>
+                        <span className="truncate font-medium">{g.label}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
+                      {format(parseISO(g.startedAt), 'MMM d, yyyy')}
+                      {g.achievedAt ? ` · achieved ${format(parseISO(g.achievedAt), 'MMM d')}` : ''}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs tabular-nums text-muted-foreground">
+                      {progress.currentLabel} → {progress.targetLabel}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className={cn(TONE_BADGE[progress.tone])}>{progress.headline}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-0.5">
+                        {!g.achievedAt && progress.tone === 'good' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            aria-label="Mark achieved"
+                            onClick={() => db.goals.update(g.id!, { achievedAt: new Date().toISOString() })}
+                          >
+                            <Check className="size-3.5" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Delete goal" onClick={() => db.goals.delete(g.id!)}>
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
         </div>
       ) : (
         <PanelEmpty icon={Target} title="No goals yet" detail="A goal turns into progress bars and remaining-delta callouts across the app." />
@@ -255,28 +275,43 @@ function MarkerTargetEditor() {
       </p>
 
       {targets.length > 0 ? (
-        <div className="mb-4 flex flex-col">
-          {targets.map((t, i) => {
-            const meta = metaForKey(t.marker)
-            const label = meta?.label ?? t.marker
-            return (
-              <div key={t.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{label}</p>
-                  <p className="truncate text-xs text-muted-foreground">{t.rationale || (meta?.unit ?? t.unit ?? '')}</p>
-                </div>
-                <div className="w-28 shrink-0">
-                  <RangeBar value={t.low !== undefined && t.high !== undefined ? (t.low + t.high) / 2 : undefined} low={t.low} high={t.high} />
-                </div>
-                <Badge variant="secondary" className="shrink-0 font-mono tabular-nums">
-                  {t.low ?? '?'} – {t.high ?? '?'} {t.unit ?? meta?.unit ?? ''}
-                </Badge>
-                <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-destructive" aria-label="Remove target" onClick={() => db.markerTargets.delete(t.id!)}>
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
-            )
-          })}
+        <div className="mb-4">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Marker</TableHead>
+                <TableHead className="hidden md:table-cell">Notes</TableHead>
+                <TableHead className="w-[120px]">Range</TableHead>
+                <TableHead>Target</TableHead>
+                <TableHead className="w-[44px] text-right" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {targets.map((t) => {
+                const meta = metaForKey(t.marker)
+                const label = meta?.label ?? t.marker
+                return (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-medium">{label}</TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground md:table-cell">{t.rationale || (meta?.unit ?? t.unit ?? '')}</TableCell>
+                    <TableCell>
+                      <RangeBar value={t.low !== undefined && t.high !== undefined ? (t.low + t.high) / 2 : undefined} low={t.low} high={t.high} />
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="font-mono tabular-nums">
+                        {t.low ?? '?'} – {t.high ?? '?'} {t.unit ?? meta?.unit ?? ''}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Remove target" onClick={() => db.markerTargets.delete(t.id!)}>
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
         </div>
       ) : (
         <PanelEmpty icon={Target} title="No personal ranges" detail="Catalog defaults are used until you set your own." />

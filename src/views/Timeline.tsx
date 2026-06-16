@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 type EventType = 'injection' | 'bp' | 'lab' | 'file' | 'symptom'
@@ -102,20 +103,28 @@ function TimelineGrouped({ events }: { events: TimelineEvent[] }) {
               <span className="text-xs text-muted-foreground">{group.subLabel}</span>
             )}
           </div>
-          <div className="flex flex-col">
-            {group.events.map((e, i) => (
-              <div key={e.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground">
-                  <e.icon className="size-3.5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{e.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">{e.detail}</p>
-                </div>
-                <time className="shrink-0 text-xs tabular-nums text-muted-foreground">{format(e.date, 'HH:mm')}</time>
-              </div>
-            ))}
-          </div>
+          <Table>
+            <TableBody>
+              {group.events.map((e) => (
+                <TableRow key={e.id}>
+                  <TableCell className="w-[44px]">
+                    <span className="grid size-7 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground">
+                      <e.icon className="size-3.5" />
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <p className="truncate font-medium">{e.title}</p>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    <p className="truncate text-xs">{e.detail}</p>
+                  </TableCell>
+                  <TableCell className="w-[60px] text-right font-mono text-xs tabular-nums text-muted-foreground">
+                    {format(e.date, 'HH:mm')}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       ))}
     </div>
