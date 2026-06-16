@@ -18,9 +18,6 @@ import { Label } from '@/components/ui/label'
 import {
   Sheet, SheetBody, SheetContent, SheetFooter, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 type Tab = 'injection' | 'bp'
@@ -365,10 +362,13 @@ function DoseField({
 
 type SiteStat = { site: string; lastMs: number; daysAgo: number; lastCompoundId?: number }
 
+// Recency tinting:
+//   selected         → primary ring
+//   < 7 days         → red (you injected here recently — avoid)
+//   ≥ 7 days unused  → neutral / fresh (safe to use)
 function recencyChip(daysAgo: number, selected: boolean): string {
   if (selected) return 'border-primary bg-primary/15 text-foreground ring-1 ring-primary'
-  if (daysAgo < 2) return 'border-destructive/50 bg-destructive/10 text-destructive'
-  if (daysAgo < 4) return 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+  if (daysAgo < 7) return 'border-destructive/50 bg-destructive/10 text-destructive'
   return 'border-border text-muted-foreground hover:bg-accent hover:text-foreground'
 }
 
@@ -415,31 +415,40 @@ function SitePicker({
     return [...map.values()]
   }, [injections, now])
 
-  const statFor = (site: string): SiteStat | undefined => stats.find((s) => s.site === site)
-
   // Most recent injection overall (any site) — "what you last did".
   const lastOverall = useMemo(
     () => stats.slice().sort((a, b) => b.lastMs - a.lastMs)[0],
     [stats],
   )
 
-  // Recommended next site: the group site used longest ago (unused wins).
-  const ranked = useMemo(
-    () => groupSites
-      .map((site) => statFor(site) ?? { site, lastMs: 0, daysAgo: Infinity })
-      .sort((a, b) => b.daysAgo - a.daysAgo),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [groupSites, stats],
+  // Default chips = only sites that have been used (sorted by least-recent first
+  // so the safest options surface at the top). Unused sites live behind 'More'.
+  const usedRanked = useMemo(
+    () => stats.slice().sort((a, b) => b.daysAgo - a.daysAgo),
+    [stats],
   )
-  const recommended = ranked[0]?.site
 
-  // Sites that aren't in the standard group list but were used (custom).
+  // Recommendation logic:
+  //   - If there's any used site with ≥ 7 days of rest, star the freshest one.
+  //   - Otherwise nothing gets a star (everything is "recently used" / red).
+  const recommended = useMemo(() => {
+    const fresh = usedRanked.find((s) => s.daysAgo >= 7)
+    return fresh?.site
+  }, [usedRanked])
+
+  // Recent custom sites (logged but not in the standard group list).
   const recentCustom = useMemo(
     () => stats
       .filter((s) => !groupSites.includes(s.site))
       .sort((a, b) => b.lastMs - a.lastMs)
-      .slice(0, 4),
+      .slice(0, 6),
     [stats, groupSites],
+  )
+
+  // Unused group sites — kept hidden by default, revealed by 'More sites'.
+  const unusedGroupSites = useMemo(
+    () => groupSites.filter((site) => !stats.some((s) => s.site === site)),
+    [groupSites, stats],
   )
 
   const recentSites = useMemo(
@@ -449,37 +458,41 @@ function SitePicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between gap-2">
         <Label>Site</Label>
         {lastOverall && (
-          <span className="text-xs text-muted-foreground">
+          <span className="truncate text-xs text-muted-foreground">
             Last: <span className="font-medium text-foreground">{lastOverall.site}</span>
             {compoundName(lastOverall.lastCompoundId) ? ` · ${compoundName(lastOverall.lastCompoundId)}` : ''} · {daysLabel(lastOverall.daysAgo)}
           </span>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {ranked.map(({ site, daysAgo }) => {
-          const selected = value === site
-          const isRec = site === recommended
-          return (
-            <button
-              key={site}
-              type="button"
-              onClick={() => onChange(site)}
-              className={cn(
-                'flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
-                recencyChip(daysAgo, selected),
-              )}
-            >
-              {isRec && !selected && <Star className="size-3 fill-current text-primary" />}
-              {site}
-              <small className="text-[10px] font-normal opacity-70">{daysLabel(daysAgo)}</small>
-            </button>
-          )
-        })}
-      </div>
+      {usedRanked.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {usedRanked.map(({ site, daysAgo }) => {
+            const selected = value === site
+            const isRec = site === recommended
+            return (
+              <button
+                key={site}
+                type="button"
+                onClick={() => onChange(site)}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                  recencyChip(daysAgo, selected),
+                )}
+              >
+                {isRec && !selected && <Star className="size-3 fill-current text-primary" />}
+                {site}
+                <small className="text-[10px] font-normal opacity-70">{daysLabel(daysAgo)}</small>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No sites used yet — pick one from <em>More sites</em>.</p>
+      )}
 
       {recommended && value !== recommended && (
         <button
@@ -491,9 +504,28 @@ function SitePicker({
         </button>
       )}
 
-      {/* Custom / full list */}
+      {/* Hidden unused sites + custom */}
       {moreOpen ? (
-        <div className="pt-1">
+        <div className="flex flex-col gap-2 pt-1">
+          {unusedGroupSites.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {unusedGroupSites.map((site) => (
+                <button
+                  key={site}
+                  type="button"
+                  onClick={() => onChange(site)}
+                  className={cn(
+                    'rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                    value === site
+                      ? 'border-primary bg-primary/15 text-foreground ring-1 ring-primary'
+                      : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+                  )}
+                >
+                  {site}
+                </button>
+              ))}
+            </div>
+          )}
           <SiteCombobox value={value} onChange={onChange} recentSites={[...recentSites, ...recentCustom.map((s) => s.site)]} />
         </div>
       ) : (
@@ -625,15 +657,18 @@ function InjectionForm({
     <>
       <SheetBody>
         <div className="flex flex-col gap-4">
-          {/* Compound */}
+          {/* Compound — native select avoids the Radix popover overlap inside a sheet */}
           <div className="flex flex-col gap-1.5">
-            <Label>Compound</Label>
-            <Select value={String(compoundId)} onValueChange={(v) => setCompoundId(Number(v))}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {compounds.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Label htmlFor="ql-compound">Compound</Label>
+            <select
+              id="ql-compound"
+              value={String(compoundId)}
+              onChange={(e) => setCompoundId(Number(e.target.value))}
+              className="h-10 w-full appearance-none rounded-md border border-input bg-transparent bg-[length:1em_1em] bg-[right_0.75rem_center] bg-no-repeat pr-8 pl-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              style={{ backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m6 9 6 6 6-6'/%3e%3c/svg%3e\")" }}
+            >
+              {compounds.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+            </select>
           </div>
 
           {/* Dose + syringe calculator */}
