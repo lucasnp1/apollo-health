@@ -17,6 +17,7 @@ import { SiteRotation } from '../components/SiteRotation'
 import { lazy, Suspense } from 'react'
 const ActiveLevelsCard = lazy(() => import('../components/ActiveLevelsCard').then((m) => ({ default: m.ActiveLevelsCard })))
 import { Button } from '@/components/ui/button'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { View } from '../app/views'
 import type { QuickLogPrefill } from '../App'
 
@@ -220,9 +221,9 @@ export function Overview({
           </div>
         )}
 
-        {/* ── 4. Recent doses — same row treatment as Up next subtitle for consistency ── */}
+        {/* ── 4. Recent doses — full-width on desktop, shadcn Table for clean column alignment ── */}
         <PanelCard
-          className="md:col-span-2 xl:col-span-3"
+          className="md:col-span-2 xl:col-span-6"
           title="Recent doses"
           action={
             <Button variant="ghost" size="sm" onClick={() => onNavigate('meds')}>
@@ -231,31 +232,42 @@ export function Overview({
           }
         >
           {injections.length > 0 ? (
-            <div className="flex flex-col">
-              {injections.slice(0, 6).map((inj, i) => {
-                const compound = compoundMap.get(inj.compoundId)
-                return (
-                  <div key={inj.id} className={`flex items-center gap-3 py-2.5 ${i > 0 ? 'border-t' : ''}`}>
-                    <span className="size-2.5 shrink-0 rounded-full" style={{ background: compound?.color ?? 'var(--primary)' }} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{compound?.name ?? 'Injection'}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        <span className="font-mono tabular-nums">{inj.dose} {inj.unit}</span>
-                        {inj.site ? ` · ${inj.site}` : ''}
-                      </p>
-                    </div>
-                    {inj.route && (
-                      <span className="shrink-0 rounded-full border border-border bg-secondary/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {inj.route}
-                      </span>
-                    )}
-                    <time className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
-                      {compactAgo(inj.takenAt)}
-                    </time>
-                  </div>
-                )
-              })}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[36%]">Compound</TableHead>
+                  <TableHead className="w-[14%]">Dose</TableHead>
+                  <TableHead className="hidden w-[10%] md:table-cell">Route</TableHead>
+                  <TableHead className="hidden md:table-cell">Site</TableHead>
+                  <TableHead className="w-[16%] text-right">When</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {injections.slice(0, 8).map((inj) => {
+                  const compound = compoundMap.get(inj.compoundId)
+                  return (
+                    <TableRow key={inj.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <span className="size-2.5 shrink-0 rounded-full" style={{ background: compound?.color ?? 'var(--primary)' }} />
+                          <span className="truncate font-medium">{compound?.name ?? 'Injection'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono tabular-nums">{inj.dose} {inj.unit}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {inj.route && (
+                          <span className="rounded-full border border-border bg-secondary/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                            {inj.route}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden text-muted-foreground md:table-cell">{inj.site ?? '—'}</TableCell>
+                      <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">{compactAgo(inj.takenAt)}</TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
           ) : (
             <PanelEmpty icon={Syringe} title="No doses logged yet" detail="Tap + Add to log your first injection." />
           )}

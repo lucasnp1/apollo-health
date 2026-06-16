@@ -14,10 +14,17 @@ export function DashGrid({ children, className }: { children: ReactNode; classNa
   )
 }
 
-/** Top KPI row — wraps 2-up on phones, 3-up on tablets, 6-up on wide. */
+/**
+ * Top KPI row — auto-fits as many cards as the viewport can hold, with a
+ * sensible minimum so phones get 2-up and desktops get 4–6-up regardless of
+ * how many StatCards a view chooses to render. Removes the "4 cards in a
+ * 6-track grid leaves a gap" awkwardness.
+ */
 export function StatRow({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('grid grid-cols-2 gap-5 md:grid-cols-3 2xl:grid-cols-6', className)}>
+    <div
+      className={cn('grid gap-5 grid-cols-[repeat(auto-fit,minmax(170px,1fr))]', className)}
+    >
       {children}
     </div>
   )

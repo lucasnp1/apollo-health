@@ -16,10 +16,21 @@ import type { Compound, InjectionLog } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
 import { PanelCard, PanelEmpty } from './dashboard/PanelCard'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Activity } from 'lucide-react'
+import { Activity, ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const MS_PER_DAY = 86_400_000
 const WINDOW_DAYS = 60
+
+function mean(xs: number[]): number {
+  return xs.length === 0 ? 0 : xs.reduce((s, x) => s + x, 0) / xs.length
+}
+
+function stdev(xs: number[]): number {
+  if (xs.length < 2) return 0
+  const m = mean(xs)
+  return Math.sqrt(xs.reduce((s, x) => s + (x - m) ** 2, 0) / xs.length)
+}
 
 // Same ester-name fallbacks the timeline card uses, kept inline so this card
 // doesn't depend on PKOverviewCard.
@@ -38,6 +49,19 @@ type Legend = {
   color: string
   current: number
   peak: { level: number; dayNum: number } | null
+  // 7-day mean now vs 7-day mean a week earlier — direction of travel.
+  trend: 'up' | 'down' | 'flat'
+  trendPct: number
+  // Coefficient of variation over the trailing 14 days. Lower = more
+  // even serum levels (less peak/trough swing); higher = spikier.
+  stability: 'stable' | 'variable' | 'spiky'
+  cv: number
+}
+
+const STABILITY_META: Record<Legend['stability'], { label: string; cls: string }> = {
+  stable:   { label: 'Stable',   cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
+  variable: { label: 'Variable', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  spiky:    { label: 'Spiky',    cls: 'bg-destructive/15 text-destructive' },
 }
 
 export function ActiveLevelsCard({
@@ -104,17 +128,46 @@ export function ActiveLevelsCard({
     const legend: Legend[] = eligible.map((c) => {
       const key = `c${c.id}`
       const last = data[data.length - 1]
+      // Pull this compound's daily levels back out for stats math.
+      const series = data.map((pt) => (typeof pt[key] === 'number' ? (pt[key] as number) : 0))
+      const recent7 = series.slice(-7)
+      const prior7 = series.slice(-14, -7)
+      const trailing14 = series.slice(-14)
+      const meanRecent = mean(recent7)
+      const meanPrior = mean(prior7)
+      const trendPct = meanPrior > 0.01 ? ((meanRecent - meanPrior) / meanPrior) * 100 : 0
+      const trend: Legend['trend'] = trendPct > 10 ? 'up' : trendPct < -10 ? 'down' : 'flat'
+      const cv = stdev(trailing14) / Math.max(mean(trailing14), 0.01) * 100
+      const stability: Legend['stability'] = cv < 15 ? 'stable' : cv < 30 ? 'variable' : 'spiky'
       return {
         key,
         name: c.name,
         color: c.color,
         current: typeof last[key] === 'number' ? (last[key] as number) : 0,
         peak: peakOf[key] ?? null,
+        trend,
+        trendPct,
+        stability,
+        cv,
       }
     })
 
     return { data, legend, anchorMs }
   }, [compounds, injections])
+
+  const totalNow = legend.reduce((s, l) => s + l.current, 0)
+  const totalPeak = useMemo(() => {
+    if (data.length === 0) return 0
+    let max = 0
+    for (const pt of data) {
+      let sum = 0
+      for (const l of legend) sum += typeof pt[l.key] === 'number' ? (pt[l.key] as number) : 0
+      if (sum > max) max = sum
+    }
+    return max
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, legend])
+  const totalPct = totalPeak > 0 ? Math.round((totalNow / totalPeak) * 100) : 0
 
   if (legend.length === 0) {
     return (
@@ -161,22 +214,52 @@ export function ActiveLevelsCard({
         </AreaChart>
       </ChartContainer>
 
-      {/* Per-compound readout — current level + when it peaked in the window */}
-      <ul className="mt-4 flex flex-col gap-1.5">
-        {legend.map((s) => (
-          <li key={s.key} className="flex items-center gap-2.5 text-xs">
-            <span className="size-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
-            <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
-            <span className="font-mono tabular-nums text-muted-foreground">
-              {s.current.toFixed(1)} <small className="text-[10px]">mg/d now</small>
-            </span>
-            {s.peak && s.peak.level > 0.1 && (
-              <span className="font-mono tabular-nums text-muted-foreground">
-                · peak {s.peak.level.toFixed(1)} on {format(new Date(anchorMs + s.peak.dayNum * MS_PER_DAY), 'MMM d')}
+      {/* Total active now — single big number, with how much of your peak that represents */}
+      <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t pt-3">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total active now</span>
+        <span className="font-mono text-2xl font-semibold tabular-nums">
+          {totalNow.toFixed(1)}
+          <small className="ml-1 text-xs font-normal text-muted-foreground">mg/d</small>
+        </span>
+        {totalPeak > 0.1 && (
+          <span className="text-xs text-muted-foreground">
+            {totalPct}% of 60d peak ({totalPeak.toFixed(1)})
+          </span>
+        )}
+      </div>
+
+      {/* Per-compound readout — current level + 7d trend + stability chip + window peak */}
+      <ul className="mt-3 flex flex-col gap-2">
+        {legend.map((s) => {
+          const TrendIcon = s.trend === 'up' ? ArrowUpRight : s.trend === 'down' ? ArrowDownRight : Minus
+          const trendCls = s.trend === 'up'
+            ? 'text-emerald-700 dark:text-emerald-400'
+            : s.trend === 'down'
+              ? 'text-destructive'
+              : 'text-muted-foreground'
+          const stab = STABILITY_META[s.stability]
+          return (
+            <li key={s.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              <span className="size-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
+              <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
+              <span className="font-mono tabular-nums">
+                {s.current.toFixed(1)} <small className="text-[10px] font-normal text-muted-foreground">mg/d</small>
               </span>
-            )}
-          </li>
-        ))}
+              <span className={cn('flex items-center gap-0.5 font-mono tabular-nums', trendCls)}>
+                <TrendIcon className="size-3" />
+                {s.trend === 'flat' ? 'steady' : `${s.trendPct > 0 ? '+' : ''}${s.trendPct.toFixed(0)}% 7d`}
+              </span>
+              <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide', stab.cls)}>
+                {stab.label}
+              </span>
+              {s.peak && s.peak.level > 0.1 && (
+                <span className="basis-full pl-5 font-mono tabular-nums text-muted-foreground">
+                  peak {s.peak.level.toFixed(1)} on {format(new Date(anchorMs + s.peak.dayNum * MS_PER_DAY), 'MMM d')} · CV {s.cv.toFixed(0)}%
+                </span>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </PanelCard>
   )
