@@ -399,3 +399,72 @@ function scoreCandidate(
 
   return score
 }
+
+// ── Collection date extraction ────────────────────────────────────────────
+// Lab PDFs typically print one of: "Collection Date", "Specimen Collected",
+// "Date Collected", "Sample Date", "Reported", "Sample taken on". We scan
+// for any of those labels followed by a date in common formats, prefer the
+// earliest plausible match (collection beats report date), and return an
+// ISO yyyy-mm-dd string. Returns undefined when nothing recognisable found.
+
+const DATE_LABELS = [
+  /\b(?:collection|specimen|sample)\s*(?:date|collected|taken)\b/i,
+  /\bdate\s+(?:of\s+)?collect(?:ed|ion)\b/i,
+  /\bcollected\s*(?:on|at)?\b/i,
+  /\bspecimen\s+received\b/i,
+  /\bsample\s+(?:date|received|taken)\b/i,
+  /\b(?:reported|report)\s*(?:date)?\b/i,
+]
+
+// Parse a captured date string into yyyy-mm-dd. Handles:
+//   2025-06-12, 12/06/2025, 12-06-2025, 12 Jun 2025, June 12 2025
+function parseLabDate(raw: string): string | undefined {
+  const s = raw.trim()
+
+  // ISO yyyy-mm-dd
+  let m = s.match(/(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+
+  // d/m/yyyy or m/d/yyyy — we can't disambiguate without locale; default
+  // to day-first since most lab PDFs the user uploads are UK Medichecks.
+  m = s.match(/(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})/)
+  if (m) {
+    const a = parseInt(m[1], 10)
+    const b = parseInt(m[2], 10)
+    // If first number > 12 it can only be day-first. Otherwise default day-first.
+    const day = a > 12 ? a : a
+    const month = a > 12 ? b : b
+    void day; void month
+    return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
+  }
+
+  // d Mon yyyy or Mon d yyyy
+  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+  m = s.match(/(\d{1,2})\s+([A-Za-z]{3,9})\s+(20\d{2})/)
+  if (m) {
+    const mi = months.indexOf(m[2].slice(0, 3).toLowerCase())
+    if (mi >= 0) return `${m[3]}-${String(mi + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`
+  }
+  m = s.match(/([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(20\d{2})/)
+  if (m) {
+    const mi = months.indexOf(m[1].slice(0, 3).toLowerCase())
+    if (mi >= 0) return `${m[3]}-${String(mi + 1).padStart(2, '0')}-${m[2].padStart(2, '0')}`
+  }
+  return undefined
+}
+
+export function extractCollectionDate(text: string): string | undefined {
+  // Search each labelled match within a 60-character window after the label.
+  const found: string[] = []
+  for (const label of DATE_LABELS) {
+    const re = new RegExp(label.source + '.{0,60}', label.flags + 'g')
+    for (const m of text.matchAll(re)) {
+      const iso = parseLabDate(m[0])
+      if (iso) found.push(iso)
+    }
+  }
+  if (found.length === 0) return undefined
+  // Earliest date wins — collection date is earlier than report date.
+  found.sort()
+  return found[0]
+}

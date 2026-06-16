@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -75,7 +76,7 @@ function rangePos(v: number, low?: number, high?: number): number | null {
   return Math.max(0, Math.min(1, (v - lo) / range))
 }
 
-// ── Marker row — portfolio-statement style line item ─────────────────────
+// ── Marker row — portfolio-statement style line item, as a shadcn TableRow ──
 function MarkerRow({
   summary,
   selected,
@@ -99,33 +100,29 @@ function MarkerRow({
     : null
 
   return (
-    <button
-      type="button"
+    <TableRow
       onClick={onClick}
       aria-pressed={selected}
-      aria-label={`${summary.label}: ${latest?.rawValue ?? '—'}${summary.unit ? ' ' + summary.unit : ''}`}
-      className={cn(
-        'grid w-full grid-cols-[minmax(0,1.4fr)_minmax(110px,auto)_minmax(110px,1fr)_52px_64px_16px] items-center gap-3.5 border-b py-3 text-left transition-colors last:border-b-0 hover:bg-accent/50',
-        'max-md:grid-cols-[minmax(0,1fr)_auto] max-md:gap-x-3 max-md:gap-y-1.5',
-        selected && 'bg-accent/50',
-      )}
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+      className={cn('cursor-pointer', selected && 'bg-accent/50')}
     >
-      <span className="truncate text-sm font-medium">{summary.label}</span>
-
-      <span className="flex items-baseline gap-1.5 tabular-nums">
-        <span className="font-mono text-[15px] font-medium">{val !== undefined ? (latest.rawValue || String(val)) : '—'}</span>
-        {summary.unit && val !== undefined && <span className="text-[11px] text-muted-foreground">{summary.unit}</span>}
-        {delta !== undefined && Math.abs(delta) > 0.05 && (
-          <span className="ml-1 inline-flex items-center text-[11px] font-semibold text-muted-foreground">
-            {delta > 0 ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-            {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
-          </span>
-        )}
-      </span>
-
-      <span aria-hidden="true" className="max-md:col-span-2 max-md:order-3">
+      <TableCell className="font-medium">{summary.label}</TableCell>
+      <TableCell>
+        <span className="inline-flex items-baseline gap-1.5 tabular-nums">
+          <span className="font-mono text-[15px] font-medium">{val !== undefined ? (latest.rawValue || String(val)) : '—'}</span>
+          {summary.unit && val !== undefined && <span className="text-[11px] text-muted-foreground">{summary.unit}</span>}
+          {delta !== undefined && Math.abs(delta) > 0.05 && (
+            <span className="ml-1 inline-flex items-center text-[11px] font-semibold text-muted-foreground">
+              {delta > 0 ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+              {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
+            </span>
+          )}
+        </span>
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
         {pos !== null ? (
-          <span className="relative block h-1.5 rounded-full bg-secondary">
+          <span aria-hidden="true" className="relative block h-1.5 w-full rounded-full bg-secondary">
             <span className="absolute inset-y-0 left-0 rounded-full bg-primary/55" style={{ width: `${pos * 100}%` }} />
             <span
               className={cn(
@@ -136,11 +133,10 @@ function MarkerRow({
             />
           </span>
         ) : (
-          <span className="block h-1.5 rounded-full bg-secondary/60" />
+          <span aria-hidden="true" className="block h-1.5 w-full rounded-full bg-secondary/60" />
         )}
-      </span>
-
-      <span className="flex justify-center max-md:order-4 max-md:justify-start">
+      </TableCell>
+      <TableCell className="w-[60px]">
         {badgeLabel && (
           <Badge
             variant="secondary"
@@ -152,16 +148,30 @@ function MarkerRow({
             {badgeLabel}
           </Badge>
         )}
-      </span>
-
-      <span className="text-right text-[11px] tabular-nums text-muted-foreground max-md:order-5 max-md:text-left">
+      </TableCell>
+      <TableCell className="hidden text-right font-mono text-[11px] tabular-nums text-muted-foreground md:table-cell">
         {latest ? format(parseISO(latest.date), 'MMM d, yy') : '—'}
-      </span>
-
-      <span aria-hidden="true" className="text-muted-foreground max-md:hidden">
+      </TableCell>
+      <TableCell aria-hidden="true" className="w-[28px] text-right text-muted-foreground">
         {selected ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-      </span>
-    </button>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+// Headers for both the "Out of range" panel and each per-panel section.
+function MarkerTableHeader() {
+  return (
+    <TableHeader>
+      <TableRow className="hover:bg-transparent">
+        <TableHead>Marker</TableHead>
+        <TableHead>Value</TableHead>
+        <TableHead className="hidden md:table-cell">Range</TableHead>
+        <TableHead className="w-[60px]">Status</TableHead>
+        <TableHead className="hidden text-right md:table-cell">Date</TableHead>
+        <TableHead className="w-[28px]" />
+      </TableRow>
+    </TableHeader>
   )
 }
 
@@ -370,8 +380,10 @@ export function Labs({
         })
       }
       const summary = summaryMap.get(key)!
-      const dupKey = `${exam.name}|${exam.collectedAt.slice(0, 10)}`
-      if (summary.entries.some(e => `${e.examName}|${e.date.slice(0, 10)}` === dupKey)) continue
+      // Per-result dedupe ONLY — keep different exams' entries even when
+      // they happen to share a name + day (e.g. user re-uploading a corrected
+      // PDF). The previous name+day check silently dropped real entries.
+      if (r.id !== undefined && summary.entries.some(e => e.resultId === r.id)) continue
 
       summary.entries.push({
         resultId: r.id,
@@ -508,16 +520,19 @@ export function Labs({
       {/* ── Needs attention ── */}
       {hasData && outOfRangeSummaries.length > 0 && (
         <PanelCard className="md:col-span-2 xl:col-span-6 border-l-2 border-l-destructive" title={`${outOfRangeSummaries.length} out of range`} subtitle="Needs attention">
-          <div className="flex flex-col">
-            {outOfRangeSummaries.map(s => (
-              <MarkerRow
-                key={`attn-${s.key}`}
-                summary={s}
-                selected={selectedKey === s.key}
-                onClick={() => setSelectedKey(selectedKey === s.key ? null : s.key)}
-              />
-            ))}
-          </div>
+          <Table>
+            <MarkerTableHeader />
+            <TableBody>
+              {outOfRangeSummaries.map(s => (
+                <MarkerRow
+                  key={`attn-${s.key}`}
+                  summary={s}
+                  selected={selectedKey === s.key}
+                  onClick={() => setSelectedKey(selectedKey === s.key ? null : s.key)}
+                />
+              ))}
+            </TableBody>
+          </Table>
         </PanelCard>
       )}
 
@@ -562,15 +577,20 @@ export function Labs({
             </button>
 
             {!collapsed && (
-              <div className="mt-2 flex flex-col">
-                {summaries.map(s => (
-                  <MarkerRow
-                    key={s.key}
-                    summary={s}
-                    selected={selectedKey === s.key}
-                    onClick={() => setSelectedKey(selectedKey === s.key ? null : s.key)}
-                  />
-                ))}
+              <div className="mt-2">
+                <Table>
+                  <MarkerTableHeader />
+                  <TableBody>
+                    {summaries.map(s => (
+                      <MarkerRow
+                        key={s.key}
+                        summary={s}
+                        selected={selectedKey === s.key}
+                        onClick={() => setSelectedKey(selectedKey === s.key ? null : s.key)}
+                      />
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             )}
 

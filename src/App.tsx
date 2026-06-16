@@ -193,11 +193,11 @@ function Shell({
     null,
   )
 
-  async function commitPdfImport(items: ExtractedMarker[]) {
+  async function commitPdfImport(items: ExtractedMarker[], collectedAt: string) {
     if (!pdfReviewFile?.id || items.length === 0) return
     const examId = await db.exams.add({
       name: pdfReviewFile.name.replace(/\.pdf$/i, ''),
-      collectedAt: new Date().toISOString(),
+      collectedAt,
       labName: 'PDF import',
       sourceFileId: pdfReviewFile.id,
     })

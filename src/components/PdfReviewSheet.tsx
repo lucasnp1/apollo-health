@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, FileText, Plus, Trash2 } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { extractMarkersFromText, type ExtractedMarker } from '../lib/pdf'
+import { extractMarkersFromText, extractCollectionDate, type ExtractedMarker } from '../lib/pdf'
 import { db, type HealthFile } from '../lib/db'
 import { canonicalize } from '../lib/markers'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -40,7 +41,7 @@ export function PdfReviewSheet({
 }: {
   file: HealthFile
   duplicateWarning?: string
-  onImport: (markers: ExtractedMarker[]) => Promise<void>
+  onImport: (markers: ExtractedMarker[], collectedAt: string) => Promise<void>
   onClose: () => void
 }) {
   const initial = useMemo<Row[]>(() => {
@@ -48,12 +49,23 @@ export function PdfReviewSheet({
     return markers.map((m) => ({ ...m, include: true }))
   }, [file.extractedText])
 
+  // Try to lift the lab's actual collection date out of the PDF text;
+  // fall back to today so the user can correct it before importing.
+  const detectedDate = useMemo(
+    () => (file.extractedText ? extractCollectionDate(file.extractedText) : undefined),
+    [file.extractedText],
+  )
+  const fallbackDate = new Date().toISOString().slice(0, 10)
+  const [collectedAt, setCollectedAt] = useState<string>(detectedDate ?? fallbackDate)
+  const usingDetected = collectedAt === detectedDate
+
   const [rows, setRows] = useState<Row[]>(initial)
   const [saving, setSaving] = useState(false)
   const suggestions = useMarkerSuggestions()
 
   // If the file changes (user uploads another PDF before closing) reset.
   useEffect(() => { setRows(initial) }, [initial])
+  useEffect(() => { setCollectedAt(detectedDate ?? fallbackDate) }, [detectedDate, fallbackDate])
 
   const selectedCount = rows.filter((r) => r.include).length
   const allSelected = selectedCount === rows.length && rows.length > 0
@@ -93,7 +105,10 @@ export function PdfReviewSheet({
     if (items.length === 0) return
     setSaving(true)
     try {
-      await onImport(items)
+      // Stamp at noon UTC so the date the user picked is preserved across
+      // timezones when stored as an ISO string.
+      const iso = new Date(`${collectedAt}T12:00:00Z`).toISOString()
+      await onImport(items, iso)
       onClose()
     } finally {
       setSaving(false)
@@ -118,6 +133,23 @@ export function PdfReviewSheet({
             {duplicateWarning}
           </div>
         )}
+
+        {/* Editable collection date — prefilled from the PDF when found */}
+        <div className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 px-3 py-2">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="pdf-date" className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Collection date</Label>
+            <Input
+              id="pdf-date"
+              type="date"
+              value={collectedAt}
+              onChange={(e) => setCollectedAt(e.target.value)}
+              className="h-8 w-40 text-sm"
+            />
+          </div>
+          <span className="text-[11px] text-muted-foreground">
+            {usingDetected ? 'Detected in PDF — edit if wrong.' : detectedDate ? 'Manually set.' : 'Not found in PDF — defaulted to today.'}
+          </span>
+        </div>
 
         {/* Shared datalist gives every marker-name field the same
             autocomplete: canonical markers + markers already in the
