@@ -382,12 +382,14 @@ function daysLabel(daysAgo: number): string {
 function SitePicker({
   route,
   value,
+  compoundId,
   injections,
   compounds,
   onChange,
 }: {
   route: Route
   value: string
+  compoundId: number | ''
   injections: InjectionLog[]
   compounds: Compound[]
   onChange: (site: string) => void
@@ -401,11 +403,16 @@ function SitePicker({
   )
   const compoundName = (id?: number) => compounds.find((c) => c.id === id)?.name
 
-  // Per-site recency across all compounds.
+  // Per-site recency, scoped to THIS compound + route. A site you used for
+  // a different compound (or a different route) doesn't pollute the picker —
+  // SubQ rotation shouldn't surface IM sites and vice versa.
   const stats = useMemo<SiteStat[]>(() => {
     const map = new Map<string, SiteStat>()
     for (const inj of injections) {
       if (!inj.site) continue
+      if (compoundId !== '' && inj.compoundId !== compoundId) continue
+      const injRoute: Route = inj.route === 'SubQ' ? 'SubQ' : inj.route === 'IM' ? 'IM' : 'Other'
+      if (injRoute !== route) continue
       const t = new Date(inj.takenAt).getTime()
       const cur = map.get(inj.site)
       if (!cur || t > cur.lastMs) {
@@ -413,7 +420,7 @@ function SitePicker({
       }
     }
     return [...map.values()]
-  }, [injections, now])
+  }, [injections, compoundId, route, now])
 
   // Most recent injection overall (any site) — "what you last did".
   const lastOverall = useMemo(
@@ -540,7 +547,7 @@ function SitePicker({
 // ── Injection ──────────────────────────────────────────────────────────────
 
 function InjectionForm({
-  compounds,
+  compounds: rawCompounds,
   prefill,
   onSaved,
 }: {
@@ -548,6 +555,17 @@ function InjectionForm({
   prefill?: QuickLogPrefill
   onSaved: () => void
 }) {
+  // Defensive dedupe — sync history occasionally leaves duplicate compound
+  // rows with the same display name. Keep the first one we see (oldest id)
+  // so the row already referenced by injections/protocols stays the canonical one.
+  const compounds = useMemo(() => {
+    const byName = new Map<string, Compound>()
+    for (const c of rawCompounds) {
+      const key = c.name.trim().toLowerCase()
+      if (!byName.has(key)) byName.set(key, c)
+    }
+    return [...byName.values()]
+  }, [rawCompounds])
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
   const injections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().limit(80).toArray(), [], [])
 
@@ -719,6 +737,7 @@ function InjectionForm({
             <SitePicker
               route={route}
               value={site}
+              compoundId={compoundId}
               injections={injections ?? []}
               compounds={compounds}
               onChange={setSite}

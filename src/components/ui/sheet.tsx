@@ -23,8 +23,10 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Dialo
   return (
     <DialogPrimitive.Overlay
       data-slot="sheet-overlay"
+      // pointer-events-auto + opaque mobile backdrop ensures taps never leak
+      // through to the page underneath while the sheet is open or animating.
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "fixed inset-0 z-50 bg-black/50 pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
         className,
       )}
       {...props}
@@ -59,7 +61,8 @@ function SheetContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="sheet-close"
-            className="absolute top-4 right-4 z-10 rounded-md p-1 opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden [&_svg]:pointer-events-none [&_svg]:shrink-0"
+            // Vertically centered against the header content (py-4 + ~32px row → center ≈ 32px from top).
+            className="absolute top-[1.375rem] right-4 z-10 grid size-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground opacity-80 transition-opacity hover:bg-accent hover:text-foreground hover:opacity-100 focus:ring-2 focus:ring-ring focus:outline-hidden [&_svg]:pointer-events-none [&_svg]:shrink-0"
           >
             <XIcon className="size-5" />
             <span className="sr-only">Close</span>
