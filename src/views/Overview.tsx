@@ -1,25 +1,34 @@
-import { lazy, Suspense, useMemo } from 'react'
+import { useMemo } from 'react'
 import {
   AlertTriangle, CalendarClock, ChevronRight, FlaskConical,
   HeartPulse, Plus, Scale, Syringe,
 } from 'lucide-react'
-// Lazy — recharts loads after initial paint so the page appears immediately
-const PKOverviewCard = lazy(() => import('../components/PKOverviewCard').then(m => ({ default: m.PKOverviewCard })))
-import { formatDistanceToNow, format, parseISO } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
 import { flagLatestResults, type EnrichedResult } from '../lib/insights'
-import { simpleUpcomingSchedule, timeUntil } from '../lib/schedule'
+import { simpleUpcomingSchedule } from '../lib/schedule'
 import { skipScheduledDose } from '../lib/injections'
 import { DashGrid, StatRow } from '../components/dashboard/Grid'
 import { StatCard } from '../components/dashboard/StatCard'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { HeroCard } from '../components/dashboard/HeroCard'
-import { CompoundCarousel } from '../components/dashboard/CompoundCarousel'
 import { SiteRotation } from '../components/SiteRotation'
 import { Button } from '@/components/ui/button'
 import type { View } from '../app/views'
 import type { QuickLogPrefill } from '../App'
+
+// Compact "X ago" labels — matches the rest of the app (carousel, schedule).
+function compactAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime()
+  if (ms < 60_000) return 'just now'
+  const minutes = Math.round(ms / 60_000)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.round(ms / 3_600_000)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.round(ms / 86_400_000)
+  return `${days}d ago`
+}
 
 export function Overview({
   compounds,
@@ -114,7 +123,7 @@ export function Overview({
         </div>
       )}
 
-      {/* ── KPI row ── */}
+      {/* ── KPI row — 4 essentials (no Next dose since Up Next has it; no Lab panels) ── */}
       <StatRow>
         <StatCard
           icon={HeartPulse}
@@ -123,14 +132,6 @@ export function Overview({
           sub={avgBp ? `avg 7d ${avgBp.sys}/${avgBp.dia}` : latestBp ? format(parseISO(latestBp.measuredAt), 'MMM d') : 'No reading'}
           tone={bpTone}
           colorValue={bpTone === 'bad'}
-        />
-        <StatCard
-          icon={CalendarClock}
-          label="Next dose"
-          value={upNext ? (upNext.isOverdue ? 'Overdue' : timeUntil(upNext.nextDue)) : '—'}
-          sub={upNext ? compoundMap.get(upNext.protocol.compoundId)?.name : 'No schedule'}
-          tone={upNext?.isOverdue ? 'bad' : 'primary'}
-          colorValue={upNext?.isOverdue}
         />
         <StatCard
           icon={Syringe}
@@ -153,16 +154,10 @@ export function Overview({
           value={lastWeight !== undefined ? `${lastWeight} kg` : '—'}
           tone="info"
         />
-        <StatCard
-          icon={FlaskConical}
-          label="Lab panels"
-          value={exams.length}
-          tone="neutral"
-        />
       </StatRow>
 
       <DashGrid>
-        {/* ── Hero: up next ── */}
+        {/* ── 1. Up next ── */}
         <HeroCard
           className="md:col-span-2 xl:col-span-3"
           eyebrow={upNext ? 'Up next' : 'Status'}
@@ -207,56 +202,14 @@ export function Overview({
           }
         />
 
-        {/* ── Upcoming schedule list ── */}
-        <PanelCard
-          className="md:col-span-2 xl:col-span-3"
-          title="Schedule"
-          subtitle="Next doses across all compounds"
-          action={
-            <Button variant="ghost" size="sm" onClick={() => onNavigate('meds')}>
-              All <ChevronRight className="size-3.5" />
-            </Button>
-          }
-        >
-          {schedule.length > 0 ? (
-            <div className="flex flex-col">
-              {schedule.slice(0, 5).map((item, i) => {
-                const c = compoundMap.get(item.protocol.compoundId)
-                return (
-                  <div key={item.protocol.id} className={`flex items-center gap-3 py-2.5 ${i > 0 ? 'border-t' : ''}`}>
-                    <span className="size-2 shrink-0 rounded-full" style={{ background: c?.color ?? 'var(--primary)' }} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{c?.name ?? 'Compound'}</p>
-                      <p className="truncate text-xs text-muted-foreground">{item.protocol.dose} {item.protocol.unit} · {format(item.nextDue, 'EEE MMM d')}</p>
-                    </div>
-                    <span className={`shrink-0 font-mono text-xs tabular-nums ${item.isOverdue ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {item.isOverdue ? `${Math.round(Math.abs(item.daysUntil))}d overdue` : timeUntil(item.nextDue)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 shrink-0 px-2.5 text-xs"
-                      onClick={() => onOpenQuickLog('injection', { compoundId: item.protocol.compoundId, dose: item.protocol.dose, unit: item.protocol.unit, protocolId: item.protocol.id, scheduledAt: item.nextDue.toISOString() })}
-                    >
-                      Log
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <PanelEmpty icon={CalendarClock} title="No scheduled doses" detail="Add a compound to populate this list." action={<Button size="sm" onClick={() => onNavigate('meds')}>My compounds</Button>} />
-          )}
-        </PanelCard>
+        {/* ── 2. Site rotation — promoted right under Up next ── */}
+        {injections.length > 0 && (
+          <PanelCard className="md:col-span-2 xl:col-span-3" title="Site rotation" subtitle="Red = used recently">
+            <SiteRotation injections={injections} compounds={compounds} />
+          </PanelCard>
+        )}
 
-        {/* ── PK release levels ── */}
-        <div className="md:col-span-2 xl:col-span-3">
-          <Suspense fallback={null}>
-            <PKOverviewCard compounds={compounds} injections={injections} protocols={protocols} protocolDoses={[]} exams={exams} />
-          </Suspense>
-        </div>
-
-        {/* ── Recent doses ── */}
+        {/* ── 3. Recent doses — same row treatment as Up next subtitle for consistency ── */}
         <PanelCard
           className="md:col-span-2 xl:col-span-3"
           title="Recent doses"
@@ -272,15 +225,21 @@ export function Overview({
                 const compound = compoundMap.get(inj.compoundId)
                 return (
                   <div key={inj.id} className={`flex items-center gap-3 py-2.5 ${i > 0 ? 'border-t' : ''}`}>
-                    <span className="size-2 shrink-0 rounded-full" style={{ background: compound?.color ?? 'var(--primary)' }} />
+                    <span className="size-2.5 shrink-0 rounded-full" style={{ background: compound?.color ?? 'var(--primary)' }} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{compound?.name ?? 'Injection'}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {inj.dose} {inj.unit}{inj.site ? ` · ${inj.site}` : ''}{inj.weightKg ? ` · ${inj.weightKg} kg` : ''}
+                        <span className="font-mono tabular-nums">{inj.dose} {inj.unit}</span>
+                        {inj.site ? ` · ${inj.site}` : ''}
                       </p>
                     </div>
-                    <time className="shrink-0 text-xs text-muted-foreground">
-                      {formatDistanceToNow(parseISO(inj.takenAt), { addSuffix: true })}
+                    {inj.route && (
+                      <span className="shrink-0 rounded-full border border-border bg-secondary/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {inj.route}
+                      </span>
+                    )}
+                    <time className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                      {compactAgo(inj.takenAt)}
                     </time>
                   </div>
                 )
@@ -291,14 +250,7 @@ export function Overview({
           )}
         </PanelCard>
 
-        {/* ── Site rotation — quick pin-site check before logging ── */}
-        {injections.length > 0 && (
-          <PanelCard className="md:col-span-2 xl:col-span-3" title="Site rotation" subtitle="Red = used recently">
-            <SiteRotation injections={injections} compounds={compounds} />
-          </PanelCard>
-        )}
-
-        {/* ── Lab flags ── */}
+        {/* ── 4. Lab flags — only when there are flags ── */}
         {labFlags.length > 0 && (
           <PanelCard
             className="md:col-span-2 xl:col-span-3"
@@ -325,19 +277,6 @@ export function Overview({
               ))}
             </div>
           </PanelCard>
-        )}
-
-        {/* ── Compounds carousel — last ── */}
-        {protocols.length > 0 && (
-          <div className="md:col-span-2 xl:col-span-6">
-            <CompoundCarousel
-              protocols={protocols}
-              compounds={compounds}
-              injections={injections}
-              schedule={schedule}
-              onLog={onOpenQuickLog}
-            />
-          </div>
         )}
       </DashGrid>
     </div>
