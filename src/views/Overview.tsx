@@ -14,6 +14,8 @@ import { StatCard } from '../components/dashboard/StatCard'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { HeroCard } from '../components/dashboard/HeroCard'
 import { SiteRotation } from '../components/SiteRotation'
+import { lazy, Suspense } from 'react'
+const ActiveLevelsCard = lazy(() => import('../components/ActiveLevelsCard').then((m) => ({ default: m.ActiveLevelsCard })))
 import { Button } from '@/components/ui/button'
 import type { View } from '../app/views'
 import type { QuickLogPrefill } from '../App'
@@ -209,7 +211,16 @@ export function Overview({
           </PanelCard>
         )}
 
-        {/* ── 3. Recent doses — same row treatment as Up next subtitle for consistency ── */}
+        {/* ── 3. Active levels — past-only stacked chart of what you injected ── */}
+        {injections.length > 0 && (
+          <div className="md:col-span-2 xl:col-span-6">
+            <Suspense fallback={null}>
+              <ActiveLevelsCard compounds={compounds} injections={injections} />
+            </Suspense>
+          </div>
+        )}
+
+        {/* ── 4. Recent doses — same row treatment as Up next subtitle for consistency ── */}
         <PanelCard
           className="md:col-span-2 xl:col-span-3"
           title="Recent doses"
