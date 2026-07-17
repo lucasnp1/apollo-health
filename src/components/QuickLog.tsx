@@ -1,10 +1,12 @@
 // Quick-log sheet — a full-screen takeover on mobile, centered card on desktop.
-// Two tabs: Injection | Blood pressure. The injection form has an inline
-// syringe calculator (mg ⇄ units), a rotation-aware site picker, and a
-// collapsible "How do you feel?" section that also holds weight + notes.
+// Three tabs: Injection | Weight | Blood pressure.
+//  - Injection: one or MORE compound lines sharing a single syringe / site /
+//    time (e.g. Test + Primo in one pin), each with its own syringe calculator.
+//  - Weight: standalone body-weight entry → bodyMetrics.
+//  - BP: systolic/diastolic/pulse → vitals.
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ChevronDown, ChevronUp, Droplet, HeartPulse, Plus, Star, TriangleAlert } from 'lucide-react'
+import { ChevronDown, ChevronUp, Droplet, HeartPulse, Plus, Scale, Star, TriangleAlert, X } from 'lucide-react'
 import { db, type Compound, type InjectionLog, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
 import { parseConcentrationMgPerMl } from '../lib/vials'
@@ -20,7 +22,7 @@ import {
 } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 
-type Tab = 'injection' | 'bp'
+type Tab = 'injection' | 'weight' | 'bp'
 type Route = 'IM' | 'SubQ' | 'Oral' | 'Other'
 
 // ── Segmented control ───────────────────────────────────────────────────────
@@ -50,7 +52,7 @@ function Segmented<T extends string>({
           onClick={() => onChange(o.value)}
           className={cn(
             'flex-1 rounded-md font-medium transition-colors',
-            size === 'sm' ? 'px-2 py-1 text-xs' : 'px-2.5 py-1.5 text-sm',
+            size === 'sm' ? 'px-2 py-1 text-xs' : 'px-2 py-1.5 text-sm',
             value === o.value
               ? 'bg-background text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground',
@@ -94,6 +96,27 @@ function chipsToSymptom(selected: string[]): Partial<Symptom> {
     if (def) (out as Record<string, number>)[def.key as string] = def.positiveValue
   }
   return out
+}
+
+// Newest logged weight across injections (legacy) + bodyMetrics (current).
+function useLastWeightKg(): number | undefined {
+  const bodyMetrics = useLiveQuery(() => db.bodyMetrics.orderBy('measuredAt').reverse().limit(20).toArray(), [], [])
+  const injections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().limit(40).toArray(), [], [])
+  return useMemo(() => {
+    let bestMs = -Infinity
+    let bestW: number | undefined
+    for (const b of bodyMetrics ?? []) {
+      if (b.weightKg === undefined) continue
+      const ms = new Date(b.measuredAt).getTime()
+      if (ms > bestMs) { bestMs = ms; bestW = b.weightKg }
+    }
+    for (const i of injections ?? []) {
+      if (i.weightKg === undefined) continue
+      const ms = new Date(i.takenAt).getTime()
+      if (ms > bestMs) { bestMs = ms; bestW = i.weightKg }
+    }
+    return bestW
+  }, [bodyMetrics, injections])
 }
 
 // ── Collapsible "How do you feel?" — chips + optional top slot + notes ──────
@@ -208,14 +231,15 @@ export function QuickLog({
             className="w-full"
             options={[
               { value: 'injection' as Tab, label: <span className="flex items-center justify-center gap-1.5"><Droplet className="size-3.5" /> Injection</span> },
-              { value: 'bp' as Tab, label: <span className="flex items-center justify-center gap-1.5"><HeartPulse className="size-3.5" /> Blood pressure</span> },
+              { value: 'weight' as Tab, label: <span className="flex items-center justify-center gap-1.5"><Scale className="size-3.5" /> Weight</span> },
+              { value: 'bp' as Tab, label: <span className="flex items-center justify-center gap-1.5"><HeartPulse className="size-3.5" /> BP</span> },
             ]}
           />
         </SheetHeader>
 
-        {tab === 'injection'
-          ? <InjectionForm compounds={compounds} prefill={prefill} onSaved={onClose} />
-          : <BPForm onSaved={onClose} />}
+        {tab === 'injection' && <InjectionForm compounds={compounds} prefill={prefill} onSaved={onClose} />}
+        {tab === 'weight' && <WeightForm onSaved={onClose} />}
+        {tab === 'bp' && <BPForm onSaved={onClose} />}
       </SheetContent>
     </Sheet>
   )
@@ -257,6 +281,8 @@ function DoseField({
   concentrationSource,
   entryMode,
   amount,
+  idSuffix,
+  autoFocus,
   onChangeMode,
   onChangeAmount,
   onChangeConcentration,
@@ -267,6 +293,8 @@ function DoseField({
   concentrationSource?: string
   entryMode: 'dose' | 'units'
   amount: string
+  idSuffix: string
+  autoFocus?: boolean
   onChangeMode: (m: 'dose' | 'units') => void
   onChangeAmount: (v: string) => void
   onChangeConcentration: (v: string) => void
@@ -276,11 +304,12 @@ function DoseField({
   const canUseUnits = unit === 'mg' || unit === 'mcg'
   const { mg, ml, units } = derived
   const overdraw = ml !== undefined && ml > 1
+  const amountId = `ql-amount-${idSuffix}`
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <Label htmlFor="ql-amount">{entryMode === 'units' ? 'Draw on syringe' : `Dose (${unit})`}</Label>
+        <Label htmlFor={amountId}>{entryMode === 'units' ? 'Draw on syringe' : `Dose (${unit})`}</Label>
         {canUseUnits && (
           <Segmented
             value={entryMode}
@@ -296,9 +325,9 @@ function DoseField({
 
       <div className="relative">
         <Input
-          id="ql-amount"
+          id={amountId}
           inputMode="decimal"
-          autoFocus
+          autoFocus={autoFocus}
           placeholder={entryMode === 'units' ? 'e.g. 40' : ''}
           value={amount}
           onChange={(e) => onChangeAmount(e.target.value)}
@@ -342,9 +371,9 @@ function DoseField({
           </button>
         ) : (
           <div className="flex items-center gap-2">
-            <Label htmlFor="ql-conc" className="shrink-0 text-xs text-muted-foreground">Concentration</Label>
+            <Label htmlFor={`ql-conc-${idSuffix}`} className="shrink-0 text-xs text-muted-foreground">Concentration</Label>
             <Input
-              id="ql-conc"
+              id={`ql-conc-${idSuffix}`}
               inputMode="decimal"
               placeholder="mg/mL (e.g. 250)"
               defaultValue={concentration ?? ''}
@@ -544,7 +573,39 @@ function SitePicker({
   )
 }
 
-// ── Injection ──────────────────────────────────────────────────────────────
+// ── Injection (multi-compound) ──────────────────────────────────────────────
+
+type CompoundLine = {
+  key: string
+  compoundId: number | ''
+  entryMode: 'dose' | 'units'
+  amount: string
+  concOverride: string
+  protocolId?: number
+  scheduledAt?: string
+}
+
+let lineCounter = 0
+function newLine(partial: { compoundId?: number; dose?: number; protocolId?: number; scheduledAt?: string } = {}): CompoundLine {
+  lineCounter += 1
+  return {
+    key: `line-${lineCounter}`,
+    compoundId: partial.compoundId ?? '',
+    entryMode: 'dose',
+    amount: partial.dose !== undefined ? String(partial.dose) : '',
+    concOverride: '',
+    protocolId: partial.protocolId,
+    scheduledAt: partial.scheduledAt,
+  }
+}
+
+function initialLines(prefill: QuickLogPrefill | undefined, compounds: Compound[]): CompoundLine[] {
+  if (prefill?.lines?.length) return prefill.lines.map((l) => newLine(l))
+  if (prefill?.compoundId !== undefined || prefill?.dose !== undefined) {
+    return [newLine({ compoundId: prefill.compoundId, dose: prefill.dose, protocolId: prefill.protocolId, scheduledAt: prefill.scheduledAt })]
+  }
+  return [newLine({ compoundId: compounds[0]?.id })]
+}
 
 function InjectionForm({
   compounds: rawCompounds,
@@ -556,8 +617,7 @@ function InjectionForm({
   onSaved: () => void
 }) {
   // Defensive dedupe — sync history occasionally leaves duplicate compound
-  // rows with the same display name. Keep the first one we see (oldest id)
-  // so the row already referenced by injections/protocols stays the canonical one.
+  // rows with the same display name. Keep the first one we see (oldest id).
   const compounds = useMemo(() => {
     const byName = new Map<string, Compound>()
     for (const c of rawCompounds) {
@@ -568,18 +628,9 @@ function InjectionForm({
   }, [rawCompounds])
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
   const injections = useLiveQuery(() => db.injections.orderBy('takenAt').reverse().limit(80).toArray(), [], [])
+  const lastWeightKg = useLastWeightKg()
 
-  const lastWeightKg = useMemo(() => {
-    for (const inj of injections ?? []) {
-      if (inj.weightKg !== undefined) return inj.weightKg
-    }
-    return undefined
-  }, [injections])
-
-  const [compoundId, setCompoundId] = useState<number | ''>(prefill?.compoundId ?? compounds[0]?.id ?? '')
-  const [entryMode, setEntryMode] = useState<'dose' | 'units'>('dose')
-  const [amount, setAmount] = useState(prefill?.dose !== undefined ? String(prefill.dose) : '')
-  const [concOverride, setConcOverride] = useState('')
+  const [lines, setLines] = useState<CompoundLine[]>(() => initialLines(prefill, compounds))
   const [route, setRoute] = useState<Route>('IM')
   const [showMoreRoutes, setShowMoreRoutes] = useState(false)
   const [site, setSite] = useState('')
@@ -588,71 +639,93 @@ function InjectionForm({
   const [symptomChips, setSymptomChips] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
 
-  const compound = compounds.find((c) => c.id === compoundId)
-  const unit = (compound?.unit ?? 'mg') as Unit
-  const activeVial = vials && compound ? pickActiveVial(vials, compound.id!) : undefined
-
-  // Concentration priority: manual override → active vial → compound text.
-  const concentration =
-    parseConcentrationMgPerMl(concOverride) ??
-    activeVial?.concentrationMgPerMl ??
-    parseConcentrationMgPerMl(compound?.concentration)
-  const concentrationSource = concOverride
-    ? undefined
-    : activeVial?.concentrationMgPerMl
-      ? (activeVial.label || 'vial')
-      : compound?.concentration
-        ? 'from compound'
-        : undefined
-
-  const derived = computeDose({ entryMode, amount: parseFloat(amount), unit, concentration })
-
+  // Reset whenever the prefill changes (sheet reopened with new context).
+  const prefillSig = JSON.stringify(prefill ?? null)
   useEffect(() => {
-    if (prefill?.compoundId !== undefined) setCompoundId(prefill.compoundId)
-    else if (compounds[0]?.id) setCompoundId(compounds[0].id)
-    setEntryMode('dose')
-    setAmount(prefill?.dose !== undefined ? String(prefill.dose) : '')
-    setConcOverride('')
-    setNotes('')
-    setWeightKg('')
-    setSymptomChips([])
+    setLines(initialLines(prefill, compounds))
+    setRoute('IM'); setShowMoreRoutes(false); setSite(''); setWeightKg(''); setNotes(''); setSymptomChips([])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefill?.compoundId, prefill?.dose, prefill?.scheduledAt])
+  }, [prefillSig])
 
+  // First line's compound defaults to the first compound once they load.
   useEffect(() => {
-    if (compounds.length > 0 && compoundId === '') setCompoundId(compounds[0].id ?? '')
-  }, [compounds, compoundId])
+    if (compounds.length > 0 && lines.length === 1 && lines[0].compoundId === '' && !prefill?.lines && prefill?.compoundId === undefined) {
+      setLines([{ ...lines[0], compoundId: compounds[0].id ?? '' }])
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compounds])
 
-  // Switching to units mode requires a known concentration to be meaningful.
+  function updateLine(key: string, patch: Partial<CompoundLine>) {
+    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)))
+  }
+  function removeLine(key: string) {
+    setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.key !== key) : prev))
+  }
+  function addLine() {
+    const used = new Set(lines.map((l) => l.compoundId))
+    const next = compounds.find((c) => c.id !== undefined && !used.has(c.id))
+    setLines((prev) => [...prev, newLine({ compoundId: next?.id })])
+  }
+
+  // Resolve each line into compound + concentration + derived dose.
+  const resolved = useMemo(() => lines.map((line) => {
+    const compound = compounds.find((c) => c.id === line.compoundId)
+    const unit = (compound?.unit ?? 'mg') as Unit
+    const activeVial = vials && compound ? pickActiveVial(vials, compound.id!) : undefined
+    const concentration =
+      parseConcentrationMgPerMl(line.concOverride) ??
+      activeVial?.concentrationMgPerMl ??
+      parseConcentrationMgPerMl(compound?.concentration)
+    const concentrationSource = line.concOverride
+      ? undefined
+      : activeVial?.concentrationMgPerMl
+        ? (activeVial.label || 'vial')
+        : compound?.concentration
+          ? 'from compound'
+          : undefined
+    const derived = computeDose({ entryMode: line.entryMode, amount: parseFloat(line.amount), unit, concentration })
+    return { line, compound, unit, activeVial, concentration, concentrationSource, derived }
+  }), [lines, compounds, vials])
+
   const injectable = route === 'IM' || route === 'SubQ'
-  const doseValue = derived.doseInUnit
-  const canSave = Boolean(compound) && doseValue !== undefined && doseValue > 0 && !busy
+  const validLines = resolved.filter((r) => r.compound && r.derived.doseInUnit !== undefined && r.derived.doseInUnit > 0)
+  // Same compound twice in one syringe collapses under the App-level dedupe.
+  const compoundIds = validLines.map((r) => r.compound!.id)
+  const hasDuplicate = new Set(compoundIds).size !== compoundIds.length
+  const canSave = validLines.length > 0 && !hasDuplicate && !busy
+  const canAddCompound = compounds.length > lines.length
 
   async function save() {
-    if (!compound || doseValue === undefined || doseValue <= 0) return
+    if (!canSave) return
     setBusy(true)
     try {
-      const activeVialId = activeVial?.id
-      const link = prefill?.protocolId && prefill.scheduledAt
-        ? { protocolId: prefill.protocolId, scheduledAt: prefill.scheduledAt }
-        : undefined
-      await logInjection(
-        {
-          compoundId: compound.id!,
-          takenAt: new Date().toISOString(),
-          dose: Number(doseValue.toFixed(unit === 'mcg' ? 1 : 3)),
-          unit,
-          route,
-          site: injectable ? (site || undefined) : undefined,
-          notes: notes || undefined,
-          vialId: activeVialId,
-          weightKg: weightKg ? Number(weightKg) : undefined,
-        },
-        link ? { link } : undefined,
-      )
+      // One shared timestamp — same syringe, same moment.
+      const takenAt = new Date().toISOString()
+      for (const r of validLines) {
+        const link = r.line.protocolId && r.line.scheduledAt
+          ? { protocolId: r.line.protocolId, scheduledAt: r.line.scheduledAt }
+          : undefined
+        await logInjection(
+          {
+            compoundId: r.compound!.id!,
+            takenAt,
+            dose: Number(r.derived.doseInUnit!.toFixed(r.unit === 'mcg' ? 1 : 3)),
+            unit: r.unit,
+            route,
+            site: injectable ? (site || undefined) : undefined,
+            notes: notes || undefined,
+            vialId: r.activeVial?.id,
+          },
+          link ? { link } : undefined,
+        )
+      }
+      // Weight is a body metric (single source of truth), not an injection field.
+      if (weightKg) {
+        await db.bodyMetrics.add({ measuredAt: takenAt, source: 'manual', weightKg: Number(weightKg) })
+      }
       if (symptomChips.length > 0 || notes) {
         await db.symptoms.add({
-          recordedAt: new Date().toISOString(),
+          recordedAt: takenAt,
           ...chipsToSymptom(symptomChips),
           notes: notes || undefined,
         })
@@ -675,32 +748,50 @@ function InjectionForm({
     <>
       <SheetBody>
         <div className="flex flex-col gap-4">
-          {/* Compound — native select avoids the Radix popover overlap inside a sheet */}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="ql-compound">Compound</Label>
-            <select
-              id="ql-compound"
-              value={String(compoundId)}
-              onChange={(e) => setCompoundId(Number(e.target.value))}
-              className="h-10 w-full appearance-none rounded-md border border-input bg-transparent bg-[length:1em_1em] bg-[right_0.75rem_center] bg-no-repeat pr-8 pl-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              style={{ backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m6 9 6 6 6-6'/%3e%3c/svg%3e\")" }}
-            >
-              {compounds.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-            </select>
+          {/* Compound lines — each its own compound + dose; one shared syringe */}
+          <div className="flex flex-col gap-2.5">
+            {resolved.map((r, i) => (
+              <div key={r.line.key} className="flex flex-col gap-3 rounded-xl border bg-card/40 p-3">
+                <div className="flex items-center gap-2">
+                  <select
+                    aria-label="Compound"
+                    value={String(r.line.compoundId)}
+                    onChange={(e) => updateLine(r.line.key, { compoundId: Number(e.target.value) })}
+                    className="h-9 w-full appearance-none rounded-md border border-input bg-transparent bg-[length:1em_1em] bg-[right_0.75rem_center] bg-no-repeat pr-8 pl-3 text-sm font-medium shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    style={{ backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m6 9 6 6 6-6'/%3e%3c/svg%3e\")" }}
+                  >
+                    {compounds.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                  </select>
+                  {lines.length > 1 && (
+                    <Button variant="ghost" size="icon" className="size-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => removeLine(r.line.key)} aria-label="Remove compound">
+                      <X className="size-4" />
+                    </Button>
+                  )}
+                </div>
+                <DoseField
+                  unit={r.unit}
+                  concentration={r.concentration}
+                  concentrationSource={r.concentrationSource}
+                  entryMode={r.line.entryMode}
+                  amount={r.line.amount}
+                  idSuffix={r.line.key}
+                  autoFocus={i === 0}
+                  onChangeMode={(m) => updateLine(r.line.key, { entryMode: m })}
+                  onChangeAmount={(v) => updateLine(r.line.key, { amount: v })}
+                  onChangeConcentration={(v) => updateLine(r.line.key, { concOverride: v })}
+                  derived={r.derived}
+                />
+              </div>
+            ))}
+            {canAddCompound && (
+              <Button variant="outline" size="sm" className="self-start" onClick={addLine}>
+                <Plus className="size-3.5" /> Add compound (same syringe)
+              </Button>
+            )}
+            {hasDuplicate && (
+              <p className="text-xs text-destructive">Each compound can only appear once — remove the duplicate.</p>
+            )}
           </div>
-
-          {/* Dose + syringe calculator */}
-          <DoseField
-            unit={unit}
-            concentration={concentration}
-            concentrationSource={concentrationSource}
-            entryMode={entryMode}
-            amount={amount}
-            onChangeMode={setEntryMode}
-            onChangeAmount={setAmount}
-            onChangeConcentration={setConcOverride}
-            derived={derived}
-          />
 
           {/* Route — IM / SubQ prominent; Oral/Other tucked away */}
           <div className="flex flex-col gap-1.5">
@@ -732,12 +823,12 @@ function InjectionForm({
             )}
           </div>
 
-          {/* Site — only for injections */}
+          {/* Site — one shared site for the whole syringe */}
           {injectable && (
             <SitePicker
               route={route}
               value={site}
-              compoundId={compoundId}
+              compoundId={resolved[0]?.line.compoundId ?? ''}
               injections={injections ?? []}
               compounds={compounds}
               onChange={setSite}
@@ -769,7 +860,59 @@ function InjectionForm({
 
       <SheetFooter>
         <Button size="lg" onClick={save} disabled={!canSave}>
-          <Plus className="size-4" /> {busy ? 'Saving…' : 'Log injection'}
+          <Plus className="size-4" /> {busy ? 'Saving…' : validLines.length > 1 ? `Log ${validLines.length} compounds` : 'Log injection'}
+        </Button>
+      </SheetFooter>
+    </>
+  )
+}
+
+// ── Weight ───────────────────────────────────────────────────────────────────
+
+function WeightForm({ onSaved }: { onSaved: () => void }) {
+  const lastWeightKg = useLastWeightKg()
+  const [weight, setWeight] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function save() {
+    if (!weight) return
+    setBusy(true)
+    try {
+      await db.bodyMetrics.add({ measuredAt: new Date().toISOString(), source: 'manual', weightKg: Number(weight) })
+      onSaved()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <SheetBody>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="w-weight">Weight</Label>
+            <div className="relative">
+              <Input
+                id="w-weight"
+                inputMode="decimal"
+                autoFocus
+                placeholder={lastWeightKg !== undefined ? String(lastWeightKg) : 'e.g. 82.5'}
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                className="pr-10 text-base"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">kg</span>
+            </div>
+            {lastWeightKg !== undefined && (
+              <p className="text-xs text-muted-foreground">Last logged: {lastWeightKg} kg</p>
+            )}
+          </div>
+        </div>
+      </SheetBody>
+
+      <SheetFooter>
+        <Button size="lg" onClick={save} disabled={busy || !weight}>
+          <Plus className="size-4" /> {busy ? 'Saving…' : 'Log weight'}
         </Button>
       </SheetFooter>
     </>

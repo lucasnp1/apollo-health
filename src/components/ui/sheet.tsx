@@ -61,8 +61,9 @@ function SheetContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="sheet-close"
-            // Vertically centered against the header content (py-4 + ~32px row → center ≈ 32px from top).
-            className="absolute top-[1.375rem] right-4 z-10 grid size-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground opacity-80 transition-opacity hover:bg-accent hover:text-foreground hover:opacity-100 focus:ring-2 focus:ring-ring focus:outline-hidden [&_svg]:pointer-events-none [&_svg]:shrink-0"
+            // Vertically centered on the header tab row: py-4 top padding (16px)
+            // + half the 40px Segmented row = 36px = top-9, then -translate-y-1/2.
+            className="absolute top-9 right-4 z-10 grid size-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground opacity-80 transition-opacity hover:bg-accent hover:text-foreground hover:opacity-100 focus:ring-2 focus:ring-ring focus:outline-hidden [&_svg]:pointer-events-none [&_svg]:shrink-0"
           >
             <XIcon className="size-5" />
             <span className="sr-only">Close</span>

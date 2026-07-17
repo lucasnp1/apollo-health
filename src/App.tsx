@@ -58,9 +58,22 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
 
-type QuickLogTab = 'injection' | 'bp'
+type QuickLogTab = 'injection' | 'bp' | 'weight'
+
+// One compound line inside an injection. Multiple lines = one syringe / one
+// site logged in a single go (e.g. Test + Primo).
+export type QuickLogLine = {
+  compoundId?: number
+  dose?: number
+  unit?: string
+  protocolId?: number
+  scheduledAt?: string
+}
 
 export type QuickLogPrefill = {
+  // Preferred: multi-compound prefill (protocol quick-add, multi-line).
+  lines?: QuickLogLine[]
+  // Legacy single-compound fields (carousel / schedule callers still use these).
   compoundId?: number
   dose?: number
   unit?: string
@@ -288,6 +301,11 @@ function Shell({
     () => db.protocolDoses.toArray(),
     [], [],
   )
+  // Body metrics (weight etc.) — standalone weight logs land here.
+  const bodyMetrics = useLiveQuery(
+    () => db.bodyMetrics.orderBy('measuredAt').reverse().limit(200).toArray(),
+    [], [],
+  )
 
   // Injection reminders — fires notifications before upcoming doses
   useInjectionReminders(protocols, protocolDoses, compounds ?? [])
@@ -364,6 +382,9 @@ function Shell({
               </div>
               <Button variant="outline" size="sm" className="justify-start" onClick={() => openQuickLog('injection')}>
                 <Plus className="size-3.5" /> Injection
+              </Button>
+              <Button variant="outline" size="sm" className="justify-start" onClick={() => openQuickLog('weight')}>
+                <Plus className="size-3.5" /> Weight
               </Button>
               <Button variant="outline" size="sm" className="justify-start" onClick={() => openQuickLog('bp')}>
                 <Plus className="size-3.5" /> Blood pressure
@@ -459,6 +480,7 @@ function Shell({
             vitals={vitals}
             exams={exams}
             results={enrichedResults}
+            bodyMetrics={bodyMetrics}
             onNavigate={setActiveView}
             onOpenQuickLog={openQuickLog}
             onOpenWizard={() => setProtocolWizardOpen(true)}

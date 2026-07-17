@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
+import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
 import { flagLatestResults, type EnrichedResult } from '../lib/insights'
 import { simpleUpcomingSchedule } from '../lib/schedule'
 import { skipScheduledDose } from '../lib/injections'
@@ -39,6 +39,7 @@ export function Overview({
   vitals,
   exams,
   results,
+  bodyMetrics,
   onNavigate,
   onOpenQuickLog,
   onOpenWizard,
@@ -48,6 +49,7 @@ export function Overview({
   vitals: VitalLog[]
   exams: LabExam[]
   results: EnrichedResult[]
+  bodyMetrics: BodyMetric[]
   onNavigate: (view: View) => void
   onOpenQuickLog: (tab: 'injection', prefill?: QuickLogPrefill) => void
   onOpenWizard: () => void
@@ -80,10 +82,22 @@ export function Overview({
       }
     : undefined
 
+  // Newest weight across bodyMetrics (standalone logs) + injections (legacy).
   const lastWeight = useMemo(() => {
-    for (const inj of injections) if (inj.weightKg !== undefined) return inj.weightKg
-    return undefined
-  }, [injections])
+    let bestMs = -Infinity
+    let bestW: number | undefined
+    for (const b of bodyMetrics) {
+      if (b.weightKg === undefined) continue
+      const ms = new Date(b.measuredAt).getTime()
+      if (ms > bestMs) { bestMs = ms; bestW = b.weightKg }
+    }
+    for (const inj of injections) {
+      if (inj.weightKg === undefined) continue
+      const ms = new Date(inj.takenAt).getTime()
+      if (ms > bestMs) { bestMs = ms; bestW = inj.weightKg }
+    }
+    return bestW
+  }, [bodyMetrics, injections])
 
   const lastTest = exams[0]
   const outOfRange = labFlags.length

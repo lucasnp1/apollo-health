@@ -76,13 +76,17 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
     pulse: v.pulse,
   }))
 
+  // Mean is intentionally windowed to the last 30 days — a reading from years
+  // ago shouldn't drag your current average. The chart/table below still show
+  // everything (they follow the range picker).
   const stats = useMemo(() => {
-    if (filtered.length === 0) return undefined
-    const sys = filtered.map((v) => v.systolic)
-    const dia = filtered.map((v) => v.diastolic)
+    const recent = filterByRange(vitals, '1M', (v) => parseISO(v.measuredAt))
+    if (recent.length === 0) return undefined
+    const sys = recent.map((v) => v.systolic)
+    const dia = recent.map((v) => v.diastolic)
     const avg = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length
-    return { meanSys: avg(sys), meanDia: avg(dia), n: filtered.length }
-  }, [filtered])
+    return { meanSys: avg(sys), meanDia: avg(dia), n: recent.length }
+  }, [vitals])
 
   function startEditVital(v: VitalLog) {
     setEditingVital(v)
@@ -119,7 +123,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
   return (
     <div className="flex flex-col gap-5">
       {/* ── KPI row ── */}
-      {stats && latest && (
+      {latest && (
         <StatRow className="md:grid-cols-3 2xl:grid-cols-3">
           <StatCard
             icon={HeartPulse}
@@ -130,9 +134,9 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
           />
           <StatCard
             icon={Activity}
-            label={`Mean (${stats.n} readings)`}
-            value={`${stats.meanSys.toFixed(0)}/${stats.meanDia.toFixed(0)}`}
-            sub={meanStatus ? BP_META[meanStatus].label : undefined}
+            label="Mean (last 30d)"
+            value={stats ? `${stats.meanSys.toFixed(0)}/${stats.meanDia.toFixed(0)}` : '—'}
+            sub={stats ? `${stats.n} reading${stats.n === 1 ? '' : 's'}${meanStatus ? ` · ${BP_META[meanStatus].label}` : ''}` : 'No readings in 30d'}
             tone={meanStatus && (meanStatus === 'high' || meanStatus === 'danger') ? 'bad' : meanStatus === 'monitor' ? 'primary' : 'good'}
           />
           <StatCard
@@ -149,7 +153,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
       <ChartCard
         className="md:col-span-2 xl:col-span-6"
         title="Blood pressure trend"
-        subtitle={stats ? `Mean ${stats.meanSys.toFixed(0)}/${stats.meanDia.toFixed(0)} over ${stats.n} readings` : undefined}
+        subtitle={stats ? `Mean ${stats.meanSys.toFixed(0)}/${stats.meanDia.toFixed(0)} · last 30d (${stats.n})` : undefined}
         action={<TimeRangePicker value={range} onChange={setRange} />}
       >
         {chart.length > 0 ? (
