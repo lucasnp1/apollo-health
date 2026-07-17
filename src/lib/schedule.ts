@@ -1,4 +1,4 @@
-import { addDays, addMinutes, isAfter, isBefore, parseISO, setHours, setMinutes, startOfDay } from 'date-fns'
+import { addDays, addMinutes, endOfDay, isAfter, isBefore, parseISO, setHours, setMinutes, startOfDay, subDays } from 'date-fns'
 import type { InjectionLog, Protocol, ProtocolCadence, ProtocolDose } from './db'
 
 /**
@@ -199,6 +199,33 @@ export function upcomingSchedule(
     }
   }
   return items.sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime())
+}
+
+// Doses that need action right now: pending (not done/skipped) instants from
+// the recent past through the END OF TODAY — i.e. overdue + due-today. Deduped
+// by compound (earliest pending instant wins) so the UI shows one row per drug.
+//
+// Every scheduledAt is a canonical generateDoseInstants() value, so logging or
+// skipping via that exact ISO string round-trips: upcomingSchedule() already
+// drops done/skipped instants, so a resolved dose stops appearing here.
+export function pendingDoses(
+  protocols: Protocol[],
+  doses: ProtocolDose[],
+  now = new Date(),
+  lookbackDays = 21,
+): ScheduledItem[] {
+  const from = subDays(startOfDay(now), lookbackDays)
+  const end = endOfDay(now)
+  const items = upcomingSchedule(protocols, doses, from, lookbackDays + 2)
+    .filter((it) => !isAfter(it.scheduledAt, end))
+
+  const byCompound = new Map<number, ScheduledItem>()
+  for (const it of items) {
+    const cid = it.protocol.compoundId
+    const cur = byCompound.get(cid)
+    if (!cur || it.scheduledAt < cur.scheduledAt) byCompound.set(cid, it)
+  }
+  return [...byCompound.values()].sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime())
 }
 
 export function describeCadence(cadence: ProtocolCadence): string {

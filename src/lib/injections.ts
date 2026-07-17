@@ -73,11 +73,19 @@ async function attachScheduledDose(
   entry: Omit<InjectionLog, 'id'>,
   options?: LogInjectionOptions,
 ) {
-  // Path A: caller already knows the exact dose to satisfy.
+  // Path A: caller already knows the exact dose to satisfy. Reuse the existing
+  // ProtocolDose row for this slot if there is one (spread its id) — a bare
+  // put() without the id would mint a second row for the same instant.
   if (options?.link) {
+    const { protocolId, scheduledAt } = options.link
+    const existing = await db.protocolDoses
+      .where('protocolId').equals(protocolId)
+      .and((d) => d.scheduledAt === scheduledAt)
+      .first()
     await db.protocolDoses.put({
-      protocolId: options.link.protocolId,
-      scheduledAt: options.link.scheduledAt,
+      ...(existing ?? {}),
+      protocolId,
+      scheduledAt,
       status: 'done',
       injectionId,
     })

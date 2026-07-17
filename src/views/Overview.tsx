@@ -1,27 +1,26 @@
-import { useMemo } from 'react'
+import { useMemo, lazy, Suspense } from 'react'
 import {
-  AlertTriangle, CalendarClock, ChevronRight, FlaskConical,
-  HeartPulse, Plus, Scale, Syringe,
+  AlertTriangle, CalendarClock, ChevronRight, FlaskConical, Plus, Syringe, X,
 } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
+import { format, startOfDay } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type LabResult, type VitalLog } from '../lib/db'
 import { flagLatestResults, type EnrichedResult } from '../lib/insights'
-import { simpleUpcomingSchedule } from '../lib/schedule'
+import { pendingDoses, upcomingSchedule, timeUntil, type ScheduledItem } from '../lib/schedule'
 import { skipScheduledDose } from '../lib/injections'
-import { DashGrid, StatRow } from '../components/dashboard/Grid'
-import { StatCard } from '../components/dashboard/StatCard'
+import { DashGrid } from '../components/dashboard/Grid'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
-import { HeroCard } from '../components/dashboard/HeroCard'
 import { SiteRotation } from '../components/SiteRotation'
-import { lazy, Suspense } from 'react'
-const ActiveLevelsCard = lazy(() => import('../components/ActiveLevelsCard').then((m) => ({ default: m.ActiveLevelsCard })))
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { View } from '../app/views'
-import type { QuickLogPrefill } from '../App'
+import type { QuickLogPrefill, QuickLogLine } from '../App'
+const ActiveLevelsCard = lazy(() => import('../components/ActiveLevelsCard').then((m) => ({ default: m.ActiveLevelsCard })))
 
-// Compact "X ago" labels — matches the rest of the app (carousel, schedule).
+type QuickLogFn = (tab: 'injection' | 'bp' | 'weight', prefill?: QuickLogPrefill) => void
+
+const DAY = 86_400_000
+
 function compactAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
   if (ms < 60_000) return 'just now'
@@ -29,8 +28,22 @@ function compactAgo(iso: string): string {
   if (minutes < 60) return `${minutes}m ago`
   const hours = Math.round(ms / 3_600_000)
   if (hours < 24) return `${hours}h ago`
-  const days = Math.round(ms / 86_400_000)
-  return `${days}d ago`
+  return `${Math.round(ms / DAY)}d ago`
+}
+
+// Whole days a scheduled instant is before the start of today (0 = today).
+function overdueDays(scheduledAt: Date): number {
+  return Math.floor((startOfDay(new Date()).getTime() - scheduledAt.getTime()) / DAY)
+}
+
+function lineFor(item: ScheduledItem): QuickLogLine {
+  return {
+    compoundId: item.protocol.compoundId,
+    dose: item.protocol.dose,
+    unit: item.protocol.unit,
+    protocolId: item.protocol.id,
+    scheduledAt: item.scheduledAt.toISOString(),
+  }
 }
 
 export function Overview({
@@ -51,65 +64,63 @@ export function Overview({
   results: EnrichedResult[]
   bodyMetrics: BodyMetric[]
   onNavigate: (view: View) => void
-  onOpenQuickLog: (tab: 'injection', prefill?: QuickLogPrefill) => void
+  onOpenQuickLog: QuickLogFn
   onOpenWizard: () => void
 }) {
   const protocols = useLiveQuery(() => db.protocols.filter((p) => !p.archived).toArray(), [], [])
   const protocolDoses = useLiveQuery(() => db.protocolDoses.toArray(), [], [])
   const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id, c])), [compounds])
-  const schedule = useMemo(
-    () => simpleUpcomingSchedule(protocols, injections, protocolDoses),
-    [protocols, injections, protocolDoses],
+
+  // Overdue + due-today, keyed on canonical schedule instants (so logging /
+  // dismissing actually clears them). Plus the next future dose for the
+  // "all caught up" state.
+  const pending = useMemo(() => pendingDoses(protocols, protocolDoses), [protocols, protocolDoses])
+  const nextUp = useMemo(
+    () => upcomingSchedule(protocols, protocolDoses, new Date(), 30).find((it) => it.scheduledAt.getTime() > Date.now()),
+    [protocols, protocolDoses],
   )
-  const upNext = schedule[0]
 
   const labFlags = flagLatestResults(results)
   const latestBp = vitals[0]
 
-  // HCT alert — hematocrit > 52% is a safety flag for TRT users
   const hctResult = results.find((r) => {
     const m = r.marker?.toLowerCase()
     return (m?.includes('hematocrit') || m === 'hct' || m === 'haematocrit') && r.value !== undefined && r.value > 52
   })
 
-  // 7-day average BP
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-  const recentVitals = vitals.filter((v) => parseISO(v.measuredAt).getTime() >= sevenDaysAgo)
-  const avgBp = recentVitals.length >= 2
-    ? {
-        sys: Math.round(recentVitals.reduce((s, v) => s + v.systolic, 0) / recentVitals.length),
-        dia: Math.round(recentVitals.reduce((s, v) => s + v.diastolic, 0) / recentVitals.length),
-      }
-    : undefined
+  // BP average of the LAST 5 readings (vitals is newest-first).
+  const bpAvg5 = useMemo(() => {
+    const last5 = vitals.slice(0, 5)
+    if (last5.length === 0) return undefined
+    const avg = (xs: number[]) => Math.round(xs.reduce((s, x) => s + x, 0) / xs.length)
+    return { sys: avg(last5.map((v) => v.systolic)), dia: avg(last5.map((v) => v.diastolic)), n: last5.length }
+  }, [vitals])
 
-  // Newest weight across bodyMetrics (standalone logs) + injections (legacy).
-  const lastWeight = useMemo(() => {
-    let bestMs = -Infinity
-    let bestW: number | undefined
-    for (const b of bodyMetrics) {
-      if (b.weightKg === undefined) continue
-      const ms = new Date(b.measuredAt).getTime()
-      if (ms > bestMs) { bestMs = ms; bestW = b.weightKg }
-    }
-    for (const inj of injections) {
-      if (inj.weightKg === undefined) continue
-      const ms = new Date(inj.takenAt).getTime()
-      if (ms > bestMs) { bestMs = ms; bestW = inj.weightKg }
-    }
-    return bestW
+  // Weight: newest + delta vs the previous point, across bodyMetrics + injections.
+  const weightInfo = useMemo(() => {
+    const pts: Array<{ ms: number; kg: number }> = []
+    for (const b of bodyMetrics) if (b.weightKg !== undefined) pts.push({ ms: new Date(b.measuredAt).getTime(), kg: b.weightKg })
+    for (const i of injections) if (i.weightKg !== undefined) pts.push({ ms: new Date(i.takenAt).getTime(), kg: i.weightKg })
+    pts.sort((a, b) => a.ms - b.ms)
+    if (pts.length === 0) return undefined
+    const latest = pts[pts.length - 1]
+    const prev = pts.length > 1 ? pts[pts.length - 2] : undefined
+    return { kg: latest.kg, delta: prev ? latest.kg - prev.kg : undefined, at: latest.ms }
   }, [bodyMetrics, injections])
 
-  const lastTest = exams[0]
-  const outOfRange = labFlags.length
-
-  const bpTone = latestBp
-    ? latestBp.systolic >= 145 ? 'bad' as const : latestBp.systolic >= 135 ? 'primary' as const : 'good' as const
-    : 'neutral' as const
+  const bpTone = bpAvg5
+    ? bpAvg5.sys >= 145 ? 'text-destructive' : bpAvg5.sys >= 135 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'
+    : ''
 
   const hasProtocol = compounds.length > 0
   const hasInjection = injections.length > 0
   const hasLabs = exams.length > 0
   const showOnboarding = !hasProtocol || !hasInjection || !hasLabs
+
+  function logAll() {
+    if (pending.length === 0) return
+    onOpenQuickLog('injection', { lines: pending.map(lineFor) })
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -140,93 +151,70 @@ export function Overview({
         </div>
       )}
 
-      {/* ── KPI row — 4 essentials (no Next dose since Up Next has it; no Lab panels) ── */}
-      <StatRow>
-        <StatCard
-          icon={HeartPulse}
-          label="Blood pressure"
-          value={latestBp ? `${latestBp.systolic}/${latestBp.diastolic}` : '—'}
-          sub={avgBp ? `avg 7d ${avgBp.sys}/${avgBp.dia}` : latestBp ? format(parseISO(latestBp.measuredAt), 'MMM d') : 'No reading'}
-          tone={bpTone}
-          colorValue={bpTone === 'bad'}
-        />
-        <StatCard
-          icon={Syringe}
-          label="Active compounds"
-          value={protocols.length}
-          sub={injections.length > 0 ? `${injections.length} doses logged` : undefined}
-          tone="primary"
-        />
-        <StatCard
-          icon={FlaskConical}
-          label="Out of range"
-          value={outOfRange}
-          sub={lastTest ? `last test ${format(parseISO(lastTest.collectedAt), 'MMM d')}` : 'No labs yet'}
-          tone={outOfRange > 0 ? 'bad' : 'good'}
-          colorValue
-        />
-        <StatCard
-          icon={Scale}
-          label="Weight"
-          value={lastWeight !== undefined ? `${lastWeight} kg` : '—'}
-          tone="info"
-        />
-      </StatRow>
-
       <DashGrid>
-        {/* ── 1. Up next ── */}
-        <HeroCard
-          className="md:col-span-2 xl:col-span-3"
-          eyebrow={upNext ? 'Up next' : 'Status'}
-          icon={CalendarClock}
-          title={
-            upNext
-              ? (compoundMap.get(upNext.protocol.compoundId)?.name ?? upNext.protocol.name)
-              : latestBp
-                ? `${latestBp.systolic}/${latestBp.diastolic}`
-                : 'Welcome'
-          }
-          subtitle={
-            upNext
-              ? `${upNext.protocol.dose} ${upNext.protocol.unit} · ${upNext.isOverdue ? `${Math.round(Math.abs(upNext.daysUntil))}d overdue` : format(upNext.nextDue, 'EEEE, MMM d · HH:mm')}`
-              : latestBp
-                ? `Latest blood pressure · ${format(parseISO(latestBp.measuredAt), 'MMM d, HH:mm')}`
-                : 'Add a compound to see your schedule here.'
-          }
-          onAction={
-            upNext
-              ? () => onOpenQuickLog('injection', {
-                  compoundId: upNext.protocol.compoundId,
-                  dose: upNext.protocol.dose,
-                  unit: upNext.protocol.unit,
-                  protocolId: upNext.protocol.id,
-                  scheduledAt: upNext.nextDue.toISOString(),
-                })
-              : undefined
-          }
-          actionLabel="Log this dose"
-          secondary={
-            upNext && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                onClick={() => skipScheduledDose(upNext.protocol.id!, upNext.nextDue.toISOString())}
-              >
-                Skip this dose
-              </Button>
-            )
-          }
-        />
+        {/* ── 1. Today's protocol — the driver ── */}
+        <div className="md:col-span-2 xl:col-span-3">
+          <ProtocolTodayCard
+            pending={pending}
+            nextUp={nextUp}
+            hasProtocols={protocols.length > 0}
+            compoundMap={compoundMap}
+            onLogAll={logAll}
+            onLogOne={(it) => onOpenQuickLog('injection', { lines: [lineFor(it)] })}
+            onDismiss={(it) => void skipScheduledDose(it.protocol.id!, it.scheduledAt.toISOString())}
+            onOpenWizard={onOpenWizard}
+            onNavigate={onNavigate}
+          />
+        </div>
 
-        {/* ── 2. Site rotation — promoted right under Up next ── */}
+        {/* ── 2. Vitals — BP avg of last 5 + weight ── */}
+        <PanelCard
+          className="md:col-span-2 xl:col-span-3"
+          title="Vitals"
+          subtitle="Recent averages"
+        >
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-medium text-muted-foreground">Blood pressure</p>
+              <p className={`font-mono text-2xl font-semibold tabular-nums ${bpTone}`}>
+                {bpAvg5 ? `${bpAvg5.sys}/${bpAvg5.dia}` : '—'}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {bpAvg5
+                  ? `avg last ${bpAvg5.n}${latestBp ? ` · latest ${latestBp.systolic}/${latestBp.diastolic}` : ''}`
+                  : 'No readings'}
+              </p>
+              <Button variant="ghost" size="sm" className="mt-0.5 h-7 self-start px-2 text-xs text-muted-foreground" onClick={() => onOpenQuickLog('bp')}>
+                <Plus className="size-3" /> Log BP
+              </Button>
+            </div>
+            <div className="flex flex-col gap-1 border-l pl-4">
+              <p className="text-xs font-medium text-muted-foreground">Weight</p>
+              <p className="font-mono text-2xl font-semibold tabular-nums">
+                {weightInfo ? weightInfo.kg : '—'}<small className="ml-1 text-xs font-normal text-muted-foreground">kg</small>
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {weightInfo
+                  ? (weightInfo.delta !== undefined && Math.abs(weightInfo.delta) >= 0.05
+                      ? `${weightInfo.delta > 0 ? '+' : ''}${weightInfo.delta.toFixed(1)} kg vs last`
+                      : format(weightInfo.at, 'MMM d'))
+                  : 'Not logged'}
+              </p>
+              <Button variant="ghost" size="sm" className="mt-0.5 h-7 self-start px-2 text-xs text-muted-foreground" onClick={() => onOpenQuickLog('weight')}>
+                <Plus className="size-3" /> Log weight
+              </Button>
+            </div>
+          </div>
+        </PanelCard>
+
+        {/* ── 3. Site rotation — full width, high priority for planning pins ── */}
         {injections.length > 0 && (
-          <PanelCard className="md:col-span-2 xl:col-span-3" title="Site rotation" subtitle="Red = used recently">
+          <PanelCard className="md:col-span-2 xl:col-span-6" title="Site rotation" subtitle="Volume, balance & recency — last 60 days">
             <SiteRotation injections={injections} compounds={compounds} />
           </PanelCard>
         )}
 
-        {/* ── 3. Active levels — past-only stacked chart of what you injected ── */}
+        {/* ── 4. Active levels — plain-language ── */}
         {injections.length > 0 && (
           <div className="md:col-span-2 xl:col-span-6">
             <Suspense fallback={null}>
@@ -235,7 +223,7 @@ export function Overview({
           </div>
         )}
 
-        {/* ── 4. Recent doses — full-width on desktop, shadcn Table for clean column alignment ── */}
+        {/* ── 5. Recent doses ── */}
         <PanelCard
           className="md:col-span-2 xl:col-span-6"
           title="Recent doses"
@@ -287,7 +275,7 @@ export function Overview({
           )}
         </PanelCard>
 
-        {/* ── 4. Lab flags — only when there are flags ── */}
+        {/* ── 6. Lab flags — only when there are flags ── */}
         {labFlags.length > 0 && (
           <PanelCard
             className="md:col-span-2 xl:col-span-3"
@@ -332,6 +320,112 @@ export function Overview({
         )}
       </DashGrid>
     </div>
+  )
+}
+
+// ── Today's protocol card ────────────────────────────────────────────────────
+
+function ProtocolTodayCard({
+  pending,
+  nextUp,
+  hasProtocols,
+  compoundMap,
+  onLogAll,
+  onLogOne,
+  onDismiss,
+  onOpenWizard,
+  onNavigate,
+}: {
+  pending: ScheduledItem[]
+  nextUp?: ScheduledItem
+  hasProtocols: boolean
+  compoundMap: Map<number | undefined, Compound>
+  onLogAll: () => void
+  onLogOne: (it: ScheduledItem) => void
+  onDismiss: (it: ScheduledItem) => void
+  onOpenWizard: () => void
+  onNavigate: (view: View) => void
+}) {
+  const anyOverdue = pending.some((it) => overdueDays(it.scheduledAt) >= 1)
+
+  return (
+    <PanelCard
+      className="h-full"
+      title="Today's protocol"
+      subtitle={pending.length > 0 ? (anyOverdue ? 'Log what you took, or dismiss it' : 'Due today') : 'Your schedule'}
+      action={
+        hasProtocols ? (
+          <Button variant="ghost" size="sm" onClick={() => onNavigate('meds')}>
+            Manage <ChevronRight className="size-3.5" />
+          </Button>
+        ) : undefined
+      }
+    >
+      {!hasProtocols ? (
+        <PanelEmpty
+          icon={CalendarClock}
+          title="No protocols yet"
+          detail="Add a compound with a schedule and your daily doses show up here."
+          action={<Button size="sm" onClick={onOpenWizard}><Plus className="size-3.5" /> Add compound</Button>}
+        />
+      ) : pending.length > 0 ? (
+        <div className="flex flex-col gap-2.5">
+          <ul className="flex flex-col">
+            {pending.map((it, i) => {
+              const c = compoundMap.get(it.protocol.compoundId)
+              const od = overdueDays(it.scheduledAt)
+              return (
+                <li key={`${it.protocol.id}-${it.scheduledAt.toISOString()}`} className={`flex items-center gap-2.5 py-2 ${i > 0 ? 'border-t' : ''}`}>
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ background: c?.color ?? 'var(--primary)' }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{c?.name ?? it.protocol.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      <span className="font-mono tabular-nums">{it.protocol.dose} {it.protocol.unit}</span>
+                      {' · '}
+                      <span className={od >= 1 ? 'text-destructive' : ''}>{od >= 1 ? `${od}d overdue` : 'due today'}</span>
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" className="h-7 shrink-0 px-2.5 text-xs" onClick={() => onLogOne(it)}>Log</Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                    aria-label="Dismiss dose"
+                    title="Dismiss (didn't take)"
+                    onClick={() => onDismiss(it)}
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </li>
+              )
+            })}
+          </ul>
+          {pending.length > 1 && (
+            <Button size="lg" onClick={onLogAll}>
+              <Syringe className="size-4" /> Log all {pending.length} (one syringe)
+            </Button>
+          )}
+        </div>
+      ) : nextUp ? (
+        <div className="flex flex-col gap-3 py-2">
+          <div className="flex items-center gap-2.5">
+            <span className="size-2.5 shrink-0 rounded-full" style={{ background: compoundMap.get(nextUp.protocol.compoundId)?.color ?? 'var(--primary)' }} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">
+                {compoundMap.get(nextUp.protocol.compoundId)?.name ?? nextUp.protocol.name}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                <span className="font-mono tabular-nums">{nextUp.protocol.dose} {nextUp.protocol.unit}</span>
+                {' · '}next {timeUntil(nextUp.scheduledAt)}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-emerald-700 dark:text-emerald-400">✓ All caught up — nothing due today.</p>
+        </div>
+      ) : (
+        <PanelEmpty icon={CalendarClock} title="Nothing scheduled" detail="No upcoming protocol doses." />
+      )}
+    </PanelCard>
   )
 }
 

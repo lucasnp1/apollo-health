@@ -58,11 +58,12 @@ type Legend = {
   cv: number
 }
 
-const STABILITY_META: Record<Legend['stability'], { label: string; cls: string }> = {
-  stable:   { label: 'Stable',   cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
-  variable: { label: 'Variable', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
-  spiky:    { label: 'Spiky',    cls: 'bg-destructive/15 text-destructive' },
-}
+// Plain-language status from the 7-day trend — no jargon.
+const STATUS_META = {
+  up:   { label: 'Rising',   icon: ArrowUpRight,   cls: 'text-emerald-700 dark:text-emerald-400' },
+  flat: { label: 'Steady',   icon: Minus,          cls: 'text-muted-foreground' },
+  down: { label: 'Tapering', icon: ArrowDownRight, cls: 'text-amber-700 dark:text-amber-400' },
+} as const
 
 export function ActiveLevelsCard({
   compounds,
@@ -71,7 +72,7 @@ export function ActiveLevelsCard({
   compounds: Compound[]
   injections: InjectionLog[]
 }) {
-  const { data, legend, anchorMs } = useMemo(() => {
+  const { data, legend } = useMemo(() => {
     const nowMs = Date.now()
     const anchorMs = nowMs - WINDOW_DAYS * MS_PER_DAY
 
@@ -169,9 +170,14 @@ export function ActiveLevelsCard({
   }, [data, legend])
   const totalPct = totalPeak > 0 ? Math.round((totalNow / totalPeak) * 100) : 0
 
+  // Plain description of how full the tank is right now.
+  const overallLevel = totalPct >= 80 ? 'near your usual high'
+    : totalPct >= 40 ? 'in your normal range'
+    : 'on the low side'
+
   if (legend.length === 0) {
     return (
-      <PanelCard title="Active levels" subtitle="Stacked from logged doses (last 60 days)">
+      <PanelCard title="Active levels" subtitle="Estimated active drug from your logged doses">
         <PanelEmpty icon={Activity} title="No injections yet" detail="Log a dose to see your active levels build here." />
       </PanelCard>
     )
@@ -182,7 +188,7 @@ export function ActiveLevelsCard({
   )
 
   return (
-    <PanelCard title="Active levels" subtitle="Stacked from logged doses · last 60 days">
+    <PanelCard title="Active levels" subtitle="Estimated active drug in your system, from every dose logged">
       <ChartContainer config={chartConfig} className="h-[200px] w-full">
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
           <defs>
@@ -214,49 +220,37 @@ export function ActiveLevelsCard({
         </AreaChart>
       </ChartContainer>
 
-      {/* Total active now — single big number, with how much of your peak that represents */}
+      {/* Plain explainer — what the chart actually means */}
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        Each shot spikes your level, then it tapers between doses. Higher = more active drug on board right now.
+      </p>
+
+      {/* "Active now" — one big number in plain language */}
       <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t pt-3">
-        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total active now</span>
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Active now</span>
         <span className="font-mono text-2xl font-semibold tabular-nums">
-          {totalNow.toFixed(1)}
-          <small className="ml-1 text-xs font-normal text-muted-foreground">mg/d</small>
+          ≈{totalNow.toFixed(0)}
+          <small className="ml-1 text-xs font-normal text-muted-foreground">mg/day</small>
         </span>
-        {totalPeak > 0.1 && (
-          <span className="text-xs text-muted-foreground">
-            {totalPct}% of 60d peak ({totalPeak.toFixed(1)})
-          </span>
-        )}
+        {totalPeak > 0.1 && <span className="text-xs text-muted-foreground">— {overallLevel}</span>}
       </div>
 
-      {/* Per-compound readout — current level + 7d trend + stability chip + window peak */}
+      {/* Per-compound — plain status word + rough level, no jargon */}
       <ul className="mt-3 flex flex-col gap-2">
         {legend.map((s) => {
-          const TrendIcon = s.trend === 'up' ? ArrowUpRight : s.trend === 'down' ? ArrowDownRight : Minus
-          const trendCls = s.trend === 'up'
-            ? 'text-emerald-700 dark:text-emerald-400'
-            : s.trend === 'down'
-              ? 'text-destructive'
-              : 'text-muted-foreground'
-          const stab = STABILITY_META[s.stability]
+          const status = STATUS_META[s.trend]
+          const StatusIcon = status.icon
           return (
-            <li key={s.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <li key={s.key} className="flex items-center gap-2.5 text-sm">
               <span className="size-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
               <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
-              <span className="font-mono tabular-nums">
-                {s.current.toFixed(1)} <small className="text-[10px] font-normal text-muted-foreground">mg/d</small>
+              <span className={cn('flex items-center gap-1 text-xs font-medium', status.cls)}>
+                <StatusIcon className="size-3.5" />
+                {status.label}
               </span>
-              <span className={cn('flex items-center gap-0.5 font-mono tabular-nums', trendCls)}>
-                <TrendIcon className="size-3" />
-                {s.trend === 'flat' ? 'steady' : `${s.trendPct > 0 ? '+' : ''}${s.trendPct.toFixed(0)}% 7d`}
+              <span className="w-16 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                ≈{s.current.toFixed(0)} mg/d
               </span>
-              <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide', stab.cls)}>
-                {stab.label}
-              </span>
-              {s.peak && s.peak.level > 0.1 && (
-                <span className="basis-full pl-5 font-mono tabular-nums text-muted-foreground">
-                  peak {s.peak.level.toFixed(1)} on {format(new Date(anchorMs + s.peak.dayNum * MS_PER_DAY), 'MMM d')} · CV {s.cv.toFixed(0)}%
-                </span>
-              )}
             </li>
           )
         })}
