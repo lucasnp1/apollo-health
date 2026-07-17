@@ -325,7 +325,7 @@ function Shell({
       )}
     >
       {/* ── Sidebar (desktop) ── */}
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-5 border-r bg-sidebar px-3 py-5 md:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 border-r border-border bg-sidebar px-3 py-5 md:flex">
         <div className="flex items-center justify-between px-1.5">
           <div className="flex min-w-0 items-center gap-2.5">
             <BrandMark size={32} />
@@ -356,16 +356,16 @@ function Shell({
                 type="button"
                 onClick={() => setActiveView(item.id)}
                 className={cn(
-                  'relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm transition-colors',
+                  'relative flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors',
                   active
-                    ? 'bg-accent font-semibold text-primary'
-                    : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                    ? 'bg-primary/10 font-medium text-foreground dark:bg-primary/15 [&_svg]:text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                   sidebarCollapsed && 'justify-center px-0',
                 )}
                 title={sidebarCollapsed ? item.label : undefined}
               >
                 {active && !sidebarCollapsed && (
-                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                  <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
                 )}
                 <item.icon className="size-4 shrink-0" />
                 {!sidebarCollapsed && <span>{item.label}</span>}
@@ -377,7 +377,7 @@ function Shell({
         <div className="mt-auto flex flex-col gap-4">
           {!sidebarCollapsed && (
             <div className="flex flex-col gap-1.5">
-              <div className="px-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="px-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                 Quick log
               </div>
               <Button variant="outline" size="sm" className="justify-start" onClick={() => openQuickLog('injection')}>
@@ -417,7 +417,7 @@ function Shell({
 
       {/* ── Main panel ── */}
       <main className="min-w-0">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur md:px-6">
           <Button
             variant="ghost"
             size="icon"
@@ -427,7 +427,7 @@ function Shell({
           >
             <Menu className="size-5" />
           </Button>
-          <h1 className="flex-1 truncate font-display text-xl font-semibold md:text-2xl">{titleFor(activeView)}</h1>
+          <h1 className="flex-1 truncate text-xl font-semibold tracking-[-0.011em] md:text-[22px]">{titleFor(activeView)}</h1>
           <div className="flex items-center gap-2">
             {activeView === 'meds' && (
               <Button variant="ghost" size="icon" onClick={() => setCalcOpen(true)} aria-label="Dose calculator" title="Dose calculator">
@@ -514,11 +514,11 @@ function Shell({
       {/* Mobile hamburger drawer — replaces bottom tabs */}
       {menuOpen && (
         <div
-          className="fixed inset-0 z-50 flex bg-black/45 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-50 flex bg-black/40 backdrop-blur-sm md:hidden"
           onClick={() => setMenuOpen(false)}
         >
           <nav
-            className="flex h-full w-72 max-w-[80%] flex-col gap-4 border-r bg-sidebar p-4 shadow-xl"
+            className="flex h-full w-72 max-w-[80%] flex-col gap-4 border-r border-border bg-sidebar p-4 shadow-lg"
             onClick={(e) => e.stopPropagation()}
             aria-label="Mobile navigation"
           >
@@ -542,8 +542,8 @@ function Shell({
                     className={cn(
                       'flex h-11 items-center gap-3 rounded-md px-3 text-[15px] transition-colors',
                       active
-                        ? 'bg-accent font-medium text-foreground'
-                        : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                        ? 'bg-primary/10 font-medium text-foreground dark:bg-primary/15 [&_svg]:text-primary'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                     )}
                   >
                     <item.icon className="size-[18px] shrink-0" />

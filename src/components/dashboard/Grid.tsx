@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
  */
 export function DashGrid({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn('grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-6', className)}>
+    <div className={cn('grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-6', className)}>
       {children}
     </div>
   )
@@ -23,7 +23,7 @@ export function DashGrid({ children, className }: { children: ReactNode; classNa
 export function StatRow({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={cn('grid gap-5 grid-cols-[repeat(auto-fit,minmax(170px,1fr))]', className)}
+      className={cn('grid gap-6 grid-cols-[repeat(auto-fit,minmax(170px,1fr))]', className)}
     >
       {children}
     </div>

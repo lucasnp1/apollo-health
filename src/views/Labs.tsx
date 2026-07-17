@@ -519,7 +519,7 @@ export function Labs({
 
       {/* ── Needs attention ── */}
       {hasData && outOfRangeSummaries.length > 0 && (
-        <PanelCard className="md:col-span-2 xl:col-span-6 border-l-2 border-l-destructive" title={`${outOfRangeSummaries.length} out of range`} subtitle="Needs attention">
+        <PanelCard className="md:col-span-2 xl:col-span-6 border-l border-l-destructive" title={`${outOfRangeSummaries.length} out of range`} subtitle="Needs attention">
           <Table>
             <MarkerTableHeader />
             <TableBody>

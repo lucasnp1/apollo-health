@@ -30,18 +30,18 @@ export function ChartCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={cn('flex flex-col rounded-2xl border bg-card p-5', className)}
+      className={cn('flex flex-col rounded-xl border border-border bg-card p-6', className)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-display text-xl font-semibold leading-tight">{title}</h3>
-          {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
+          <h3 className="text-[15px] font-semibold leading-5 tracking-[-0.006em] text-foreground">{title}</h3>
+          {subtitle && <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">{subtitle}</p>}
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
       {hero && (
         <div className="mt-3">
-          <p className="font-mono text-3xl font-semibold tabular-nums leading-none">{hero}</p>
+          <p className="text-2xl font-semibold tabular-nums leading-none">{hero}</p>
           {heroSub && <p className="mt-1.5 text-xs text-muted-foreground">{heroSub}</p>}
         </div>
       )}

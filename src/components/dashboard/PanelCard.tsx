@@ -27,13 +27,13 @@ export function PanelCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={cn('rounded-2xl border bg-card p-5', className)}
+      className={cn('rounded-xl border border-border bg-card p-6 shadow-none', className)}
     >
       {(title || action) && (
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            {title && <h3 className="font-display text-xl font-semibold leading-tight">{title}</h3>}
-            {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
+            {title && <h3 className="text-[15px] font-semibold leading-5 tracking-[-0.006em] text-foreground">{title}</h3>}
+            {subtitle && <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">{subtitle}</p>}
           </div>
           {action && <div className="flex shrink-0 items-center gap-1.5">{action}</div>}
         </div>
@@ -57,7 +57,7 @@ export function PanelEmpty({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-      <span className="grid size-11 place-items-center rounded-full bg-secondary text-muted-foreground">
+      <span className="grid size-10 place-items-center rounded-lg bg-muted text-muted-foreground">
         <Icon className="size-5" />
       </span>
       <p className="text-sm font-medium">{title}</p>

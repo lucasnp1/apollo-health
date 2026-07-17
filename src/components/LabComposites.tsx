@@ -340,7 +340,7 @@ function CompositeRow({ panel, expanded, onToggle, first }: {
   const hasDetail = Boolean(panel.note) || panel.recommendations.length > 0
 
   return (
-    <div className={cn('border-l-2 pl-3.5', STATUS_BORDER[panel.status], !first && 'mt-3')}>
+    <div className={cn('border-l pl-3.5', STATUS_BORDER[panel.status], !first && 'mt-3')}>
       <button
         type="button"
         className="flex w-full flex-col gap-1.5 text-left"

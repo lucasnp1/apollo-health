@@ -108,71 +108,64 @@ function CompoundCard({
     : format(schedItem.nextDue, 'EEE MMM d')
 
   return (
-    <div className="relative h-[340px] overflow-hidden rounded-3xl border bg-card">
-      {/* Gradient header — top half */}
-      <div
-        className="absolute inset-x-0 top-0 flex h-1/2 flex-col justify-end p-5"
-        style={{ background: `linear-gradient(150deg, ${color}cc 0%, ${color}33 45%, transparent 100%)` }}
-      >
+    <div className="flex h-[260px] flex-col rounded-xl border border-border bg-card p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="size-2.5 shrink-0 rounded-full" style={{ background: color }} />
+            <p className="truncate text-[17px] font-semibold text-foreground">{compound?.name ?? protocol.name}</p>
+          </div>
+          {compound?.ester && <p className="mt-0.5 pl-[18px] text-xs text-muted-foreground">{compound.ester}</p>}
+        </div>
         {overdue && (
-          <span className="absolute right-4 top-4 rounded-full bg-destructive/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+          <span className="shrink-0 rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive">
             Overdue
           </span>
         )}
-        <p className="font-display text-2xl font-bold leading-[1.1] text-gradient-gold">
-          {compound?.name ?? protocol.name}
+      </div>
+      <p className="mt-2 pl-[18px] text-sm tabular-nums text-muted-foreground">{protocol.dose} {protocol.unit}</p>
+
+      <div className="mt-auto flex flex-col gap-1.5 text-sm">
+        <p className="text-xs text-muted-foreground">{describeCadence(protocol.cadence)}</p>
+        <p className="flex justify-between gap-2">
+          <span className="text-muted-foreground">Last</span>
+          <span className="tabular-nums">{lastLabel}</span>
         </p>
-        {compound?.ester && (
-          <p className="mt-1 text-sm text-muted-foreground">{compound.ester}</p>
-        )}
-        <p className="mt-2 font-mono text-sm tabular-nums text-foreground/80">
-          {protocol.dose} {protocol.unit}
+        <p className="flex justify-between gap-2">
+          <span className="text-muted-foreground">Next</span>
+          <span className={cn('tabular-nums', overdue && 'text-destructive')}>{nextLabel}</span>
         </p>
       </div>
 
-      {/* Detail section */}
-      <div className="absolute inset-x-0 bottom-0 flex h-1/2 flex-col justify-between p-5">
-        <div className="flex flex-col gap-1.5 text-sm">
-          <p className="text-xs text-muted-foreground">{describeCadence(protocol.cadence)}</p>
-          <p className="flex justify-between gap-2">
-            <span className="text-muted-foreground">Last</span>
-            <span className="font-mono tabular-nums">{lastLabel}</span>
-          </p>
-          <p className="flex justify-between gap-2">
-            <span className="text-muted-foreground">Next</span>
-            <span className={cn('font-mono tabular-nums', overdue && 'text-destructive')}>{nextLabel}</span>
-          </p>
-        </div>
-        <div className="flex items-center justify-between">
-          {onEdit ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-9 rounded-full"
-              aria-label="Edit protocol"
-              onClick={(e) => { e.stopPropagation(); onEdit() }}
-            >
-              <Pencil className="size-4" />
-            </Button>
-          ) : <span />}
-          <button
-            type="button"
-            aria-label={`Log ${compound?.name ?? protocol.name}`}
-            className="grid size-11 place-items-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-300 hover:scale-110 hover:rotate-45"
-            onClick={(e) => {
-              e.stopPropagation()
-              onLog('injection', {
-                compoundId: protocol.compoundId,
-                dose: protocol.dose,
-                unit: protocol.unit,
-                protocolId: protocol.id,
-                scheduledAt: schedItem?.nextDue.toISOString(),
-              })
-            }}
+      <div className="mt-4 flex items-center justify-between">
+        {onEdit ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground"
+            aria-label="Edit protocol"
+            onClick={(e) => { e.stopPropagation(); onEdit() }}
           >
-            <ArrowUpRight className="size-5" />
-          </button>
-        </div>
+            <Pencil className="size-4" />
+          </Button>
+        ) : <span />}
+        <button
+          type="button"
+          aria-label={`Log ${compound?.name ?? protocol.name}`}
+          className="grid size-9 place-items-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+          onClick={(e) => {
+            e.stopPropagation()
+            onLog('injection', {
+              compoundId: protocol.compoundId,
+              dose: protocol.dose,
+              unit: protocol.unit,
+              protocolId: protocol.id,
+              scheduledAt: schedItem?.nextDue.toISOString(),
+            })
+          }}
+        >
+          <ArrowUpRight className="size-5" />
+        </button>
       </div>
     </div>
   )

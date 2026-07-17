@@ -7,18 +7,21 @@ export type StatTone = 'primary' | 'good' | 'bad' | 'info' | 'neutral'
 
 // Horizon MiniStatistics anatomy: icon in a tinted circle on the left,
 // muted label + bold value on the right.
+// Restrained, mostly-monochrome icon chips — colour only for good/bad/info,
+// and even then a faint tint. Keeps the field calm (Things-3).
 const TONE_CIRCLE: Record<StatTone, string> = {
-  primary: 'bg-primary/15 text-primary',
-  good:    'bg-emerald-500/15 text-emerald-500',
-  bad:     'bg-destructive/15 text-destructive',
-  info:    'bg-blue-500/15 text-blue-400',
-  neutral: 'bg-secondary text-muted-foreground',
+  primary: 'bg-muted text-muted-foreground',
+  neutral: 'bg-muted text-muted-foreground',
+  good:    'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  bad:     'bg-destructive/10 text-destructive',
+  info:    'bg-blue-500/10 text-blue-600 dark:text-blue-400',
 }
 
+// The big number is always ink; status colour lives in the sub line, not here.
 const TONE_VALUE: Record<StatTone, string> = {
   primary: 'text-foreground',
-  good:    'text-emerald-500',
-  bad:     'text-destructive',
+  good:    'text-foreground',
+  bad:     'text-foreground',
   info:    'text-foreground',
   neutral: 'text-foreground',
 }
@@ -47,15 +50,14 @@ export function StatCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      whileHover={{ y: -2 }}
-      className={cn('flex items-center gap-3 rounded-2xl border bg-card px-4 py-4 md:gap-4 md:px-5', className)}
+      className={cn('flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 md:gap-4', className)}
     >
-      <span className={cn('grid size-10 shrink-0 place-items-center rounded-full md:size-12', TONE_CIRCLE[tone])}>
-        <Icon className="size-4 md:size-5" />
+      <span className={cn('grid size-9 shrink-0 place-items-center rounded-lg md:size-10', TONE_CIRCLE[tone])}>
+        <Icon className="size-4 md:size-[18px]" />
       </span>
       <div className="min-w-0">
         <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
-        <p className={cn('truncate font-mono text-lg font-semibold tabular-nums leading-tight md:text-xl', colorValue ? TONE_VALUE[tone] : 'text-foreground')}>
+        <p className={cn('truncate text-lg font-semibold tabular-nums leading-tight md:text-xl', colorValue ? TONE_VALUE[tone] : 'text-foreground')}>
           {value}
         </p>
         {sub && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</p>}

@@ -182,7 +182,7 @@ export function Vitals({ vitals }: { vitals: VitalLog[] }) {
         )}
 
         {insight && (
-          <div className={`mt-4 rounded-lg border-l-2 px-3.5 py-2.5 ${insight.cls}`}>
+          <div className={`mt-4 rounded-lg border-l px-3.5 py-2.5 ${insight.cls}`}>
             <p className="text-sm font-medium">{insight.title} — avg {stats!.meanSys.toFixed(0)}/{stats!.meanDia.toFixed(0)}</p>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{insight.body}</p>
           </div>

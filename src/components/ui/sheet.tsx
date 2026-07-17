@@ -26,7 +26,7 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Dialo
       // pointer-events-auto + opaque mobile backdrop ensures taps never leak
       // through to the page underneath while the sheet is open or animating.
       className={cn(
-        "fixed inset-0 z-50 bg-black/50 pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
+        "fixed inset-0 z-50 bg-black/40 pointer-events-auto data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
         className,
       )}
       {...props}
@@ -51,7 +51,7 @@ function SheetContent({
           "data-[state=closed]:animate-out data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "max-sm:data-[state=closed]:slide-out-to-bottom-4 max-sm:data-[state=open]:slide-in-from-bottom-4",
           // Desktop: centered rounded card (mirrors dialog.tsx centering + zoom).
-          "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[88vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:border sm:shadow-lg",
+          "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[88vh] sm:w-full sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:border sm:border-border sm:bg-card sm:shadow-[0_8px_28px_oklch(0_0_0/0.12)] dark:sm:shadow-[0_8px_28px_oklch(0_0_0/0.5)]",
           "sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95",
           className,
         )}
