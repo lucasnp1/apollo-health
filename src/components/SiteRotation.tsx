@@ -75,9 +75,6 @@ const STANDARD_SET = new Set(STANDARD_SITES.map((s) => s.site))
 const FILL: Record<Kind, string> = {
   hot: 'fill-red-500', warm: 'fill-amber-500', rested: 'fill-emerald-500', available: '',
 }
-const STROKE: Record<Kind, string> = {
-  hot: 'stroke-red-500', warm: 'stroke-amber-500', rested: 'stroke-emerald-500', available: '',
-}
 
 function routeOf(inj: InjectionLog): RouteGroup {
   return inj.route === 'SubQ' ? 'SubQ' : inj.route === 'IM' || !inj.route ? 'IM' : 'Other'
@@ -128,6 +125,22 @@ export function SiteRotation({
 }) {
   const [now] = useState(() => Date.now())
   const [selectedSite, setSelectedSite] = useState<string | null>(null)
+  const [activeRoute, setActiveRoute] = useState<'IM' | 'SubQ'>(() => {
+    // Open on the route of the most recent injection so the tab matches what
+    // the user actually does.
+    let best = -Infinity
+    let r: 'IM' | 'SubQ' = 'IM'
+    for (const inj of injections) {
+      const rr = routeOf(inj)
+      if (rr !== 'IM' && rr !== 'SubQ') continue
+      const t = new Date(inj.takenAt).getTime()
+      if (t > best) {
+        best = t
+        r = rr
+      }
+    }
+    return r
+  })
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
 
   const compoundMap = useMemo(
@@ -182,11 +195,15 @@ export function SiteRotation({
 
   // Overused = far above the typical bucket. Uses count in-window.
   const overusedThreshold = useMemo(() => {
-    const counts = buckets.map((b) => b.count).filter((c) => c > 0).sort((a, b) => a - b)
+    const counts = buckets
+      .filter((b) => b.route === activeRoute)
+      .map((b) => b.count)
+      .filter((c) => c > 0)
+      .sort((a, b) => a - b)
     if (counts.length === 0) return Infinity
     const median = counts[Math.floor(counts.length / 2)]
     return Math.max(3, median * 3)
-  }, [buckets])
+  }, [buckets, activeRoute])
 
   // Most recent bucket per site string (a site logged both IM + SubQ is rare;
   // show whichever was hit last).
@@ -199,8 +216,17 @@ export function SiteRotation({
     return m
   }, [buckets])
 
+  const routeCounts = useMemo(
+    () => ({
+      IM: buckets.filter((b) => b.route === 'IM').length,
+      SubQ: buckets.filter((b) => b.route === 'SubQ').length,
+    }),
+    [buckets],
+  )
+
   // Every standard site placed on the body: coloured by recency if used, a faint
-  // "available" anchor if never touched.
+  // "available" anchor if never touched. `route` is the site's canonical route
+  // (from the IM/SubQ site lists) so the active tab filters cleanly.
   const placed = useMemo<PlacedZone[]>(() => {
     const out: PlacedZone[] = []
     for (const { site, route } of STANDARD_SITES) {
@@ -211,7 +237,7 @@ export function SiteRotation({
       const b = bucketBySite.get(site)
       out.push({
         site,
-        route: b ? b.route : route,
+        route,
         x,
         y: pos.y,
         view: pos.view,
@@ -225,19 +251,23 @@ export function SiteRotation({
 
   // Used sites we can't place on the body (free-text / custom) — shown as chips.
   const customUsed = useMemo(
-    () => buckets.filter((b) => !STANDARD_SET.has(b.site)).sort((a, b) => a.daysAgo - b.daysAgo),
-    [buckets],
+    () =>
+      buckets
+        .filter((b) => !STANDARD_SET.has(b.site) && b.route === activeRoute)
+        .sort((a, b) => a.daysAgo - b.daysAgo),
+    [buckets, activeRoute],
   )
 
   // Overall left/right balance (in-window). Prefer mL, fall back to count.
   const balance = useMemo(() => {
+    const rel = buckets.filter((b) => b.route === activeRoute)
     let byVolume = true
-    for (const b of buckets) {
+    for (const b of rel) {
       if (b.side === null || b.count === 0) continue
       if (b.totalMl === undefined) byVolume = false
     }
     let left = 0, right = 0
-    for (const b of buckets) {
+    for (const b of rel) {
       if (b.side === null || b.count === 0) continue
       const amount = byVolume ? (b.totalMl ?? 0) : b.count
       if (b.side === 'L') left += amount
@@ -246,14 +276,14 @@ export function SiteRotation({
     const total = left + right
     if (total === 0) return null
     return { left, right, total, rightPct: right / total, byVolume }
-  }, [buckets])
+  }, [buckets, activeRoute])
 
   const selectedBucket = selectedSite ? bucketBySite.get(selectedSite) ?? null : null
   const imbalanced = balance && (balance.rightPct > 0.62 || balance.rightPct < 0.38)
-  const hasData = buckets.length > 0
+  const routeHasData = routeCounts[activeRoute] > 0
 
   function renderBody(view: BodyView) {
-    const zones = placed.filter((z) => z.view === view)
+    const zones = placed.filter((z) => z.view === view && z.route === activeRoute)
     return (
       <>
         {/* silhouette fill (both halves, seamless) */}
@@ -332,27 +362,15 @@ export function SiteRotation({
                     strokeWidth={1.5}
                   />
                 )}
-                {z.route === 'SubQ' ? (
-                  <ellipse
-                    cx={z.x}
-                    cy={z.y}
-                    rx={8.5}
-                    ry={7.5}
-                    style={{ fill: 'var(--card)' }}
-                    className={STROKE[z.kind]}
-                    strokeWidth={3}
-                  />
-                ) : (
-                  <ellipse
-                    cx={z.x}
-                    cy={z.y}
-                    rx={9}
-                    ry={8}
-                    className={FILL[z.kind]}
-                    style={{ stroke: 'var(--card)' }}
-                    strokeWidth={1.5}
-                  />
-                )}
+                <ellipse
+                  cx={z.x}
+                  cy={z.y}
+                  rx={9}
+                  ry={8}
+                  className={FILL[z.kind]}
+                  style={{ stroke: 'var(--card)' }}
+                  strokeWidth={1.5}
+                />
               </g>
             )
           })}
@@ -362,6 +380,34 @@ export function SiteRotation({
 
   return (
     <>
+      {/* Route tabs — IM and SubQ never share a body */}
+      <div className="mb-3 flex justify-center">
+        <div className="inline-flex rounded-lg bg-muted p-0.5 text-xs">
+          {(['IM', 'SubQ'] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => {
+                setActiveRoute(r)
+                setSelectedSite(null)
+              }}
+              aria-pressed={activeRoute === r}
+              className={cn(
+                'rounded-md px-3.5 py-1.5 font-medium transition-colors',
+                activeRoute === r
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {r === 'IM' ? 'Intramuscular' : 'Subcutaneous'}
+              {routeCounts[r] > 0 && (
+                <span className="ml-1.5 tabular-nums opacity-60">{routeCounts[r]}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Left/right balance headline — the "you favoured your right side" callout */}
       {balance && (
         <div className="mb-3 flex flex-col gap-1.5">
@@ -405,9 +451,9 @@ export function SiteRotation({
         </svg>
       </div>
 
-      {!hasData && (
+      {!routeHasData && (
         <p className="mt-1 text-center text-xs text-muted-foreground">
-          No injections logged yet — every site is open.
+          No {activeRoute === 'IM' ? 'intramuscular' : 'subcutaneous'} sites logged yet — every site is open.
         </p>
       )}
 
@@ -462,14 +508,6 @@ export function SiteRotation({
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-full bg-red-500" /> ≤2d — resting
         </span>
-        <span className="ml-auto flex items-center gap-2">
-          <span className="flex items-center gap-1">
-            <span className="size-2.5 rounded-full bg-muted-foreground" /> IM
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="size-2.5 rounded-full border-2 border-muted-foreground" /> SubQ
-          </span>
-        </span>
       </div>
 
       {/* Custom / unmappable sites */}
@@ -502,7 +540,7 @@ export function SiteRotation({
       )}
 
       <p className="mt-2 text-xs text-muted-foreground">
-        Green = rested (7d+) · amber 3–6d · red ≤2d. Solid = IM, ring = SubQ. Tap a zone for detail.
+        Green = rested (7d+) · amber 3–6d · red ≤2d. Tap a zone for detail.
       </p>
     </>
   )
