@@ -5,10 +5,13 @@ import { TriangleAlert, X } from 'lucide-react'
 import { db, type Compound, type InjectionLog } from '../lib/db'
 import { mlFromDose, parseConcentrationMgPerMl } from '../lib/vials'
 import { pickActiveVial } from '../lib/injections'
+import { IM_SITES, SUBQ_SITES } from '../lib/sites'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 type RouteGroup = 'IM' | 'SubQ' | 'Other'
+type Kind = 'hot' | 'warm' | 'rested' | 'available'
+type BodyView = 'front' | 'back'
 
 const DAY = 86_400_000
 const WINDOW_DAYS = 60 // volume/count totals cover the last 2 months
@@ -25,18 +28,55 @@ type SiteBucket = {
   injections: InjectionLog[]
 }
 
-const ROUTE_LABEL: Record<RouteGroup, string> = {
-  IM: 'Intramuscular', SubQ: 'Subcutaneous', Other: 'Other',
+// ── Body silhouette ─────────────────────────────────────────────────────────
+// One continuous half-outline (head-top → right side → crotch). Filled with Z
+// (the implicit close is the vertical centre seam) and mirrored for the left
+// half; stroked without Z so only the outer contour is drawn, no centre line.
+const CX = 170
+const MIRROR = `translate(${CX * 2},0) scale(-1,1)`
+const BODY_HALF =
+  'M170,38 Q193,42 199,64 Q198,85 184,98 Q182,101 201,108 Q215,115 221,127 ' +
+  'Q225,139 224,153 Q221,205 213,256 Q217,279 209,290 Q202,293 197,285 ' +
+  'Q195,276 197,268 Q203,232 205,192 Q206,174 205,160 Q191,176 189,206 ' +
+  'Q188,228 201,240 Q207,248 205,258 Q205,280 204,300 Q201,330 199,357 ' +
+  'Q202,376 201,395 Q196,415 190,432 Q189,441 192,450 L174,450 Q173,441 176,432 ' +
+  'Q174,415 175,395 Q175,376 176,357 Q177,330 177,300 Q173,278 170,260'
+
+// Where each anatomical region sits on the silhouette. `dx` is distance from the
+// centre line; the L/R side of a site places it left (CX-dx) or right (CX+dx).
+const ZONES: Record<string, { view: BodyView; dx: number; y: number }> = {
+  // front
+  Deltoid: { view: 'front', dx: 48, y: 127 },
+  Pectoral: { view: 'front', dx: 22, y: 150 },
+  Forearm: { view: 'front', dx: 34, y: 250 },
+  Abdomen: { view: 'front', dx: 20, y: 186 },
+  'Love Handle': { view: 'front', dx: 24, y: 208 },
+  'Navel (SubQ)': { view: 'front', dx: 0, y: 204 },
+  'Rectus Femoris': { view: 'front', dx: 9, y: 296 },
+  'Vastus Lateralis': { view: 'front', dx: 30, y: 300 },
+  'Upper Thigh': { view: 'front', dx: 15, y: 276 },
+  'Outer Thigh': { view: 'front', dx: 32, y: 288 },
+  // back
+  Lat: { view: 'back', dx: 32, y: 176 },
+  Tricep: { view: 'back', dx: 44, y: 172 },
+  'Upper Arm': { view: 'back', dx: 46, y: 150 },
+  Ventrogluteal: { view: 'back', dx: 32, y: 246 },
+  Dorsogluteal: { view: 'back', dx: 17, y: 258 },
+  'Glute SubQ': { view: 'back', dx: 24, y: 270 },
+  'Lower Back': { view: 'back', dx: 16, y: 214 },
 }
-const ROUTE_TEXT: Record<RouteGroup, string> = {
-  IM: 'text-amber-700 dark:text-amber-400',
-  SubQ: 'text-blue-600 dark:text-blue-400',
-  Other: 'text-muted-foreground',
+
+const STANDARD_SITES: { site: string; route: RouteGroup }[] = [
+  ...IM_SITES.flatMap((g) => g.sites.map((site) => ({ site, route: 'IM' as RouteGroup }))),
+  ...SUBQ_SITES.flatMap((g) => g.sites.map((site) => ({ site, route: 'SubQ' as RouteGroup }))),
+]
+const STANDARD_SET = new Set(STANDARD_SITES.map((s) => s.site))
+
+const FILL: Record<Kind, string> = {
+  hot: 'fill-red-500', warm: 'fill-amber-500', rested: 'fill-emerald-500', available: '',
 }
-const ROUTE_DOT: Record<RouteGroup, string> = {
-  IM: 'bg-amber-500',
-  SubQ: 'bg-blue-500',
-  Other: 'bg-muted-foreground',
+const STROKE: Record<Kind, string> = {
+  hot: 'stroke-red-500', warm: 'stroke-amber-500', rested: 'stroke-emerald-500', available: '',
 }
 
 function routeOf(inj: InjectionLog): RouteGroup {
@@ -49,9 +89,34 @@ function splitSite(site: string): { region: string; side: 'L' | 'R' | null } {
   return m ? { region: m[1], side: m[2] as 'L' | 'R' } : { region: site, side: null }
 }
 
+function recencyKind(daysAgo: number): Kind {
+  if (!Number.isFinite(daysAgo)) return 'rested'
+  if (daysAgo < 2) return 'hot'
+  if (daysAgo < 7) return 'warm'
+  return 'rested'
+}
+
 function volLabel(b: SiteBucket): string {
   if (b.totalMl !== undefined && b.totalMl > 0) return `${b.totalMl.toFixed(b.totalMl < 10 ? 1 : 0)} mL`
   return `${b.count}×`
+}
+
+function daysLabel(daysAgo: number): string {
+  if (!Number.isFinite(daysAgo)) return '—'
+  if (daysAgo < 0.5) return 'today'
+  if (daysAgo < 1.5) return '1d ago'
+  return `${Math.round(daysAgo)}d ago`
+}
+
+type PlacedZone = {
+  site: string
+  route: RouteGroup
+  x: number
+  y: number
+  view: BodyView
+  kind: Kind
+  overused: boolean
+  bucket?: SiteBucket
 }
 
 export function SiteRotation({
@@ -123,15 +188,55 @@ export function SiteRotation({
     return Math.max(3, median * 3)
   }, [buckets])
 
+  // Most recent bucket per site string (a site logged both IM + SubQ is rare;
+  // show whichever was hit last).
+  const bucketBySite = useMemo(() => {
+    const m = new Map<string, SiteBucket>()
+    for (const b of buckets) {
+      const ex = m.get(b.site)
+      if (!ex || b.lastMs > ex.lastMs) m.set(b.site, b)
+    }
+    return m
+  }, [buckets])
+
+  // Every standard site placed on the body: coloured by recency if used, a faint
+  // "available" anchor if never touched.
+  const placed = useMemo<PlacedZone[]>(() => {
+    const out: PlacedZone[] = []
+    for (const { site, route } of STANDARD_SITES) {
+      const { region, side } = splitSite(site)
+      const pos = ZONES[region]
+      if (!pos) continue
+      const x = pos.dx === 0 ? CX : side === 'R' ? CX + pos.dx : CX - pos.dx
+      const b = bucketBySite.get(site)
+      out.push({
+        site,
+        route: b ? b.route : route,
+        x,
+        y: pos.y,
+        view: pos.view,
+        kind: b ? recencyKind(b.daysAgo) : 'available',
+        overused: b ? b.count >= overusedThreshold : false,
+        bucket: b,
+      })
+    }
+    return out
+  }, [bucketBySite, overusedThreshold])
+
+  // Used sites we can't place on the body (free-text / custom) — shown as chips.
+  const customUsed = useMemo(
+    () => buckets.filter((b) => !STANDARD_SET.has(b.site)).sort((a, b) => a.daysAgo - b.daysAgo),
+    [buckets],
+  )
+
   // Overall left/right balance (in-window). Prefer mL, fall back to count.
   const balance = useMemo(() => {
-    let left = 0, right = 0
     let byVolume = true
     for (const b of buckets) {
       if (b.side === null || b.count === 0) continue
-      const amount = b.totalMl
-      if (amount === undefined) byVolume = false
+      if (b.totalMl === undefined) byVolume = false
     }
+    let left = 0, right = 0
     for (const b of buckets) {
       if (b.side === null || b.count === 0) continue
       const amount = byVolume ? (b.totalMl ?? 0) : b.count
@@ -143,67 +248,121 @@ export function SiteRotation({
     return { left, right, total, rightPct: right / total, byVolume }
   }, [buckets])
 
-  function recencyClass(daysAgo: number) {
-    if (daysAgo < 2) return 'border-destructive/50 bg-destructive/10 text-destructive'
-    if (daysAgo < 4) return 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-    if (daysAgo < 7) return 'border-amber-500/30 bg-amber-500/5'
-    return 'border-border bg-secondary/50'
-  }
-
-  function daysLabel(daysAgo: number): string {
-    if (!Number.isFinite(daysAgo)) return '—'
-    if (daysAgo < 0.5) return 'today'
-    if (daysAgo < 1.5) return '1d'
-    return `${Math.round(daysAgo)}d`
-  }
-
-  const selectedBucket = selectedSite ? buckets.find((b) => `${b.site}||${b.route}` === selectedSite) : null
-
-  if (buckets.length === 0) {
-    return <p className="text-sm text-muted-foreground">Log injections to track site rotation.</p>
-  }
-
+  const selectedBucket = selectedSite ? bucketBySite.get(selectedSite) ?? null : null
   const imbalanced = balance && (balance.rightPct > 0.62 || balance.rightPct < 0.38)
+  const hasData = buckets.length > 0
 
-  function RouteSection({ group }: { group: RouteGroup }) {
-    const sites = buckets.filter((b) => b.route === group)
-    if (sites.length === 0) return null
+  function renderBody(view: BodyView) {
+    const zones = placed.filter((z) => z.view === view)
     return (
-      <div>
-        <div className={cn('mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider', ROUTE_TEXT[group])}>
-          <span className={cn('size-1.5 rounded-full', ROUTE_DOT[group])} />
-          {ROUTE_LABEL[group]}
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {sites.map((b) => {
-            const overused = b.count >= overusedThreshold
-            const key = `${b.site}||${b.route}`
+      <>
+        {/* silhouette fill (both halves, seamless) */}
+        <g style={{ fill: 'var(--muted-foreground)', fillOpacity: 0.12 }}>
+          <path d={`${BODY_HALF} Z`} />
+          <path d={`${BODY_HALF} Z`} transform={MIRROR} />
+        </g>
+        {/* silhouette contour (open, no centre seam) */}
+        <g
+          fill="none"
+          style={{ stroke: 'var(--muted-foreground)', strokeOpacity: 0.55 }}
+          strokeWidth={1.1}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        >
+          <path d={BODY_HALF} />
+          <path d={BODY_HALF} transform={MIRROR} />
+        </g>
+
+        {/* available anchors — sites you've never used */}
+        {zones
+          .filter((z) => z.kind === 'available')
+          .map((z) => (
+            <circle
+              key={z.site}
+              cx={z.x}
+              cy={z.y}
+              r={3.5}
+              style={{ fill: 'var(--muted-foreground)', fillOpacity: 0.32 }}
+            />
+          ))}
+
+        {/* used zones — coloured by recency */}
+        {zones
+          .filter((z) => z.kind !== 'available')
+          .map((z) => {
+            const selected = z.site === selectedSite
             return (
-              <button
-                key={key}
-                type="button"
-                className={cn(
-                  'flex items-baseline gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors hover:brightness-95',
-                  recencyClass(b.daysAgo),
-                  overused && 'ring-1 ring-destructive/60',
-                )}
-                onClick={() => setSelectedSite(selectedSite === key ? null : key)}
+              <g
+                key={z.site}
+                role="button"
+                tabIndex={0}
+                aria-label={`${z.site}, ${daysLabel(z.bucket!.daysAgo)}${z.overused ? ', overused' : ''}`}
+                className="cursor-pointer outline-none"
+                onClick={() => setSelectedSite(selected ? null : z.site)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedSite(selected ? null : z.site)
+                  }
+                }}
               >
-                {overused && <TriangleAlert className="size-3 shrink-0 text-destructive" />}
-                {b.site}
-                {b.count > 0 && <span className="font-mono tabular-nums opacity-90">{volLabel(b)}</span>}
-                <small className="text-[10px] font-normal opacity-70">{daysLabel(b.daysAgo)}</small>
-              </button>
+                {/* generous touch target */}
+                <circle cx={z.x} cy={z.y} r={15} fill="transparent" />
+                {z.overused && (
+                  <ellipse
+                    cx={z.x}
+                    cy={z.y}
+                    rx={13}
+                    ry={12}
+                    fill="none"
+                    className="stroke-red-500"
+                    strokeWidth={1}
+                    strokeDasharray="2 2"
+                    opacity={0.85}
+                  />
+                )}
+                {selected && (
+                  <ellipse
+                    cx={z.x}
+                    cy={z.y}
+                    rx={12.5}
+                    ry={11.5}
+                    fill="none"
+                    style={{ stroke: 'var(--foreground)' }}
+                    strokeWidth={1.5}
+                  />
+                )}
+                {z.route === 'SubQ' ? (
+                  <ellipse
+                    cx={z.x}
+                    cy={z.y}
+                    rx={8.5}
+                    ry={7.5}
+                    style={{ fill: 'var(--card)' }}
+                    className={STROKE[z.kind]}
+                    strokeWidth={3}
+                  />
+                ) : (
+                  <ellipse
+                    cx={z.x}
+                    cy={z.y}
+                    rx={9}
+                    ry={8}
+                    className={FILL[z.kind]}
+                    style={{ stroke: 'var(--card)' }}
+                    strokeWidth={1.5}
+                  />
+                )}
+              </g>
             )
           })}
-        </div>
-      </div>
+      </>
     )
   }
 
   return (
     <>
-      {/* Left/right balance headline — the "you favored your right side" callout */}
+      {/* Left/right balance headline — the "you favoured your right side" callout */}
       {balance && (
         <div className="mb-3 flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-[11px] font-medium">
@@ -227,19 +386,45 @@ export function SiteRotation({
         </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        <RouteSection group="IM" />
-        <RouteSection group="SubQ" />
-        <RouteSection group="Other" />
+      {/* The body map */}
+      <div className="flex justify-center">
+        <svg
+          viewBox="100 24 440 484"
+          className="h-[360px] w-auto max-w-full"
+          role="img"
+          aria-label="Injection sites over the last 60 days, front and back, coloured by how recently each was used"
+        >
+          <g>{renderBody('front')}</g>
+          <g transform="translate(300,0)">{renderBody('back')}</g>
+          <text x={CX} y={476} textAnchor="middle" style={{ fill: 'var(--muted-foreground)' }} fontSize={12} fontWeight={500}>
+            Front
+          </text>
+          <text x={CX + 300} y={476} textAnchor="middle" style={{ fill: 'var(--muted-foreground)' }} fontSize={12} fontWeight={500}>
+            Back
+          </text>
+        </svg>
       </div>
 
-      {/* Selected site detail */}
+      {!hasData && (
+        <p className="mt-1 text-center text-xs text-muted-foreground">
+          No injections logged yet — every site is open.
+        </p>
+      )}
+
+      {/* Selected site detail — right under the body it was tapped on */}
       {selectedBucket && (
         <div className="mt-3 rounded-lg border bg-muted/40 px-3 py-2.5">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-semibold">
+            <span className="flex items-center gap-1.5 text-xs font-semibold">
+              {selectedBucket.count >= overusedThreshold && (
+                <TriangleAlert className="size-3.5 shrink-0 text-destructive" />
+              )}
               {selectedBucket.site} · {selectedBucket.count} in {WINDOW_DAYS}d
-              {selectedBucket.totalMl !== undefined && selectedBucket.totalMl > 0 ? ` · ${selectedBucket.totalMl.toFixed(1)} mL` : ''}
+              {selectedBucket.totalMl !== undefined && selectedBucket.totalMl > 0
+                ? ` · ${volLabel(selectedBucket)}`
+                : ''}
+              {' · '}
+              <span className="font-normal text-muted-foreground">last {daysLabel(selectedBucket.daysAgo)}</span>
             </span>
             <Button variant="ghost" size="icon" className="size-6" onClick={() => setSelectedSite(null)} aria-label="Close">
               <X className="size-3" />
@@ -266,8 +451,58 @@ export function SiteRotation({
         </div>
       )}
 
+      {/* Legend */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-full bg-emerald-500" /> Rested — inject here
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-full bg-amber-500" /> 3–6d
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-full bg-red-500" /> ≤2d — resting
+        </span>
+        <span className="ml-auto flex items-center gap-2">
+          <span className="flex items-center gap-1">
+            <span className="size-2.5 rounded-full bg-muted-foreground" /> IM
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="size-2.5 rounded-full border-2 border-muted-foreground" /> SubQ
+          </span>
+        </span>
+      </div>
+
+      {/* Custom / unmappable sites */}
+      {customUsed.length > 0 && (
+        <div className="mt-3">
+          <div className="mb-1 text-[11px] font-medium text-muted-foreground">Other sites</div>
+          <div className="flex flex-wrap gap-1.5">
+            {customUsed.map((b) => {
+              const kind = recencyKind(b.daysAgo)
+              const dot = kind === 'hot' ? 'bg-red-500' : kind === 'warm' ? 'bg-amber-500' : 'bg-emerald-500'
+              const selected = selectedSite === b.site
+              return (
+                <button
+                  key={`${b.site}||${b.route}`}
+                  type="button"
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent',
+                    selected && 'ring-1 ring-foreground/40',
+                  )}
+                  onClick={() => setSelectedSite(selected ? null : b.site)}
+                >
+                  <span className={cn('size-2 rounded-full', dot)} />
+                  {b.site}
+                  <small className="text-[10px] font-normal text-muted-foreground">{daysLabel(b.daysAgo)}</small>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <p className="mt-2 text-xs text-muted-foreground">
-        Red = used recently · ⚠ = overused · amounts are last {WINDOW_DAYS}d. Tap a site for detail.
+        Green = rested (7d+) · amber 3–6d · red ≤2d. Solid = IM, ring = SubQ. Tap a zone for detail.
       </p>
     </>
   )
