@@ -2,7 +2,7 @@ import { lazy, Suspense, useMemo } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { FlaskConical, HeartPulse, Scale, Syringe } from 'lucide-react'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '../lib/db'
-import { SymptomTrends } from '../components/SymptomTrends'
+import { SymptomSummary } from '../components/SymptomSummary'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { cn } from '@/lib/utils'
 import type { View } from '../app/views'
@@ -104,17 +104,7 @@ export function Overview({
         </div>
       </div>
 
-      {/* Drug levels through time */}
-      {injections.length > 0 && (
-        <Suspense fallback={null}>
-          <ActiveLevelsCard compounds={compounds} injections={injections} />
-        </Suspense>
-      )}
-
-      {/* Symptoms over time */}
-      <SymptomTrends symptoms={symptoms} />
-
-      {/* BP (7-day) + Weight — two half-height columns */}
+      {/* BP (7-day) + Weight — two half-height columns, above the charts */}
       <div className="grid grid-cols-2 gap-4">
         <PanelCard title="Blood pressure" subtitle="7-day average">
           <div className="flex items-end justify-between gap-3">
@@ -140,6 +130,16 @@ export function Overview({
           </p>
         </PanelCard>
       </div>
+
+      {/* Drug levels through time */}
+      {injections.length > 0 && (
+        <Suspense fallback={null}>
+          <ActiveLevelsCard compounds={compounds} injections={injections} />
+        </Suspense>
+      )}
+
+      {/* How you've been — last-7-days symptom digest */}
+      <SymptomSummary symptoms={symptoms} />
     </div>
   )
 }
