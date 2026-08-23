@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
+  ArrowLeft,
   Brain,
   CalendarClock,
   FlaskConical,
@@ -9,11 +10,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  Calculator,
   Menu,
   Settings as SettingsIcon,
   Share2,
-  Syringe,
   Upload,
   X,
 } from 'lucide-react'
@@ -27,19 +26,17 @@ import { extractPdfText, extractMarkersFromText, type ExtractedMarker } from './
 import { ToastProvider, useToast } from './lib/toast'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
-import { useInjectionReminders } from './lib/useInjectionReminders'
 import { InstallPrompt } from './components/InstallPrompt'
-// Modals are lazy — only loaded when first opened
-const QuickLog       = lazy(() => import('./components/QuickLog').then(m => ({ default: m.QuickLog })))
-const ProtocolWizard = lazy(() => import('./components/ProtocolWizard').then(m => ({ default: m.ProtocolWizard })))
+// Modals / add-pages are lazy — only loaded when first opened
 const ExportSheet      = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportSheet })))
-const DoseCalculator   = lazy(() => import('./components/DoseCalculator').then(m => ({ default: m.DoseCalculator })))
 const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
-// Overview is eager (first screen) — everything else is lazy
+// Overview (the launcher) is eager — everything else is lazy
 import { Overview } from './views/Overview'
-const Protocols = lazy(() => import('./views/Protocols').then(m => ({ default: m.Protocols })))
+const AddInjection = lazy(() => import('./views/AddInjection').then(m => ({ default: m.AddInjection })))
+const AddWeight    = lazy(() => import('./views/AddWeight').then(m => ({ default: m.AddWeight })))
+const AddBP        = lazy(() => import('./views/AddBP').then(m => ({ default: m.AddBP })))
 const Vitals    = lazy(() => import('./views/Vitals').then(m => ({ default: m.Vitals })))
 const Labs      = lazy(() => import('./views/Labs').then(m => ({ default: m.Labs })))
 const Targets   = lazy(() => import('./views/Targets').then(m => ({ default: m.Targets })))
@@ -49,37 +46,13 @@ const Settings  = lazy(() => import('./views/Settings').then(m => ({ default: m.
 import './index.css'
 
 const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
-  { id: 'overview', label: 'Overview', icon: Home },
-  { id: 'meds', label: 'Protocols', icon: Syringe },
+  { id: 'overview', label: 'Home', icon: Home },
   { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
   { id: 'symptoms', label: 'Symptoms', icon: Brain },
   { id: 'timeline', label: 'Timeline', icon: CalendarClock },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
-
-type QuickLogTab = 'injection' | 'bp' | 'weight'
-
-// One compound line inside an injection. Multiple lines = one syringe / one
-// site logged in a single go (e.g. Test + Primo).
-export type QuickLogLine = {
-  compoundId?: number
-  dose?: number
-  unit?: string
-  protocolId?: number
-  scheduledAt?: string
-}
-
-export type QuickLogPrefill = {
-  // Preferred: multi-compound prefill (protocol quick-add, multi-line).
-  lines?: QuickLogLine[]
-  // Legacy single-compound fields (carousel / schedule callers still use these).
-  compoundId?: number
-  dose?: number
-  unit?: string
-  protocolId?: number
-  scheduledAt?: string
-}
 
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
@@ -143,14 +116,9 @@ function Shell({
   // local-only users see no sync UI, but the same Shell
   const sync = useSync(isAuthed)
 
-  const [qlOpen, setQlOpen] = useState(false)
-  const [qlTab, setQlTab] = useState<QuickLogTab>('injection')
-  const [qlPrefill, setQlPrefill] = useState<QuickLogPrefill | undefined>(undefined)
   const [labAddOpen, setLabAddOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
-  const [calcOpen,   setCalcOpen]   = useState(false)
   const [menuOpen,   setMenuOpen]   = useState(false)
-  const [protocolWizardOpen, setProtocolWizardOpen] = useState(false)
   // PDF upload pipeline state — parsing overlay + review sheet. Transient
   // messages now route through the shared toast context (snackbar UI lives
   // in ToastProvider so any view can fire one without prop drilling).
@@ -232,14 +200,6 @@ function Shell({
     })
   }
 
-  const [editingProtocol, setEditingProtocol] = useState<(import('./lib/db').Protocol & { id: number }) | undefined>(undefined)
-
-  function openQuickLog(tab: QuickLogTab, prefill?: QuickLogPrefill) {
-    setQlTab(tab)
-    setQlPrefill(prefill)
-    setQlOpen(true)
-  }
-
   const compounds = useLiveQuery(
     () => db.compounds.filter(c => !c.archived).toArray(),
     [], [],
@@ -293,22 +253,11 @@ function Shell({
     () => db.results.toArray(),
     [], [],
   )
+  // Kept for Settings export; protocol scheduling UI was removed.
   const protocols = useLiveQuery(
     () => db.protocols.toArray(),
     [], [],
   )
-  const protocolDoses = useLiveQuery(
-    () => db.protocolDoses.toArray(),
-    [], [],
-  )
-  // Body metrics (weight etc.) — standalone weight logs land here.
-  const bodyMetrics = useLiveQuery(
-    () => db.bodyMetrics.orderBy('measuredAt').reverse().limit(200).toArray(),
-    [], [],
-  )
-
-  // Injection reminders — fires notifications before upcoming doses
-  useInjectionReminders(protocols, protocolDoses, compounds ?? [])
   const files = useLiveQuery(() => db.files.orderBy('addedAt').reverse().toArray(), [], [])
 
   const examMap = useMemo(() => new Map(exams.map((e) => [e.id, e])), [exams])
@@ -375,22 +324,6 @@ function Shell({
         </nav>
 
         <div className="mt-auto flex flex-col gap-4">
-          {!sidebarCollapsed && (
-            <div className="flex flex-col gap-1.5">
-              <div className="px-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Quick log
-              </div>
-              <Button variant="outline" size="sm" className="justify-start" onClick={() => openQuickLog('injection')}>
-                <Plus className="size-3.5" /> Injection
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start" onClick={() => openQuickLog('weight')}>
-                <Plus className="size-3.5" /> Weight
-              </Button>
-              <Button variant="outline" size="sm" className="justify-start" onClick={() => openQuickLog('bp')}>
-                <Plus className="size-3.5" /> Blood pressure
-              </Button>
-            </div>
-          )}
 
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2 px-1.5 text-xs text-muted-foreground" title={isAuthed ? sync.lastError || '' : ''}>
@@ -418,23 +351,18 @@ function Shell({
       {/* ── Main panel ── */}
       <main className="min-w-0">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur md:px-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="size-5" />
-          </Button>
+          {activeView.startsWith('add-') ? (
+            <Button variant="ghost" size="icon" onClick={() => setActiveView('overview')} aria-label="Back to home">
+              <ArrowLeft className="size-5" />
+            </Button>
+          ) : (
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMenuOpen(true)} aria-label="Open menu">
+              <Menu className="size-5" />
+            </Button>
+          )}
           <h1 className="flex-1 truncate text-xl font-semibold tracking-[-0.011em] md:text-[22px]">{titleFor(activeView)}</h1>
           <div className="flex items-center gap-2">
-            {activeView === 'meds' && (
-              <Button variant="ghost" size="icon" onClick={() => setCalcOpen(true)} aria-label="Dose calculator" title="Dose calculator">
-                <Calculator className="size-4" />
-              </Button>
-            )}
-            {(activeView === 'meds' || activeView === 'labs' || activeView === 'vitals') && (
+            {(activeView === 'labs' || activeView === 'vitals') && (
               <Button variant="ghost" size="icon" onClick={() => setExportOpen(true)} aria-label="Export for doctor" title="Share with doctor">
                 <Share2 className="size-4" />
               </Button>
@@ -453,41 +381,15 @@ function Shell({
                 </Button>
               </>
             )}
-
-            {activeView === 'meds' && (
-              <Button size="sm" onClick={() => setProtocolWizardOpen(true)} title="Create protocol">
-                <Plus className="size-4" /> <span className="hidden sm:inline">New protocol</span>
-              </Button>
-            )}
-
-            {activeView !== 'labs' && activeView !== 'meds' && activeView !== 'settings' && (
-              <Button
-                size="sm"
-                onClick={() => openQuickLog(activeView === 'vitals' ? 'bp' : 'injection')}
-                title={activeView === 'vitals' ? 'Log reading' : 'Add'}
-              >
-                <Plus className="size-4" /> <span className="hidden sm:inline">{activeView === 'vitals' ? 'Log reading' : 'Add'}</span>
-              </Button>
-            )}
           </div>
         </header>
 
         <div className="px-4 py-5 pb-24 md:px-6">
-        {activeView === 'overview' && (
-          <Overview
-            compounds={compounds}
-            injections={injections}
-            vitals={vitals}
-            exams={exams}
-            results={enrichedResults}
-            bodyMetrics={bodyMetrics}
-            onNavigate={setActiveView}
-            onOpenQuickLog={openQuickLog}
-            onOpenWizard={() => setProtocolWizardOpen(true)}
-          />
-        )}
+        {activeView === 'overview' && <Overview onNavigate={setActiveView} />}
         <Suspense fallback={<div className="min-h-[40dvh]" />}>
-          {activeView === 'meds' && <Protocols compounds={compounds} injections={injections} onOpenQuickLog={openQuickLog} onOpenWizard={() => setProtocolWizardOpen(true)} onEditProtocol={(p) => { setEditingProtocol(p); setProtocolWizardOpen(true) }} />}
+          {activeView === 'add-injection' && <AddInjection compounds={compounds ?? []} injections={injections ?? []} onBack={() => setActiveView('overview')} />}
+          {activeView === 'add-weight' && <AddWeight onBack={() => setActiveView('overview')} />}
+          {activeView === 'add-bp' && <AddBP onBack={() => setActiveView('overview')} />}
           {activeView === 'vitals' && <Vitals vitals={vitals} />}
           {activeView === 'labs' && (
             <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} onReviewFile={(id) => setPdfReviewFileId(id)} />
@@ -552,34 +454,13 @@ function Shell({
                 )
               })}
             </div>
-            <div className="mt-auto">
-              <Button className="w-full" onClick={() => { openQuickLog('injection'); setMenuOpen(false) }}>
-                <Plus className="size-4" /> Log injection
-              </Button>
-            </div>
           </nav>
         </div>
       )}
 
-      <QuickLog
-        open={qlOpen}
-        initialTab={qlTab}
-        prefill={qlPrefill}
-        compounds={compounds ?? []}
-        onClose={() => { setQlOpen(false); setQlPrefill(undefined) }}
-      />
-
-      <ProtocolWizard
-        open={protocolWizardOpen}
-        onClose={() => { setProtocolWizardOpen(false); setEditingProtocol(undefined) }}
-        compounds={compounds ?? []}
-        editProtocol={editingProtocol}
-      />
-
       <InstallPrompt />
 
       <Suspense fallback={null}>
-        {calcOpen && <DoseCalculator onClose={() => setCalcOpen(false)} />}
         {exportOpen && (
           <ExportSheet
             compounds={compounds ?? []}
@@ -619,8 +500,10 @@ function Shell({
 
 function titleFor(view: View) {
   const map: Record<View, string> = {
-    overview: 'Overview',
-    meds: 'Protocols',
+    overview: 'Home',
+    'add-injection': 'Add injection',
+    'add-weight': 'Add weight',
+    'add-bp': 'Add blood pressure',
     vitals: 'Vitals',
     labs: 'Labs',
     symptoms: 'Symptoms',

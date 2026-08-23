@@ -1,6 +1,8 @@
 export type View =
   | 'overview'
-  | 'meds'
+  | 'add-injection'
+  | 'add-weight'
+  | 'add-bp'
   | 'vitals'
   | 'labs'
   | 'timeline'

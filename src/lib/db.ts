@@ -16,6 +16,11 @@ export type Compound = {
   halfLifeDays?: number
   peakHours?: number
   archived?: boolean
+  // Per-compound values remembered for the next injection (protocols removed —
+  // the compound itself carries its defaults now). Non-indexed → no migration.
+  concentrationMgPerMl?: number
+  defaultRoute?: 'IM' | 'SubQ'
+  lastDose?: number
 }
 
 export type SyncFields = {
