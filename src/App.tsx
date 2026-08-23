@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
-  Brain,
   CalendarClock,
   FlaskConical,
   HeartPulse,
@@ -41,7 +40,6 @@ const Vitals    = lazy(() => import('./views/Vitals').then(m => ({ default: m.Vi
 const Labs      = lazy(() => import('./views/Labs').then(m => ({ default: m.Labs })))
 const Targets   = lazy(() => import('./views/Targets').then(m => ({ default: m.Targets })))
 const Timeline  = lazy(() => import('./views/Timeline').then(m => ({ default: m.Timeline })))
-const Symptoms  = lazy(() => import('./views/Symptoms').then(m => ({ default: m.Symptoms })))
 const Settings  = lazy(() => import('./views/Settings').then(m => ({ default: m.Settings })))
 import './index.css'
 
@@ -49,7 +47,6 @@ const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: 'overview', label: 'Home', icon: Home },
   { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
-  { id: 'symptoms', label: 'Symptoms', icon: Brain },
   { id: 'timeline', label: 'Timeline', icon: CalendarClock },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
@@ -258,6 +255,8 @@ function Shell({
     () => db.protocols.toArray(),
     [], [],
   )
+  const bodyMetrics = useLiveQuery(() => db.bodyMetrics.orderBy('measuredAt').reverse().limit(200).toArray(), [], [])
+  const symptoms = useLiveQuery(() => db.symptoms.orderBy('recordedAt').reverse().limit(200).toArray(), [], [])
   const files = useLiveQuery(() => db.files.orderBy('addedAt').reverse().toArray(), [], [])
 
   const examMap = useMemo(() => new Map(exams.map((e) => [e.id, e])), [exams])
@@ -385,7 +384,16 @@ function Shell({
         </header>
 
         <div className="px-4 py-5 pb-24 md:px-6">
-        {activeView === 'overview' && <Overview onNavigate={setActiveView} />}
+        {activeView === 'overview' && (
+          <Overview
+            compounds={compounds ?? []}
+            injections={injections ?? []}
+            vitals={vitals ?? []}
+            bodyMetrics={bodyMetrics ?? []}
+            symptoms={symptoms ?? []}
+            onNavigate={setActiveView}
+          />
+        )}
         <Suspense fallback={<div className="min-h-[40dvh]" />}>
           {activeView === 'add-injection' && <AddInjection compounds={compounds ?? []} injections={injections ?? []} onBack={() => setActiveView('overview')} />}
           {activeView === 'add-weight' && <AddWeight onBack={() => setActiveView('overview')} />}
@@ -394,7 +402,6 @@ function Shell({
           {activeView === 'labs' && (
             <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} onReviewFile={(id) => setPdfReviewFileId(id)} />
           )}
-          {activeView === 'symptoms' && <Symptoms />}
           {activeView === 'targets' && <Targets />}
           {activeView === 'timeline' && (
             <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
@@ -506,7 +513,6 @@ function titleFor(view: View) {
     'add-bp': 'Add blood pressure',
     vitals: 'Vitals',
     labs: 'Labs',
-    symptoms: 'Symptoms',
     targets: 'Targets',
     timeline: 'Timeline',
     files: 'Files',

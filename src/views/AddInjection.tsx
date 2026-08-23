@@ -5,10 +5,11 @@
 // bac water mL give the concentration, and dosing shows units on the syringe.
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Plus, TriangleAlert, X } from 'lucide-react'
-import { db, type Compound, type InjectionLog, type Unit } from '../lib/db'
+import { ChevronDown, ChevronUp, Plus, TriangleAlert, X } from 'lucide-react'
+import { db, type Compound, type InjectionLog, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
 import { parseConcentrationMgPerMl } from '../lib/vials'
+import { NEGATIVE, POSITIVE, chipTone, type SymptomDef } from '../lib/symptoms'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from '../components/SiteCombobox'
 import { Button } from '@/components/ui/button'
@@ -130,6 +131,8 @@ export function AddInjection({
   const [lines, setLines] = useState<Line[]>(() => [primary ? lineFromCompound(primary) : blankLine()])
   const [site, setSite] = useState('')
   const [notes, setNotes] = useState('')
+  const [feel, setFeel] = useState<Partial<Symptom>>({})
+  const [feelOpen, setFeelOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -240,6 +243,11 @@ export function AddInjection({
           vialId: activeVial?.id,
         })
       }
+      // Symptom check-in rides along with the injection (same moment).
+      const anyFeel = [...POSITIVE, ...NEGATIVE].some((s) => typeof feel[s.key] === 'number')
+      if (anyFeel || notes) {
+        await db.symptoms.add({ recordedAt: takenAt, ...feel, notes: notes || undefined })
+      }
       onBack()
     } finally {
       setBusy(false)
@@ -291,6 +299,35 @@ export function AddInjection({
       <section className="flex flex-col gap-3">
         <h2 className="px-0.5 text-xs font-medium uppercase tracking-[0.02em] text-muted-foreground">Site</h2>
         <SitePicker route={route} value={site} injections={injections} onChange={setSite} />
+      </section>
+
+      {/* How do you feel? — optional symptom check-in that rides with the shot */}
+      <section className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => setFeelOpen((o) => !o)}
+          className="flex items-center gap-1.5 self-start px-0.5 text-xs font-medium uppercase tracking-[0.02em] text-muted-foreground"
+          aria-expanded={feelOpen}
+        >
+          {feelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+          How do you feel? <span className="font-normal normal-case tracking-normal">— optional</span>
+        </button>
+        {feelOpen && (
+          <div className="flex flex-col gap-5 rounded-xl border border-border bg-card p-5">
+            <div>
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Positive — higher is better</p>
+              {POSITIVE.map((s) => (
+                <SymptomScale key={s.key as string} def={s} value={feel[s.key] as number | undefined} onChange={(v) => setFeel((f) => ({ ...f, [s.key]: v }))} />
+              ))}
+            </div>
+            <div>
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Side effects — higher is worse</p>
+              {NEGATIVE.map((s) => (
+                <SymptomScale key={s.key as string} def={s} value={feel[s.key] as number | undefined} onChange={(v) => setFeel((f) => ({ ...f, [s.key]: v }))} />
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">
@@ -432,6 +469,43 @@ function CompoundLine({
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+// ── Symptom 1-5 scale (shared shape with the old Symptoms page) ─────────────
+const SCALE_TONE: Record<'good' | 'warn' | 'bad' | 'neutral', string> = {
+  good: 'border-emerald-500 bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
+  warn: 'border-amber-500 bg-amber-500/12 text-amber-700 dark:text-amber-400',
+  bad: 'border-destructive bg-destructive/12 text-destructive',
+  neutral: 'border-foreground bg-accent text-foreground',
+}
+
+function SymptomScale({ def, value, onChange }: { def: SymptomDef; value: number | undefined; onChange: (v: number) => void }) {
+  return (
+    <div className="grid grid-cols-[minmax(120px,1.5fr)_auto] items-center gap-4 py-1.5 max-md:grid-cols-1 max-md:gap-1">
+      <span className="text-sm">{def.label}</span>
+      <div className="flex gap-1 max-md:w-full" role="radiogroup" aria-label={def.label}>
+        {[1, 2, 3, 4, 5].map((n) => {
+          const selected = value === n
+          const tone = selected ? chipTone(n, def.direction) : 'neutral'
+          return (
+            <button
+              key={n}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              className={cn(
+                'size-8 rounded-md border text-[13px] tabular-nums transition-colors max-md:flex-1',
+                selected ? `font-semibold ${SCALE_TONE[tone]}` : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
+              )}
+              onClick={() => onChange(n)}
+            >
+              {n}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

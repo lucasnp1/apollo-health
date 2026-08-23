@@ -6,7 +6,6 @@ export type View =
   | 'vitals'
   | 'labs'
   | 'timeline'
-  | 'symptoms'
   | 'targets'
   | 'files'
   | 'settings'
