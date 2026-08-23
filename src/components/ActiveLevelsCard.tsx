@@ -76,33 +76,28 @@ export function ActiveLevelsCard({
     const nowMs = Date.now()
     const anchorMs = nowMs - WINDOW_DAYS * MS_PER_DAY
 
-    // Active compounds: any that have a logged dose in our window.
-    const eligible = compounds
-      .map((c) => {
-        if (!c.id) return null
-        const doses = injections.filter(
-          (i) => i.compoundId === c.id && i.dose !== undefined && i.unit === 'mg',
-        )
-        if (doses.length === 0) return null
-        const pk = findPKCompound(c.name, c.ester && c.ester !== 'Custom' ? c.ester : inferEster(c.name))
-        if (!pk) return null
-        const lambda = Math.LN2 / pk.halfLifeDays
-        return {
-          id: c.id,
-          name: c.name,
-          color: c.color ?? 'var(--primary)',
-          lambda,
-          activePct: pk.activeDosePct,
-          doses: doses.map((d) => ({ ms: new Date(d.takenAt).getTime(), dose: d.dose ?? 0 })),
-        }
-      })
-      .filter(Boolean) as Array<{
-        id: number; name: string; color: string; lambda: number; activePct: number
-        doses: Array<{ ms: number; dose: number }>
-      }>
+    // Merge compound records by display name → one series per DRUG (all its
+    // shots summed), so duplicate compound rows don't split "Testosterone E"
+    // into several tooltip lines. Result: one total per compound, per shot.
+    const groups = new Map<string, { name: string; color: string; ester?: Compound['ester']; doses: Array<{ ms: number; dose: number }> }>()
+    for (const c of compounds) {
+      if (!c.id) continue
+      const doses = injections.filter((i) => i.compoundId === c.id && i.dose !== undefined && i.unit === 'mg')
+      if (doses.length === 0) continue
+      const k = c.name.trim().toLowerCase()
+      let g = groups.get(k)
+      if (!g) { g = { name: c.name, color: c.color ?? 'var(--primary)', ester: c.ester, doses: [] }; groups.set(k, g) }
+      for (const d of doses) g.doses.push({ ms: new Date(d.takenAt).getTime(), dose: d.dose ?? 0 })
+    }
+
+    const eligible = [...groups.values()].map((g, i) => {
+      const pk = findPKCompound(g.name, g.ester && g.ester !== 'Custom' ? g.ester : inferEster(g.name))
+      if (!pk) return null
+      return { key: `s${i}`, name: g.name, color: g.color, lambda: Math.LN2 / pk.halfLifeDays, activePct: pk.activeDosePct, doses: g.doses }
+    }).filter(Boolean) as Array<{ key: string; name: string; color: string; lambda: number; activePct: number; doses: Array<{ ms: number; dose: number }> }>
 
     if (eligible.length === 0) {
-      return { data: [] as SeriesPoint[], legend: [] as Legend[], anchorMs }
+      return { data: [] as SeriesPoint[], legend: [] as Legend[] }
     }
 
     // Build daily series for the past window only — past, not projected.
@@ -118,19 +113,16 @@ export function ActiveLevelsCard({
           const tDays = (ptMs - inj.ms) / MS_PER_DAY
           level += inj.dose * (c.activePct / 100) * Math.exp(-tDays * c.lambda) * c.lambda
         }
-        const key = `c${c.id}`
-        pt[key] = parseFloat(level.toFixed(2))
-        const peak = peakOf[key]
-        if (!peak || level > peak.level) peakOf[key] = { level, dayNum: d }
+        pt[c.key] = parseFloat(level.toFixed(2))
+        const peak = peakOf[c.key]
+        if (!peak || level > peak.level) peakOf[c.key] = { level, dayNum: d }
       }
       data.push(pt)
     }
 
     const legend: Legend[] = eligible.map((c) => {
-      const key = `c${c.id}`
       const last = data[data.length - 1]
-      // Pull this compound's daily levels back out for stats math.
-      const series = data.map((pt) => (typeof pt[key] === 'number' ? (pt[key] as number) : 0))
+      const series = data.map((pt) => (typeof pt[c.key] === 'number' ? (pt[c.key] as number) : 0))
       const recent7 = series.slice(-7)
       const prior7 = series.slice(-14, -7)
       const trailing14 = series.slice(-14)
@@ -141,11 +133,11 @@ export function ActiveLevelsCard({
       const cv = stdev(trailing14) / Math.max(mean(trailing14), 0.01) * 100
       const stability: Legend['stability'] = cv < 15 ? 'stable' : cv < 30 ? 'variable' : 'spiky'
       return {
-        key,
+        key: c.key,
         name: c.name,
         color: c.color,
-        current: typeof last[key] === 'number' ? (last[key] as number) : 0,
-        peak: peakOf[key] ?? null,
+        current: typeof last[c.key] === 'number' ? (last[c.key] as number) : 0,
+        peak: peakOf[c.key] ?? null,
         trend,
         trendPct,
         stability,
@@ -153,7 +145,7 @@ export function ActiveLevelsCard({
       }
     })
 
-    return { data, legend, anchorMs }
+    return { data, legend }
   }, [compounds, injections])
 
   const totalNow = legend.reduce((s, l) => s + l.current, 0)
