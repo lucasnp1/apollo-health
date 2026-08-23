@@ -21,6 +21,10 @@ export type Compound = {
   concentrationMgPerMl?: number
   defaultRoute?: 'IM' | 'SubQ'
   lastDose?: number
+  // Peptides (SubQ) are reconstituted: powder strength + bac water added give
+  // the concentration. Stored so the vial maths pre-fills next time.
+  vialMg?: number
+  reconstituteMl?: number
 }
 
 export type SyncFields = {
