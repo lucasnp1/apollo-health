@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import type { View } from '../app/views'
 
 const ActiveLevelsCard = lazy(() => import('../components/ActiveLevelsCard').then((m) => ({ default: m.ActiveLevelsCard })))
+const BpTrendCard = lazy(() => import('../components/BpTrendCard').then((m) => ({ default: m.BpTrendCard })))
 
 const DAY = 86_400_000
 
@@ -140,6 +141,13 @@ export function Overview({
 
       {/* How you've been — last-7-days symptom digest */}
       <SymptomSummary symptoms={symptoms} />
+
+      {/* Blood pressure trend — full history chart, last widget */}
+      {vitals.length > 0 && (
+        <Suspense fallback={null}>
+          <BpTrendCard vitals={vitals} />
+        </Suspense>
+      )}
     </div>
   )
 }

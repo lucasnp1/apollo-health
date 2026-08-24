@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   CalendarClock,
   FlaskConical,
-  HeartPulse,
   Home,
   Lock,
   PanelLeftClose,
@@ -36,7 +35,6 @@ import { Overview } from './views/Overview'
 const AddInjection = lazy(() => import('./views/AddInjection').then(m => ({ default: m.AddInjection })))
 const AddWeight    = lazy(() => import('./views/AddWeight').then(m => ({ default: m.AddWeight })))
 const AddBP        = lazy(() => import('./views/AddBP').then(m => ({ default: m.AddBP })))
-const Vitals    = lazy(() => import('./views/Vitals').then(m => ({ default: m.Vitals })))
 const Labs      = lazy(() => import('./views/Labs').then(m => ({ default: m.Labs })))
 const Targets   = lazy(() => import('./views/Targets').then(m => ({ default: m.Targets })))
 const Timeline  = lazy(() => import('./views/Timeline').then(m => ({ default: m.Timeline })))
@@ -45,7 +43,6 @@ import './index.css'
 
 const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
   { id: 'overview', label: 'Home', icon: Home },
-  { id: 'vitals', label: 'Vitals', icon: HeartPulse },
   { id: 'labs', label: 'Labs', icon: FlaskConical },
   { id: 'timeline', label: 'Timeline', icon: CalendarClock },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
@@ -361,7 +358,7 @@ function Shell({
           )}
           <h1 className="flex-1 truncate text-xl font-semibold tracking-[-0.011em] md:text-[22px]">{titleFor(activeView)}</h1>
           <div className="flex items-center gap-2">
-            {(activeView === 'labs' || activeView === 'vitals') && (
+            {activeView === 'labs' && (
               <Button variant="ghost" size="icon" onClick={() => setExportOpen(true)} aria-label="Export for doctor" title="Share with doctor">
                 <Share2 className="size-4" />
               </Button>
@@ -398,7 +395,6 @@ function Shell({
           {activeView === 'add-injection' && <AddInjection compounds={compounds ?? []} injections={injections ?? []} onBack={() => setActiveView('overview')} />}
           {activeView === 'add-weight' && <AddWeight onBack={() => setActiveView('overview')} />}
           {activeView === 'add-bp' && <AddBP onBack={() => setActiveView('overview')} />}
-          {activeView === 'vitals' && <Vitals vitals={vitals} />}
           {activeView === 'labs' && (
             <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} onReviewFile={(id) => setPdfReviewFileId(id)} />
           )}
@@ -511,7 +507,6 @@ function titleFor(view: View) {
     'add-injection': 'Add injection',
     'add-weight': 'Add weight',
     'add-bp': 'Add blood pressure',
-    vitals: 'Vitals',
     labs: 'Labs',
     targets: 'Targets',
     timeline: 'Timeline',
