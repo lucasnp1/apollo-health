@@ -10,7 +10,7 @@
  * its 60-day peak so you can see at a glance when things stacked highest.
  */
 import { useMemo } from 'react'
-import { format } from 'date-fns'
+import { format, startOfWeek } from 'date-fns'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { Compound, InjectionLog } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
@@ -148,6 +148,28 @@ export function ActiveLevelsCard({
     return { data, legend }
   }, [compounds, injections])
 
+  // Raw dose totals for the current week (Sunday → Sunday). Sums every logged
+  // dose per drug since this week's Sunday — e.g. 100mg Test 3×/wk shows 300mg.
+  // Independent of PK: covers peptides and everything else you've injected.
+  const weekTotals = useMemo(() => {
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 }).getTime()
+    const nowMs = Date.now()
+    const compoundById = new Map(compounds.map((c) => [c.id, c]))
+    const byName = new Map<string, { name: string; color: string; total: number; unit: string }>()
+    for (const inj of injections) {
+      if (inj.dose === undefined) continue
+      const ms = new Date(inj.takenAt).getTime()
+      if (ms < weekStart || ms > nowMs) continue
+      const c = compoundById.get(inj.compoundId)
+      if (!c) continue
+      const k = c.name.trim().toLowerCase()
+      let g = byName.get(k)
+      if (!g) { g = { name: c.name, color: c.color ?? 'var(--primary)', total: 0, unit: inj.unit }; byName.set(k, g) }
+      g.total += inj.dose
+    }
+    return [...byName.values()].sort((a, b) => b.total - a.total)
+  }, [compounds, injections])
+
   const totalNow = legend.reduce((s, l) => s + l.current, 0)
   const totalPeak = useMemo(() => {
     if (data.length === 0) return 0
@@ -247,6 +269,26 @@ export function ActiveLevelsCard({
           )
         })}
       </ul>
+
+      {/* This week — raw dose totals injected since Sunday */}
+      {weekTotals.length > 0 && (
+        <div className="mt-4 border-t pt-3">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            This week <span className="font-normal normal-case text-muted-foreground/70">· injected since Sunday</span>
+          </p>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {weekTotals.map((w) => (
+              <li key={w.name} className="flex items-center gap-2.5 text-sm">
+                <span className="size-2.5 shrink-0 rounded-full" style={{ background: w.color }} />
+                <span className="min-w-0 flex-1 truncate font-medium">{w.name}</span>
+                <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
+                  {Math.round(w.total * 100) / 100} {w.unit}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </PanelCard>
   )
 }

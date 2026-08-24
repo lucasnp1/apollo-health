@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react'
-import { Brain, FileText, FlaskConical, HeartPulse, Syringe } from 'lucide-react'
+import { Brain, FileText, FlaskConical, HeartPulse, Scale, Syringe } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { format, parseISO, startOfDay, startOfWeek, differenceInCalendarDays, isThisWeek, isToday, isYesterday } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
+import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
-type EventType = 'injection' | 'bp' | 'lab' | 'file' | 'symptom'
+type EventType = 'injection' | 'weight' | 'bp' | 'lab' | 'file' | 'symptom'
 
 type TimelineEvent = {
   id: string
@@ -23,6 +23,7 @@ type TimelineEvent = {
 
 const TYPE_LABELS: Record<EventType, string> = {
   injection: 'Injections',
+  weight: 'Weight',
   bp: 'BP',
   lab: 'Labs',
   file: 'Files',
@@ -31,6 +32,7 @@ const TYPE_LABELS: Record<EventType, string> = {
 
 const TYPE_ICONS: Record<EventType, LucideIcon> = {
   injection: Syringe,
+  weight: Scale,
   bp: HeartPulse,
   lab: FlaskConical,
   file: FileText,
@@ -137,12 +139,14 @@ export function Timeline({
   vitals,
   exams,
   files,
+  bodyMetrics,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
   vitals: VitalLog[]
   exams: LabExam[]
   files: Array<{ id?: number; addedAt: string; name: string; status: string }>
+  bodyMetrics: BodyMetric[]
 }) {
   const symptoms = useLiveQuery(() => db.symptoms.toArray(), [], [])
 
@@ -170,6 +174,16 @@ export function Timeline({
         type: 'injection' as EventType,
         compoundId: i.compoundId,
       })),
+      ...bodyMetrics
+        .filter((b) => b.weightKg !== undefined)
+        .map((b) => ({
+          id: `w-${b.id}`,
+          date: parseISO(b.measuredAt),
+          icon: Scale,
+          title: 'Weight',
+          detail: `${b.weightKg} kg`,
+          type: 'weight' as EventType,
+        })),
       ...vitals.map((v) => ({
         id: `v-${v.id}`,
         date: parseISO(v.measuredAt),
@@ -205,7 +219,7 @@ export function Timeline({
     ]
       .filter((e) => e.date.getTime() <= now)
       .sort((a, b) => b.date.getTime() - a.date.getTime())
-  }, [injections, vitals, exams, files, symptoms, compounds])
+  }, [injections, vitals, exams, files, symptoms, compounds, bodyMetrics])
 
   // Compounds that actually appear in the timeline
   const injectionCompounds = useMemo(() => {
@@ -234,7 +248,7 @@ export function Timeline({
 
   // Count per type for badges
   const counts = useMemo(() => {
-    const map: Record<EventType, number> = { injection: 0, bp: 0, lab: 0, file: 0, symptom: 0 }
+    const map: Record<EventType, number> = { injection: 0, weight: 0, bp: 0, lab: 0, file: 0, symptom: 0 }
     for (const e of events) map[e.type]++
     return map
   }, [events])

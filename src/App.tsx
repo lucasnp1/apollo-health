@@ -1,21 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
-  CalendarClock,
-  FlaskConical,
-  Home,
   Lock,
-  PanelLeftClose,
-  PanelLeftOpen,
   Plus,
-  Menu,
-  Settings as SettingsIcon,
   Share2,
   Upload,
-  X,
 } from 'lucide-react'
-import { BrandMark } from './components/BrandMark'
-import type { LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -41,16 +31,8 @@ const Timeline  = lazy(() => import('./views/Timeline').then(m => ({ default: m.
 const Settings  = lazy(() => import('./views/Settings').then(m => ({ default: m.Settings })))
 import './index.css'
 
-const NAV: Array<{ id: View; label: string; icon: LucideIcon }> = [
-  { id: 'overview', label: 'Home', icon: Home },
-  { id: 'labs', label: 'Labs', icon: FlaskConical },
-  { id: 'timeline', label: 'Timeline', icon: CalendarClock },
-  { id: 'settings', label: 'Settings', icon: SettingsIcon },
-]
-
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const auth = useAuth()
 
   useEffect(() => {
@@ -83,8 +65,6 @@ function App() {
       <Shell
         activeView={activeView}
         setActiveView={setActiveView}
-        sidebarCollapsed={sidebarCollapsed}
-        setSidebarCollapsed={setSidebarCollapsed}
         auth={auth}
       />
     </ToastProvider>
@@ -96,14 +76,10 @@ type AuthBundle = ReturnType<typeof useAuth>
 function Shell({
   activeView,
   setActiveView,
-  sidebarCollapsed,
-  setSidebarCollapsed,
   auth,
 }: {
   activeView: View
   setActiveView: (v: View) => void
-  sidebarCollapsed: boolean
-  setSidebarCollapsed: (fn: (prev: boolean) => boolean) => void
   auth: AuthBundle
 }) {
   const isAuthed = auth.state.status === 'authed'
@@ -112,7 +88,6 @@ function Shell({
 
   const [labAddOpen, setLabAddOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
-  const [menuOpen,   setMenuOpen]   = useState(false)
   // PDF upload pipeline state — parsing overlay + review sheet. Transient
   // messages now route through the shared toast context (snackbar UI lives
   // in ToastProvider so any view can fire one without prop drilling).
@@ -263,101 +238,30 @@ function Shell({
   )
 
   return (
-    <div
-      className={cn(
-        'grid min-h-dvh grid-cols-1',
-        sidebarCollapsed ? 'md:grid-cols-[72px_minmax(0,1fr)]' : 'md:grid-cols-[240px_minmax(0,1fr)]',
-      )}
-    >
-      {/* ── Sidebar (desktop) ── */}
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 border-r border-border bg-sidebar px-3 py-5 md:flex">
-        <div className="flex items-center justify-between px-1.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <BrandMark size={32} />
-            {!sidebarCollapsed && (
-              <div className="leading-tight">
-                <div className="font-display text-base font-semibold">Apollo</div>
-                <div className="text-xs text-muted-foreground">Health</div>
-              </div>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 shrink-0 text-muted-foreground"
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            onClick={() => setSidebarCollapsed((c) => !c)}
-          >
-            {sidebarCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
-          </Button>
-        </div>
-
-        <nav className="flex flex-col gap-0.5" aria-label="Primary">
-          {NAV.map((item) => {
-            const active = activeView === item.id
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveView(item.id)}
-                className={cn(
-                  'relative flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors',
-                  active
-                    ? 'bg-primary/10 font-medium text-foreground dark:bg-primary/15 [&_svg]:text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  sidebarCollapsed && 'justify-center px-0',
-                )}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                {active && !sidebarCollapsed && (
-                  <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
-                )}
-                <item.icon className="size-4 shrink-0" />
-                {!sidebarCollapsed && <span>{item.label}</span>}
-              </button>
-            )
-          })}
-        </nav>
-
-        <div className="mt-auto flex flex-col gap-4">
-
-          {!sidebarCollapsed && (
-            <div className="flex items-center gap-2 px-1.5 text-xs text-muted-foreground" title={isAuthed ? sync.lastError || '' : ''}>
-              {isAuthed ? (
-                <>
-                  <span className={cn('size-1.5 rounded-full', sync.state === 'error' ? 'bg-destructive' : 'bg-emerald-500')} />
-                  <span>
-                    {sync.state === 'syncing' ? 'Syncing…' : sync.state === 'error' ? 'Sync error' : 'Synced'}
-                    {sync.lastRunAt && sync.state === 'idle'
-                      ? ` · ${new Date(sync.lastRunAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                      : ''}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Lock className="size-3" />
-                  <span>Local only</span>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </aside>
-
-      {/* ── Main panel ── */}
+    <div className="min-h-dvh bg-background">
+      {/* ── Main panel (no sidebar — navigation lives on the Home launcher) ── */}
       <main className="min-w-0">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur md:px-6">
-          {activeView.startsWith('add-') ? (
+          {activeView !== 'overview' && (
             <Button variant="ghost" size="icon" onClick={() => setActiveView('overview')} aria-label="Back to home">
               <ArrowLeft className="size-5" />
-            </Button>
-          ) : (
-            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMenuOpen(true)} aria-label="Open menu">
-              <Menu className="size-5" />
             </Button>
           )}
           <h1 className="flex-1 truncate text-xl font-semibold tracking-[-0.011em] md:text-[22px]">{titleFor(activeView)}</h1>
           <div className="flex items-center gap-2">
+            {/* Sync / local-only status — moved here from the deleted sidebar */}
+            {activeView === 'overview' && (
+              isAuthed ? (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground" title={sync.lastError || ''}>
+                  <span className={cn('size-1.5 rounded-full', sync.state === 'error' ? 'bg-destructive' : sync.state === 'syncing' ? 'bg-amber-500' : 'bg-emerald-500')} />
+                  <span className="hidden sm:inline">{sync.state === 'syncing' ? 'Syncing…' : sync.state === 'error' ? 'Sync error' : 'Synced'}</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Lock className="size-3" /> <span className="hidden sm:inline">Local only</span>
+                </span>
+              )
+            )}
             {activeView === 'labs' && (
               <Button variant="ghost" size="icon" onClick={() => setExportOpen(true)} aria-label="Export for doctor" title="Share with doctor">
                 <Share2 className="size-4" />
@@ -380,7 +284,7 @@ function Shell({
           </div>
         </header>
 
-        <div className="px-4 py-5 pb-24 md:px-6">
+        <div className="mx-auto w-full max-w-5xl px-4 py-5 pb-24 md:px-6">
         {activeView === 'overview' && (
           <Overview
             compounds={compounds ?? []}
@@ -400,7 +304,7 @@ function Shell({
           )}
           {activeView === 'targets' && <Targets />}
           {activeView === 'timeline' && (
-            <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} />
+            <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} bodyMetrics={bodyMetrics} />
           )}
           {activeView === 'settings' && (
             <Settings
@@ -415,51 +319,6 @@ function Shell({
         </Suspense>
         </div>
       </main>
-
-      {/* Mobile hamburger drawer — replaces bottom tabs */}
-      {menuOpen && (
-        <div
-          className="fixed inset-0 z-50 flex bg-black/40 backdrop-blur-sm md:hidden"
-          onClick={() => setMenuOpen(false)}
-        >
-          <nav
-            className="flex h-full w-72 max-w-[80%] flex-col gap-4 border-r border-border bg-sidebar p-4 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-            aria-label="Mobile navigation"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <BrandMark size={28} />
-                <strong className="font-display text-base">Apollo Health</strong>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => setMenuOpen(false)} aria-label="Close menu">
-                <X className="size-4" />
-              </Button>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              {NAV.map((item) => {
-                const active = activeView === item.id
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => { setActiveView(item.id); setMenuOpen(false) }}
-                    className={cn(
-                      'flex h-11 items-center gap-3 rounded-md px-3 text-[15px] transition-colors',
-                      active
-                        ? 'bg-primary/10 font-medium text-foreground dark:bg-primary/15 [&_svg]:text-primary'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                    )}
-                  >
-                    <item.icon className="size-[18px] shrink-0" />
-                    <span>{item.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </nav>
-        </div>
-      )}
 
       <InstallPrompt />
 
