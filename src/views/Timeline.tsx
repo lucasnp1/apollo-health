@@ -3,7 +3,8 @@ import { Brain, FileText, FlaskConical, HeartPulse, Scale, Syringe } from 'lucid
 import type { LucideIcon } from 'lucide-react'
 import { format, parseISO, startOfDay, startOfWeek, differenceInCalendarDays, isThisWeek, isToday, isYesterday } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
+import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type Symptom, type VitalLog } from '../lib/db'
+import { ALL_SYMPTOMS, chipTone } from '../lib/symptoms'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
@@ -37,6 +38,25 @@ const TYPE_ICONS: Record<EventType, LucideIcon> = {
   lab: FlaskConical,
   file: FileText,
   symptom: Brain,
+}
+
+// Summarise one symptom check-in into the notable highs/lows, so a symptom
+// row on the timeline (and the Symptoms filter) shows what actually stood out
+// rather than just two of the nine ratings.
+function symptomDetail(s: Symptom): string {
+  const good: string[] = []
+  const watch: string[] = []
+  for (const def of ALL_SYMPTOMS) {
+    const v = s[def.key]
+    if (typeof v !== 'number') continue
+    const t = chipTone(v, def.direction)
+    if (t === 'good') good.push(def.label)
+    else if (t === 'bad' || t === 'warn') watch.push(def.label)
+  }
+  const parts: string[] = []
+  if (good.length) parts.push(`Good: ${good.join(', ')}`)
+  if (watch.length) parts.push(`Watch: ${watch.join(', ')}`)
+  return parts.length ? parts.join(' · ') : 'Steady check-in'
 }
 
 // ── Day/week grouped rendering ──────────────────────────────────────────────
@@ -212,8 +232,8 @@ export function Timeline({
         id: `s-${s.id}`,
         date: parseISO(s.recordedAt),
         icon: Brain,
-        title: 'Symptom log',
-        detail: `Mood ${s.mood ?? '—'} · Energy ${s.energy ?? '—'}`,
+        title: 'Symptom check-in',
+        detail: symptomDetail(s),
         type: 'symptom' as EventType,
       })),
     ]

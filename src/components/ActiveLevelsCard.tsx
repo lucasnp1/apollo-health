@@ -10,7 +10,7 @@
  * its 60-day peak so you can see at a glance when things stacked highest.
  */
 import { useMemo } from 'react'
-import { format, startOfWeek } from 'date-fns'
+import { format } from 'date-fns'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { Compound, InjectionLog } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
@@ -148,18 +148,18 @@ export function ActiveLevelsCard({
     return { data, legend }
   }, [compounds, injections])
 
-  // Raw dose totals for the current week (Sunday → Sunday). Sums every logged
-  // dose per drug since this week's Sunday — e.g. 100mg Test 3×/wk shows 300mg.
-  // Independent of PK: covers peptides and everything else you've injected.
-  const weekTotals = useMemo(() => {
-    const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 }).getTime()
+  // Raw dose totals for the last 7 days (rolling). Sums every logged dose per
+  // drug in the past week — e.g. 100mg Test 3×/wk shows 300mg. Independent of
+  // PK: covers peptides and everything else you've injected.
+  const last7Totals = useMemo(() => {
     const nowMs = Date.now()
+    const cutoff = nowMs - 7 * MS_PER_DAY
     const compoundById = new Map(compounds.map((c) => [c.id, c]))
     const byName = new Map<string, { name: string; color: string; total: number; unit: string }>()
     for (const inj of injections) {
       if (inj.dose === undefined) continue
       const ms = new Date(inj.takenAt).getTime()
-      if (ms < weekStart || ms > nowMs) continue
+      if (ms < cutoff || ms > nowMs) continue
       const c = compoundById.get(inj.compoundId)
       if (!c) continue
       const k = c.name.trim().toLowerCase()
@@ -189,7 +189,7 @@ export function ActiveLevelsCard({
     : totalPct >= 40 ? 'in your normal range'
     : 'on the low side'
 
-  if (legend.length === 0) {
+  if (injections.length === 0) {
     return (
       <PanelCard title="Active levels" subtitle="Estimated active drug from your logged doses">
         <PanelEmpty icon={Activity} title="No injections yet" detail="Log a dose to see your active levels build here." />
@@ -202,7 +202,8 @@ export function ActiveLevelsCard({
   )
 
   return (
-    <PanelCard title="Active levels" subtitle="Estimated active drug in your system, from every dose logged">
+    <PanelCard title="Active levels" subtitle={legend.length > 0 ? 'Estimated active drug in your system, from every dose logged' : 'Doses you have logged in the last 7 days'}>
+      {legend.length > 0 && (<>
       <ChartContainer config={chartConfig} className="h-[200px] w-full">
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
           <defs>
@@ -269,15 +270,16 @@ export function ActiveLevelsCard({
           )
         })}
       </ul>
+      </>)}
 
-      {/* This week — raw dose totals injected since Sunday */}
-      {weekTotals.length > 0 && (
-        <div className="mt-4 border-t pt-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            This week <span className="font-normal normal-case text-muted-foreground/70">· injected since Sunday</span>
-          </p>
+      {/* Last 7 days — raw dose totals injected in the past week (always shown) */}
+      <div className={legend.length > 0 ? 'mt-4 border-t pt-3' : ''}>
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Last 7 days <span className="font-normal normal-case text-muted-foreground/70">· total injected</span>
+        </p>
+        {last7Totals.length > 0 ? (
           <ul className="mt-2 flex flex-col gap-1.5">
-            {weekTotals.map((w) => (
+            {last7Totals.map((w) => (
               <li key={w.name} className="flex items-center gap-2.5 text-sm">
                 <span className="size-2.5 shrink-0 rounded-full" style={{ background: w.color }} />
                 <span className="min-w-0 flex-1 truncate font-medium">{w.name}</span>
@@ -287,8 +289,10 @@ export function ActiveLevelsCard({
               </li>
             ))}
           </ul>
-        </div>
-      )}
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">Nothing injected in the last 7 days.</p>
+        )}
+      </div>
     </PanelCard>
   )
 }

@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
-  ArrowLeft,
   Lock,
   Plus,
   Share2,
   Upload,
 } from 'lucide-react'
+import { BrandMark } from './components/BrandMark'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -242,13 +242,25 @@ function Shell({
       {/* ── Main panel (no sidebar — navigation lives on the Home launcher) ── */}
       <main className="min-w-0">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur md:px-6">
+          {/* Brand — always far-left, doubles as the Home button */}
+          <button
+            type="button"
+            onClick={() => setActiveView('overview')}
+            className="-mx-1 flex shrink-0 items-center gap-2.5 rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            aria-label="Apollo Health — go to Home"
+          >
+            <BrandMark size={30} />
+            <span className="font-display text-base font-semibold leading-none tracking-[-0.011em]">
+              Apollo <span className="font-normal text-muted-foreground">Health</span>
+            </span>
+          </button>
           {activeView !== 'overview' && (
-            <Button variant="ghost" size="icon" onClick={() => setActiveView('overview')} aria-label="Back to home">
-              <ArrowLeft className="size-5" />
-            </Button>
+            <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-muted-foreground">
+              <span className="text-border">/</span>
+              <span className="truncate">{titleFor(activeView)}</span>
+            </span>
           )}
-          <h1 className="flex-1 truncate text-xl font-semibold tracking-[-0.011em] md:text-[22px]">{titleFor(activeView)}</h1>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2">
             {/* Sync / local-only status — moved here from the deleted sidebar */}
             {activeView === 'overview' && (
               isAuthed ? (

@@ -20,6 +20,9 @@ import { cn } from '@/lib/utils'
 
 type AuthBundle = ReturnType<typeof useAuth>
 
+// Toggle to bring back the "Reset device" (wipe-all) card in Settings.
+const SHOW_RESET_DEVICE = false
+
 async function importJson(file: File) {
   const text = await file.text()
   const dump = JSON.parse(text)
@@ -97,7 +100,8 @@ export function Settings({
       </div>
       <div className="md:col-span-2 xl:col-span-6"><LabDataSettings /></div>
       <div className="md:col-span-2 xl:col-span-6"><TrashSettings compounds={compounds ?? []} /></div>
-      <div className="md:col-span-2 xl:col-span-6"><DangerSettings /></div>
+      {/* Reset device / danger zone hidden for now — flip to re-enable. */}
+      {SHOW_RESET_DEVICE && <div className="md:col-span-2 xl:col-span-6"><DangerSettings /></div>}
     </DashGrid>
   )
 }
