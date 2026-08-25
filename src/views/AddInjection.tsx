@@ -4,12 +4,13 @@
 // values that persist for next time. Peptides are reconstituted: powder mg +
 // bac water mL give the concentration, and dosing shows units on the syringe.
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Plus, TriangleAlert, X } from 'lucide-react'
 import { db, type Compound, type InjectionLog, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
 import { parseConcentrationMgPerMl } from '../lib/vials'
 import { NEGATIVE, POSITIVE, chipTone, type SymptomDef } from '../lib/symptoms'
+import { IM_QUICK_SITES, SUBQ_QUICK_SITES, siteGroup, type QuickSite } from '../lib/sites'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from '../components/SiteCombobox'
 import { Button } from '@/components/ui/button'
@@ -21,11 +22,6 @@ type Route = 'IM' | 'SubQ'
 const SYRINGE_UNITS_PER_ML = 100
 const NEW = '__new__'
 const COLORS = ['#f4c95c', '#2566c4', '#2f8b54', '#c43c2f', '#7c5cff', '#d98324', '#3aa5a0']
-
-// Curated quick lists — the sites actually used often. Everything else stays
-// reachable under "Other site / custom…".
-const IM_QUICK = ['Deltoid L', 'Deltoid R', 'Vastus Lateralis L', 'Vastus Lateralis R', 'Pectoral L', 'Pectoral R', 'Lat L', 'Lat R']
-const SUBQ_QUICK = ['Abdomen L', 'Abdomen R', 'Glute SubQ L', 'Glute SubQ R']
 
 function Segmented<T extends string>({
   value, options, onChange, className,
@@ -118,30 +114,56 @@ export function AddInjection({
   }, [rawCompounds])
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
 
-  // Freshest injected compound sets the initial route + prefill.
-  const primary = useMemo(() => {
+  // The last syringe you logged on a route = every compound sharing the most
+  // recent takenAt for that route. Reopening prefills the WHOLE stack (with each
+  // compound's saved concentration/dose), not just the primary compound.
+  const syringeForRoute = useCallback((r: Route): Compound[] => {
+    let batchAt: string | undefined
     for (const inj of injections) {
-      const c = compounds.find((x) => x.id === inj.compoundId)
-      if (c) return c
+      if ((inj.route === 'SubQ' ? 'SubQ' : 'IM') !== r) continue
+      batchAt = inj.takenAt
+      break
     }
-    return compounds[0]
-  }, [compounds, injections])
+    if (batchAt) {
+      const seen = new Set<number>()
+      const out: Compound[] = []
+      for (const inj of injections) {
+        if (inj.takenAt !== batchAt) continue
+        if ((inj.route === 'SubQ' ? 'SubQ' : 'IM') !== r) continue
+        if (seen.has(inj.compoundId)) continue
+        const c = compounds.find((x) => x.id === inj.compoundId)
+        if (c) { seen.add(inj.compoundId); out.push(c) }
+      }
+      if (out.length) return out
+    }
+    const first = compounds.find((c) => c.defaultRoute === r)
+    return first ? [first] : []
+  }, [injections, compounds])
 
-  const [route, setRoute] = useState<Route>(primary?.defaultRoute ?? 'IM')
-  const [lines, setLines] = useState<Line[]>(() => [primary ? lineFromCompound(primary) : blankLine()])
+  // Initial route + stack: the overall freshest syringe, else the first compound.
+  const initial = useMemo(() => {
+    const freshest = injections[0]
+    const r: Route = freshest ? (freshest.route === 'SubQ' ? 'SubQ' : 'IM') : (compounds[0]?.defaultRoute ?? 'IM')
+    return { route: r, stack: syringeForRoute(r) }
+  }, [injections, compounds, syringeForRoute])
+
+  const [route, setRoute] = useState<Route>(() => initial.route)
+  const [lines, setLines] = useState<Line[]>(() => (initial.stack.length ? initial.stack.map(lineFromCompound) : [blankLine()]))
   const [site, setSite] = useState('')
   const [notes, setNotes] = useState('')
   const [feel, setFeel] = useState<Partial<Symptom>>({})
   const [feelOpen, setFeelOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  // Data loads async (liveQuery starts empty). Hydrate the form from the last
+  // syringe once — the first time real data arrives — never clobbering edits.
+  const hydrated = useRef(initial.stack.length > 0)
   useEffect(() => {
-    if (primary && lines.length === 1 && lines[0].compoundId === '' && lines[0].newName === '') {
-      setRoute(primary.defaultRoute ?? 'IM')
-      setLines([lineFromCompound(primary)])
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [primary])
+    if (hydrated.current || initial.stack.length === 0) return
+    setRoute(initial.route)
+    setLines(initial.stack.map(lineFromCompound))
+    hydrated.current = true
+  }, [initial])
 
   // Compounds shown for the current route — SubQ hides IM oils and vice versa.
   const routeCompounds = useMemo(
@@ -149,22 +171,13 @@ export function AddInjection({
     [compounds, route],
   )
 
-  function freshestOfRoute(r: Route): Compound | undefined {
-    for (const inj of injections) {
-      const ir = inj.route === 'SubQ' ? 'SubQ' : 'IM'
-      if (ir !== r) continue
-      const c = compounds.find((x) => x.id === inj.compoundId)
-      if (c) return c
-    }
-    return compounds.find((c) => c.defaultRoute === r)
-  }
-
-  // Switching route resets the syringe (can't mix) + the site list.
+  // Switching route resets the syringe (can't mix) + the site list, prefilling
+  // the last stack you used on that route.
   function changeRoute(r: Route) {
     if (r === route) return
     setRoute(r)
-    const fresh = freshestOfRoute(r)
-    setLines([fresh ? lineFromCompound(fresh) : blankLine()])
+    const stack = syringeForRoute(r)
+    setLines(stack.length ? stack.map(lineFromCompound) : [blankLine()])
     setSite('')
   }
 
@@ -314,6 +327,7 @@ export function AddInjection({
         </button>
         {feelOpen && (
           <div className="flex flex-col gap-5 rounded-xl border border-border bg-card p-5">
+            <p className="text-xs text-muted-foreground">Tap a number to rate — tap it again to clear. Anything you leave blank counts as fine.</p>
             <div>
               <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Positive — higher is better</p>
               {POSITIVE.map((s) => (
@@ -481,7 +495,7 @@ const SCALE_TONE: Record<'good' | 'warn' | 'bad' | 'neutral', string> = {
   neutral: 'border-foreground bg-accent text-foreground',
 }
 
-function SymptomScale({ def, value, onChange }: { def: SymptomDef; value: number | undefined; onChange: (v: number) => void }) {
+function SymptomScale({ def, value, onChange }: { def: SymptomDef; value: number | undefined; onChange: (v: number | undefined) => void }) {
   return (
     <div className="grid grid-cols-[minmax(120px,1.5fr)_auto] items-center gap-4 py-1.5 max-md:grid-cols-1 max-md:gap-1">
       <span className="text-sm">{def.label}</span>
@@ -499,7 +513,8 @@ function SymptomScale({ def, value, onChange }: { def: SymptomDef; value: number
                 'size-8 rounded-md border text-[13px] tabular-nums transition-colors max-md:flex-1',
                 selected ? `font-semibold ${SCALE_TONE[tone]}` : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
               )}
-              onClick={() => onChange(n)}
+              // Tap the selected value again to clear it — leaving it blank means "fine".
+              onClick={() => onChange(selected ? undefined : n)}
             >
               {n}
             </button>
@@ -510,90 +525,112 @@ function SymptomScale({ def, value, onChange }: { def: SymptomDef; value: number
   )
 }
 
+const DAY = 86_400_000
+
+function dayLabel(d: number): string {
+  if (!Number.isFinite(d)) return 'Rested'
+  if (d < 0.5) return 'today'
+  if (d < 1.5) return 'yesterday'
+  return `${Math.round(d)}d ago`
+}
+
+// Group score → traffic light. Under 4 days = avoid, 4–10 = caution, else good.
+function statusOf(groupDays: number): 'good' | 'warn' | 'bad' {
+  if (!Number.isFinite(groupDays)) return 'good'
+  if (groupDays < 4) return 'bad'
+  if (groupDays < 10) return 'warn'
+  return 'good'
+}
+
+const DOT_CLASS = { good: 'bg-emerald-500', warn: 'bg-amber-500', bad: 'bg-destructive' } as const
+const LABEL_CLASS = {
+  good: 'text-muted-foreground',
+  warn: 'text-amber-700 dark:text-amber-400',
+  bad: 'text-destructive',
+} as const
+
 function SitePicker({
   route, value, injections, onChange,
 }: { route: Route; value: string; injections: InjectionLog[]; onChange: (s: string) => void }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const now = Date.now()
-  const quick = route === 'SubQ' ? SUBQ_QUICK : IM_QUICK
+  const quick: QuickSite[] = route === 'SubQ' ? SUBQ_QUICK_SITES : IM_QUICK_SITES
 
-  const daysBySite = useMemo(() => {
-    const map = new Map<string, number>()
+  // Days since each exact site, and days since each adjacency group (min across
+  // its sites). The group score colours the row, so a recent shot to one deltoid
+  // head flags the whole deltoid on that side.
+  const { daysBySite, daysByGroup } = useMemo(() => {
+    const bySite = new Map<string, number>()
+    const byGroup = new Map<string, number>()
     for (const inj of injections) {
       if (!inj.site) continue
-      const r = inj.route === 'SubQ' ? 'SubQ' : 'IM'
-      if (r !== route) continue
-      const d = (now - new Date(inj.takenAt).getTime()) / 86_400_000
-      const cur = map.get(inj.site)
-      if (cur === undefined || d < cur) map.set(inj.site, d)
+      if ((inj.route === 'SubQ' ? 'SubQ' : 'IM') !== route) continue
+      const d = (now - new Date(inj.takenAt).getTime()) / DAY
+      const cur = bySite.get(inj.site)
+      if (cur === undefined || d < cur) bySite.set(inj.site, d)
+      const g = siteGroup(inj.site)
+      if (g) { const gc = byGroup.get(g); if (gc === undefined || d < gc) byGroup.set(g, d) }
     }
-    return map
+    return { daysBySite: bySite, daysByGroup: byGroup }
   }, [injections, route, now])
 
-  const fresh = quick.filter((s) => (daysBySite.get(s) ?? Infinity) >= 7)
-  const recent = quick
-    .filter((s) => (daysBySite.get(s) ?? Infinity) < 7)
-    .sort((a, b) => (daysBySite.get(a) ?? 0) - (daysBySite.get(b) ?? 0))
-
-  function label(s: string) {
-    const d = daysBySite.get(s)
-    if (d === undefined || !Number.isFinite(d)) return null
-    if (d < 0.5) return 'today'
-    if (d < 1.5) return '1d'
-    return `${Math.round(d)}d`
-  }
-
-  function Chip({ s, tone }: { s: string; tone: 'fresh' | 'recent' }) {
-    const selected = value === s
-    return (
-      <button
-        type="button"
-        onClick={() => onChange(s)}
-        className={cn(
-          'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
-          selected
-            ? 'border-primary bg-primary/15 text-foreground ring-1 ring-primary'
-            : tone === 'recent'
-              ? 'border-destructive/40 bg-destructive/8 text-destructive'
-              : 'border-border hover:bg-muted',
-        )}
-      >
-        {s}
-        {label(s) && <small className="text-[10px] font-normal opacity-70">{label(s)}</small>}
-      </button>
-    )
-  }
+  // Most rested first (never-used at the very top); most-recently-used sinks to
+  // the bottom — "which muscle should I use right now", read top to bottom.
+  const ordered = useMemo(() => {
+    return [...quick].sort((a, b) => {
+      const ga = daysByGroup.get(a.group) ?? Infinity
+      const gb = daysByGroup.get(b.group) ?? Infinity
+      if (ga !== gb) return gb - ga
+      const ea = daysBySite.get(a.site) ?? Infinity
+      const eb = daysBySite.get(b.site) ?? Infinity
+      return eb - ea
+    })
+  }, [quick, daysByGroup, daysBySite])
 
   return (
-    <div className="flex flex-col gap-3">
-      <div>
-        <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-          <span className="size-1.5 rounded-full bg-emerald-500" /> Good to use — rested
-        </p>
-        {fresh.length > 0 ? (
-          <div className="flex flex-wrap gap-2">{fresh.map((s) => <Chip key={s} s={s} tone="fresh" />)}</div>
-        ) : (
-          <p className="text-xs text-muted-foreground">All the usual sites were used in the last week — pick the least-recent, or a custom site.</p>
-        )}
+    <div className="flex flex-col gap-2">
+      <p className="px-0.5 text-xs text-muted-foreground">Most rested first. Amber and red were used recently — a whole area stays flagged even if you'd hit a different head.</p>
+      <div className="flex flex-col gap-1.5">
+        {ordered.map((q) => {
+          const groupDays = daysByGroup.get(q.group) ?? Infinity
+          const exactDays = daysBySite.get(q.site) ?? Infinity
+          const status = statusOf(groupDays)
+          const selected = value === q.site
+          // A nearby head in the same area (not this exact spot) triggered the flag.
+          const areaTriggered = Number.isFinite(groupDays) && (!Number.isFinite(exactDays) || exactDays > groupDays + 0.02)
+          const labelText = !Number.isFinite(groupDays)
+            ? 'Rested'
+            : areaTriggered ? `Area used ${dayLabel(groupDays)}` : dayLabel(exactDays)
+          return (
+            <button
+              key={q.site}
+              type="button"
+              onClick={() => onChange(q.site)}
+              aria-pressed={selected}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-lg border px-3.5 py-2.5 text-left transition-colors',
+                selected ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border hover:bg-muted',
+              )}
+            >
+              <span className={cn('size-2.5 shrink-0 rounded-full', DOT_CLASS[status])} />
+              <span className="min-w-0 flex-1">
+                <span className="text-sm font-medium text-foreground">{q.muscle}</span>
+                <span className="ml-1.5 text-xs text-muted-foreground">{q.side === 'L' ? 'Left' : 'Right'}</span>
+              </span>
+              <span className={cn('shrink-0 text-xs', selected ? 'text-foreground' : LABEL_CLASS[status])}>{labelText}</span>
+            </button>
+          )
+        })}
       </div>
 
-      {recent.length > 0 && (
-        <div>
-          <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-destructive">
-            <span className="size-1.5 rounded-full bg-destructive" /> Used recently — avoid
-          </p>
-          <div className="flex flex-wrap gap-2">{recent.map((s) => <Chip key={s} s={s} tone="recent" />)}</div>
-        </div>
-      )}
-
-      {value && !quick.includes(value) && (
-        <p className="text-xs text-muted-foreground">Selected: <span className="font-medium text-foreground">{value}</span></p>
+      {value && !quick.some((q) => q.site === value) && (
+        <p className="px-0.5 text-xs text-muted-foreground">Selected: <span className="font-medium text-foreground">{value}</span></p>
       )}
 
       {moreOpen ? (
         <SiteCombobox value={value} onChange={onChange} />
       ) : (
-        <button type="button" onClick={() => setMoreOpen(true)} className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline">
+        <button type="button" onClick={() => setMoreOpen(true)} className="self-start px-0.5 text-xs text-muted-foreground underline-offset-2 hover:underline">
           Other site / custom…
         </button>
       )}
