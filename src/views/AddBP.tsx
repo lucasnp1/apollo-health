@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { db } from '../lib/db'
+import { useKeyboardInset } from '../lib/useKeyboardInset'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +10,7 @@ export function AddBP({ onBack }: { onBack: () => void }) {
   const [dia, setDia] = useState('')
   const [pulse, setPulse] = useState('')
   const [busy, setBusy] = useState(false)
+  const kbInset = useKeyboardInset()
 
   async function save() {
     if (!sys || !dia) return
@@ -44,7 +46,7 @@ export function AddBP({ onBack }: { onBack: () => void }) {
         </div>
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/90 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/90 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-[bottom] duration-150" style={{ bottom: kbInset }}>
         <div className="mx-auto flex max-w-xl gap-2">
           <Button variant="outline" onClick={onBack} className="shrink-0">Cancel</Button>
           <Button size="lg" className="flex-1" onClick={save} disabled={busy || !sys || !dia}>{busy ? 'Saving…' : 'Save reading'}</Button>

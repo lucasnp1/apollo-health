@@ -11,6 +11,7 @@ import { logInjection, pickActiveVial } from '../lib/injections'
 import { parseConcentrationMgPerMl } from '../lib/vials'
 import { NEGATIVE, POSITIVE, chipTone, type SymptomDef } from '../lib/symptoms'
 import { IM_QUICK_SITES, SUBQ_QUICK_SITES, siteGroup, type QuickSite } from '../lib/sites'
+import { useKeyboardInset } from '../lib/useKeyboardInset'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from '../components/SiteCombobox'
 import { Button } from '@/components/ui/button'
@@ -155,6 +156,7 @@ export function AddInjection({
   const [feel, setFeel] = useState<Partial<Symptom>>({})
   const [feelOpen, setFeelOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const kbInset = useKeyboardInset()
 
   // Data loads async (liveQuery starts empty). Hydrate the form from the last
   // syringe once — the first time real data arrives — never clobbering edits.
@@ -350,7 +352,7 @@ export function AddInjection({
         <Input placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/90 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/90 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-[bottom] duration-150" style={{ bottom: kbInset }}>
         <div className="mx-auto flex max-w-xl gap-2">
           <Button variant="outline" onClick={onBack} className="shrink-0">Cancel</Button>
           <Button size="lg" className="flex-1" onClick={save} disabled={!canSave}>
