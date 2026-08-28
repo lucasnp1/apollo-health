@@ -140,12 +140,13 @@ export function AddInjection({
     return first ? [first] : []
   }, [injections, compounds])
 
-  // Initial route + stack: the overall freshest syringe, else the first compound.
-  const initial = useMemo(() => {
-    const freshest = injections[0]
-    const r: Route = freshest ? (freshest.route === 'SubQ' ? 'SubQ' : 'IM') : (compounds[0]?.defaultRoute ?? 'IM')
-    return { route: r, stack: syringeForRoute(r) }
-  }, [injections, compounds, syringeForRoute])
+  // Always land on the IM tab — even if SubQ was the last route used. SubQ data
+  // is still kept and recalled the moment you switch over. Prefill the last IM
+  // syringe (falls back to a blank line when there's no IM history).
+  const initial = useMemo(
+    () => ({ route: 'IM' as Route, stack: syringeForRoute('IM') }),
+    [syringeForRoute],
+  )
 
   const [route, setRoute] = useState<Route>(() => initial.route)
   const [lines, setLines] = useState<Line[]>(() => (initial.stack.length ? initial.stack.map(lineFromCompound) : [blankLine()]))
@@ -534,20 +535,35 @@ function dayLabel(d: number): string {
   return `${Math.round(d)}d ago`
 }
 
-// Group score → traffic light. Under 4 days = avoid, 4–10 = caution, else good.
-function statusOf(groupDays: number): 'good' | 'warn' | 'bad' {
-  if (!Number.isFinite(groupDays)) return 'good'
-  if (groupDays < 4) return 'bad'
-  if (groupDays < 10) return 'warn'
-  return 'good'
+// Friendly muscle name for an adjacency group — used in the "nearby used" warning.
+function groupMuscle(group: string): string {
+  if (group.startsWith('delt')) return 'deltoid'
+  if (group.startsWith('lat')) return 'lats'
+  if (group.startsWith('vl')) return 'vastus'
+  if (group.startsWith('abd')) return 'abdomen'
+  if (group.startsWith('glute')) return 'glute'
+  if (group.startsWith('thigh')) return 'thigh'
+  return 'that area'
 }
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-const DOT_CLASS = { good: 'bg-emerald-500', warn: 'bg-amber-500', bad: 'bg-destructive' } as const
-const LABEL_CLASS = {
-  good: 'text-muted-foreground',
-  warn: 'text-amber-700 dark:text-amber-400',
-  bad: 'text-destructive',
-} as const
+// rested → this spot is free. near → an ADJACENT spot on the same muscle was
+// used (soft warning, not blocked). caution / avoid → you actually used THIS
+// spot (a while ago / recently).
+type SiteStatus = 'rested' | 'near' | 'caution' | 'avoid'
+const RANK: Record<SiteStatus, number> = { rested: 0, near: 1, caution: 2, avoid: 3 }
+
+const DOT_CLASS: Record<'rested' | 'caution' | 'avoid', string> = {
+  rested: 'bg-emerald-500',
+  caution: 'bg-amber-500',
+  avoid: 'bg-destructive',
+}
+const LABEL_CLASS: Record<SiteStatus, string> = {
+  rested: 'text-muted-foreground',
+  near: 'text-amber-700 dark:text-amber-400',
+  caution: 'text-amber-700 dark:text-amber-400',
+  avoid: 'text-destructive',
+}
 
 function SitePicker({
   route, value, injections, onChange,
@@ -556,12 +572,12 @@ function SitePicker({
   const now = Date.now()
   const quick: QuickSite[] = route === 'SubQ' ? SUBQ_QUICK_SITES : IM_QUICK_SITES
 
-  // Days since each exact site, and days since each adjacency group (min across
-  // its sites). The group score colours the row, so a recent shot to one deltoid
-  // head flags the whole deltoid on that side.
-  const { daysBySite, daysByGroup } = useMemo(() => {
+  // Days since each exact site, plus the most-recent USED site per adjacency
+  // group. The group is only used to warn neighbours — it never marks an
+  // untouched spot as "used".
+  const { daysBySite, groupRecent } = useMemo(() => {
     const bySite = new Map<string, number>()
-    const byGroup = new Map<string, number>()
+    const gRecent = new Map<string, { days: number; site: string }>()
     for (const inj of injections) {
       if (!inj.site) continue
       if ((inj.route === 'SubQ' ? 'SubQ' : 'IM') !== route) continue
@@ -569,38 +585,41 @@ function SitePicker({
       const cur = bySite.get(inj.site)
       if (cur === undefined || d < cur) bySite.set(inj.site, d)
       const g = siteGroup(inj.site)
-      if (g) { const gc = byGroup.get(g); if (gc === undefined || d < gc) byGroup.set(g, d) }
+      if (g) { const prev = gRecent.get(g); if (!prev || d < prev.days) gRecent.set(g, { days: d, site: inj.site }) }
     }
-    return { daysBySite: bySite, daysByGroup: byGroup }
+    return { daysBySite: bySite, groupRecent: gRecent }
   }, [injections, route, now])
 
-  // Most rested first (never-used at the very top); most-recently-used sinks to
-  // the bottom — "which muscle should I use right now", read top to bottom.
-  const ordered = useMemo(() => {
-    return [...quick].sort((a, b) => {
-      const ga = daysByGroup.get(a.group) ?? Infinity
-      const gb = daysByGroup.get(b.group) ?? Infinity
-      if (ga !== gb) return gb - ga
-      const ea = daysBySite.get(a.site) ?? Infinity
-      const eb = daysBySite.get(b.site) ?? Infinity
-      return eb - ea
+  // Classify + order: rested first, then nearby-warnings, then this-spot-used,
+  // most-recently-used at the very bottom.
+  const rows = useMemo(() => {
+    const out = quick.map((q) => {
+      const exact = daysBySite.get(q.site) ?? Infinity
+      const gr = groupRecent.get(q.group)
+      let status: SiteStatus
+      let label: string
+      if (exact < 4) { status = 'avoid'; label = `Used ${dayLabel(exact)}` }
+      else if (exact < 10) { status = 'caution'; label = `Used ${dayLabel(exact)}` }
+      else if (gr && gr.days < 7 && gr.site !== q.site) {
+        status = 'near'
+        label = `${cap(groupMuscle(q.group))} used ${dayLabel(gr.days)} — nearby, go carefully`
+      } else {
+        status = 'rested'
+        label = Number.isFinite(exact) ? `Used ${dayLabel(exact)}` : 'Rested'
+      }
+      const sortDays = status === 'near' ? (gr?.days ?? Infinity) : exact
+      return { q, status, label, sortDays }
     })
-  }, [quick, daysByGroup, daysBySite])
+    out.sort((a, b) => (RANK[a.status] - RANK[b.status]) || (b.sortDays - a.sortDays))
+    return out
+  }, [quick, daysBySite, groupRecent])
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="px-0.5 text-xs text-muted-foreground">Most rested first. Amber and red were used recently — a whole area stays flagged even if you'd hit a different head.</p>
+      <p className="px-0.5 text-xs text-muted-foreground">Most rested first. Red = you used that spot recently. Amber ⚠ = a nearby spot on the same muscle was used — usable, just go carefully.</p>
       <div className="flex flex-col gap-1.5">
-        {ordered.map((q) => {
-          const groupDays = daysByGroup.get(q.group) ?? Infinity
-          const exactDays = daysBySite.get(q.site) ?? Infinity
-          const status = statusOf(groupDays)
+        {rows.map(({ q, status, label }) => {
           const selected = value === q.site
-          // A nearby head in the same area (not this exact spot) triggered the flag.
-          const areaTriggered = Number.isFinite(groupDays) && (!Number.isFinite(exactDays) || exactDays > groupDays + 0.02)
-          const labelText = !Number.isFinite(groupDays)
-            ? 'Rested'
-            : areaTriggered ? `Area used ${dayLabel(groupDays)}` : dayLabel(exactDays)
           return (
             <button
               key={q.site}
@@ -612,12 +631,17 @@ function SitePicker({
                 selected ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'border-border hover:bg-muted',
               )}
             >
-              <span className={cn('size-2.5 shrink-0 rounded-full', DOT_CLASS[status])} />
+              {status === 'near' ? (
+                <TriangleAlert className="size-4 shrink-0 text-amber-500" />
+              ) : (
+                <span className={cn('size-2.5 shrink-0 rounded-full', DOT_CLASS[status])} />
+              )}
               <span className="min-w-0 flex-1">
-                <span className="text-sm font-medium text-foreground">{q.muscle}</span>
-                <span className="ml-1.5 text-xs text-muted-foreground">{q.side === 'L' ? 'Left' : 'Right'}</span>
+                <span className="block text-sm font-medium text-foreground">
+                  {q.muscle}<span className="ml-1.5 text-xs font-normal text-muted-foreground">{q.side === 'L' ? 'Left' : 'Right'}</span>
+                </span>
+                <span className={cn('block text-xs', selected ? 'text-foreground' : LABEL_CLASS[status])}>{label}</span>
               </span>
-              <span className={cn('shrink-0 text-xs', selected ? 'text-foreground' : LABEL_CLASS[status])}>{labelText}</span>
             </button>
           )
         })}

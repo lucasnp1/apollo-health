@@ -9,8 +9,8 @@
  * have actually injected. Legend shows each compound's current level and
  * its 60-day peak so you can see at a glance when things stacked highest.
  */
-import { useMemo } from 'react'
-import { format } from 'date-fns'
+import { useCallback, useMemo, useState } from 'react'
+import { format, startOfWeek } from 'date-fns'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { Compound, InjectionLog } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
@@ -148,12 +148,11 @@ export function ActiveLevelsCard({
     return { data, legend }
   }, [compounds, injections])
 
-  // Raw dose totals for the last 7 days (rolling). Sums every logged dose per
-  // drug in the past week — e.g. 100mg Test 3×/wk shows 300mg. Independent of
-  // PK: covers peptides and everything else you've injected.
-  const last7Totals = useMemo(() => {
+  // Raw dose totals per drug between a cutoff and now — e.g. 100mg Test 3×/wk
+  // shows 300mg. Independent of PK: covers peptides and everything you inject.
+  const [totalsView, setTotalsView] = useState<'7d' | 'week'>('7d')
+  const totalsSince = useCallback((cutoff: number) => {
     const nowMs = Date.now()
-    const cutoff = nowMs - 7 * MS_PER_DAY
     const compoundById = new Map(compounds.map((c) => [c.id, c]))
     const byName = new Map<string, { name: string; color: string; total: number; unit: string }>()
     for (const inj of injections) {
@@ -169,6 +168,10 @@ export function ActiveLevelsCard({
     }
     return [...byName.values()].sort((a, b) => b.total - a.total)
   }, [compounds, injections])
+  // Rolling last-7-days vs the current calendar week (Sunday → now).
+  const last7Totals = useMemo(() => totalsSince(Date.now() - 7 * MS_PER_DAY), [totalsSince])
+  const weekTotals = useMemo(() => totalsSince(startOfWeek(new Date(), { weekStartsOn: 0 }).getTime()), [totalsSince])
+  const activeTotals = totalsView === '7d' ? last7Totals : weekTotals
 
   const totalNow = legend.reduce((s, l) => s + l.current, 0)
   const totalPeak = useMemo(() => {
@@ -272,14 +275,29 @@ export function ActiveLevelsCard({
       </ul>
       </>)}
 
-      {/* Last 7 days — raw dose totals injected in the past week (always shown) */}
+      {/* Total injected — rolling 7 days or the current Sun→Sun week (always shown) */}
       <div className={legend.length > 0 ? 'mt-4 border-t pt-3' : ''}>
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Last 7 days <span className="font-normal normal-case text-muted-foreground/70">· total injected</span>
-        </p>
-        {last7Totals.length > 0 ? (
-          <ul className="mt-2 flex flex-col gap-1.5">
-            {last7Totals.map((w) => (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total injected</p>
+          <div className="inline-flex rounded-lg bg-muted p-0.5 text-xs">
+            {([['7d', 'Last 7 days'], ['week', 'This week']] as const).map(([v, l]) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setTotalsView(v)}
+                className={cn(
+                  'rounded-md px-2.5 py-1 font-medium transition-colors',
+                  totalsView === v ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        {activeTotals.length > 0 ? (
+          <ul className="mt-2.5 flex flex-col gap-1.5">
+            {activeTotals.map((w) => (
               <li key={w.name} className="flex items-center gap-2.5 text-sm">
                 <span className="size-2.5 shrink-0 rounded-full" style={{ background: w.color }} />
                 <span className="min-w-0 flex-1 truncate font-medium">{w.name}</span>
@@ -290,8 +308,13 @@ export function ActiveLevelsCard({
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">Nothing injected in the last 7 days.</p>
+          <p className="mt-2.5 text-sm text-muted-foreground">
+            {totalsView === '7d' ? 'Nothing injected in the last 7 days.' : 'Nothing injected yet this week.'}
+          </p>
         )}
+        <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+          {totalsView === '7d' ? 'Rolling 7-day window.' : 'Since Sunday.'}
+        </p>
       </div>
     </PanelCard>
   )
