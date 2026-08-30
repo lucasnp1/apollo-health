@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Reveal } from '../components/motion'
 import type { useAuth } from '../lib/useAuth'
 
 type AuthBundle = ReturnType<typeof useAuth>
@@ -38,7 +39,9 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
 
   return (
     <div className="min-h-dvh grid place-items-center bg-background px-4">
-      <div className="w-full max-w-sm rounded-xl border bg-card p-6 shadow-sm">
+      <Reveal className="w-full max-w-sm">
+      <div className="w-full rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-lift)]">
+        <p className="eyebrow mb-4">Local-first · encrypted sync</p>
         <div className="flex items-center gap-3">
           <BrandMark size={44} />
           <div>
@@ -112,6 +115,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
           Data syncs to your account on Cloudflare over HTTPS. No third-party trackers or analytics.
         </p>
       </div>
+      </Reveal>
     </div>
   )
 }

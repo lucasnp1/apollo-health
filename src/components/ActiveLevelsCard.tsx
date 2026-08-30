@@ -16,6 +16,8 @@ import type { Compound, InjectionLog } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
 import { PanelCard, PanelEmpty } from './dashboard/PanelCard'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
+import { Segmented } from '@/components/ui/segmented'
+import { AnimatedNumber } from './motion'
 import { Activity, ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -245,9 +247,9 @@ export function ActiveLevelsCard({
 
       {/* "Active now" — one big number in plain language */}
       <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t pt-3">
-        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Active now</span>
+        <span className="eyebrow">Active now</span>
         <span className="font-mono text-2xl font-semibold tabular-nums">
-          ≈{totalNow.toFixed(0)}
+          ≈<AnimatedNumber value={totalNow} animateOnMount />
           <small className="ml-1 text-xs font-normal text-muted-foreground">mg/day</small>
         </span>
         {totalPeak > 0.1 && <span className="text-xs text-muted-foreground">— {overallLevel}</span>}
@@ -278,22 +280,13 @@ export function ActiveLevelsCard({
       {/* Total injected — rolling 7 days or the current Sun→Sun week (always shown) */}
       <div className={legend.length > 0 ? 'mt-4 border-t pt-3' : ''}>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total injected</p>
-          <div className="inline-flex rounded-lg bg-muted p-0.5 text-xs">
-            {([['7d', 'Last 7 days'], ['week', 'This week']] as const).map(([v, l]) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setTotalsView(v)}
-                className={cn(
-                  'rounded-md px-2.5 py-1 font-medium transition-colors',
-                  totalsView === v ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                )}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
+          <p className="eyebrow">Total injected</p>
+          <Segmented
+            size="sm"
+            value={totalsView}
+            onChange={setTotalsView}
+            options={[{ value: '7d', label: 'Last 7 days' }, { value: 'week', label: 'This week' }]}
+          />
         </div>
         {activeTotals.length > 0 ? (
           <ul className="mt-2.5 flex flex-col gap-1.5">

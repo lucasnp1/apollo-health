@@ -4,7 +4,7 @@
 // values that persist for next time. Peptides are reconstituted: powder mg +
 // bac water mL give the concentration, and dosing shows units on the syringe.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, Plus, TriangleAlert, X } from 'lucide-react'
 import { db, type Compound, type InjectionLog, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
@@ -17,34 +17,13 @@ import { SiteCombobox } from '../components/SiteCombobox'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Segmented } from '@/components/ui/segmented'
 import { cn } from '@/lib/utils'
 
 type Route = 'IM' | 'SubQ'
 const SYRINGE_UNITS_PER_ML = 100
 const NEW = '__new__'
 const COLORS = ['#f4c95c', '#2566c4', '#2f8b54', '#c43c2f', '#7c5cff', '#d98324', '#3aa5a0']
-
-function Segmented<T extends string>({
-  value, options, onChange, className,
-}: { value: T; options: { value: T; label: ReactNode }[]; onChange: (v: T) => void; className?: string }) {
-  return (
-    <div className={cn('inline-flex rounded-lg bg-muted p-1', className)}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={cn(
-            'flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-            value === o.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 // mg ⇄ units for one line, given its concentration. doseInUnit is in the
 // compound's own unit (mg or mcg) so it can be stored + re-shown next time.
@@ -273,7 +252,7 @@ export function AddInjection({
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-8 pb-28">
       <section className="flex flex-col gap-3">
-        <h2 className="px-0.5 text-xs font-medium uppercase tracking-[0.02em] text-muted-foreground">Route</h2>
+        <h2 className="px-0.5 eyebrow">Route</h2>
         <Segmented
           value={route}
           onChange={changeRoute}
@@ -286,7 +265,7 @@ export function AddInjection({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="px-0.5 text-xs font-medium uppercase tracking-[0.02em] text-muted-foreground">
+        <h2 className="px-0.5 eyebrow">
           {resolved.length > 1 ? 'Compounds (one syringe)' : 'Compound'}
         </h2>
         <div className="flex flex-col gap-4">
@@ -313,7 +292,7 @@ export function AddInjection({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="px-0.5 text-xs font-medium uppercase tracking-[0.02em] text-muted-foreground">Site</h2>
+        <h2 className="px-0.5 eyebrow">Site</h2>
         <SitePicker route={route} value={site} injections={injections} onChange={setSite} />
       </section>
 
@@ -322,7 +301,7 @@ export function AddInjection({
         <button
           type="button"
           onClick={() => setFeelOpen((o) => !o)}
-          className="flex items-center gap-1.5 self-start px-0.5 text-xs font-medium uppercase tracking-[0.02em] text-muted-foreground"
+          className="flex items-center gap-1.5 self-start px-0.5 eyebrow"
           aria-expanded={feelOpen}
         >
           {feelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
@@ -332,13 +311,13 @@ export function AddInjection({
           <div className="flex flex-col gap-5 rounded-xl border border-border bg-card p-5">
             <p className="text-xs text-muted-foreground">Tap a number to rate — tap it again to clear. Anything you leave blank counts as fine.</p>
             <div>
-              <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Positive — higher is better</p>
+              <p className="mb-1 eyebrow">Positive — higher is better</p>
               {POSITIVE.map((s) => (
                 <SymptomScale key={s.key as string} def={s} value={feel[s.key] as number | undefined} onChange={(v) => setFeel((f) => ({ ...f, [s.key]: v }))} />
               ))}
             </div>
             <div>
-              <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Side effects — higher is worse</p>
+              <p className="mb-1 eyebrow">Side effects — higher is worse</p>
               {NEGATIVE.map((s) => (
                 <SymptomScale key={s.key as string} def={s} value={feel[s.key] as number | undefined} onChange={(v) => setFeel((f) => ({ ...f, [s.key]: v }))} />
               ))}
@@ -348,7 +327,7 @@ export function AddInjection({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="px-0.5 text-xs font-medium uppercase tracking-[0.02em] text-muted-foreground">Notes</h2>
+        <h2 className="px-0.5 eyebrow">Notes</h2>
         <Input placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </section>
 

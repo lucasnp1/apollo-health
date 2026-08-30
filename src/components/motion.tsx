@@ -31,11 +31,12 @@ export function Reveal({ children, delay = 0, y = 10, className }: { children: R
   )
 }
 
-/** Count-up to `value` on change (easeOutCubic). Static under reduced motion. */
-export function AnimatedNumber({ value, decimals = 0, className }: { value: number; decimals?: number; className?: string }) {
+/** Count-up to `value` (easeOutCubic). Static under reduced motion. Set
+ *  `animateOnMount` to count up from 0 the first time it appears. */
+export function AnimatedNumber({ value, decimals = 0, className, animateOnMount = false }: { value: number; decimals?: number; className?: string; animateOnMount?: boolean }) {
   const reduce = useReducedMotion() ?? false
-  const [display, setDisplay] = useState(value)
-  const from = useRef(value)
+  const [display, setDisplay] = useState(() => (animateOnMount && !reduce ? 0 : value))
+  const from = useRef(animateOnMount && !reduce ? 0 : value)
 
   useEffect(() => {
     if (reduce || from.current === value) { setDisplay(value); from.current = value; return }

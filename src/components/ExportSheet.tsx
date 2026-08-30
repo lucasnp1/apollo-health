@@ -304,7 +304,7 @@ export function ExportSheet({
         <div className="flex flex-col gap-5">
           {/* Date range */}
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Date range</p>
+            <p className="mb-2 eyebrow">Date range</p>
             <div className="grid grid-cols-3 gap-1.5">
               {(Object.entries(RANGE_LABELS) as [DateRange, string][]).map(([k, label]) => (
                 <button
@@ -327,7 +327,7 @@ export function ExportSheet({
 
           {/* What to include */}
           <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Include</p>
+            <p className="mb-2 eyebrow">Include</p>
             <div className="flex flex-col gap-2">
               <label className="flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-3">
                 <Checkbox checked={inclInjections} onCheckedChange={(v) => setInclInjections(v === true)} />
@@ -340,7 +340,7 @@ export function ExportSheet({
               {/* Compound filter (shown when injections is checked) */}
               {inclInjections && compoundsWithHistory.length > 0 && (
                 <div className="flex flex-col gap-1.5 pl-4">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Filter by compound</span>
+                  <span className="eyebrow">Filter by compound</span>
                   <div className="flex flex-wrap gap-1.5">
                     {compoundsWithHistory.map(c => {
                       const on = selectedCompounds.includes(c.id!)

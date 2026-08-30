@@ -33,7 +33,7 @@ export function AddWeight({ onBack }: { onBack: () => void }) {
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-8 pb-28">
       <section className="flex flex-col gap-3">
-        <h2 className="px-0.5 text-xs font-medium uppercase tracking-[0.02em] text-muted-foreground">Weight</h2>
+        <h2 className="px-0.5 eyebrow">Weight</h2>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="w">Body weight</Label>
           <div className="relative">

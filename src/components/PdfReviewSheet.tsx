@@ -137,7 +137,7 @@ export function PdfReviewSheet({
         {/* Editable collection date — prefilled from the PDF when found */}
         <div className="flex flex-wrap items-end gap-2 rounded-md border bg-muted/30 px-3 py-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="pdf-date" className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Collection date</Label>
+            <Label htmlFor="pdf-date" className="eyebrow">Collection date</Label>
             <Input
               id="pdf-date"
               type="date"

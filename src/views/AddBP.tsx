@@ -29,7 +29,7 @@ export function AddBP({ onBack }: { onBack: () => void }) {
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-8 pb-28">
       <section className="flex flex-col gap-3">
-        <h2 className="px-0.5 text-xs font-medium uppercase tracking-[0.02em] text-muted-foreground">Blood pressure</h2>
+        <h2 className="px-0.5 eyebrow">Blood pressure</h2>
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="sys">Systolic</Label>

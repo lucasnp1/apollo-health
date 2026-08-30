@@ -210,7 +210,7 @@ function MarkerHistoryPane({
     <div>
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{summary.panel} · all tests</p>
+          <p className="eyebrow">{summary.panel} · all tests</p>
           <h3 className="flex items-baseline gap-2 font-display text-lg font-semibold">
             {summary.label}
             {summary.unit && <span className="text-sm font-normal text-muted-foreground">{summary.unit}</span>}
