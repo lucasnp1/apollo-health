@@ -3,12 +3,8 @@
 @import "./print.css";
 
 /* ── Self-hosted type ─────────────────────────────────────────────────────
-   Clash Display (characterful grotesk) for headlines, Hanken Grotesk (warm
-   humanist grotesk) for body/UI, JetBrains Mono for data. Self-hosted woff2
-   in /public/fonts — offline-capable and no render-blocking third party. */
-@font-face { font-family: 'Clash Display'; src: url('/fonts/clash-display-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
-@font-face { font-family: 'Clash Display'; src: url('/fonts/clash-display-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
-@font-face { font-family: 'Clash Display'; src: url('/fonts/clash-display-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+   Hanken Grotesk (humanist grotesk) for headlines + body/UI, JetBrains Mono
+   for data. Self-hosted woff2 in /public/fonts — offline, no third party. */
 @font-face { font-family: 'Hanken Grotesk'; src: url('/fonts/hanken-grotesk.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; }
 @font-face { font-family: 'JetBrains Mono'; src: url('/fonts/jetbrains-mono.woff2') format('woff2'); font-weight: 100 800; font-style: normal; font-display: swap; }
 
@@ -17,12 +13,8 @@
    remaining legacy styles toggle together from one source of truth. */
 @custom-variant dark (&:is([data-theme="dark"] *));
 
-/* ── Apollo brand theme ──────────────────────────────────────────────────
-   Neutral black/white/grey as the working palette (shadcn-style), with the
-   Byzantine-medallion YELLOW reserved for the primary action + brand. Greys
-   carry a faint warm tint so the app still feels related to the logo without
-   washing every surface in cream. */
-/* Clinical instrument, LIGHT companion: crisp cool near-white, cool ink,
+/* ── Apollo theme — clinical instrument ───────────────────────────────────
+   Clinical instrument, LIGHT companion: crisp cool near-white, cool ink,
    visible hairlines, a single sharp amber signal, mono data. Dark is the
    default (see below); this is the opt-in light skin. */
 :root {
@@ -68,18 +60,6 @@
 
   --chart-1: oklch(0.74 0.152 72);   /* amber */
   --chart-2: oklch(0.6 0.12 220);    /* cool cyan-blue */
-  --chart-3: oklch(0.6 0.14 155);    /* green */
-  --chart-4: oklch(0.6 0.2 22);      /* red */
-  --chart-5: oklch(0.58 0.14 285);   /* violet */
-
-  --sidebar: oklch(0.984 0.002 250);
-  --sidebar-foreground: oklch(0.205 0.013 255);
-  --sidebar-primary: oklch(0.74 0.152 72);
-  --sidebar-primary-foreground: oklch(0.20 0.02 68);
-  --sidebar-accent: oklch(0.945 0.005 255);
-  --sidebar-accent-foreground: oklch(0.205 0.013 255);
-  --sidebar-border: oklch(0.22 0.03 255 / 0.12);
-  --sidebar-ring: oklch(0.74 0.152 72);
 }
 
 /* Dark — the DEFAULT. Clinical instrument: deep cool near-black, lifted
@@ -123,18 +103,6 @@
 
   --chart-1: oklch(0.82 0.155 78);   /* amber */
   --chart-2: oklch(0.7 0.12 220);    /* cyan-blue */
-  --chart-3: oklch(0.72 0.14 158);   /* green */
-  --chart-4: oklch(0.68 0.2 22);     /* red */
-  --chart-5: oklch(0.68 0.14 285);   /* violet */
-
-  --sidebar: oklch(0.165 0.006 255);
-  --sidebar-foreground: oklch(0.955 0.005 250);
-  --sidebar-primary: oklch(0.82 0.155 78);
-  --sidebar-primary-foreground: oklch(0.19 0.03 68);
-  --sidebar-accent: oklch(0.285 0.009 255);
-  --sidebar-accent-foreground: oklch(0.955 0.005 250);
-  --sidebar-border: oklch(1 0 0 / 0.10);
-  --sidebar-ring: oklch(0.82 0.155 78);
 }
 
 @theme inline {
@@ -160,17 +128,6 @@
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
 
   /* Crisp instrument radii — precise corners, not soft pillows. */
   --radius-sm: 0.25rem;    /* 4px  — chips / badges */
@@ -213,21 +170,6 @@
 @utility font-display {
   font-family: var(--font-display);
   letter-spacing: -0.011em;
-}
-
-/* Gold gradient display text — showcase-card-style titles, in brand yellow.
-   Defined with @utility (not @layer utilities) so variants like
-   `group-hover:` / `hover:` work in Tailwind v4. */
-@utility text-gradient-gold {
-  background-image: linear-gradient(100deg, oklch(0.88 0.12 92), oklch(0.78 0.14 75));
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-}
-
-/* Yellow glow used on card hover (showcase-card lift effect). */
-@utility glow-primary {
-  box-shadow: 0 0 0 1px oklch(0.845 0.118 90 / 25%), 0 16px 48px -16px oklch(0.845 0.118 90 / 18%);
 }
 
 /* Instrument section label — mono, uppercase, tracked. One source of truth for
