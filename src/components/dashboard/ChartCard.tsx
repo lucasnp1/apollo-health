@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { cn } from '@/lib/utils'
+import { revealProps } from '../motion'
 
 /**
  * Chart container card — Horizon's "This month" pattern: header row with
@@ -25,23 +26,22 @@ export function ChartCard({
   children: ReactNode
   className?: string
 }) {
+  const reduce = useReducedMotion() ?? false
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={cn('flex flex-col rounded-xl border border-border bg-card p-6', className)}
+      {...revealProps(reduce)}
+      className={cn('flex flex-col rounded-xl border border-border/70 bg-card p-6 shadow-[var(--shadow-card)]', className)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-[15px] font-semibold leading-5 tracking-[-0.006em] text-foreground">{title}</h3>
+          <h3 className="text-base font-semibold leading-5 tracking-[-0.01em] text-foreground">{title}</h3>
           {subtitle && <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">{subtitle}</p>}
         </div>
         {action && <div className="shrink-0">{action}</div>}
       </div>
       {hero && (
         <div className="mt-3">
-          <p className="text-2xl font-semibold tabular-nums leading-none">{hero}</p>
+          <p className="font-mono text-2xl font-semibold tabular-nums leading-none">{hero}</p>
           {heroSub && <p className="mt-1.5 text-xs text-muted-foreground">{heroSub}</p>}
         </div>
       )}

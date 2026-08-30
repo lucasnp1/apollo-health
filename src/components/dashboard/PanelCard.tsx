@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { revealProps } from '../motion'
 
 /**
  * Generic dashboard card for tables / lists / forms. Horizon anatomy:
@@ -22,17 +23,16 @@ export function PanelCard({
   className?: string
   contentClassName?: string
 }) {
+  const reduce = useReducedMotion() ?? false
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={cn('rounded-xl border border-border bg-card p-6 shadow-none', className)}
+      {...revealProps(reduce)}
+      className={cn('rounded-xl border border-border/70 bg-card p-6 shadow-[var(--shadow-card)]', className)}
     >
       {(title || action) && (
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            {title && <h3 className="text-[15px] font-semibold leading-5 tracking-[-0.006em] text-foreground">{title}</h3>}
+            {title && <h3 className="text-base font-semibold leading-5 tracking-[-0.01em] text-foreground">{title}</h3>}
             {subtitle && <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">{subtitle}</p>}
           </div>
           {action && <div className="flex shrink-0 items-center gap-1.5">{action}</div>}

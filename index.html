@@ -9,9 +9,9 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/logo-64.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/logo-192.png" />
     <link rel="apple-touch-icon" href="/logo-180.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+    <!-- Self-hosted type (offline-capable PWA, no render-blocking third-party). @font-face lives in index.css. -->
+    <link rel="preload" href="/fonts/hanken-grotesk.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/clash-display-600.woff2" as="font" type="font/woff2" crossorigin />
     <meta property="og:title" content="Apollo Health" />
     <meta property="og:description" content="A local-first personal health tracker for protocols, vitals, and lab results." />
     <meta property="og:image" content="/logo-512.png" />

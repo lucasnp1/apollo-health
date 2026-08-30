@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { revealProps } from '../motion'
 
 export type StatTone = 'primary' | 'good' | 'bad' | 'info' | 'neutral'
 
@@ -45,12 +46,11 @@ export function StatCard({
   colorValue?: boolean
   className?: string
 }) {
+  const reduce = useReducedMotion() ?? false
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className={cn('flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 md:gap-4', className)}
+      {...revealProps(reduce)}
+      className={cn('flex items-center gap-3 rounded-xl border border-border/70 bg-card px-5 py-4 shadow-[var(--shadow-card)] md:gap-4', className)}
     >
       <span className={cn('grid size-9 shrink-0 place-items-center rounded-lg md:size-10', TONE_CIRCLE[tone])}>
         <Icon className="size-4 md:size-[18px]" />

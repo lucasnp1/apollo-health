@@ -250,8 +250,8 @@ function Shell({
             aria-label="Apollo Health — go to Home"
           >
             <BrandMark size={30} />
-            <span className="font-display text-base font-semibold leading-none tracking-[-0.011em]">
-              Apollo <span className="font-normal text-muted-foreground">Health</span>
+            <span className="font-display text-[17px] font-semibold leading-none tracking-[-0.02em]">
+              Apollo <span className="font-medium text-muted-foreground">Health</span>
             </span>
           </button>
           {activeView !== 'overview' && (

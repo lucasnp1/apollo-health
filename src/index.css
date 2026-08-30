@@ -2,6 +2,16 @@
 @import "tw-animate-css";
 @import "./print.css";
 
+/* ── Self-hosted type ─────────────────────────────────────────────────────
+   Clash Display (characterful grotesk) for headlines, Hanken Grotesk (warm
+   humanist grotesk) for body/UI, JetBrains Mono for data. Self-hosted woff2
+   in /public/fonts — offline-capable and no render-blocking third party. */
+@font-face { font-family: 'Clash Display'; src: url('/fonts/clash-display-500.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Clash Display'; src: url('/fonts/clash-display-600.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Clash Display'; src: url('/fonts/clash-display-700.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Hanken Grotesk'; src: url('/fonts/hanken-grotesk.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'JetBrains Mono'; src: url('/fonts/jetbrains-mono.woff2') format('woff2'); font-weight: 100 800; font-style: normal; font-display: swap; }
+
 /* Dark mode is driven by the existing `data-theme="dark"` attribute on
    <html> (set by src/lib/useTheme.ts) so shadcn components and the
    remaining legacy styles toggle together from one source of truth. */
@@ -26,9 +36,11 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.235 0.006 75);
 
-  /* Primary = brand yellow, rationed to the single primary action + accents. */
-  --primary: oklch(0.845 0.128 92);
-  --primary-foreground: oklch(0.235 0.006 75);
+  /* Primary = brand honey-gold, rationed to the single primary action + accents. */
+  --primary: oklch(0.82 0.145 86);
+  --primary-foreground: oklch(0.235 0.012 70);
+  /* Deep honey for accent TEXT — legible on light where --primary is too pale. */
+  --accent-ink: oklch(0.585 0.13 74);
 
   --secondary: oklch(0.965 0.003 95);    /* one neutral fill */
   --secondary-foreground: oklch(0.30 0.006 75);
@@ -45,6 +57,13 @@
   --border: oklch(0 0 0 / 0.07);         /* true black-7% hairline */
   --input: oklch(0 0 0 / 0.10);
   --ring: oklch(0.80 0.13 92);           /* yellow focus ring */
+
+  /* Depth — warm-tinted, low. Elevated surfaces use these instead of relying
+     on hairlines alone, which is what made every card read the same. */
+  --shadow-card: 0 1px 2px oklch(0.28 0.02 70 / 0.05), 0 4px 12px -4px oklch(0.28 0.02 70 / 0.07);
+  --shadow-lift: 0 2px 6px oklch(0.28 0.02 70 / 0.06), 0 18px 40px -14px oklch(0.28 0.02 70 / 0.16);
+  /* Faint warm paper texture layered under the page (set on body). */
+  --page-glow: radial-gradient(115% 90% at 50% -10%, oklch(0.9 0.05 88 / 0.5), transparent 60%);
 
   /* Chart palette — yellow lead, then calm complements. */
   --chart-1: oklch(0.78 0.13 92);
@@ -79,8 +98,9 @@
   --popover: oklch(0.235 0.005 75);
   --popover-foreground: oklch(0.945 0.004 90);
 
-  --primary: oklch(0.85 0.145 92);
+  --primary: oklch(0.85 0.15 90);
   --primary-foreground: oklch(0.235 0.02 80);
+  --accent-ink: oklch(0.86 0.15 92);
 
   --secondary: oklch(0.275 0.005 75);
   --secondary-foreground: oklch(0.945 0.004 90);
@@ -97,6 +117,10 @@
   --border: oklch(1 0 0 / 0.08);
   --input: oklch(1 0 0 / 0.10);
   --ring: oklch(0.80 0.13 92);
+
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.35), 0 4px 14px -6px oklch(0 0 0 / 0.4);
+  --shadow-lift: 0 2px 8px oklch(0 0 0 / 0.4), 0 22px 46px -16px oklch(0 0 0 / 0.62);
+  --page-glow: radial-gradient(120% 95% at 50% -12%, oklch(0.5 0.06 90 / 0.16), transparent 58%);
 
   --chart-1: oklch(0.85 0.145 92);
   --chart-2: oklch(0.65 0.13 250);
@@ -129,6 +153,7 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-ink: var(--accent-ink);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -148,15 +173,17 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* One coherent radius language: chips 6, controls/nav 8, cards/overlays 12. */
+  /* Differentiated radius language: chips 6, controls/nav 10, panels 14,
+     hero/primary surfaces 18 — no longer one value on everything. */
   --radius-sm: 0.375rem;   /* 6px  — chips / badges */
-  --radius-md: 0.5rem;     /* 8px  — buttons, inputs, nav/row tint */
-  --radius-lg: 0.625rem;   /* 10px */
-  --radius-xl: 0.75rem;    /* 12px — panels, cards, dialog, sheet */
+  --radius-md: 0.625rem;   /* 10px — buttons, inputs, nav/row tint */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 0.875rem;   /* 14px — panels, cards, dialog, sheet */
+  --radius-2xl: 1.125rem;  /* 18px — hero / primary surfaces */
 
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+  --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Clash Display", "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -166,15 +193,30 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    background-image: var(--page-glow);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  /* Section titles: Inter semibold with gentle negative tracking — Things-3
-     hierarchy comes from weight + size, never heavy bold. */
+  /* Faint paper grain over the whole page — real texture instead of a flat
+     single fill. Behind content (z-index -1), non-interactive, honours reduced
+     transparency by simply being very low opacity. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  /* Headlines: Clash Display, tight display tracking. Hierarchy now comes from
+     a real display face + scale, not just weight. */
   h1, h2, h3 {
     font-family: var(--font-display);
     font-weight: 600;
-    letter-spacing: -0.011em;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -198,5 +240,26 @@
 /* Yellow glow used on card hover (showcase-card lift effect). */
 @utility glow-primary {
   box-shadow: 0 0 0 1px oklch(0.845 0.118 90 / 25%), 0 16px 48px -16px oklch(0.845 0.118 90 / 18%);
+}
+
+@layer components {
+  /* Brand medallion badge — the logo art is square-cropped on yellow; frame it
+     in a soft rounded badge so it reads as crafted next to the wordmark. */
+  .brand-mark {
+    display: inline-grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 9px;
+    box-shadow: var(--shadow-card), inset 0 0 0 1px oklch(0 0 0 / 0.06);
+  }
+  .brand-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+  }
+  .brand-mark-bordered {
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
 }
 
