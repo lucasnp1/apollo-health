@@ -22,120 +22,119 @@
    Byzantine-medallion YELLOW reserved for the primary action + brand. Greys
    carry a faint warm tint so the app still feels related to the logo without
    washing every surface in cream. */
+/* Clinical instrument, LIGHT companion: crisp cool near-white, cool ink,
+   visible hairlines, a single sharp amber signal, mono data. Dark is the
+   default (see below); this is the opt-in light skin. */
 :root {
   color-scheme: light;
-  --radius: 0.75rem;
+  --radius: 0.5rem;
 
-  /* Things-3 light: soft off-white page, pure-white surfaces that lift off it,
-     hairline black borders (not shadows) defining every surface. */
-  --background: oklch(0.980 0.003 95);   /* soft off-white page */
-  --foreground: oklch(0.235 0.006 75);   /* near-black ink */
+  --background: oklch(0.984 0.002 250);
+  --foreground: oklch(0.205 0.013 255);
 
-  --card: oklch(1 0 0);                  /* pure white surface */
-  --card-foreground: oklch(0.235 0.006 75);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.013 255);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.006 75);
+  --popover-foreground: oklch(0.205 0.013 255);
 
-  /* Primary = brand honey-gold, rationed to the single primary action + accents. */
-  --primary: oklch(0.82 0.145 86);
-  --primary-foreground: oklch(0.235 0.012 70);
-  /* Deep honey for accent TEXT — legible on light where --primary is too pale. */
-  --accent-ink: oklch(0.585 0.13 74);
+  /* Single sharp amber signal, rationed to the primary action + emphasis. */
+  --primary: oklch(0.74 0.152 72);
+  --primary-foreground: oklch(0.20 0.02 68);
+  --accent-ink: oklch(0.545 0.14 66);      /* deep amber for accent TEXT */
 
-  --secondary: oklch(0.965 0.003 95);    /* one neutral fill */
-  --secondary-foreground: oklch(0.30 0.006 75);
+  --secondary: oklch(0.955 0.004 255);
+  --secondary-foreground: oklch(0.30 0.012 255);
 
-  --muted: oklch(0.965 0.003 95);
-  --muted-foreground: oklch(0.55 0.008 75);
+  --muted: oklch(0.955 0.004 255);
+  --muted-foreground: oklch(0.505 0.013 255);
 
-  --accent: oklch(0.955 0.004 95);       /* neutral hover surface (de-yellowed) */
-  --accent-foreground: oklch(0.235 0.006 75);
+  --accent: oklch(0.945 0.005 255);
+  --accent-foreground: oklch(0.205 0.013 255);
 
-  --destructive: oklch(0.585 0.18 27);
-  --destructive-foreground: oklch(0.99 0.005 95);
+  --destructive: oklch(0.58 0.19 27);
+  --destructive-foreground: oklch(0.99 0.005 250);
 
-  --border: oklch(0 0 0 / 0.07);         /* true black-7% hairline */
-  --input: oklch(0 0 0 / 0.10);
-  --ring: oklch(0.80 0.13 92);           /* yellow focus ring */
+  --border: oklch(0.22 0.03 255 / 0.12);   /* crisp cool hairline */
+  --input: oklch(0.22 0.03 255 / 0.16);
+  --ring: oklch(0.74 0.152 72);
 
-  /* Depth — warm-tinted, low. Elevated surfaces use these instead of relying
-     on hairlines alone, which is what made every card read the same. */
-  --shadow-card: 0 1px 2px oklch(0.28 0.02 70 / 0.05), 0 4px 12px -4px oklch(0.28 0.02 70 / 0.07);
-  --shadow-lift: 0 2px 6px oklch(0.28 0.02 70 / 0.06), 0 18px 40px -14px oklch(0.28 0.02 70 / 0.16);
-  /* Faint warm paper texture layered under the page (set on body). */
-  --page-glow: radial-gradient(115% 90% at 50% -10%, oklch(0.9 0.05 88 / 0.5), transparent 60%);
+  --shadow-card: 0 1px 2px oklch(0.2 0.02 255 / 0.05), 0 2px 6px -2px oklch(0.2 0.02 255 / 0.06);
+  --shadow-lift: 0 2px 6px oklch(0.2 0.02 255 / 0.06), 0 14px 30px -12px oklch(0.2 0.02 255 / 0.14);
+  --glow-accent: 0 0 0 1px oklch(0.74 0.152 72 / 0.35), 0 8px 22px -8px oklch(0.74 0.152 72 / 0.30);
 
-  /* Chart palette — yellow lead, then calm complements. */
-  --chart-1: oklch(0.78 0.13 92);
-  --chart-2: oklch(0.55 0.13 250);
-  --chart-3: oklch(0.6 0.14 150);
-  --chart-4: oklch(0.6 0.2 20);
-  --chart-5: oklch(0.58 0.16 300);
+  /* Faint technical grid behind the page (instrument panel), set on body. */
+  --page-fx: linear-gradient(oklch(0.2 0.03 255 / 0.03) 1px, transparent 1px), linear-gradient(90deg, oklch(0.2 0.03 255 / 0.03) 1px, transparent 1px);
+  --page-fx-size: 34px 34px;
 
-  /* Sidebar = page tone so content cards are the only white. */
-  --sidebar: oklch(0.980 0.003 95);
-  --sidebar-foreground: oklch(0.235 0.006 75);
-  --sidebar-primary: oklch(0.845 0.128 92);
-  --sidebar-primary-foreground: oklch(0.235 0.006 75);
-  --sidebar-accent: oklch(0.955 0.004 95);
-  --sidebar-accent-foreground: oklch(0.235 0.006 75);
-  --sidebar-border: oklch(0 0 0 / 0.07);
-  --sidebar-ring: oklch(0.80 0.13 92);
+  --chart-1: oklch(0.74 0.152 72);   /* amber */
+  --chart-2: oklch(0.6 0.12 220);    /* cool cyan-blue */
+  --chart-3: oklch(0.6 0.14 155);    /* green */
+  --chart-4: oklch(0.6 0.2 22);      /* red */
+  --chart-5: oklch(0.58 0.14 285);   /* violet */
+
+  --sidebar: oklch(0.984 0.002 250);
+  --sidebar-foreground: oklch(0.205 0.013 255);
+  --sidebar-primary: oklch(0.74 0.152 72);
+  --sidebar-primary-foreground: oklch(0.20 0.02 68);
+  --sidebar-accent: oklch(0.945 0.005 255);
+  --sidebar-accent-foreground: oklch(0.205 0.013 255);
+  --sidebar-border: oklch(0.22 0.03 255 / 0.12);
+  --sidebar-ring: oklch(0.74 0.152 72);
 }
 
-/* Dark — the DEFAULT look. Near-black showcase-card aesthetic: deep
-   neutral background, slightly lifted cards with hairline borders,
-   brand yellow as the single accent. */
+/* Dark — the DEFAULT. Clinical instrument: deep cool near-black, lifted
+   panels, crisp bright hairlines, a single sharp amber signal, mono data. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  /* Same airy Things-3 structure on a dark skin: near-black page, surfaces
-     lifted clearly above it, white hairline borders, off-white text. */
-  --background: oklch(0.185 0.004 75);
-  --foreground: oklch(0.945 0.004 90);
+  --background: oklch(0.165 0.006 255);
+  --foreground: oklch(0.955 0.005 250);
 
-  --card: oklch(0.235 0.005 75);
-  --card-foreground: oklch(0.945 0.004 90);
-  --popover: oklch(0.235 0.005 75);
-  --popover-foreground: oklch(0.945 0.004 90);
+  --card: oklch(0.205 0.007 255);
+  --card-foreground: oklch(0.955 0.005 250);
+  --popover: oklch(0.215 0.008 255);
+  --popover-foreground: oklch(0.955 0.005 250);
 
-  --primary: oklch(0.85 0.15 90);
-  --primary-foreground: oklch(0.235 0.02 80);
-  --accent-ink: oklch(0.86 0.15 92);
+  --primary: oklch(0.82 0.155 78);
+  --primary-foreground: oklch(0.19 0.03 68);
+  --accent-ink: oklch(0.84 0.155 80);
 
-  --secondary: oklch(0.275 0.005 75);
-  --secondary-foreground: oklch(0.945 0.004 90);
+  --secondary: oklch(0.255 0.008 255);
+  --secondary-foreground: oklch(0.955 0.005 250);
 
-  --muted: oklch(0.275 0.005 75);
-  --muted-foreground: oklch(0.72 0.006 80);
+  --muted: oklch(0.255 0.008 255);
+  --muted-foreground: oklch(0.685 0.012 255);
 
-  --accent: oklch(0.30 0.005 75);
-  --accent-foreground: oklch(0.945 0.004 90);
+  --accent: oklch(0.285 0.009 255);
+  --accent-foreground: oklch(0.955 0.005 250);
 
-  --destructive: oklch(0.62 0.17 25);
-  --destructive-foreground: oklch(0.98 0.005 95);
+  --destructive: oklch(0.65 0.19 26);
+  --destructive-foreground: oklch(0.98 0.005 250);
 
-  --border: oklch(1 0 0 / 0.08);
-  --input: oklch(1 0 0 / 0.10);
-  --ring: oklch(0.80 0.13 92);
+  --border: oklch(1 0 0 / 0.10);
+  --input: oklch(1 0 0 / 0.14);
+  --ring: oklch(0.82 0.155 78);
 
-  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.35), 0 4px 14px -6px oklch(0 0 0 / 0.4);
-  --shadow-lift: 0 2px 8px oklch(0 0 0 / 0.4), 0 22px 46px -16px oklch(0 0 0 / 0.62);
-  --page-glow: radial-gradient(120% 95% at 50% -12%, oklch(0.5 0.06 90 / 0.16), transparent 58%);
+  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.4), 0 4px 14px -6px oklch(0 0 0 / 0.5);
+  --shadow-lift: 0 2px 10px oklch(0 0 0 / 0.5), 0 24px 50px -18px oklch(0 0 0 / 0.7);
+  --glow-accent: 0 0 0 1px oklch(0.82 0.155 78 / 0.4), 0 0 26px -6px oklch(0.82 0.155 78 / 0.4);
 
-  --chart-1: oklch(0.85 0.145 92);
-  --chart-2: oklch(0.65 0.13 250);
-  --chart-3: oklch(0.68 0.14 150);
-  --chart-4: oklch(0.66 0.2 20);
-  --chart-5: oklch(0.66 0.16 300);
+  --page-fx: linear-gradient(oklch(1 0 0 / 0.022) 1px, transparent 1px), linear-gradient(90deg, oklch(1 0 0 / 0.022) 1px, transparent 1px);
+  --page-fx-size: 34px 34px;
 
-  --sidebar: oklch(0.180 0.004 75);
-  --sidebar-foreground: oklch(0.945 0.004 90);
-  --sidebar-primary: oklch(0.85 0.145 92);
-  --sidebar-primary-foreground: oklch(0.235 0.02 80);
-  --sidebar-accent: oklch(0.30 0.005 75);
-  --sidebar-accent-foreground: oklch(0.945 0.004 90);
-  --sidebar-border: oklch(1 0 0 / 0.08);
-  --sidebar-ring: oklch(0.80 0.13 92);
+  --chart-1: oklch(0.82 0.155 78);   /* amber */
+  --chart-2: oklch(0.7 0.12 220);    /* cyan-blue */
+  --chart-3: oklch(0.72 0.14 158);   /* green */
+  --chart-4: oklch(0.68 0.2 22);     /* red */
+  --chart-5: oklch(0.68 0.14 285);   /* violet */
+
+  --sidebar: oklch(0.165 0.006 255);
+  --sidebar-foreground: oklch(0.955 0.005 250);
+  --sidebar-primary: oklch(0.82 0.155 78);
+  --sidebar-primary-foreground: oklch(0.19 0.03 68);
+  --sidebar-accent: oklch(0.285 0.009 255);
+  --sidebar-accent-foreground: oklch(0.955 0.005 250);
+  --sidebar-border: oklch(1 0 0 / 0.10);
+  --sidebar-ring: oklch(0.82 0.155 78);
 }
 
 @theme inline {
@@ -173,16 +172,15 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Differentiated radius language: chips 6, controls/nav 10, panels 14,
-     hero/primary surfaces 18 — no longer one value on everything. */
-  --radius-sm: 0.375rem;   /* 6px  — chips / badges */
-  --radius-md: 0.625rem;   /* 10px — buttons, inputs, nav/row tint */
-  --radius-lg: 0.75rem;    /* 12px */
-  --radius-xl: 0.875rem;   /* 14px — panels, cards, dialog, sheet */
-  --radius-2xl: 1.125rem;  /* 18px — hero / primary surfaces */
+  /* Crisp instrument radii — precise corners, not soft pillows. */
+  --radius-sm: 0.25rem;    /* 4px  — chips / badges */
+  --radius-md: 0.375rem;   /* 6px  — buttons, inputs, nav/row tint */
+  --radius-lg: 0.5rem;     /* 8px */
+  --radius-xl: 0.625rem;   /* 10px — panels, cards, dialog, sheet */
+  --radius-2xl: 0.75rem;   /* 12px — hero / primary surfaces */
 
   --font-sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: "Clash Display", "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -193,26 +191,16 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
-    background-image: var(--page-glow);
-    background-attachment: fixed;
-    background-repeat: no-repeat;
+    /* Faint technical gridlines — instrument panel, not flat single fill.
+       (No fixed attachment — it janks on iOS Safari; the grid scrolls.) */
+    background-image: var(--page-fx);
+    background-size: var(--page-fx-size);
+    background-position: center top;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  /* Faint paper grain over the whole page — real texture instead of a flat
-     single fill. Behind content (z-index -1), non-interactive, honours reduced
-     transparency by simply being very low opacity. */
-  body::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    opacity: 0.035;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-  /* Headlines: Clash Display, tight display tracking. Hierarchy now comes from
-     a real display face + scale, not just weight. */
+  /* Headlines: tight grotesk. Hierarchy comes from scale + weight + the mono
+     data faces, kept precise. */
   h1, h2, h3 {
     font-family: var(--font-display);
     font-weight: 600;

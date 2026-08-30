@@ -27,7 +27,7 @@ export function PanelCard({
   return (
     <motion.div
       {...revealProps(reduce)}
-      className={cn('rounded-xl border border-border/70 bg-card p-6 shadow-[var(--shadow-card)]', className)}
+      className={cn('rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]', className)}
     >
       {(title || action) && (
         <div className="mb-4 flex items-start justify-between gap-3">

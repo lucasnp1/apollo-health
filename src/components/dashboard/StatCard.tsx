@@ -50,7 +50,7 @@ export function StatCard({
   return (
     <motion.div
       {...revealProps(reduce)}
-      className={cn('flex items-center gap-3 rounded-xl border border-border/70 bg-card px-5 py-4 shadow-[var(--shadow-card)] md:gap-4', className)}
+      className={cn('flex items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-[var(--shadow-card)] md:gap-4', className)}
     >
       <span className={cn('grid size-9 shrink-0 place-items-center rounded-lg md:size-10', TONE_CIRCLE[tone])}>
         <Icon className="size-4 md:size-[18px]" />

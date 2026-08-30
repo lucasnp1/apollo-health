@@ -11,14 +11,13 @@ function applyTheme(t: Theme) {
   document.documentElement.setAttribute('data-theme', t)
 }
 
-// Apply synchronously before React paint. Light (Things-3 style) is the
-// DEFAULT — only an explicit 'dark' preference opts out. Always set the
-// attribute explicitly so an opted-in dark preference actually activates.
+// Apply synchronously before React paint. Dark (the clinical-instrument look)
+// is the DEFAULT — only an explicit 'light' preference opts out.
 const saved = localStorage.getItem(STORAGE_KEY) as Theme | null
-applyTheme(saved === 'dark' ? 'dark' : 'light')
+applyTheme(saved === 'light' ? 'light' : 'dark')
 
 export function getTheme(): Theme {
-  return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'light'
+  return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'dark'
 }
 
 export function setTheme(t: Theme) {
@@ -38,23 +37,20 @@ export function toggleTheme() {
  */
 export function getChartColors(dark: boolean) {
   return {
-    // Warm faint grid — sits on cream surface in light mode, on warm
-    // brown-black in dark mode.
-    grid:          dark ? 'rgba(244,201,92,0.10)' : 'rgba(26,22,16,0.08)',
-    tick:          dark ? 'rgba(253,250,240,0.50)' : 'rgba(26,22,16,0.55)',
-    // Tooltip: matches surface tokens, warm hairline border
-    tooltipBg:     dark ? '#1f1a14' : '#fffcf5',
-    tooltipBorder: dark ? 'rgba(244,201,92,0.24)' : 'rgba(26,22,16,0.12)',
-    tooltipText:   dark ? '#fdfaf0' : '#1a1611',
-    // Primary chart stroke: deep warm ink (matches logo line art). The
-    // yellow accent is reserved for fills + emphasis, since a yellow
-    // line on cream is illegible.
-    accent:        dark ? '#fdfaf0' : '#1a1611',
-    // Accent fill used for area gradients — yellow that reads on cream.
-    accentFill:    dark ? '#f4c95c' : '#f4c95c',
-    good:          dark ? '#3eb874' : '#2f8b54',
-    warn:          dark ? '#e8a534' : '#c5821e',
-    bad:           dark ? '#e5594b' : '#c43c2f',
+    // Cool faint gridlines on the instrument surface.
+    grid:          dark ? 'rgba(255,255,255,0.07)' : 'rgba(20,24,33,0.08)',
+    tick:          dark ? 'rgba(233,237,245,0.50)' : 'rgba(20,24,33,0.55)',
+    // Tooltip: matches the cool near-black panel + amber hairline.
+    tooltipBg:     dark ? '#1c1f27' : '#ffffff',
+    tooltipBorder: dark ? 'rgba(245,176,66,0.28)' : 'rgba(20,24,33,0.12)',
+    tooltipText:   dark ? '#eef1f6' : '#141821',
+    // Primary chart stroke: high-contrast ink so lines read on either ground.
+    accent:        dark ? '#eef1f6' : '#141821',
+    // Amber signal for area fills + emphasis.
+    accentFill:    '#f5b042',
+    good:          dark ? '#3ecf8e' : '#0f9d63',
+    warn:          dark ? '#f5b042' : '#b26a05',
+    bad:           dark ? '#f26b5e' : '#d23b30',
   }
 }
 

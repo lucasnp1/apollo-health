@@ -41,8 +41,10 @@ function LaunchCard({ card, onNavigate, delay = 0 }: { card: LaunchItem; onNavig
         whileTap={reduce ? undefined : { scale: 0.98 }}
         transition={spring}
         className={cn(
-          'group flex h-full min-h-[132px] w-full flex-col items-start gap-3 rounded-2xl border p-5 text-left shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-lift)] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-          card.primary ? 'border-primary/35 bg-primary/[0.06]' : 'border-border/70 bg-card',
+          'group flex h-full min-h-[132px] w-full flex-col items-start gap-3 rounded-2xl border p-5 text-left transition-shadow focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+          card.primary
+            ? 'border-primary/45 bg-primary/[0.07] shadow-[var(--glow-accent)] hover:shadow-[var(--shadow-lift)]'
+            : 'border-border bg-card shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-lift)]',
         )}
       >
         <span className={cn('grid size-11 shrink-0 place-items-center rounded-xl transition-transform duration-200 group-hover:scale-105', card.chip)}>
@@ -81,8 +83,8 @@ function MiniSpark({ values, className }: { values: number[]; className?: string
 function MiniStat({ label, delay, children }: { label: string; delay: number; children: React.ReactNode }) {
   return (
     <Reveal delay={delay} className="min-w-0">
-      <div className="h-full rounded-xl border border-border/70 bg-card p-4 shadow-[var(--shadow-card)]">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="h-full rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
         {children}
       </div>
     </Reveal>
@@ -159,14 +161,14 @@ export function Overview({
       {/* Greeting hero */}
       <Reveal>
         <div className="pt-1">
-          <p className="text-[13px] font-medium text-muted-foreground">{today}</p>
-          <h1 className="mt-1 font-display text-3xl font-semibold tracking-[-0.02em] text-foreground sm:text-[34px]">{greeting}</h1>
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{today}</p>
+          <h1 className="mt-1.5 font-display text-3xl font-semibold tracking-[-0.02em] text-foreground sm:text-[34px]">{greeting}</h1>
         </div>
       </Reveal>
 
       {/* Launcher */}
       <div>
-        <p className="mb-3 px-0.5 text-[13px] font-medium text-muted-foreground">Add to your log</p>
+        <p className="mb-3 px-0.5 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Add to your log</p>
         <div className="grid grid-cols-2 gap-4">
           {CARDS.map((c, i) => (
             <LaunchCard key={c.view} card={c} onNavigate={onNavigate} delay={0.04 * i} />
@@ -233,7 +235,7 @@ export function Overview({
 
       {/* Navigation launcher — replaces the sidebar */}
       <div>
-        <p className="mb-3 px-0.5 text-[13px] font-medium text-muted-foreground">More</p>
+        <p className="mb-3 px-0.5 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">More</p>
         <div className="grid grid-cols-2 gap-4">
           {BOTTOM_CARDS.map((c, i) => (
             <LaunchCard key={c.view} card={c} onNavigate={onNavigate} delay={0.04 * i} />

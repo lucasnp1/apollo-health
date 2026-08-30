@@ -30,7 +30,7 @@ export function ChartCard({
   return (
     <motion.div
       {...revealProps(reduce)}
-      className={cn('flex flex-col rounded-xl border border-border/70 bg-card p-6 shadow-[var(--shadow-card)]', className)}
+      className={cn('flex flex-col rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]', className)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
