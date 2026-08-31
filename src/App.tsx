@@ -15,6 +15,7 @@ import { ToastProvider, useToast } from './lib/toast'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { InstallPrompt } from './components/InstallPrompt'
+import { Onboarding, ONBOARDED_KEY } from './components/Onboarding'
 // Modals / add-pages are lazy — only loaded when first opened
 const ExportSheet      = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportSheet })))
 const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
@@ -37,6 +38,10 @@ import './index.css'
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
   const auth = useAuth()
+  // First-run onboarding is per-device: show it once until dismissed/completed.
+  const [onboardingDone, setOnboardingDone] = useState(() => {
+    try { return localStorage.getItem(ONBOARDED_KEY) === '1' } catch { return true }
+  })
 
   useEffect(() => {
     if (auth.state.status !== 'loading') {
@@ -60,8 +65,8 @@ function App() {
     )
   }
 
-  // 'local' = user explicitly chose local-only mode — show full app, no sync
-  // 'authed' = signed in — show full app with sync
+  // Only 'authed' reaches Shell now — an account is required, so every user's
+  // data syncs to the server (local-first, but always backed up).
 
   return (
     <ToastProvider>
@@ -70,6 +75,7 @@ function App() {
         setActiveView={setActiveView}
         auth={auth}
       />
+      {!onboardingDone && <Onboarding onDone={() => setOnboardingDone(true)} />}
     </ToastProvider>
   )
 }
@@ -86,8 +92,11 @@ function Shell({
   auth: AuthBundle
 }) {
   const isAuthed = auth.state.status === 'authed'
-  // local-only users see no sync UI, but the same Shell
   const sync = useSync(isAuthed)
+
+  // Ask the browser to keep our IndexedDB from being evicted under storage
+  // pressure (matters most on iOS). Best-effort, prompts on no supported browser.
+  useEffect(() => { void navigator.storage?.persist?.() }, [])
 
   const [labAddOpen, setLabAddOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)

@@ -1,55 +1,19 @@
-// One-time install hint shown to first-time mobile/web visitors who haven't
-// added the PWA to their home screen yet.
-//
-// iOS Safari can't programmatically install — only show instructions.
-// Android Chrome fires beforeinstallprompt, which we capture and use for a
-// one-tap install button.
+// Ongoing reminder banner for users who haven't added the PWA to their home
+// screen yet. The first-run flow lives in Onboarding.tsx; this is the gentle
+// nudge afterwards. Capture + platform detection are shared via useInstallPrompt.
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Share, Smartphone, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useInstallPrompt } from '../lib/useInstallPrompt'
 
 const DISMISSED_KEY = 'apollo.installPrompt.dismissed'
 
-type Platform = 'ios' | 'android' | 'desktop' | 'unknown'
-
-function detectPlatform(): Platform {
-  const ua = navigator.userAgent
-  if (/iPhone|iPad|iPod/i.test(ua)) return 'ios'
-  if (/Android/i.test(ua)) return 'android'
-  if (/(Macintosh|Windows|Linux)/i.test(ua)) return 'desktop'
-  return 'unknown'
-}
-
-function isStandalone(): boolean {
-  return (
-    window.matchMedia?.('(display-mode: standalone)').matches ||
-    // iOS Safari proprietary flag
-    (navigator as unknown as { standalone?: boolean }).standalone === true
-  )
-}
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
-}
-
 export function InstallPrompt() {
-  const [platform] = useState<Platform>(() => detectPlatform())
-  const [installed] = useState<boolean>(() => isStandalone())
+  const { platform, standalone, canInstall, promptInstall } = useInstallPrompt()
   const [dismissed, setDismissed] = useState<boolean>(() => localStorage.getItem(DISMISSED_KEY) === '1')
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 
-  useEffect(() => {
-    const handler = (event: Event) => {
-      event.preventDefault()
-      setDeferredPrompt(event as BeforeInstallPromptEvent)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
-
-  if (installed) return null
+  if (standalone) return null
   if (dismissed) return null
   if (platform === 'desktop' || platform === 'unknown') return null
 
@@ -59,10 +23,8 @@ export function InstallPrompt() {
   }
 
   async function install() {
-    if (!deferredPrompt) return
-    await deferredPrompt.prompt()
-    const result = await deferredPrompt.userChoice
-    if (result.outcome === 'accepted') dismiss()
+    const accepted = await promptInstall()
+    if (accepted) dismiss()
   }
 
   return (
@@ -83,7 +45,7 @@ export function InstallPrompt() {
           <span className="mt-0.5 block text-[11px] text-muted-foreground">Tap install to add it as an app. It works offline.</span>
         )}
       </div>
-      {deferredPrompt && (
+      {canInstall && (
         <Button size="sm" className="h-8 shrink-0" onClick={install}>
           Install
         </Button>

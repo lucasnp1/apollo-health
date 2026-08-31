@@ -4,7 +4,6 @@ import { api, type ApiUser, type LoginPayload, type SignupPayload } from './api'
 export type AuthState =
   | { status: 'loading' }
   | { status: 'guest' }     // unauthenticated, sign-in screen shown
-  | { status: 'local' }     // user explicitly chose local-only mode
   | { status: 'authed'; user: ApiUser }
 
 export function useAuth() {
@@ -15,9 +14,14 @@ export function useAuth() {
   useEffect(() => {
     if (fetched.current) return
     fetched.current = true
-    // Restore local-only preference across page reloads
-    if (localStorage.getItem('apollo-local-mode') === '1') {
-      setState({ status: 'local' })
+    // An account is required. Legacy local-only sessions fall through to the
+    // sign-in screen; their on-device data stays in IndexedDB and backfills up
+    // to the account on first sync (see runBackfillOnce in sync.ts).
+    localStorage.removeItem('apollo-local-mode')
+    // DEV ONLY: the dev server has no backend, so set localStorage
+    // apollo-dev-authed=1 to enter the app for UI work. Stripped from prod builds.
+    if (import.meta.env.DEV && localStorage.getItem('apollo-dev-authed') === '1') {
+      setState({ status: 'authed', user: { id: 'dev-user', email: 'dev@local', is_admin: 0, display_name: 'Dev' } })
       return
     }
     void (async () => {
@@ -58,15 +62,9 @@ export function useAuth() {
     try {
       await api.post('/api/auth/logout')
     } finally {
-      localStorage.removeItem('apollo-local-mode')
       setState({ status: 'guest' })
     }
   }, [])
 
-  const continueAsGuest = useCallback(() => {
-    localStorage.setItem('apollo-local-mode', '1')
-    setState({ status: 'local' })
-  }, [])
-
-  return { state, error, login, signup, logout, continueAsGuest }
+  return { state, error, login, signup, logout }
 }

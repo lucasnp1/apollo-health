@@ -1,14 +1,25 @@
 import { useState } from 'react'
-import { KeyRound, LogIn, UserPlus } from 'lucide-react'
+import { Check, LogIn, UserPlus } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Reveal } from '../components/motion'
+import { cn } from '@/lib/utils'
 import type { useAuth } from '../lib/useAuth'
 
 type AuthBundle = ReturnType<typeof useAuth>
+
+// Live password requirement (mirrors the server rule in functions/api/auth/signup.ts)
+function Req({ ok, children }: { ok: boolean; children: React.ReactNode }) {
+  return (
+    <li className={cn('flex items-center gap-1.5 transition-colors', ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
+      <Check className={cn('size-3 shrink-0', ok ? 'opacity-100' : 'opacity-30')} />
+      {children}
+    </li>
+  )
+}
 
 export function SignIn({ auth }: { auth: AuthBundle }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
@@ -18,13 +29,16 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
   const [displayName, setDisplayName] = useState('')
   const [busy, setBusy] = useState(false)
 
+  const lenOk = password.length >= 10
+  const caseOk = /[a-z]/.test(password) && /[A-Z]/.test(password)
+  const numOk = /\d/.test(password)
+  const mismatch = confirm.length > 0 && password !== confirm
+  const signupReady = lenOk && caseOk && numOk && password === confirm && email.includes('@')
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (busy) return
-    if (mode === 'signup' && password !== confirm) {
-      alert('Passwords do not match')
-      return
-    }
+    if (mode === 'signup' && !signupReady) return
     setBusy(true)
     try {
       if (mode === 'login') {
@@ -47,7 +61,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
           <div>
             <h1 className="font-display text-2xl font-semibold leading-none">Apollo Health</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">
-              {mode === 'login' ? 'Sign in to sync across devices.' : 'Create a free account.'}
+              {mode === 'login' ? 'Sign in to sync across devices.' : 'Create a free account to back up your data.'}
             </p>
           </div>
         </div>
@@ -70,7 +84,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
             <Input
               id="password"
               type="password"
-              placeholder={mode === 'login' ? 'Password' : 'Password (10+ chars, mixed case, a number)'}
+              placeholder="Password"
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               minLength={mode === 'signup' ? 10 : 8}
               required
@@ -81,9 +95,15 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
 
           {mode === 'signup' && (
             <>
+              <ul className="-mt-0.5 flex flex-col gap-1 px-0.5 text-[11px]">
+                <Req ok={lenOk}>At least 10 characters</Req>
+                <Req ok={caseOk}>Upper and lowercase letters</Req>
+                <Req ok={numOk}>A number</Req>
+              </ul>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="confirm" className="sr-only">Confirm password</Label>
-                <Input id="confirm" type="password" placeholder="Confirm password" autoComplete="new-password" minLength={10} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                <Input id="confirm" type="password" placeholder="Confirm password" autoComplete="new-password" aria-invalid={mismatch} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                {mismatch && <p className="px-0.5 text-[11px] text-destructive">Passwords don't match.</p>}
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="display" className="sr-only">Display name</Label>
@@ -94,25 +114,16 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
 
           {auth.error && <p className="text-sm text-destructive">{auth.error}</p>}
 
-          <Button type="submit" disabled={busy} className="w-full">
+          <Button type="submit" disabled={busy || (mode === 'signup' && !signupReady)} className="w-full">
             {mode === 'login' ? <LogIn className="size-4" /> : <UserPlus className="size-4" />}
             {busy ? 'Working…' : mode === 'login' ? 'Sign in' : 'Create account'}
           </Button>
         </form>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="mt-3 w-full text-muted-foreground"
-          onClick={() => auth.continueAsGuest()}
-        >
-          <KeyRound className="size-3.5" />
-          Continue without an account (local-only)
-        </Button>
-
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-          Data syncs to your account on Cloudflare over HTTPS. No third-party trackers or analytics.
+          {mode === 'signup'
+            ? 'Your data is backed up to your private account. Anything already saved on this device is kept and backed up too. No third-party trackers or analytics.'
+            : 'Data syncs to your account on Cloudflare over HTTPS. No third-party trackers or analytics.'}
         </p>
       </div>
       </Reveal>
