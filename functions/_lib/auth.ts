@@ -2,6 +2,7 @@
 
 import type { AuthedUser, Env } from './types'
 import { sha256Hex } from './crypto'
+import { isProUser } from './stripe'
 
 const COOKIE_NAME = 'apollo_session'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -31,12 +32,12 @@ export async function readSession(env: Env, request: Request): Promise<AuthedUse
 
   const row = await env.DB
     .prepare(
-      `SELECT u.id, u.email, u.is_admin, u.display_name, s.expires_at
+      `SELECT u.id, u.email, u.is_admin, u.display_name, u.plan, u.plan_kind, u.plan_until, s.expires_at
        FROM sessions s JOIN users u ON s.user_id = u.id
        WHERE s.token = ?`,
     )
     .bind(token)
-    .first<{ id: string; email: string; is_admin: number; display_name: string | null; expires_at: number }>()
+    .first<{ id: string; email: string; is_admin: number; display_name: string | null; plan: string | null; plan_kind: string | null; plan_until: number | null; expires_at: number }>()
 
   if (!row) return null
   if (row.expires_at < Date.now()) {
@@ -45,7 +46,16 @@ export async function readSession(env: Env, request: Request): Promise<AuthedUse
     return null
   }
 
-  return { id: row.id, email: row.email, is_admin: row.is_admin, display_name: row.display_name }
+  return {
+    id: row.id,
+    email: row.email,
+    is_admin: row.is_admin,
+    display_name: row.display_name,
+    plan: row.plan ?? 'free',
+    plan_kind: row.plan_kind,
+    plan_until: row.plan_until,
+    is_pro: isProUser(env, row),
+  }
 }
 
 export async function requireUser(env: Env, request: Request): Promise<{ user: AuthedUser } | Response> {

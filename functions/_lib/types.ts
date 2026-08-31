@@ -3,6 +3,15 @@
 export type Env = {
   DB: D1Database
   FILES?: R2Bucket // optional until the bucket binding is configured.
+  // Billing (Stripe). All optional; gating is off until BILLING_ENABLED === '1'
+  // and STRIPE_SECRET_KEY is set. Add these as Cloudflare Pages secrets.
+  BILLING_ENABLED?: string
+  STRIPE_SECRET_KEY?: string
+  STRIPE_WEBHOOK_SECRET?: string
+  STRIPE_PRICE_MONTHLY?: string
+  STRIPE_PRICE_YEARLY?: string
+  STRIPE_PRICE_LIFETIME?: string
+  APP_URL?: string // e.g. https://apollo-hq.pages.dev (checkout return URLs)
 }
 
 // Minimal R2Bucket interface — avoids needing @cloudflare/workers-types here.
@@ -37,6 +46,11 @@ export type AuthedUser = {
   email: string
   is_admin: number
   display_name: string | null
+  // Billing (populated by readSession). is_pro is the effective gate.
+  plan?: string
+  plan_kind?: string | null
+  plan_until?: number | null
+  is_pro?: boolean
 }
 
 // PagesFunction handler type (matches Cloudflare's @cloudflare/workers-types).

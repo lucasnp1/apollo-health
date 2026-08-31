@@ -66,5 +66,24 @@ export function useAuth() {
     }
   }, [])
 
-  return { state, error, login, signup, logout }
+  // Re-fetch the account (e.g. after returning from Stripe checkout) so a plan
+  // change is reflected without a full reload.
+  const refresh = useCallback(async () => {
+    try {
+      const me = await api.get<{ user: ApiUser | null }>('/api/auth/me')
+      if (me.user) setState({ status: 'authed', user: me.user })
+    } catch { /* ignore */ }
+  }, [])
+
+  // Effective Pro gate. Defaults to true when the field is absent (billing off
+  // or an old server) so we never lock users out on a glitch. DEV can force the
+  // free experience to preview paywalls.
+  const isPro =
+    state.status === 'authed'
+      ? import.meta.env.DEV && localStorage.getItem('apollo-dev-free') === '1'
+        ? false
+        : state.user.is_pro ?? true
+      : false
+
+  return { state, error, login, signup, logout, refresh, isPro }
 }

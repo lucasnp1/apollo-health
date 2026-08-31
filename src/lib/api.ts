@@ -5,6 +5,11 @@ export type ApiUser = {
   email: string
   is_admin: number
   display_name: string | null
+  // Billing — populated by the server. is_pro is the effective gate.
+  plan?: 'free' | 'pro'
+  plan_kind?: 'monthly' | 'yearly' | 'lifetime' | null
+  plan_until?: number | null
+  is_pro?: boolean
 }
 
 export class ApiError extends Error {

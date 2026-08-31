@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
-  Edit2, FileText, FlaskConical, Plus, Trash2, X,
+  Edit2, FileText, FlaskConical, Lock, Plus, Sparkles, Trash2, X,
 } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
@@ -12,6 +12,7 @@ import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
 import { LabComposites } from '../components/LabComposites'
+import { usePlan } from '../lib/plan'
 import { DashGrid, StatRow } from '../components/dashboard/Grid'
 import { StatCard } from '../components/dashboard/StatCard'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
@@ -310,6 +311,29 @@ function MarkerHistoryPane({
   )
 }
 
+// Locked stand-in for the Composites card when the user isn't on Pro.
+function ProCompositesTeaser({ onUpgrade }: { onUpgrade: () => void }) {
+  return (
+    <PanelCard
+      title="Composites"
+      subtitle="Smart analysis"
+      action={<Badge variant="secondary" className="bg-primary/12 text-primary">Pro</Badge>}
+    >
+      <div className="flex flex-col items-center gap-3 py-6 text-center">
+        <span className="grid size-11 place-items-center rounded-xl bg-primary/12 text-primary">
+          <Lock className="size-5" />
+        </span>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          Unlock smart analysis of your bloodwork: heart, hormones, blood, and liver, with plain-language guidance from your latest results.
+        </p>
+        <Button size="sm" onClick={onUpgrade}>
+          <Sparkles className="size-4" /> Unlock with Pro
+        </Button>
+      </div>
+    </PanelCard>
+  )
+}
+
 // ── Main Labs component ────────────────────────────────────────────────────────
 
 export function Labs({
@@ -334,6 +358,7 @@ export function Labs({
   onReviewFile?: (id: number) => void
 }) {
   const deleteWithUndo = useUndoableDelete()
+  const { isPro, openUpgrade } = usePlan()
   const markerTargets = useLiveQuery(() => db.markerTargets.toArray(), [], [])
   const targetByKey   = useMemo(() => new Map((markerTargets ?? []).map(t => [t.marker, t])), [markerTargets])
 
@@ -512,10 +537,14 @@ export function Labs({
       )}
 
       <DashGrid>
-      {/* ── Health composites ── */}
+      {/* ── Health composites (Pro) ── */}
       {hasData && (
         <div className="md:col-span-2 xl:col-span-6">
-          <LabComposites results={results} exams={exams} />
+          {isPro ? (
+            <LabComposites results={results} exams={exams} />
+          ) : (
+            <ProCompositesTeaser onUpgrade={() => openUpgrade('Smart lab analysis')} />
+          )}
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, RotateCcw, Send, Sun, Trash2, Upload, UserCircle } from 'lucide-react'
+import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, RotateCcw, Send, Sparkles, Sun, Trash2, Upload, UserCircle } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -10,6 +10,7 @@ import type { useAuth } from '../lib/useAuth'
 import type { Compound, InjectionLog, LabExam, Protocol, VitalLog } from '../lib/db'
 import { DashGrid } from '../components/dashboard/Grid'
 import { PanelCard } from '../components/dashboard/PanelCard'
+import { usePlan } from '../lib/plan'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -226,27 +227,33 @@ function TrashSettings({ compounds }: { compounds: Compound[] }) {
 
 function AccountSettings({ auth }: { auth: AuthBundle }) {
   const user = auth.state.status === 'authed' ? auth.state.user : null
+  const { isPro, openUpgrade } = usePlan()
+  const planLabel = isPro ? (user?.plan_kind ? `Apollo Pro · ${user.plan_kind}` : 'Apollo Pro') : 'Free plan'
   return (
     <PanelCard
       className="h-full"
       subtitle="Account"
-      title={user ? user.email : 'Guest mode'}
+      title={user?.email ?? 'Account'}
       action={<UserCircle className="size-4 text-muted-foreground" />}
     >
-      {user ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
-            Signed in as <strong className="text-foreground">{user.display_name || user.email}</strong>.
-          </p>
-          <Button variant="outline" size="sm" className="self-start" onClick={() => auth.logout()}>
-            <LogOut className="size-3.5" /> Sign out
-          </Button>
-        </div>
-      ) : (
+      <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
-          You are using local-only mode. Data lives in this browser. Sign in to sync across devices.
+          Signed in as <strong className="text-foreground">{user?.display_name || user?.email}</strong>.
         </p>
-      )}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', isPro ? 'bg-primary/12 text-primary' : 'bg-secondary text-muted-foreground')}>
+            {isPro && <Sparkles className="size-3" />} {planLabel}
+          </span>
+          {!isPro && (
+            <Button size="sm" onClick={() => openUpgrade()}>
+              <Sparkles className="size-3.5" /> Upgrade to Pro
+            </Button>
+          )}
+        </div>
+        <Button variant="outline" size="sm" className="self-start" onClick={() => auth.logout()}>
+          <LogOut className="size-3.5" /> Sign out
+        </Button>
+      </div>
     </PanelCard>
   )
 }
@@ -272,6 +279,7 @@ function AppearanceSettings() {
 }
 
 function NotificationSettings() {
+  const { isPro, openUpgrade } = usePlan()
   const [permission, setPermission] = useState<NotificationPermission>('default')
   const [enabled, setEnabled] = useState(() => localStorage.getItem('apollo-notif') === '1')
 
@@ -302,9 +310,16 @@ function NotificationSettings() {
       className="h-full"
       subtitle="Alerts"
       title="Notifications"
-      action={enabled && !blocked ? <Bell className="size-4 text-muted-foreground" /> : <BellOff className="size-4 text-muted-foreground" />}
+      action={enabled && !blocked && isPro ? <Bell className="size-4 text-muted-foreground" /> : <BellOff className="size-4 text-muted-foreground" />}
     >
-      {blocked ? (
+      {!isPro ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">Get a reminder before each scheduled injection is due.</p>
+          <Button size="sm" className="self-start" onClick={() => openUpgrade('Injection reminders')}>
+            <Sparkles className="size-3.5" /> Unlock with Pro
+          </Button>
+        </div>
+      ) : blocked ? (
         <p className="text-sm text-amber-700 dark:text-amber-400">
           Notifications are blocked in your browser settings. To re-enable, open your browser's site permissions for this page.
         </p>
@@ -344,6 +359,7 @@ function BackupSettings({
   exams?: LabExam[]
   protocols?: Protocol[]
 }) {
+  const { isPro, openUpgrade } = usePlan()
   const [importing, setImporting] = useState(false)
   const [importDone, setImportDone] = useState(false)
 
@@ -379,8 +395,8 @@ function BackupSettings({
               <Upload className="size-3.5" /> {importDone ? 'Imported ✓' : importing ? 'Importing…' : 'Import JSON'}
             </label>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
-            <Printer className="size-3.5" /> Print report
+          <Button variant="outline" size="sm" onClick={() => (isPro ? window.print() : openUpgrade('Print report'))}>
+            <Printer className="size-3.5" /> Print report {!isPro && <Sparkles className="size-3 text-primary" />}
           </Button>
         </div>
       </div>

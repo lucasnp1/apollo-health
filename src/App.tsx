@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Lock,
   Plus,
@@ -16,6 +16,8 @@ import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { InstallPrompt } from './components/InstallPrompt'
 import { Onboarding, ONBOARDED_KEY } from './components/Onboarding'
+import { UpgradeDialog } from './components/UpgradeDialog'
+import { PlanProvider, usePlan } from './lib/plan'
 // Modals / add-pages are lazy — only loaded when first opened
 const ExportSheet      = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportSheet })))
 const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
@@ -42,6 +44,9 @@ function App() {
   const [onboardingDone, setOnboardingDone] = useState(() => {
     try { return localStorage.getItem(ONBOARDED_KEY) === '1' } catch { return true }
   })
+  // Upgrade paywall — opened by any gated Pro feature.
+  const [upgrade, setUpgrade] = useState<{ open: boolean; feature?: string }>({ open: false })
+  const openUpgrade = useCallback((feature?: string) => setUpgrade({ open: true, feature }), [])
 
   useEffect(() => {
     if (auth.state.status !== 'loading') {
@@ -70,11 +75,14 @@ function App() {
 
   return (
     <ToastProvider>
-      <Shell
-        activeView={activeView}
-        setActiveView={setActiveView}
-        auth={auth}
-      />
+      <PlanProvider value={{ isPro: auth.isPro, openUpgrade }}>
+        <Shell
+          activeView={activeView}
+          setActiveView={setActiveView}
+          auth={auth}
+        />
+      </PlanProvider>
+      <UpgradeDialog open={upgrade.open} feature={upgrade.feature} onClose={() => setUpgrade({ open: false })} />
       {!onboardingDone && <Onboarding onDone={() => setOnboardingDone(true)} />}
     </ToastProvider>
   )
@@ -93,6 +101,7 @@ function Shell({
 }) {
   const isAuthed = auth.state.status === 'authed'
   const sync = useSync(isAuthed)
+  const { isPro, openUpgrade } = usePlan()
 
   // Ask the browser to keep our IndexedDB from being evicted under storage
   // pressure (matters most on iOS). Best-effort, prompts on no supported browser.
@@ -106,6 +115,22 @@ function Shell({
   const [pdfParsingName, setPdfParsingName] = useState<string | null>(null)
   const [pdfReviewFileId, setPdfReviewFileId] = useState<number | null>(null)
   const { showToast } = useToast()
+
+  // Returning from Stripe checkout: refresh the plan (webhook may lag a beat)
+  // and strip the query flag from the URL.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('upgraded') === '1') {
+      void auth.refresh()
+      const t = setTimeout(() => void auth.refresh(), 4000)
+      showToast({ message: 'Thanks for upgrading to Pro. Unlocking your features.' })
+      window.history.replaceState({}, '', window.location.pathname)
+      return () => clearTimeout(t)
+    }
+    if (params.get('upgrade_cancelled') === '1') {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [auth.refresh, showToast])
 
   async function handleLabPdfUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -287,19 +312,25 @@ function Shell({
               )
             )}
             {activeView === 'labs' && (
-              <Button variant="ghost" size="icon" onClick={() => setExportOpen(true)} aria-label="Export for doctor" title="Share with doctor">
+              <Button variant="ghost" size="icon" onClick={() => (isPro ? setExportOpen(true) : openUpgrade('Doctor export'))} aria-label="Export for doctor" title="Share with doctor">
                 <Share2 className="size-4" />
               </Button>
             )}
 
             {activeView === 'labs' && (
               <>
-                <Button asChild variant="outline" size="sm">
-                  <label className="cursor-pointer" title="Upload PDF">
-                    <input type="file" accept="application/pdf" hidden onChange={handleLabPdfUpload} />
+                {isPro ? (
+                  <Button asChild variant="outline" size="sm">
+                    <label className="cursor-pointer" title="Upload PDF">
+                      <input type="file" accept="application/pdf" hidden onChange={handleLabPdfUpload} />
+                      <Upload className="size-4" /> <span className="hidden sm:inline">Upload</span>
+                    </label>
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => openUpgrade('Lab PDF import')} title="Upload PDF (Pro)">
                     <Upload className="size-4" /> <span className="hidden sm:inline">Upload</span>
-                  </label>
-                </Button>
+                  </Button>
+                )}
                 <Button size="sm" onClick={() => setLabAddOpen(true)} title="Add result">
                   <Plus className="size-4" /> <span className="hidden sm:inline">Add result</span>
                 </Button>
