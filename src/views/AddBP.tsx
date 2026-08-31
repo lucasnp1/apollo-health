@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { db } from '../lib/db'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,27 @@ export function AddBP({ onBack }: { onBack: () => void }) {
   const [pulse, setPulse] = useState('')
   const [busy, setBusy] = useState(false)
   const kbInset = useKeyboardInset()
+
+  const sysRef = useRef<HTMLInputElement>(null)
+  const diaRef = useRef<HTMLInputElement>(null)
+  const pulseRef = useRef<HTMLInputElement>(null)
+
+  // Open the numeric keyboard the moment the screen appears. Runs in the commit
+  // phase — still inside the tap that navigated here — so iOS honours it.
+  useLayoutEffect(() => { sysRef.current?.focus() }, [])
+
+  // Three digits fills systolic / diastolic → hop to the next field with the
+  // keyboard still up. Pulse is where the flow ends, so it never auto-advances.
+  function handleDigits(
+    raw: string,
+    prev: string,
+    set: (v: string) => void,
+    next?: React.RefObject<HTMLInputElement | null>,
+  ) {
+    const v = raw.replace(/\D/g, '').slice(0, 3)
+    set(v)
+    if (next && v.length === 3 && prev.length < 3) next.current?.focus()
+  }
 
   async function save() {
     if (!sys || !dia) return
@@ -33,15 +54,15 @@ export function AddBP({ onBack }: { onBack: () => void }) {
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="sys">Systolic</Label>
-            <Input id="sys" inputMode="numeric" autoFocus className="text-base" placeholder="120" value={sys} onChange={(e) => setSys(e.target.value)} />
+            <Input id="sys" ref={sysRef} inputMode="numeric" maxLength={3} className="text-base" placeholder="120" value={sys} onChange={(e) => handleDigits(e.target.value, sys, setSys, diaRef)} />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="dia">Diastolic</Label>
-            <Input id="dia" inputMode="numeric" className="text-base" placeholder="80" value={dia} onChange={(e) => setDia(e.target.value)} />
+            <Input id="dia" ref={diaRef} inputMode="numeric" maxLength={3} className="text-base" placeholder="80" value={dia} onChange={(e) => handleDigits(e.target.value, dia, setDia, pulseRef)} />
           </div>
           <div className="col-span-2 flex flex-col gap-1.5">
             <Label htmlFor="pulse">Pulse <span className="font-normal text-muted-foreground">bpm</span></Label>
-            <Input id="pulse" inputMode="numeric" placeholder="65" value={pulse} onChange={(e) => setPulse(e.target.value)} />
+            <Input id="pulse" ref={pulseRef} inputMode="numeric" maxLength={3} className="text-base" placeholder="65" value={pulse} onChange={(e) => handleDigits(e.target.value, pulse, setPulse)} />
           </div>
         </div>
       </section>

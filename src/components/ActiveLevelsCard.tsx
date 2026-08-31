@@ -207,7 +207,7 @@ export function ActiveLevelsCard({
   )
 
   return (
-    <PanelCard title="Active levels" subtitle={legend.length > 0 ? 'Estimated active drug in your system, from every dose logged' : 'Doses you have logged in the last 7 days'}>
+    <PanelCard title="Active levels" subtitle={legend.length > 0 ? 'Estimated active drug on board' : 'Doses logged in the last 7 days'}>
       {legend.length > 0 && (<>
       <ChartContainer config={chartConfig} className="h-[200px] w-full">
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
@@ -240,9 +240,9 @@ export function ActiveLevelsCard({
         </AreaChart>
       </ChartContainer>
 
-      {/* Plain explainer — what the chart actually means */}
-      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-        Each shot spikes your level, then it tapers between doses. Higher = more active drug on board right now.
+      {/* Plain explainer — one line, no lecture */}
+      <p className="mt-1 truncate text-xs text-muted-foreground">
+        Each dose spikes, then tapers between shots.
       </p>
 
       {/* "Active now" — one big number in plain language */}
@@ -285,7 +285,7 @@ export function ActiveLevelsCard({
             size="sm"
             value={totalsView}
             onChange={setTotalsView}
-            options={[{ value: '7d', label: 'Last 7 days' }, { value: 'week', label: 'This week' }]}
+            options={[{ value: '7d', label: '7 days' }, { value: 'week', label: 'This week' }]}
           />
         </div>
         {activeTotals.length > 0 ? (

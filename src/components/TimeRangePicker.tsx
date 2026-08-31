@@ -1,17 +1,9 @@
 import { RANGE_DAYS, type TimeRange } from '../lib/timeRange'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Segmented } from '@/components/ui/segmented'
 
+// Time-range control for the trend charts. Uses the shared Segmented pill so it
+// reads the same as the other on-card toggles (e.g. Active levels).
 export function TimeRangePicker({ value, onChange }: { value: TimeRange; onChange: (next: TimeRange) => void }) {
-  const options = Object.keys(RANGE_DAYS) as TimeRange[]
-  return (
-    <Tabs value={value} onValueChange={(v) => onChange(v as TimeRange)}>
-      <TabsList className="h-8">
-        {options.map((opt) => (
-          <TabsTrigger key={opt} value={opt} className="px-2.5 text-xs">
-            {opt}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
-  )
+  const options = (Object.keys(RANGE_DAYS) as TimeRange[]).map((v) => ({ value: v, label: v }))
+  return <Segmented size="sm" value={value} onChange={onChange} options={options} />
 }

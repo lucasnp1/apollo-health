@@ -22,9 +22,12 @@ import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
 // Overview (the launcher) is eager — everything else is lazy
 import { Overview } from './views/Overview'
+// AddWeight / AddBP are eager (not lazy): mounting them synchronously inside the
+// launcher tap keeps the focus() in the same gesture, so mobile raises the
+// keyboard on open. They're tiny, so the bundle cost is negligible.
+import { AddWeight } from './views/AddWeight'
+import { AddBP } from './views/AddBP'
 const AddInjection = lazy(() => import('./views/AddInjection').then(m => ({ default: m.AddInjection })))
-const AddWeight    = lazy(() => import('./views/AddWeight').then(m => ({ default: m.AddWeight })))
-const AddBP        = lazy(() => import('./views/AddBP').then(m => ({ default: m.AddBP })))
 const Labs      = lazy(() => import('./views/Labs').then(m => ({ default: m.Labs })))
 const Targets   = lazy(() => import('./views/Targets').then(m => ({ default: m.Targets })))
 const Timeline  = lazy(() => import('./views/Timeline').then(m => ({ default: m.Timeline })))

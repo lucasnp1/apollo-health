@@ -32,7 +32,9 @@ export function ChartCard({
       {...revealProps(reduce)}
       className={cn('flex flex-col rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]', className)}
     >
-      <div className="flex items-start justify-between gap-3">
+      {/* On mobile the control drops to its own row so it can never squeeze the
+          title into a wrap; from sm up it sits inline on the right. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <h3 className="text-base font-semibold leading-5 tracking-[-0.01em] text-foreground">{title}</h3>
           {subtitle && <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">{subtitle}</p>}

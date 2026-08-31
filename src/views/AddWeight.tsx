@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
@@ -20,6 +20,11 @@ export function AddWeight({ onBack }: { onBack: () => void }) {
   const [weight, setWeight] = useState('')
   const [busy, setBusy] = useState(false)
   const kbInset = useKeyboardInset()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Open the keyboard as soon as the screen mounts — still inside the tap that
+  // navigated here, so iOS brings it up too.
+  useLayoutEffect(() => { inputRef.current?.focus() }, [])
 
   async function save() {
     if (!weight) return
@@ -37,7 +42,7 @@ export function AddWeight({ onBack }: { onBack: () => void }) {
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="w">Body weight</Label>
           <div className="relative">
-            <Input id="w" inputMode="decimal" autoFocus className="pr-10 text-base" placeholder={last !== undefined ? String(last) : 'e.g. 82.5'} value={weight} onChange={(e) => setWeight(e.target.value)} />
+            <Input id="w" ref={inputRef} inputMode="decimal" className="pr-10 text-base" placeholder={last !== undefined ? String(last) : 'e.g. 82.5'} value={weight} onChange={(e) => setWeight(e.target.value)} />
             <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">kg</span>
           </div>
           {last !== undefined && <p className="text-xs text-muted-foreground">Last logged: {last} kg</p>}

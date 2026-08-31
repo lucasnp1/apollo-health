@@ -83,8 +83,8 @@ function MiniSpark({ values, className }: { values: number[]; className?: string
 function MiniStat({ label, delay, children }: { label: string; delay: number; children: React.ReactNode }) {
   return (
     <Reveal delay={delay} className="min-w-0">
-      <div className="h-full rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <div className="h-full rounded-xl border border-border bg-card p-3.5 shadow-[var(--shadow-card)] sm:p-4">
+        <p className="truncate font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
         {children}
       </div>
     </Reveal>
@@ -178,12 +178,12 @@ export function Overview({
 
       {/* BP · Weight · How you've been — three at-a-glance widgets */}
       <div className="grid grid-cols-3 gap-3 sm:gap-4">
-        <MiniStat label="Blood pressure" delay={0.02}>
+        <MiniStat label="Pressure" delay={0.02}>
           <p className={cn('mt-1.5 font-mono text-xl font-semibold tabular-nums sm:text-2xl', bpTone)}>
             {bp.sys !== undefined ? `${bp.sys}/${bp.dia}` : '—'}
           </p>
-          <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
-            {bp.n ? `7-day avg · ${bp.n} reading${bp.n === 1 ? '' : 's'}` : 'No readings this week'}
+          <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
+            {bp.n ? `7-day avg · ${bp.n}×` : 'No readings'}
           </p>
           {bp.spark.length > 1 && <div className="mt-2 hidden text-muted-foreground sm:block"><MiniSpark values={bp.spark} /></div>}
         </MiniStat>
@@ -192,19 +192,19 @@ export function Overview({
           <p className="mt-1.5 font-mono text-xl font-semibold tabular-nums sm:text-2xl">
             {weight ? weight.kg : '—'}<small className="ml-1 text-xs font-normal text-muted-foreground">kg</small>
           </p>
-          <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
+          <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
             {weight
-              ? (weight.delta !== undefined && Math.abs(weight.delta) >= 0.05 ? `${weight.delta > 0 ? '+' : ''}${weight.delta.toFixed(1)} kg vs last` : 'No change')
+              ? (weight.delta !== undefined && Math.abs(weight.delta) >= 0.05 ? `Δ ${weight.delta > 0 ? '+' : ''}${weight.delta.toFixed(1)} kg` : 'No change')
               : 'Not logged'}
           </p>
           {weight && weight.spark.length > 1 && <div className="mt-2 hidden text-muted-foreground sm:block"><MiniSpark values={weight.spark} /></div>}
         </MiniStat>
 
-        <MiniStat label="How you've been" delay={0.1}>
+        <MiniStat label="Wellbeing" delay={0.1}>
           {sym.checkIns === 0 ? (
             <>
               <p className="mt-1.5 text-xl font-semibold text-muted-foreground sm:text-2xl">—</p>
-              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">No check-ins this week</p>
+              <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">No check-ins</p>
             </>
           ) : (
             <>
@@ -213,7 +213,7 @@ export function Overview({
                 <span className="mx-1 text-muted-foreground/50">/</span>
                 <span className="text-destructive">{sym.watchCount}</span>
               </p>
-              <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">good / to watch · {sym.checkIns} check-in{sym.checkIns === 1 ? '' : 's'}</p>
+              <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">good / watch</p>
             </>
           )}
         </MiniStat>
