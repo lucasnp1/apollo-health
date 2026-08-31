@@ -44,8 +44,10 @@ export default defineConfig({
         name: 'Apollo Health',
         short_name: 'Apollo',
         description: 'A local-first medication, vitals, labs, and exam tracker.',
-        theme_color: '#fffcf5',
-        background_color: '#fffcf5',
+        // Dark-first: match the app's near-black surface so the install splash
+        // and task-switcher tint don't flash warm white (the old, rejected look).
+        theme_color: '#14161c',
+        background_color: '#14161c',
         display: 'standalone',
         start_url: '/',
         icons: [
