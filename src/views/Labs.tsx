@@ -161,14 +161,16 @@ function MarkerRow({
 
 // Headers for both the "Out of range" panel and each per-panel section.
 function MarkerTableHeader() {
+  // Mono, 10px, tracked — the instrument header shared with the Timeline grids.
+  const th = 'font-mono text-[10px] tracking-[0.12em]'
   return (
     <TableHeader>
       <TableRow className="hover:bg-transparent">
-        <TableHead>Marker</TableHead>
-        <TableHead>Value</TableHead>
-        <TableHead className="hidden md:table-cell">Range</TableHead>
-        <TableHead className="w-[60px]">Status</TableHead>
-        <TableHead className="hidden text-right md:table-cell">Date</TableHead>
+        <TableHead className={th}>Marker</TableHead>
+        <TableHead className={th}>Value</TableHead>
+        <TableHead className={cn(th, 'hidden md:table-cell')}>Range</TableHead>
+        <TableHead className={cn(th, 'w-[60px]')}>Status</TableHead>
+        <TableHead className={cn(th, 'hidden text-right md:table-cell')}>Date</TableHead>
         <TableHead className="w-[28px]" />
       </TableRow>
     </TableHeader>

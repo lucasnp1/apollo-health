@@ -123,7 +123,7 @@ function DataGrid<T>({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">{rows.length} entr{rows.length === 1 ? 'y' : 'ies'}</p>
+        <p className="eyebrow">{rows.length} entr{rows.length === 1 ? 'y' : 'ies'}</p>
         <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => setPickerOpen((o) => !o)}>
           <SlidersHorizontal className="size-3.5" /> Columns
         </Button>
@@ -163,7 +163,7 @@ function DataGrid<T>({
                     <th
                       key={c.key}
                       className={cn(
-                        'whitespace-nowrap border-b border-border px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground',
+                        'whitespace-nowrap border-b border-border px-3 py-2 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground',
                         c.num ? 'text-right' : 'text-left',
                       )}
                     >
@@ -180,7 +180,7 @@ function DataGrid<T>({
                         key={c.key}
                         className={cn(
                           'whitespace-nowrap border-b border-border/60 px-3 py-2.5',
-                          c.num ? 'text-right tabular-nums' : 'text-left',
+                          c.num ? 'text-right font-mono tabular-nums' : 'text-left',
                         )}
                       >
                         {c.render(row)}

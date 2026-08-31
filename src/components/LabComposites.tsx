@@ -9,7 +9,7 @@ import { useMemo, useState } from 'react'
 import type { LabExam } from '../lib/db'
 import { canonicalize } from '../lib/markers'
 import type { EnrichedResult } from '../lib/insights'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { Activity, Atom, Brain, ChevronDown, ChevronUp, Droplet, Heart, type LucideIcon } from 'lucide-react'
 import { PanelCard } from './dashboard/PanelCard'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -19,7 +19,7 @@ type MarkerVal = { label: string; display: string; status: Status }
 
 type CompositePanel = {
   id: string
-  icon: string
+  icon: LucideIcon
   label: string
   status: Status
   pills: MarkerVal[]         // always shown inline
@@ -115,7 +115,7 @@ function buildCardio(map: Map<string, EnrichedResult>): CompositePanel {
     ? 'Lipid profile needs monitoring. Common on anabolic steroids. Check every 3 months on active cycle.'
     : 'Lipid profile within healthy range.'
 
-  return { id: 'cardio', icon: '❤️', label: 'Cardiovascular', status, pills, note, recommendations: recs }
+  return { id: 'cardio', icon: Heart, label: 'Cardiovascular', status, pills, note, recommendations: recs }
 }
 
 // ── 2. Hormone balance ─────────────────────────────────────────────────────
@@ -178,7 +178,7 @@ function buildHormones(map: Map<string, EnrichedResult>): CompositePanel {
     ? 'Some hormone markers need attention. Check E2 symptoms vs numbers before adjusting.'
     : 'Hormone panel looks balanced. T:E2 ratio indicates good aromatization control.'
 
-  return { id: 'hormones', icon: '⚗️', label: 'Hormone balance', status, pills, note, recommendations: recs }
+  return { id: 'hormones', icon: Atom, label: 'Hormone balance', status, pills, note, recommendations: recs }
 }
 
 // ── 3. Blood health ────────────────────────────────────────────────────────
@@ -221,7 +221,7 @@ function buildBlood(map: Map<string, EnrichedResult>): CompositePanel {
     ? 'HCT approaching threshold — monitor closely, stay hydrated.'
     : 'Blood count within safe range. TRT-driven erythropoiesis appears controlled.'
 
-  return { id: 'blood', icon: '🩸', label: 'Blood health', status, pills, note, recommendations: recs }
+  return { id: 'blood', icon: Droplet, label: 'Blood health', status, pills, note, recommendations: recs }
 }
 
 // ── 4. Liver ───────────────────────────────────────────────────────────────
@@ -270,7 +270,7 @@ function buildLiver(map: Map<string, EnrichedResult>): CompositePanel {
     source: 'NCBI — Liver Injury from AAS',
   })
 
-  return { id: 'liver', icon: '🫀', label: 'Liver', status, pills, note, recommendations: recs }
+  return { id: 'liver', icon: Activity, label: 'Liver', status, pills, note, recommendations: recs }
 }
 
 // ── 5. HPTA status ─────────────────────────────────────────────────────────
@@ -301,7 +301,7 @@ function buildHpta(map: Map<string, EnrichedResult>): CompositePanel {
     source: "HPTA Recovery Protocols — Men's Health Forum",
   })
 
-  return { id: 'hpta', icon: '🧠', label: 'HPTA status', status, pills, note, recommendations: recs }
+  return { id: 'hpta', icon: Brain, label: 'HPTA status', status, pills, note, recommendations: recs }
 }
 
 // ── Status → Tailwind class maps ───────────────────────────────────────────
@@ -324,10 +324,18 @@ const STATUS_BADGE: Record<Status, string> = {
   none: 'bg-secondary text-muted-foreground',
 }
 const STATUS_LABEL: Record<Status, string> = {
-  good: '✓ Good',
-  warn: '~ Monitor',
-  bad:  '! Action',
+  good: 'Good',
+  warn: 'Monitor',
+  bad:  'Action',
   none: 'No data',
+}
+// Status-tinted icon chip — mirrors the app's icon-in-a-circle convention
+// (StatCard / launcher) so the composites read as instruments, not emoji.
+const STATUS_CHIP: Record<Status, string> = {
+  good: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400',
+  warn: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  bad:  'bg-destructive/12 text-destructive',
+  none: 'bg-muted text-muted-foreground',
 }
 
 // ── Flat composite row — border-left status, expands inline ────────────────
@@ -348,7 +356,9 @@ function CompositeRow({ panel, expanded, onToggle, first }: {
         aria-expanded={expanded}
       >
         <span className="flex items-center gap-2">
-          <span className="text-sm">{panel.icon}</span>
+          <span className={cn('grid size-7 shrink-0 place-items-center rounded-md', STATUS_CHIP[panel.status])}>
+            <panel.icon className="size-3.5" />
+          </span>
           <span className="text-sm font-medium">{panel.label}</span>
           <Badge variant="secondary" className={cn('ml-auto px-2 text-[10px] font-semibold', STATUS_BADGE[panel.status])}>
             {STATUS_LABEL[panel.status]}
