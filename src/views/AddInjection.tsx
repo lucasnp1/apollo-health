@@ -260,7 +260,7 @@ export function AddInjection({
           options={[{ value: 'IM', label: 'Intramuscular' }, { value: 'SubQ', label: 'Subcutaneous' }]}
         />
         <p className="px-0.5 text-xs text-muted-foreground">
-          {isPeptide ? 'Subcutaneous — peptides. Reconstituted vials, drawn in units.' : 'Everything in this syringe is intramuscular.'}
+          {isPeptide ? 'Subcutaneous for peptides. Reconstituted vials, drawn in units.' : 'Everything in this syringe is intramuscular.'}
         </p>
       </section>
 
@@ -305,19 +305,19 @@ export function AddInjection({
           aria-expanded={feelOpen}
         >
           {feelOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-          How do you feel? <span className="font-normal normal-case tracking-normal">— optional</span>
+          How do you feel? <span className="font-normal normal-case tracking-normal">(optional)</span>
         </button>
         {feelOpen && (
           <div className="flex flex-col gap-5 rounded-xl border border-border bg-card p-5">
-            <p className="text-xs text-muted-foreground">Tap a number to rate — tap it again to clear. Anything you leave blank counts as fine.</p>
+            <p className="text-xs text-muted-foreground">Tap a number to rate, or tap it again to clear. Anything you leave blank counts as fine.</p>
             <div>
-              <p className="mb-1 eyebrow">Positive — higher is better</p>
+              <p className="mb-1 eyebrow">Positive · higher is better</p>
               {POSITIVE.map((s) => (
                 <SymptomScale key={s.key as string} def={s} value={feel[s.key] as number | undefined} onChange={(v) => setFeel((f) => ({ ...f, [s.key]: v }))} />
               ))}
             </div>
             <div>
-              <p className="mb-1 eyebrow">Side effects — higher is worse</p>
+              <p className="mb-1 eyebrow">Side effects · higher is worse</p>
               {NEGATIVE.map((s) => (
                 <SymptomScale key={s.key as string} def={s} value={feel[s.key] as number | undefined} onChange={(v) => setFeel((f) => ({ ...f, [s.key]: v }))} />
               ))}
@@ -457,7 +457,7 @@ function CompoundLine({
                 </div>
                 {overdraw && (
                   <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
-                    <TriangleAlert className="size-3.5 shrink-0" /> Over 1 mL — split or use a bigger barrel.
+                    <TriangleAlert className="size-3.5 shrink-0" /> Over 1 mL. Split it or use a bigger barrel.
                   </p>
                 )}
               </div>
@@ -583,7 +583,7 @@ function SitePicker({
       else if (exact < 10) { status = 'caution'; label = `Used ${dayLabel(exact)}` }
       else if (gr && gr.days < 7 && gr.site !== q.site) {
         status = 'near'
-        label = `${cap(groupMuscle(q.group))} used ${dayLabel(gr.days)} — nearby, go carefully`
+        label = `${cap(groupMuscle(q.group))} used nearby ${dayLabel(gr.days)}. Go carefully`
       } else {
         status = 'rested'
         label = Number.isFinite(exact) ? `Used ${dayLabel(exact)}` : 'Rested'
@@ -597,7 +597,7 @@ function SitePicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="px-0.5 text-xs text-muted-foreground">Most rested first. Red = you used that spot recently. Amber ⚠ = a nearby spot on the same muscle was used — usable, just go carefully.</p>
+      <p className="px-0.5 text-xs text-muted-foreground">Most rested first. Red = you used that spot recently. Amber ⚠ = a nearby spot on the same muscle was used. Still usable, just go carefully.</p>
       <div className="flex flex-col gap-1.5">
         {rows.map(({ q, status, label }) => {
           const selected = value === q.site

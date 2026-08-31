@@ -240,11 +240,6 @@ export function ActiveLevelsCard({
         </AreaChart>
       </ChartContainer>
 
-      {/* Plain explainer — one line, no lecture */}
-      <p className="mt-1 truncate text-xs text-muted-foreground">
-        Each dose spikes, then tapers between shots.
-      </p>
-
       {/* "Active now" — one big number in plain language */}
       <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t pt-3">
         <span className="eyebrow">Active now</span>
@@ -252,7 +247,7 @@ export function ActiveLevelsCard({
           ≈<AnimatedNumber value={totalNow} animateOnMount />
           <small className="ml-1 text-xs font-normal text-muted-foreground">mg/day</small>
         </span>
-        {totalPeak > 0.1 && <span className="text-xs text-muted-foreground">— {overallLevel}</span>}
+        {totalPeak > 0.1 && <span className="text-xs text-muted-foreground">{overallLevel}</span>}
       </div>
 
       {/* Per-compound — plain status word + rough level, no jargon */}

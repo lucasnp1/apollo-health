@@ -43,7 +43,7 @@ export function SiteCombobox({
         onChange={handleSelect}
         className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
-        <option value="">— Select site —</option>
+        <option value="">Select site</option>
         {recents.length > 0 && (
           <optgroup label="Recent">
             {recents.map((s) => (

@@ -215,7 +215,7 @@ const INJ_COLS: Col<InjRow>[] = [
   { key: 'notes', label: 'Notes', render: (r) => r.inj.notes || '—' },
 ]
 
-type WeightRow = { key: string; at: string; kg: number; delta?: number; source: string }
+type WeightRow = { key: string; at: string; kg: number; delta?: number; source: string; notes?: string }
 const SOURCE_LABEL: Record<string, string> = {
   manual: 'Manual', apple_health: 'Apple Health', capacitor_healthkit: 'HealthKit', health_connect: 'Health Connect',
 }
@@ -225,6 +225,7 @@ const WEIGHT_COLS: Col<WeightRow>[] = [
   { key: 'weight', label: 'Weight', num: true, render: (r) => <span className="font-semibold">{r.kg} kg</span> },
   { key: 'change', label: 'Change', num: true, render: (r) => (r.delta === undefined ? <span className="text-muted-foreground">—</span> : <Delta v={r.delta} unit="kg" />) },
   { key: 'source', label: 'Source', defaultHidden: true, render: (r) => SOURCE_LABEL[r.source] ?? r.source },
+  { key: 'notes', label: 'Notes', render: (r) => r.notes || '—' },
 ]
 
 type BpRow = { key: string; v: VitalLog; dSys?: number }
@@ -239,7 +240,7 @@ const BP_COLS: Col<BpRow>[] = [
     return <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', TONE_BG[s.tone])}>{s.label}</span>
   } },
   { key: 'dsys', label: 'Δ Sys', num: true, render: (r) => (r.dSys === undefined ? <span className="text-muted-foreground">—</span> : <Delta v={r.dSys} lowerBetter />) },
-  { key: 'notes', label: 'Notes', defaultHidden: true, render: (r) => r.v.notes || '—' },
+  { key: 'notes', label: 'Notes', render: (r) => r.v.notes || '—' },
 ]
 
 const SYM_COLS: Col<Symptom>[] = [
@@ -414,9 +415,9 @@ export function Timeline({
   const weightRows = useMemo<WeightRow[]>(() => {
     const pts = bodyMetrics
       .filter((b) => b.weightKg !== undefined)
-      .map((b) => ({ id: b.id, at: b.measuredAt, kg: b.weightKg as number, source: b.source }))
+      .map((b) => ({ id: b.id, at: b.measuredAt, kg: b.weightKg as number, source: b.source, notes: b.notes }))
       .sort((a, b) => a.at.localeCompare(b.at))
-    const withDelta = pts.map((p, i) => ({ key: `w-${p.id}`, at: p.at, kg: p.kg, source: p.source, delta: i > 0 ? p.kg - pts[i - 1].kg : undefined }))
+    const withDelta = pts.map((p, i) => ({ key: `w-${p.id}`, at: p.at, kg: p.kg, source: p.source, notes: p.notes, delta: i > 0 ? p.kg - pts[i - 1].kg : undefined }))
     return withDelta.reverse()
   }, [bodyMetrics])
 
@@ -443,7 +444,7 @@ export function Timeline({
         date: parseISO(i.takenAt),
         icon: Syringe,
         title: compoundMap.get(i.compoundId)?.name ?? 'Injection',
-        detail: i.rawDose ?? `${i.dose ?? ''} ${i.unit}${i.site ? ` · ${i.site}` : ''}${i.weightKg ? ` · ${i.weightKg} kg` : ''}`,
+        detail: `${i.rawDose ?? `${i.dose ?? ''} ${i.unit}${i.site ? ` · ${i.site}` : ''}${i.weightKg ? ` · ${i.weightKg} kg` : ''}`}${i.notes ? ` · ${i.notes}` : ''}`,
         type: 'injection' as EventType,
         compoundId: i.compoundId,
       })),
@@ -452,7 +453,7 @@ export function Timeline({
         date: parseISO(w.at),
         icon: Scale,
         title: 'Weight',
-        detail: `${w.kg} kg${w.delta !== undefined && Math.abs(w.delta) >= 0.05 ? ` · ${w.delta > 0 ? '+' : '−'}${Math.abs(w.delta).toFixed(1)} kg` : ''}`,
+        detail: `${w.kg} kg${w.delta !== undefined && Math.abs(w.delta) >= 0.05 ? ` · ${w.delta > 0 ? '+' : '−'}${Math.abs(w.delta).toFixed(1)} kg` : ''}${w.notes ? ` · ${w.notes}` : ''}`,
         type: 'weight' as EventType,
       })),
       ...vitals.map((v) => ({
@@ -460,7 +461,7 @@ export function Timeline({
         date: parseISO(v.measuredAt),
         icon: HeartPulse,
         title: 'Blood pressure',
-        detail: `${v.systolic}/${v.diastolic}${v.pulse ? ` · ${v.pulse} bpm` : ''} · ${bpStatus(v.systolic, v.diastolic).label}`,
+        detail: `${v.systolic}/${v.diastolic}${v.pulse ? ` · ${v.pulse} bpm` : ''} · ${bpStatus(v.systolic, v.diastolic).label}${v.notes ? ` · ${v.notes}` : ''}`,
         type: 'bp' as EventType,
       })),
       ...exams.map((e) => ({

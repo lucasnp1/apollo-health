@@ -47,8 +47,8 @@ export function useInjectionReminders(
 
       const timer = setTimeout(() => {
         try {
-          new Notification('💉 Apollo Health — Dose reminder', {
-            body: `Time for your ${compoundName}${dose ? ` — ${dose} ${unit}` : ''}.`,
+          new Notification('💉 Apollo Health · Dose reminder', {
+            body: `Time for your ${compoundName}${dose ? ` (${dose} ${unit})` : ''}.`,
             icon: '/icons/icon-192.png',
             tag: `apollo-dose-${item.protocol.id}-${dueAt.toISOString()}`,
           } as NotificationOptions)

@@ -200,6 +200,7 @@ export type BodyMetric = {
   restingHr?: number
   hrvMs?: number
   sleepHours?: number
+  notes?: string
   externalKey?: string // dedupe key from source (e.g., HK UUID)
 }
 

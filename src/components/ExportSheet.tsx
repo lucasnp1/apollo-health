@@ -256,7 +256,7 @@ export function ExportSheet({
         .map(c => c.name)
         .join(', ')
       sections.push({
-        title: `Injection history — ${names}`,
+        title: `Injection history: ${names}`,
         html: buildInjectionsSection(injections, compounds, selectedCompounds, cutoff),
       })
       titleParts.push('Injections')
@@ -280,7 +280,7 @@ export function ExportSheet({
 
     if (!sections.length) return
 
-    const title = `Apollo Health — ${titleParts.join(' · ')}`
+    const title = `Apollo Health · ${titleParts.join(' · ')}`
     const rangeLabel = RANGE_LABELS[range]
     const subtitle = `Period: ${rangeLabel} · Patient health record export`
     const html = buildHtml(title, subtitle, sections)

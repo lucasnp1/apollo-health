@@ -102,7 +102,7 @@ export function BpTrendCard({ vitals }: { vitals: VitalLog[] }) {
 
       {insight && (
         <div className={`mt-4 rounded-lg border-l px-3.5 py-2.5 ${insight.cls}`}>
-          <p className="text-sm font-medium">{insight.title} — avg {stats!.meanSys.toFixed(0)}/{stats!.meanDia.toFixed(0)}</p>
+          <p className="text-sm font-medium">{insight.title} · avg {stats!.meanSys.toFixed(0)}/{stats!.meanDia.toFixed(0)}</p>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{insight.body}</p>
         </div>
       )}
@@ -114,7 +114,7 @@ function bpInsight(status: BpStatus): { title: string; body: string; cls: string
   if (status === 'optimal' || status === 'good') {
     return {
       title: '✓ BP well controlled',
-      body: 'Keep logging — anabolics can push it up over time.',
+      body: 'Keep logging. Anabolics can push it up over time.',
       cls: 'border-emerald-500 bg-emerald-500/8',
     }
   }

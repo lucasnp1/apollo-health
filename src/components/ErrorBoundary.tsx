@@ -27,7 +27,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
         <div className="flex max-w-xs flex-col items-center gap-4">
           <p className="text-sm leading-relaxed text-muted-foreground">
             Something went wrong loading the app. This usually means a new
-            version is ready — reload to continue.
+            version is ready, so reload to continue.
           </p>
           <button
             type="button"

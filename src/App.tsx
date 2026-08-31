@@ -126,7 +126,7 @@ function Shell({
       } else {
         showToast({
           tone: 'warn',
-          message: `Couldn't read text from "${file.name}" — it may be a scanned image. Add the results manually under Add result.`,
+          message: `Couldn't read text from "${file.name}". It may be a scanned image, so add the results manually under Add result.`,
         })
       }
     } catch (err) {
@@ -250,7 +250,7 @@ function Shell({
             type="button"
             onClick={() => setActiveView('overview')}
             className="-mx-1 flex shrink-0 items-center gap-2.5 rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            aria-label="Apollo Health — go to Home"
+            aria-label="Apollo Health, go to Home"
           >
             <BrandMark size={30} />
             <span className="font-display text-[17px] font-semibold leading-none tracking-[-0.02em]">

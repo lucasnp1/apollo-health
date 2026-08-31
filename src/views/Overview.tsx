@@ -194,7 +194,7 @@ export function Overview({
           </p>
           <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
             {weight
-              ? (weight.delta !== undefined && Math.abs(weight.delta) >= 0.05 ? `Δ ${weight.delta > 0 ? '+' : ''}${weight.delta.toFixed(1)} kg` : 'No change')
+              ? (weight.delta !== undefined && Math.abs(weight.delta) >= 0.05 ? `${weight.delta > 0 ? '+' : ''}${weight.delta.toFixed(1)} kg` : 'No change')
               : 'Not logged'}
           </p>
           {weight && weight.spark.length > 1 && <div className="mt-2 hidden text-muted-foreground sm:block"><MiniSpark values={weight.spark} /></div>}

@@ -147,7 +147,7 @@ export function PdfReviewSheet({
             />
           </div>
           <span className="text-[11px] text-muted-foreground">
-            {usingDetected ? 'Detected in PDF — edit if wrong.' : detectedDate ? 'Manually set.' : 'Not found in PDF — defaulted to today.'}
+            {usingDetected ? 'Detected in the PDF. Edit if it\'s wrong.' : detectedDate ? 'Manually set.' : 'Not found in the PDF, so we defaulted to today.'}
           </span>
         </div>
 

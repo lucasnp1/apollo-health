@@ -9,6 +9,7 @@ export function AddBP({ onBack }: { onBack: () => void }) {
   const [sys, setSys] = useState('')
   const [dia, setDia] = useState('')
   const [pulse, setPulse] = useState('')
+  const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const kbInset = useKeyboardInset()
 
@@ -42,6 +43,7 @@ export function AddBP({ onBack }: { onBack: () => void }) {
         systolic: Number(sys),
         diastolic: Number(dia),
         pulse: pulse ? Number(pulse) : undefined,
+        notes: notes.trim() || undefined,
       })
       onBack()
     } finally { setBusy(false) }
@@ -65,6 +67,11 @@ export function AddBP({ onBack }: { onBack: () => void }) {
             <Input id="pulse" ref={pulseRef} inputMode="numeric" maxLength={3} className="text-base" placeholder="65" value={pulse} onChange={(e) => handleDigits(e.target.value, pulse, setPulse)} />
           </div>
         </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="px-0.5 eyebrow">Notes</h2>
+        <Input id="bp-notes" placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </section>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/90 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-[bottom] duration-150" style={{ bottom: kbInset }}>

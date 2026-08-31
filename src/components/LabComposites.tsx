@@ -110,7 +110,7 @@ function buildCardio(map: Map<string, EnrichedResult>): CompositePanel {
   if (pills.length === 0) pills.push({ label: 'No lipid data', display: '—', status: 'none' })
   const status = worst(...pills.map(p => p.status))
   const note = status === 'bad'
-    ? 'High cardiovascular risk — AAS commonly suppresses HDL and raises LDL/AIP. Review dose and add cardio-protective interventions.'
+    ? 'High cardiovascular risk. AAS commonly suppresses HDL and raises LDL/AIP. Review dose and add cardio-protective interventions.'
     : status === 'warn'
     ? 'Lipid profile needs monitoring. Common on anabolic steroids. Check every 3 months on active cycle.'
     : 'Lipid profile within healthy range.'
@@ -141,11 +141,11 @@ function buildHormones(map: Map<string, EnrichedResult>): CompositePanel {
     const s: Status = ratio >= 15 && ratio <= 30 ? 'good' : (ratio >= 10 || ratio <= 50) ? 'warn' : 'bad'
     pills.push({ label: 'T:E2', display: fmt(ratio, 1), status: s })
     if (ratio < 10) recs.push({
-      text: 'Low T:E2 ratio — excess aromatization. Discuss AI dose with doctor. Avoid over-correction (crashed E2 is worse).',
+      text: 'Low T:E2 ratio from excess aromatization. Discuss AI dose with doctor. Avoid over-correction (crashed E2 is worse).',
       source: 'Testosterone Therapy Guidelines',
     })
     if (ratio > 50) recs.push({
-      text: 'High T:E2 ratio — E2 may be too suppressed by AI. Joint pain and low libido are early signs. Reduce or pause AI.',
+      text: 'High T:E2 ratio. E2 may be too suppressed by AI. Joint pain and low libido are early signs. Reduce or pause AI.',
       source: 'Testosterone Therapy Guidelines',
     })
   }
@@ -161,7 +161,7 @@ function buildHormones(map: Map<string, EnrichedResult>): CompositePanel {
     pills.push({ label: 'SHBG', display: `${shbg.value} ${shbg.unit}`, status: s })
     if (shbg.value > 50) recs.push({
       text: 'High SHBG reduces free testosterone bioavailability. Boron (10 mg/day), more frequent TRT injections, and a lower carbohydrate diet may help lower SHBG.',
-      source: 'NCBI — SHBG Modulation',
+      source: 'NCBI: SHBG Modulation',
     })
   }
 
@@ -218,7 +218,7 @@ function buildBlood(map: Map<string, EnrichedResult>): CompositePanel {
   const note = status === 'bad'
     ? 'Erythrocytosis risk. HCT >52% is the clinical threshold for therapeutic phlebotomy on TRT.'
     : status === 'warn'
-    ? 'HCT approaching threshold — monitor closely, stay hydrated.'
+    ? 'HCT approaching threshold. Monitor closely and stay hydrated.'
     : 'Blood count within safe range. TRT-driven erythropoiesis appears controlled.'
 
   return { id: 'blood', icon: Droplet, label: 'Blood health', status, pills, note, recommendations: recs }
@@ -258,16 +258,16 @@ function buildLiver(map: Map<string, EnrichedResult>): CompositePanel {
   const status: Status = muscleSource ? 'warn' : rawStatus
 
   const note = muscleSource
-    ? 'ALT/AST elevation likely from muscle damage (CK elevated, GGT normal) — exercise artifact, not liver damage.'
+    ? 'ALT/AST elevation likely from muscle damage (CK elevated, GGT normal). This is an exercise artifact, not liver damage.'
     : rawStatus === 'bad'
     ? 'Significant liver enzyme elevation. If on oral AAS, discontinue and retest in 2 weeks. Hepatology referral if >5× ULN.'
     : rawStatus === 'warn'
-    ? 'Mild enzyme elevation. Watch closely on oral steroids — GGT is the key discriminator for true liver source.'
+    ? 'Mild enzyme elevation. Watch closely on oral steroids. GGT is the key discriminator for a true liver source.'
     : 'Liver enzymes within normal range.'
 
   if (!muscleSource && rawStatus !== 'good') recs.push({
     text: 'Reduce or eliminate oral 17α-alkylated steroids. TUDCA (500–1000 mg/day) and NAC (600 mg/day) have supporting evidence for hepatoprotection during AAS use.',
-    source: 'NCBI — Liver Injury from AAS',
+    source: 'NCBI: Liver Injury from AAS',
   })
 
   return { id: 'liver', icon: Activity, label: 'Liver', status, pills, note, recommendations: recs }
@@ -289,16 +289,16 @@ function buildHpta(map: Map<string, EnrichedResult>): CompositePanel {
 
   const bothSuppressed = lh && fsh && lh.value < 2 && fsh.value < 2
   const note = bothSuppressed
-    ? 'Full HPTA suppression — expected on active TRT/AAS. Endogenous production is offline. Plan PCT if cycling off.'
+    ? 'Full HPTA suppression, expected on active TRT/AAS. Endogenous production is offline. Plan PCT if cycling off.'
     : status === 'bad'
     ? 'Very high LH/FSH may indicate primary hypogonadism (testes not responding to signal). Consult endocrinology.'
     : status === 'good'
-    ? 'LH/FSH in normal range — either not suppressed or recovering post-cycle.'
+    ? 'LH/FSH in normal range, so either not suppressed or recovering post-cycle.'
     : 'Partial suppression or incomplete data.'
 
   if (bothSuppressed) recs.push({
     text: 'If planning PCT after cycle: HCG (500 IU EOD × 3 weeks) followed by Clomid (25–50 mg/day × 4–6 weeks) or Nolvadex (20–40 mg/day × 4–6 weeks) is a common recovery protocol.',
-    source: "HPTA Recovery Protocols — Men's Health Forum",
+    source: "HPTA Recovery Protocols, Men's Health Forum",
   })
 
   return { id: 'hpta', icon: Brain, label: 'HPTA status', status, pills, note, recommendations: recs }

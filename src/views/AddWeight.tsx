@@ -18,6 +18,7 @@ export function AddWeight({ onBack }: { onBack: () => void }) {
   }, [bodyMetrics, injections])
 
   const [weight, setWeight] = useState('')
+  const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const kbInset = useKeyboardInset()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -30,7 +31,7 @@ export function AddWeight({ onBack }: { onBack: () => void }) {
     if (!weight) return
     setBusy(true)
     try {
-      await db.bodyMetrics.add({ measuredAt: new Date().toISOString(), source: 'manual', weightKg: Number(weight) })
+      await db.bodyMetrics.add({ measuredAt: new Date().toISOString(), source: 'manual', weightKg: Number(weight), notes: notes.trim() || undefined })
       onBack()
     } finally { setBusy(false) }
   }
@@ -47,6 +48,11 @@ export function AddWeight({ onBack }: { onBack: () => void }) {
           </div>
           {last !== undefined && <p className="text-xs text-muted-foreground">Last logged: {last} kg</p>}
         </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="px-0.5 eyebrow">Notes</h2>
+        <Input id="w-notes" placeholder="Optional" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </section>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/90 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur transition-[bottom] duration-150" style={{ bottom: kbInset }}>

@@ -276,7 +276,7 @@ function NotificationSettings() {
       ) : (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">
-            Allow Apollo to send you a notification when your next injection is due — even if the tab is in the background.
+            Allow Apollo to send you a notification when your next injection is due, even if the tab is in the background.
           </p>
           <Button size="sm" className="self-start" onClick={requestPermission}>
             <Bell className="size-3.5" /> Allow notifications
@@ -371,7 +371,7 @@ function PrintReport({
     <div className="print-report">
       <div className="print-header">
         <div>
-          <h1>Apollo Health — Clinical Summary</h1>
+          <h1>Apollo Health Clinical Summary</h1>
           <p>Generated {format(new Date(), 'MMMM d, yyyy')}</p>
         </div>
         <p style={{ fontSize: 11, color: '#666', maxWidth: 300, textAlign: 'right' }}>
@@ -414,7 +414,7 @@ function PrintReport({
       {recentBP.length > 0 && (
         <section className="print-section">
           <h2>Blood Pressure <span style={{ fontSize: 12, fontWeight: 400, color: '#555' }}>({recentBP.length} readings)</span></h2>
-          {avgSys && <p className="print-stat">Average: <strong>{avgSys}/{avgDia} mmHg</strong> — {avgSys >= 130 ? '⚠ Elevated' : '✓ Normal range'}</p>}
+          {avgSys && <p className="print-stat">Average: <strong>{avgSys}/{avgDia} mmHg</strong> ({avgSys >= 130 ? '⚠ Elevated' : '✓ Normal range'})</p>}
           <table className="print-table">
             <thead>
               <tr><th>Date</th><th>Systolic</th><th>Diastolic</th><th>Pulse</th><th>Notes</th></tr>
@@ -636,7 +636,7 @@ function DangerSettings() {
     >
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
-          Wipes every local table — compounds, injections, vitals, labs, files, protocols, vials, symptoms,
+          Wipes every local table: compounds, injections, vitals, labs, files, protocols, vials, symptoms,
           targets, body metrics, and your passphrase. <strong className="text-foreground">Cannot be undone.</strong>
         </p>
         <Button variant="outline" size="sm" className="self-start text-destructive" onClick={() => setModalOpen(true)}>

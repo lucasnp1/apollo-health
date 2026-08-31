@@ -271,7 +271,7 @@ function MarkerTargetEditor() {
     >
       <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
         Default ranges from the catalog (e.g. E2 20–40 pg/mL) are starting points. Override them here when you want a tighter
-        or different personal goal range — the Labs view will use your numbers in range bars.
+        or different personal goal range. The Labs view will use your numbers in range bars.
       </p>
 
       {targets.length > 0 ? (
