@@ -390,6 +390,8 @@ function Shell({
             vitals={vitals ?? []}
             exams={exams ?? []}
             results={enrichedResults ?? []}
+            bodyMetrics={bodyMetrics ?? []}
+            symptoms={symptoms ?? []}
             onClose={() => setExportOpen(false)}
           />
         )}
