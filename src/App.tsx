@@ -1,8 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Lock,
+  Moon,
   Plus,
   Share2,
+  Sun,
   Upload,
 } from 'lucide-react'
 import { BrandMark } from './components/BrandMark'
@@ -14,12 +16,13 @@ import { extractPdfText, extractMarkersFromText, type ExtractedMarker } from './
 import { ToastProvider, useToast } from './lib/toast'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
+import { useTheme } from './lib/useTheme'
 import { InstallPrompt } from './components/InstallPrompt'
 import { Onboarding, ONBOARDED_KEY } from './components/Onboarding'
 import { UpgradeDialog } from './components/UpgradeDialog'
 import { PlanProvider, usePlan } from './lib/plan'
 // Modals / add-pages are lazy — only loaded when first opened
-const ExportSheet      = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportSheet })))
+const ExportPage       = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportPage })))
 const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
@@ -108,13 +111,13 @@ function Shell({
   const isAuthed = auth.state.status === 'authed'
   const sync = useSync(isAuthed)
   const { isPro, openUpgrade } = usePlan()
+  const { theme, toggle: toggleTheme } = useTheme()
 
   // Ask the browser to keep our IndexedDB from being evicted under storage
   // pressure (matters most on iOS). Best-effort, prompts on no supported browser.
   useEffect(() => { void navigator.storage?.persist?.() }, [])
 
   const [labAddOpen, setLabAddOpen] = useState(false)
-  const [exportOpen, setExportOpen] = useState(false)
   // PDF upload pipeline state — parsing overlay + review sheet. Transient
   // messages now route through the shared toast context (snackbar UI lives
   // in ToastProvider so any view can fire one without prop drilling).
@@ -318,7 +321,7 @@ function Shell({
               )
             )}
             {activeView === 'labs' && (
-              <Button variant="ghost" size="icon" onClick={() => (isPro ? setExportOpen(true) : openUpgrade('Doctor export'))} aria-label="Export for doctor" title="Share with doctor">
+              <Button variant="ghost" size="icon" onClick={() => (isPro ? setActiveView('export') : openUpgrade('Doctor export'))} aria-label="Export for doctor" title="Export / share">
                 <Share2 className="size-4" />
               </Button>
             )}
@@ -342,6 +345,11 @@ function Shell({
                 </Button>
               </>
             )}
+
+            {/* Always-available theme toggle */}
+            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle theme">
+              {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </Button>
           </div>
         </header>
 
@@ -370,6 +378,17 @@ function Shell({
           {activeView === 'files' && (
             <Files files={files ?? []} onReviewFile={(id) => setPdfReviewFileId(id)} />
           )}
+          {activeView === 'export' && (
+            <ExportPage
+              compounds={compounds ?? []}
+              injections={injections ?? []}
+              vitals={vitals ?? []}
+              exams={exams ?? []}
+              results={enrichedResults ?? []}
+              bodyMetrics={bodyMetrics ?? []}
+              symptoms={symptoms ?? []}
+            />
+          )}
           {activeView === 'settings' && (
             <Settings
               auth={auth}
@@ -378,7 +397,7 @@ function Shell({
               vitals={vitals}
               exams={exams}
               protocols={protocols}
-              onExport={() => (isPro ? setExportOpen(true) : openUpgrade('Doctor export'))}
+              onExport={() => (isPro ? setActiveView('export') : openUpgrade('Doctor export'))}
             />
           )}
         </Suspense>
@@ -388,18 +407,6 @@ function Shell({
       <InstallPrompt />
 
       <Suspense fallback={null}>
-        {exportOpen && (
-          <ExportSheet
-            compounds={compounds ?? []}
-            injections={injections ?? []}
-            vitals={vitals ?? []}
-            exams={exams ?? []}
-            results={enrichedResults ?? []}
-            bodyMetrics={bodyMetrics ?? []}
-            symptoms={symptoms ?? []}
-            onClose={() => setExportOpen(false)}
-          />
-        )}
         {pdfReviewFile && (
           <PdfReviewSheet
             file={pdfReviewFile}
@@ -437,6 +444,7 @@ function titleFor(view: View) {
     targets: 'Targets',
     timeline: 'Timeline',
     files: 'Files',
+    export: 'Export',
     settings: 'Settings',
   }
   return map[view]

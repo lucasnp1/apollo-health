@@ -16,7 +16,6 @@ import type { EnrichedResult } from '../lib/insights'
 import { ALL_SYMPTOMS } from '../lib/symptoms'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 type DateRange = '1M' | '3M' | '6M' | '1Y' | 'ALL'
@@ -194,8 +193,8 @@ function buildCsv(title: string, sections: Section[]): string {
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-export function ExportSheet({
-  compounds, injections, vitals, exams, results, bodyMetrics, symptoms, onClose,
+export function ExportPage({
+  compounds, injections, vitals, exams, results, bodyMetrics, symptoms,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
@@ -204,7 +203,6 @@ export function ExportSheet({
   results: EnrichedResult[]
   bodyMetrics: BodyMetric[]
   symptoms: Symptom[]
-  onClose: () => void
 }) {
   const [range, setRange] = useState<DateRange>('ALL')
   const [incl, setIncl] = useState({ injections: true, labs: true, bp: false, weight: false, symptoms: false })
@@ -306,13 +304,14 @@ export function ExportSheet({
   ]
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Export your data</DialogTitle>
-        </DialogHeader>
+    <div className="mx-auto max-w-xl pb-24">
+      <div className="mb-5">
+        <p className="eyebrow">Export</p>
+        <h2 className="mt-1 font-display text-2xl font-semibold tracking-[-0.01em]">Export your data</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Pick a date range and what to include, then export as a CSV sheet or a PDF.</p>
+      </div>
 
-        <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto">
+        <div className="flex flex-col gap-5">
           {/* Date range */}
           <div>
             <p className="mb-2 eyebrow">Date range</p>
@@ -388,7 +387,6 @@ export function ExportSheet({
             </p>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+    </div>
   )
 }

@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Bell, BellOff, Download, FileText, FlaskConical, LogOut, Moon, Printer, RotateCcw, Send, Sparkles, Sun, Trash2, Upload, UserCircle } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle, Bell, BellOff, Download, FileText, LogOut, RotateCcw, Send, Sparkles, Trash2, Upload } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { wipeLocalDatabase } from '../lib/lock'
-import { useTheme } from '../lib/useTheme'
 import { describeCadence } from '../lib/schedule'
 import type { useAuth } from '../lib/useAuth'
 import type { Compound, InjectionLog, LabExam, Protocol, VitalLog } from '../lib/db'
@@ -91,26 +90,33 @@ export function Settings({
   onExport: () => void
 }) {
   return (
-    <DashGrid>
-      <div className="md:col-span-1 xl:col-span-3"><AccountSettings auth={auth} /></div>
-      <div className="md:col-span-1 xl:col-span-3"><AppearanceSettings /></div>
-      <div className="md:col-span-1 xl:col-span-3"><NotificationSettings /></div>
-      <div className="md:col-span-1 xl:col-span-3">
-        <BackupSettings
-          compounds={compounds}
-          injections={injections}
-          vitals={vitals}
-          exams={exams}
-          protocols={protocols}
-          onExport={onExport}
-        />
+    <div className="flex flex-col gap-6">
+      <DashGrid>
+        <div className="md:col-span-1 xl:col-span-3"><AccountSettings auth={auth} /></div>
+        <div className="md:col-span-1 xl:col-span-3"><NotificationSettings /></div>
+        <div className="md:col-span-1 xl:col-span-3">
+          <BackupSettings
+            compounds={compounds}
+            injections={injections}
+            vitals={vitals}
+            exams={exams}
+            protocols={protocols}
+            onExport={onExport}
+          />
+        </div>
+        <div className="md:col-span-1 xl:col-span-3"><FeedbackSettings auth={auth} /></div>
+        <div className="md:col-span-2 xl:col-span-6"><TrashSettings compounds={compounds ?? []} /></div>
+        {/* Reset device / danger zone hidden for now — flip to re-enable. */}
+        {SHOW_RESET_DEVICE && <div className="md:col-span-2 xl:col-span-6"><DangerSettings /></div>}
+      </DashGrid>
+
+      {/* Sign out — floating, no container, red. */}
+      <div className="flex justify-center pb-2">
+        <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => auth.logout()}>
+          <LogOut className="size-3.5" /> Sign out
+        </Button>
       </div>
-      <div className="md:col-span-1 xl:col-span-3"><FeedbackSettings auth={auth} /></div>
-      <div className="md:col-span-2 xl:col-span-6"><LabDataSettings /></div>
-      <div className="md:col-span-2 xl:col-span-6"><TrashSettings compounds={compounds ?? []} /></div>
-      {/* Reset device / danger zone hidden for now — flip to re-enable. */}
-      {SHOW_RESET_DEVICE && <div className="md:col-span-2 xl:col-span-6"><DangerSettings /></div>}
-    </DashGrid>
+    </div>
   )
 }
 
@@ -237,114 +243,32 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
       className="h-full"
       subtitle="Account"
       title={user?.email ?? 'Account'}
-      action={<UserCircle className="size-4 text-muted-foreground" />}
+      action={
+        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', isPro ? 'bg-primary/12 text-primary' : 'bg-secondary text-muted-foreground')}>
+          {isPro && <Sparkles className="size-3" />} {planLabel}
+        </span>
+      }
     >
-      <div className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">
-          Signed in as <strong className="text-foreground">{user?.display_name || user?.email}</strong>.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', isPro ? 'bg-primary/12 text-primary' : 'bg-secondary text-muted-foreground')}>
-            {isPro && <Sparkles className="size-3" />} {planLabel}
-          </span>
-          {!isPro && (
-            <Button size="sm" onClick={() => openUpgrade()}>
-              <Sparkles className="size-3.5" /> Upgrade to Pro
-            </Button>
-          )}
-        </div>
-        <Button variant="outline" size="sm" className="self-start" onClick={() => auth.logout()}>
-          <LogOut className="size-3.5" /> Sign out
+      {isPro ? (
+        <p className="text-sm text-muted-foreground">You're on Apollo Pro. Thanks for the support.</p>
+      ) : (
+        <Button size="sm" className="self-start" onClick={() => openUpgrade()}>
+          <Sparkles className="size-3.5" /> Upgrade to Pro
         </Button>
-      </div>
-    </PanelCard>
-  )
-}
-
-function AppearanceSettings() {
-  const { theme, toggle } = useTheme()
-  const isDark = theme === 'dark'
-  return (
-    <PanelCard
-      className="h-full"
-      subtitle="Display"
-      title="Appearance"
-      action={isDark ? <Moon className="size-4 text-muted-foreground" /> : <Sun className="size-4 text-muted-foreground" />}
-    >
-      <div className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">Switch between light and dark theme. Your preference is saved locally.</p>
-        <Button variant="outline" size="sm" className="self-start" onClick={toggle}>
-          {isDark ? <><Sun className="size-3.5" /> Switch to light mode</> : <><Moon className="size-3.5" /> Switch to dark mode</>}
-        </Button>
-      </div>
+      )}
     </PanelCard>
   )
 }
 
 function NotificationSettings() {
-  const { isPro, openUpgrade } = usePlan()
-  const [permission, setPermission] = useState<NotificationPermission>('default')
-  const [enabled, setEnabled] = useState(() => localStorage.getItem('apollo-notif') === '1')
-
-  useEffect(() => {
-    if ('Notification' in window) setPermission(Notification.permission)
-  }, [])
-
-  async function requestPermission() {
-    if (!('Notification' in window)) return
-    const result = await Notification.requestPermission()
-    setPermission(result)
-    if (result === 'granted') {
-      localStorage.setItem('apollo-notif', '1')
-      setEnabled(true)
-    }
-  }
-
-  function toggle() {
-    const next = !enabled
-    setEnabled(next)
-    localStorage.setItem('apollo-notif', next ? '1' : '0')
-  }
-
-  const blocked = permission === 'denied'
-
   return (
-    <PanelCard
-      className="h-full"
-      subtitle="Alerts"
-      title="Notifications"
-      action={enabled && !blocked && isPro ? <Bell className="size-4 text-muted-foreground" /> : <BellOff className="size-4 text-muted-foreground" />}
-    >
-      {!isPro ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">Get a reminder before each scheduled injection is due.</p>
-          <Button size="sm" className="self-start" onClick={() => openUpgrade('Injection reminders')}>
-            <Sparkles className="size-3.5" /> Unlock with Pro
-          </Button>
-        </div>
-      ) : blocked ? (
-        <p className="text-sm text-amber-700 dark:text-amber-400">
-          Notifications are blocked in your browser settings. To re-enable, open your browser's site permissions for this page.
-        </p>
-      ) : permission === 'granted' ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
-            {enabled ? "You'll receive a notification before each scheduled injection." : 'Notifications are disabled. Enable to get injection reminders.'}
-          </p>
-          <Button variant="outline" size="sm" className="self-start" onClick={toggle}>
-            {enabled ? <><BellOff className="size-3.5" /> Disable reminders</> : <><Bell className="size-3.5" /> Enable reminders</>}
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
-            Allow Apollo to send you a notification when your next injection is due, even if the tab is in the background.
-          </p>
-          <Button size="sm" className="self-start" onClick={requestPermission}>
-            <Bell className="size-3.5" /> Allow notifications
-          </Button>
-        </div>
-      )}
+    <PanelCard className="h-full" subtitle="Alerts" title="Notifications" action={<BellOff className="size-4 text-muted-foreground" />}>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">Reminders before each scheduled injection are on the way.</p>
+        <Button variant="outline" size="sm" className="self-start" disabled>
+          <Bell className="size-3.5" /> Coming soon
+        </Button>
+      </div>
     </PanelCard>
   )
 }
@@ -364,7 +288,7 @@ function BackupSettings({
   protocols?: Protocol[]
   onExport: () => void
 }) {
-  const { isPro, openUpgrade } = usePlan()
+  const { isPro } = usePlan()
   const [importing, setImporting] = useState(false)
   const [importDone, setImportDone] = useState(false)
 
@@ -406,13 +330,10 @@ function BackupSettings({
                 <Upload className="size-3.5" /> {importDone ? 'Imported ✓' : importing ? 'Importing…' : 'Restore'}
               </label>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => (isPro ? window.print() : openUpgrade('Print report'))}>
-              <Printer className="size-3.5" /> Print {!isPro && <Sparkles className="size-3 text-primary" />}
-            </Button>
           </div>
         </div>
       </div>
-      {/* Hidden print-only report — rendered in DOM, visible only when printing */}
+      {/* Kept in the DOM (hidden) for the browser's own print; the export page covers PDF now. */}
       <PrintReport compounds={compounds} injections={injections} vitals={vitals} exams={exams} protocols={protocols} />
     </PanelCard>
   )
@@ -555,125 +476,6 @@ function PrintReport({
         Exported from Apollo Health · {format(new Date(), 'MMMM d, yyyy')} · Data is stored locally on your device.
       </p>
     </div>
-  )
-}
-
-function LabDataSettings() {
-  const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(false)
-  // Live dupe scan so the count refreshes as the user dedupes / imports.
-  const allExams = useLiveQuery(() => db.exams.toArray(), [], []) as LabExam[]
-  const dupeGroups = useMemo(() => {
-    const groups = new Map<string, LabExam[]>()
-    for (const ex of allExams) {
-      // Group on the same key the user perceives as "the same exam":
-      // name + collection date (rounded to day).
-      const key = `${ex.name.trim().toLowerCase()}|${ex.collectedAt.slice(0, 10)}`
-      const list = groups.get(key) ?? []
-      list.push(ex)
-      groups.set(key, list)
-    }
-    return [...groups.values()].filter((g) => g.length > 1)
-  }, [allExams])
-  const dupeExamCount = dupeGroups.reduce((sum: number, g: LabExam[]) => sum + (g.length - 1), 0)
-  const [scanShown, setScanShown] = useState(false)
-
-  async function clearLabs() {
-    if (!confirm('Clear all lab exams and results? This cannot be undone.')) return
-    setBusy(true)
-    try {
-      await db.results.clear()
-      await db.exams.clear()
-      await db.files.clear()
-      setDone(true)
-      setTimeout(() => setDone(false), 3000)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  // Surgical: keep the OLDEST exam in each group + its results, delete the
-  // rest. Same-day same-name groups have effectively identical data, so
-  // the "oldest wins" rule preserves the original record and drops the
-  // accidental clones from re-imports.
-  async function dedupeExams() {
-    if (dupeExamCount === 0) return
-    if (!confirm(`Remove ${dupeExamCount} duplicate exam${dupeExamCount === 1 ? '' : 's'} and the ${'results'} attached to them? The oldest copy of each group is kept.`)) return
-    setBusy(true)
-    try {
-      const toDelete: number[] = []
-      for (const group of dupeGroups) {
-        // Sort by createdAt if available else by id; oldest first → keep [0].
-        const sorted = [...group].sort((a, b) => {
-          const at = (a as { createdAt?: number }).createdAt ?? a.id ?? 0
-          const bt = (b as { createdAt?: number }).createdAt ?? b.id ?? 0
-          return at - bt
-        })
-        for (let i = 1; i < sorted.length; i++) {
-          const id = sorted[i].id
-          if (typeof id === 'number') toDelete.push(id)
-        }
-      }
-      // Drop the results that belonged to the doomed exams first so we
-      // don't leave dangling result rows.
-      if (toDelete.length > 0) {
-        await db.results.where('examId').anyOf(toDelete).delete()
-        await db.exams.where('id').anyOf(toDelete).delete()
-      }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <PanelCard
-      subtitle="Labs"
-      title="Lab data"
-      action={<FlaskConical className="size-4 text-muted-foreground" />}
-    >
-      {/* Duplicate scanner — surfaces dupes the user accumulated from
-          re-importing the same JSON backup multiple times. */}
-      <div className="mb-4 flex flex-col gap-2.5">
-        <p className="text-sm text-muted-foreground">
-          {dupeExamCount === 0
-            ? 'No duplicate exams detected on this device.'
-            : `${dupeExamCount} duplicate exam${dupeExamCount === 1 ? '' : 's'} detected across ${dupeGroups.length} group${dupeGroups.length === 1 ? '' : 's'}. Same name + same date.`}
-        </p>
-        {dupeExamCount > 0 && (
-          <>
-            <Button variant="outline" size="sm" className="self-start" onClick={() => setScanShown((s) => !s)}>
-              {scanShown ? 'Hide list' : `Show ${dupeGroups.length} duplicate group${dupeGroups.length === 1 ? '' : 's'}`}
-            </Button>
-            {scanShown && (
-              <ul className="ml-4 flex list-disc flex-col gap-1 text-xs text-muted-foreground">
-                {dupeGroups.slice(0, 12).map((g: LabExam[], i: number) => (
-                  <li key={i}>
-                    {g[0].name} · {format(parseISO(g[0].collectedAt), 'MMM d, yyyy')} · {g.length} copies
-                  </li>
-                ))}
-                {dupeGroups.length > 12 && <li>… and {dupeGroups.length - 12} more</li>}
-              </ul>
-            )}
-            <Button size="sm" className="self-start" onClick={dedupeExams} disabled={busy}>
-              <Trash2 className="size-3.5" /> Remove {dupeExamCount} duplicate{dupeExamCount === 1 ? '' : 's'}
-            </Button>
-          </>
-        )}
-      </div>
-
-      <p className="mb-3 text-sm text-muted-foreground">
-        Or remove all imported lab results and exams to start clean.
-      </p>
-      <Button
-        variant="outline"
-        size="sm"
-        className="self-start text-amber-700 dark:text-amber-400"
-        onClick={clearLabs}
-        disabled={busy}
-      >
-        <Trash2 className="size-3.5" /> {done ? 'Cleared ✓' : busy ? 'Clearing…' : 'Clear all lab data'}
-      </Button>
-    </PanelCard>
   )
 }
 
