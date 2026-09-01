@@ -22,6 +22,11 @@ const CT: ColumnMap = {
   deletedAt: { col: 'deleted_at', type: 'int' },
 }
 
+// Archive support (soft, restorable) for user-removable entities.
+const ARCH: ColumnMap = {
+  archivedAt: { col: 'archived_at', type: 'int' },
+}
+
 export const TABLES: Record<string, TableSpec> = {
   compounds: {
     table: 'compounds',
@@ -57,6 +62,7 @@ export const TABLES: Record<string, TableSpec> = {
       weightKg: { col: 'weight_kg', type: 'real' },
       protocolDoseId: { col: 'protocol_dose_id', type: 'text' },
       vialId: { col: 'vial_id', type: 'text' },
+      ...ARCH,
       ...CT,
     },
   },
@@ -72,6 +78,7 @@ export const TABLES: Record<string, TableSpec> = {
       waistCm: { col: 'waist_cm', type: 'real' },
       bodyFatPct: { col: 'body_fat_pct', type: 'real' },
       notes: { col: 'notes', type: 'text' },
+      ...ARCH,
       ...CT,
     },
   },
@@ -87,6 +94,7 @@ export const TABLES: Record<string, TableSpec> = {
       labName: { col: 'lab_name', type: 'text' },
       sourceFileId: { col: 'source_file_id', type: 'text' },
       notes: { col: 'notes', type: 'text' },
+      ...ARCH,
       ...CT,
     },
   },
@@ -104,6 +112,7 @@ export const TABLES: Record<string, TableSpec> = {
       status: { col: 'status', type: 'text' },
       notes: { col: 'notes', type: 'text' },
       source: { col: 'source', type: 'text' },
+      ...ARCH,
       ...CT,
     },
   },
@@ -118,6 +127,7 @@ export const TABLES: Record<string, TableSpec> = {
       status: { col: 'status', type: 'text' },
       extractedText: { col: 'extracted_text', type: 'text' },
       r2Key: { col: 'r2_key', type: 'text' },
+      ...ARCH,
       ...CT,
     },
   },
@@ -180,6 +190,7 @@ export const TABLES: Record<string, TableSpec> = {
       jointPain: { col: 'joint_pain', type: 'int' },
       headache: { col: 'headache', type: 'int' },
       notes: { col: 'notes', type: 'text' },
+      ...ARCH,
       ...CT,
     },
   },
@@ -221,6 +232,7 @@ export const TABLES: Record<string, TableSpec> = {
       hrvMs: { col: 'hrv_ms', type: 'real' },
       sleepHours: { col: 'sleep_hours', type: 'real' },
       externalKey: { col: 'external_key', type: 'text' },
+      ...ARCH,
       ...CT,
     },
   },

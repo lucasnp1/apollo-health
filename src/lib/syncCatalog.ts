@@ -106,6 +106,7 @@ export const TABLES: TableSpec[] = [
       compoundId: 'text',
       vialId: 'text',
       protocolDoseId: 'text',
+      archivedAt: 'int',
     },
     foreignKeys: [
       { field: 'compoundId', targetTable: 'compounds' },
@@ -123,6 +124,7 @@ export const TABLES: TableSpec[] = [
       addedAt: 'text',
       status: 'text',
       extractedText: 'text',
+      archivedAt: 'int',
       // blob is intentionally excluded — sync metadata only. R2 wiring is a later phase.
     },
   },
@@ -138,6 +140,7 @@ export const TABLES: TableSpec[] = [
       labName: 'text',
       notes: 'text',
       sourceFileId: 'text',
+      archivedAt: 'int',
     },
     foreignKeys: [{ field: 'sourceFileId', targetTable: 'files' }],
   },
@@ -155,6 +158,7 @@ export const TABLES: TableSpec[] = [
       notes: 'text',
       source: 'text',
       examId: 'text',
+      archivedAt: 'int',
     },
     foreignKeys: [{ field: 'examId', targetTable: 'exams' }],
   },
@@ -170,6 +174,7 @@ export const TABLES: TableSpec[] = [
       waistCm: 'real',
       bodyFatPct: 'real',
       notes: 'text',
+      archivedAt: 'int',
     },
   },
   {
@@ -187,6 +192,7 @@ export const TABLES: TableSpec[] = [
       jointPain: 'int',
       headache: 'int',
       notes: 'text',
+      archivedAt: 'int',
     },
   },
   {
@@ -225,6 +231,7 @@ export const TABLES: TableSpec[] = [
       hrvMs: 'real',
       sleepHours: 'real',
       externalKey: 'text',
+      archivedAt: 'int',
     },
   },
 ]

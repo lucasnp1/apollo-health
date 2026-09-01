@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { CloudDownload, FileText, Trash2 } from 'lucide-react'
+import { Archive, CloudDownload, FileText } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { db } from '../lib/db'
 import { ensureBlobAvailable } from '../lib/fileSync'
+import { setFileArchived } from '../lib/archive'
 import { usePlan } from '../lib/plan'
 import { DashGrid } from '../components/dashboard/Grid'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
@@ -11,17 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { HealthFile } from '../lib/db'
 
 type StoredFile = HealthFile
-
-// Remove a synced row the sync-safe way: tombstone it (so the delete propagates
-// to the server and other devices) if it's ever synced, else hard-delete.
-async function softRemove(
-  table: { update: (id: number, mods: object) => Promise<number>; delete: (id: number) => Promise<void> },
-  row: { id?: number; serverId?: string },
-) {
-  if (row.id == null) return
-  if (row.serverId) await table.update(row.id, { deletedAtSync: Date.now(), dirty: 1, updatedAt: Date.now() })
-  else await table.delete(row.id)
-}
 
 export function Files({
   files,
@@ -84,28 +74,16 @@ function FileRow({ file, onReviewFile }: { file: StoredFile; onReviewFile?: (id:
 
   // Delete the file AND everything it imported (its exam + results), so removing
   // an import cleans up after itself.
-  async function remove() {
+  async function archive() {
     if (!file.id) return
-    const exams = await db.exams.where('sourceFileId').equals(file.id).filter((e) => !e.deletedAtSync).toArray()
-    const resultsByExam = new Map<number, Array<{ id?: number; serverId?: string }>>()
+    const exams = await db.exams.where('sourceFileId').equals(file.id).filter((e) => !e.archivedAt).toArray()
     let resultCount = 0
-    for (const ex of exams) {
-      const rs = await db.results.where('examId').equals(ex.id!).filter((r) => !r.deletedAtSync).toArray()
-      resultsByExam.set(ex.id!, rs)
-      resultCount += rs.length
-    }
+    for (const ex of exams) resultCount += await db.results.where('examId').equals(ex.id!).filter((r) => !r.archivedAt).count()
     const msg = exams.length
-      ? `Delete "${file.name}" and the ${resultCount} result${resultCount === 1 ? '' : 's'} imported from it? This cannot be undone.`
-      : `Delete "${file.name}"? This cannot be undone.`
+      ? `Archive "${file.name}" and the ${resultCount} result${resultCount === 1 ? '' : 's'} imported from it? You can restore it later from the Archive.`
+      : `Archive "${file.name}"? You can restore it later from the Archive.`
     if (!confirm(msg)) return
-
-    await db.transaction('rw', db.files, db.exams, db.results, async () => {
-      for (const ex of exams) {
-        for (const r of resultsByExam.get(ex.id!) ?? []) await softRemove(db.results, r)
-        await softRemove(db.exams, ex)
-      }
-      await softRemove(db.files, file)
-    })
+    await setFileArchived(file.id, true)
   }
 
   return (
@@ -130,8 +108,8 @@ function FileRow({ file, onReviewFile }: { file: StoredFile; onReviewFile?: (id:
           <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" disabled={!canOpen || busy} onClick={open}>
             {busy ? '…' : hasLocal ? 'Open' : <><CloudDownload className="size-3" /> Fetch</>}
           </Button>
-          <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" onClick={remove} aria-label="Delete file">
-            <Trash2 className="size-3.5" />
+          <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={archive} aria-label="Archive file" title="Archive">
+            <Archive className="size-3.5" />
           </Button>
         </div>
       </TableCell>

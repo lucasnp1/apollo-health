@@ -38,6 +38,7 @@ const Labs      = lazy(() => import('./views/Labs').then(m => ({ default: m.Labs
 const Targets   = lazy(() => import('./views/Targets').then(m => ({ default: m.Targets })))
 const Timeline  = lazy(() => import('./views/Timeline').then(m => ({ default: m.Timeline })))
 const Files     = lazy(() => import('./views/Files').then(m => ({ default: m.Files })))
+const Archive   = lazy(() => import('./views/Archive').then(m => ({ default: m.Archive })))
 const Settings  = lazy(() => import('./views/Settings').then(m => ({ default: m.Settings })))
 import './index.css'
 
@@ -224,7 +225,7 @@ function Shell({
       // Fetch only the most recent 500 injections — enough for all UI needs
       const all = await db.injections
         .orderBy('takenAt').reverse()
-        .filter(i => !i.deletedAtSync)
+        .filter(i => !i.deletedAtSync && !i.archivedAt)
         .limit(500)
         .toArray()
       // Deduplicate sync phantoms: same compound + dose + minute bucket
@@ -244,11 +245,11 @@ function Shell({
   )
   // Vitals: cap at 200 — charts only show last 50, stats use last 14
   const vitals = useLiveQuery(
-    () => db.vitals.orderBy('measuredAt').reverse().limit(200).toArray(),
+    () => db.vitals.orderBy('measuredAt').reverse().filter((v) => !v.archivedAt).limit(200).toArray(),
     [], [],
   )
   const exams = useLiveQuery(
-    () => db.exams.orderBy('collectedAt').reverse().filter((e) => !e.deletedAtSync).toArray(),
+    () => db.exams.orderBy('collectedAt').reverse().filter((e) => !e.deletedAtSync && !e.archivedAt).toArray(),
     [], [],
   )
   // Duplicate detection: if an exam with the same source filename already
@@ -265,7 +266,7 @@ function Shell({
       : undefined
   }, [pdfReviewFile, exams])
   const results = useLiveQuery(
-    () => db.results.filter((r) => !r.deletedAtSync).toArray(),
+    () => db.results.filter((r) => !r.deletedAtSync && !r.archivedAt).toArray(),
     [], [],
   )
   // Kept for Settings export; protocol scheduling UI was removed.
@@ -273,9 +274,9 @@ function Shell({
     () => db.protocols.toArray(),
     [], [],
   )
-  const bodyMetrics = useLiveQuery(() => db.bodyMetrics.orderBy('measuredAt').reverse().limit(200).toArray(), [], [])
-  const symptoms = useLiveQuery(() => db.symptoms.orderBy('recordedAt').reverse().limit(200).toArray(), [], [])
-  const files = useLiveQuery(() => db.files.orderBy('addedAt').reverse().filter((f) => !f.deletedAtSync).toArray(), [], [])
+  const bodyMetrics = useLiveQuery(() => db.bodyMetrics.orderBy('measuredAt').reverse().filter((b) => !b.archivedAt).limit(200).toArray(), [], [])
+  const symptoms = useLiveQuery(() => db.symptoms.orderBy('recordedAt').reverse().filter((s) => !s.archivedAt).limit(200).toArray(), [], [])
+  const files = useLiveQuery(() => db.files.orderBy('addedAt').reverse().filter((f) => !f.deletedAtSync && !f.archivedAt).toArray(), [], [])
 
   const examMap = useMemo(() => new Map(exams.map((e) => [e.id, e])), [exams])
   const enrichedResults = useMemo(
@@ -389,6 +390,7 @@ function Shell({
               symptoms={symptoms ?? []}
             />
           )}
+          {activeView === 'archive' && <Archive />}
           {activeView === 'settings' && (
             <Settings
               auth={auth}
@@ -398,6 +400,7 @@ function Shell({
               exams={exams}
               protocols={protocols}
               onExport={() => (isPro ? setActiveView('export') : openUpgrade('Doctor export'))}
+              onOpenArchive={() => setActiveView('archive')}
             />
           )}
         </Suspense>
@@ -445,6 +448,7 @@ function titleFor(view: View) {
     timeline: 'Timeline',
     files: 'Files',
     export: 'Export',
+    archive: 'Archive',
     settings: 'Settings',
   }
   return map[view]

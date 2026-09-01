@@ -9,6 +9,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type LabExam, type VitalLog } from '../lib/db'
 import { extractMarkersFromText } from '../lib/pdf'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
+import { archiveRow, restoreRow } from '../lib/archive'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
 import { LabComposites } from '../components/LabComposites'
@@ -295,8 +296,8 @@ function MarkerHistoryPane({
                     variant="ghost"
                     size="icon"
                     className="size-6 text-muted-foreground opacity-40 hover:text-destructive group-hover:opacity-100"
-                    title="Delete this result"
-                    aria-label="Delete result"
+                    title="Archive this result"
+                    aria-label="Archive result"
                     onClick={() => onDelete(entry.resultId!)}
                   >
                     <Trash2 className="size-3" />
@@ -630,13 +631,11 @@ export function Labs({
                 <MarkerHistoryPane
                   summary={selectedSummary}
                   onClose={() => setSelectedKey(null)}
-                  onDelete={async (id) => {
-                    const snapshot = await db.results.get(id)
-                    if (!snapshot) return
+                  onDelete={(id) => {
                     void deleteWithUndo({
-                      label: 'Lab result deleted',
-                      remove: () => db.results.delete(id),
-                      restore: () => db.results.put(snapshot),
+                      label: 'Lab result archived',
+                      remove: () => archiveRow('results', id),
+                      restore: () => restoreRow('results', id),
                     })
                   }}
                   onEditTarget={() => openTargetEdit(selectedSummary.key)}

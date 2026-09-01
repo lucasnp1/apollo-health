@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Bell, BellOff, Download, FileText, LogOut, RotateCcw, Send, Sparkles, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Archive as ArchiveIcon, Bell, BellOff, Download, FileText, LogOut, Send, Sparkles, Trash2, Upload } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -79,6 +79,7 @@ export function Settings({
   exams,
   protocols,
   onExport,
+  onOpenArchive,
 }: {
   auth: AuthBundle
   compounds?: Compound[]
@@ -87,6 +88,7 @@ export function Settings({
   exams?: LabExam[]
   protocols?: Protocol[]
   onExport: () => void
+  onOpenArchive: () => void
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -104,7 +106,7 @@ export function Settings({
           />
         </div>
         <div className="md:col-span-1 xl:col-span-3"><FeedbackSettings /></div>
-        <div className="md:col-span-2 xl:col-span-6"><TrashSettings compounds={compounds ?? []} /></div>
+        <div className="md:col-span-1 xl:col-span-3"><ArchiveCard onOpen={onOpenArchive} /></div>
         {/* Reset device / danger zone hidden for now — flip to re-enable. */}
         {SHOW_RESET_DEVICE && <div className="md:col-span-2 xl:col-span-6"><DangerSettings /></div>}
       </DashGrid>
@@ -161,76 +163,32 @@ function FeedbackSettings() {
   )
 }
 
-// ── Trash ────────────────────────────────────────────────────────────────
-// Lists soft-deleted injections (those with a sync tombstone set) so the
-// user can restore one before it's pushed to the server. Only injections
-// currently soft-delete on this app — other tables hard-delete, but the
-// undo toast catches those at the moment of deletion.
-function TrashSettings({ compounds }: { compounds: Compound[] }) {
-  const deleted = useLiveQuery(
-    () => db.injections
-      .filter((i) => i.deletedAtSync !== undefined && i.deletedAtSync !== null)
-      .toArray(),
-    [],
-    [],
-  )
-  const compoundMap = new Map(compounds.map((c) => [c.id, c]))
-  const sorted = [...deleted].sort((a, b) => (b.deletedAtSync ?? 0) - (a.deletedAtSync ?? 0))
-
-  async function restore(id: number) {
-    // Clear the tombstone + bump updatedAt so the sync engine pushes the
-    // restoration on the next tick. `.modify` removes the property cleanly
-    // (partial-update with undefined leaves the key in place).
-    await db.injections.where('id').equals(id).modify((row) => {
-      delete row.deletedAtSync
-      row.updatedAt = Date.now()
-      row.dirty = 1
-    })
-  }
-
-  async function purgeAll() {
-    if (!confirm('Permanently delete all trash? This cannot be undone.')) return
-    await db.injections.filter((i) => i.deletedAtSync !== undefined).delete()
-  }
+// ── Archive ────────────────────────────────────────────────────────────────
+// Removing anything in Apollo archives it (never a permanent delete). This card
+// counts what's archived and opens the full Archive view to restore from.
+function ArchiveCard({ onOpen }: { onOpen: () => void }) {
+  const count = useLiveQuery(async () => {
+    const counts = await Promise.all([
+      db.injections.filter((i) => !!i.archivedAt).count(),
+      db.vitals.filter((v) => !!v.archivedAt).count(),
+      db.bodyMetrics.filter((b) => !!b.archivedAt).count(),
+      db.symptoms.filter((s) => !!s.archivedAt).count(),
+      db.files.filter((f) => !!f.archivedAt).count(),
+      db.results.filter((r) => !!r.archivedAt).count(),
+    ])
+    return counts.reduce((a, b) => a + b, 0)
+  }, [], 0)
 
   return (
-    <PanelCard
-      subtitle="Recently deleted"
-      title="Trash"
-      action={sorted.length > 0 && (
-        <Button variant="outline" size="sm" onClick={purgeAll}>
-          <Trash2 className="size-3.5" /> Empty trash
-        </Button>
-      )}
-    >
-      {sorted.length === 0 ? (
+    <PanelCard className="h-full" subtitle="Removed items" title="Archive" action={<ArchiveIcon className="size-4 text-muted-foreground" />}>
+      <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
-          No recently deleted injections. Items you delete appear here until they sync.
+          Anything you remove is archived, never deleted. {count ? `${count} item${count === 1 ? '' : 's'} archived.` : 'Nothing archived yet.'}
         </p>
-      ) : (
-        <div className="flex flex-col">
-          {sorted.map((inj, i) => {
-            const c = compoundMap.get(inj.compoundId)
-            const deletedAt = inj.deletedAtSync ? new Date(inj.deletedAtSync) : null
-            return (
-              <div key={inj.id} className={cn('flex items-center gap-3 py-2.5', i > 0 && 'border-t')}>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {c?.name ?? 'Unknown compound'} · {inj.dose}{inj.unit ? ` ${inj.unit}` : ''}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    Logged {format(parseISO(inj.takenAt), 'MMM d, HH:mm')}
-                    {deletedAt && ` · Deleted ${format(deletedAt, 'MMM d, HH:mm')}`}
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" className="h-7 shrink-0 px-2.5 text-xs" onClick={() => inj.id !== undefined && restore(inj.id)}>
-                  <RotateCcw className="size-3" /> Restore
-                </Button>
-              </div>
-            )
-          })}
-        </div>
-      )}
+        <Button variant="outline" size="sm" className="self-start" onClick={onOpen}>
+          <ArchiveIcon className="size-3.5" /> Open archive
+        </Button>
+      </div>
     </PanelCard>
   )
 }

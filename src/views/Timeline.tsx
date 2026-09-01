@@ -384,7 +384,7 @@ export function Timeline({
   files: Array<{ id?: number; addedAt: string; name: string; status: string }>
   bodyMetrics: BodyMetric[]
 }) {
-  const symptoms = useLiveQuery(() => db.symptoms.toArray(), [], [])
+  const symptoms = useLiveQuery(() => db.symptoms.filter((s) => !s.archivedAt).toArray(), [], [])
 
   const [activeType, setActiveType] = useState<EventType | null>(null)
   const [activeCompoundId, setActiveCompoundId] = useState<number | null>(null)

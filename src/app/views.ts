@@ -8,4 +8,5 @@ export type View =
   | 'targets'
   | 'files'
   | 'export'
+  | 'archive'
   | 'settings'

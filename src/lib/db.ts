@@ -34,6 +34,8 @@ export type SyncFields = {
   updatedAt?: number
   // ms epoch — soft-delete tombstone.
   deletedAtSync?: number
+  // ms epoch — archived (hidden but kept + restorable). Not a delete.
+  archivedAt?: number
   // 1 = local changes not yet pushed to server.
   dirty?: 0 | 1
 }
@@ -64,6 +66,7 @@ export type VitalLog = {
   waistCm?: number
   bodyFatPct?: number
   notes?: string
+  archivedAt?: number
 }
 
 export type LabExam = {
@@ -167,6 +170,7 @@ export type Symptom = {
   jointPain?: number
   headache?: number
   notes?: string
+  archivedAt?: number
 }
 
 export type MarkerTarget = {
@@ -201,6 +205,7 @@ export type BodyMetric = {
   hrvMs?: number
   sleepHours?: number
   notes?: string
+  archivedAt?: number
   externalKey?: string // dedupe key from source (e.g., HK UUID)
 }
 
