@@ -3,6 +3,8 @@ import { AlertTriangle, Bell, BellOff, Download, FileText, LogOut, RotateCcw, Se
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
+import { api } from '../lib/api'
+import { useToast } from '../lib/toast'
 import { wipeLocalDatabase } from '../lib/lock'
 import { describeCadence } from '../lib/schedule'
 import type { useAuth } from '../lib/useAuth'
@@ -22,9 +24,6 @@ type AuthBundle = ReturnType<typeof useAuth>
 
 // Toggle to bring back the "Reset device" (wipe-all) card in Settings.
 const SHOW_RESET_DEVICE = false
-
-// Where the "Send feedback" button is addressed. One place to change later.
-const FEEDBACK_EMAIL = 'jocenildo@gmail.com'
 
 async function importJson(file: File) {
   const text = await file.text()
@@ -104,7 +103,7 @@ export function Settings({
             onExport={onExport}
           />
         </div>
-        <div className="md:col-span-1 xl:col-span-3"><FeedbackSettings auth={auth} /></div>
+        <div className="md:col-span-1 xl:col-span-3"><FeedbackSettings /></div>
         <div className="md:col-span-2 xl:col-span-6"><TrashSettings compounds={compounds ?? []} /></div>
         {/* Reset device / danger zone hidden for now — flip to re-enable. */}
         {SHOW_RESET_DEVICE && <div className="md:col-span-2 xl:col-span-6"><DangerSettings /></div>}
@@ -124,19 +123,24 @@ export function Settings({
 // One-tap feedback: user types a note, tapping Send opens their own email app
 // pre-addressed to us with the message + a little device context. Nothing is
 // sent automatically and no backend is involved.
-function FeedbackSettings({ auth }: { auth: AuthBundle }) {
+function FeedbackSettings() {
+  const { showToast } = useToast()
   const [msg, setMsg] = useState('')
-  const user = auth.state.status === 'authed' ? auth.state.user : null
+  const [sending, setSending] = useState(false)
 
-  function send() {
-    const body = [
-      msg.trim(),
-      '',
-      'Sent from Apollo Health',
-      user?.email ? `Account: ${user.email}` : '',
-      `Device: ${navigator.userAgent}`,
-    ].filter(Boolean).join('\n')
-    window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent('Apollo Health feedback')}&body=${encodeURIComponent(body)}`
+  async function send() {
+    const message = msg.trim()
+    if (!message || sending) return
+    setSending(true)
+    try {
+      await api.post('/api/feedback', { message })
+      setMsg('')
+      showToast({ message: 'Thanks. Your feedback was sent.' })
+    } catch {
+      showToast({ tone: 'error', message: 'Could not send. Please try again.' })
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -149,12 +153,9 @@ function FeedbackSettings({ auth }: { auth: AuthBundle }) {
           placeholder="What's working, what's broken, what you wish it did…"
           className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
         />
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] leading-tight text-muted-foreground">Opens your email app, addressed to us.</p>
-          <Button onClick={send} disabled={!msg.trim()} className="shrink-0">
-            <Send className="size-4" /> Send feedback
-          </Button>
-        </div>
+        <Button onClick={send} disabled={!msg.trim() || sending} className="self-start">
+          <Send className="size-4" /> {sending ? 'Sending…' : 'Send feedback'}
+        </Button>
       </div>
     </PanelCard>
   )
