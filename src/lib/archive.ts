@@ -27,15 +27,27 @@ export async function restoreRow(table: ArchivableTable, id: number): Promise<vo
   await tableOf(table).where('id').equals(id).modify((row: Archivable) => stamp(row, false))
 }
 
+// Archiving a lab exam (panel) also archives its results.
+export async function setExamArchived(examId: number, archive: boolean): Promise<void> {
+  await db.transaction('rw', db.exams, db.results, async () => {
+    await db.results.where('examId').equals(examId).modify((r: Archivable) => stamp(r, archive))
+    await db.exams.where('id').equals(examId).modify((r: Archivable) => stamp(r, archive))
+  })
+}
+
 // Archiving a lab file also archives the exam(s) + results it imported, so the
 // whole import moves to the archive together. Restore reverses it.
 export async function setFileArchived(fileId: number, archive: boolean): Promise<void> {
   await db.transaction('rw', db.files, db.exams, db.results, async () => {
     const exams = await db.exams.where('sourceFileId').equals(fileId).toArray()
     for (const ex of exams) {
-      await db.results.where('examId').equals(ex.id!).modify((r: Archivable) => stamp(r, archive))
-      if (ex.id != null) await db.exams.where('id').equals(ex.id).modify((r: Archivable) => stamp(r, archive))
+      if (ex.id != null) await setExamArchivedInner(ex.id, archive)
     }
     await db.files.where('id').equals(fileId).modify((r: Archivable) => stamp(r, archive))
   })
+}
+
+async function setExamArchivedInner(examId: number, archive: boolean): Promise<void> {
+  await db.results.where('examId').equals(examId).modify((r: Archivable) => stamp(r, archive))
+  await db.exams.where('id').equals(examId).modify((r: Archivable) => stamp(r, archive))
 }

@@ -1,10 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Brain, FileText, FlaskConical, HeartPulse, Scale, SlidersHorizontal, Syringe } from 'lucide-react'
+import { Archive as ArchiveIcon, Brain, FileText, FlaskConical, HeartPulse, Scale, SlidersHorizontal, Syringe } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { format, parseISO, startOfDay, startOfWeek, differenceInCalendarDays, isThisWeek, isToday, isYesterday } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type Symptom, type VitalLog } from '../lib/db'
 import { ALL_SYMPTOMS, chipTone } from '../lib/symptoms'
+import { archiveRow, restoreRow, setExamArchived, setFileArchived } from '../lib/archive'
+import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
@@ -98,13 +100,14 @@ function loadHidden(storageKey: string, cols: { key: string; defaultHidden?: boo
 }
 
 function DataGrid<T>({
-  columns, rows, rowKey, storageKey, empty,
+  columns, rows, rowKey, storageKey, empty, onArchive,
 }: {
   columns: Col<T>[]
   rows: T[]
   rowKey: (row: T) => string | number
   storageKey: string
   empty: string
+  onArchive?: (row: T) => void
 }) {
   const [hidden, setHidden] = useState<Set<string>>(() => loadHidden(storageKey, columns))
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -170,11 +173,12 @@ function DataGrid<T>({
                       {c.label}
                     </th>
                   ))}
+                  {onArchive && <th className="w-8 border-b border-border" aria-hidden="true" />}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={rowKey(row)} className="transition-colors hover:bg-muted/40">
+                  <tr key={rowKey(row)} className="group transition-colors hover:bg-muted/40">
                     {visible.map((c) => (
                       <td
                         key={c.key}
@@ -186,6 +190,19 @@ function DataGrid<T>({
                         {c.render(row)}
                       </td>
                     ))}
+                    {onArchive && (
+                      <td className="border-b border-border/60 px-2 py-2.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onArchive(row)}
+                          aria-label="Archive entry"
+                          title="Archive"
+                          className="rounded-md p-1 text-muted-foreground opacity-40 transition-opacity hover:text-foreground group-hover:opacity-100"
+                        >
+                          <ArchiveIcon className="size-3.5" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -215,7 +232,7 @@ const INJ_COLS: Col<InjRow>[] = [
   { key: 'notes', label: 'Notes', render: (r) => r.inj.notes || '—' },
 ]
 
-type WeightRow = { key: string; at: string; kg: number; delta?: number; source: string; notes?: string }
+type WeightRow = { key: string; id: number; at: string; kg: number; delta?: number; source: string; notes?: string }
 const SOURCE_LABEL: Record<string, string> = {
   manual: 'Manual', apple_health: 'Apple Health', capacitor_healthkit: 'HealthKit', health_connect: 'Health Connect',
 }
@@ -386,6 +403,21 @@ export function Timeline({
 }) {
   const symptoms = useLiveQuery(() => db.symptoms.filter((s) => !s.archivedAt).toArray(), [], [])
 
+  // Archiving an entry (never a delete) with an Undo toast. Restore is symmetric.
+  const undo = useUndoableDelete()
+  const archiveOne = (table: 'injections' | 'vitals' | 'bodyMetrics' | 'symptoms', id?: number) => {
+    if (id == null) return
+    void undo({ label: 'Archived', remove: () => archiveRow(table, id), restore: () => restoreRow(table, id) })
+  }
+  const archiveExamEntry = (id?: number) => {
+    if (id == null) return
+    void undo({ label: 'Archived', remove: () => setExamArchived(id, true), restore: () => setExamArchived(id, false) })
+  }
+  const archiveFileEntry = (id?: number) => {
+    if (id == null) return
+    void undo({ label: 'Archived', remove: () => setFileArchived(id, true), restore: () => setFileArchived(id, false) })
+  }
+
   const [activeType, setActiveType] = useState<EventType | null>(null)
   const [activeCompoundId, setActiveCompoundId] = useState<number | null>(null)
 
@@ -417,7 +449,7 @@ export function Timeline({
       .filter((b) => b.weightKg !== undefined)
       .map((b) => ({ id: b.id, at: b.measuredAt, kg: b.weightKg as number, source: b.source, notes: b.notes }))
       .sort((a, b) => a.at.localeCompare(b.at))
-    const withDelta = pts.map((p, i) => ({ key: `w-${p.id}`, at: p.at, kg: p.kg, source: p.source, notes: p.notes, delta: i > 0 ? p.kg - pts[i - 1].kg : undefined }))
+    const withDelta = pts.map((p, i) => ({ key: `w-${p.id}`, id: p.id!, at: p.at, kg: p.kg, source: p.source, notes: p.notes, delta: i > 0 ? p.kg - pts[i - 1].kg : undefined }))
     return withDelta.reverse()
   }, [bodyMetrics])
 
@@ -584,12 +616,12 @@ export function Timeline({
       )}
 
       {activeType === null && <TimelineGrouped events={events} />}
-      {activeType === 'injection' && <DataGrid columns={INJ_COLS} rows={injRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-injection" empty="No injections logged." />}
-      {activeType === 'weight' && <DataGrid columns={WEIGHT_COLS} rows={weightRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-weight" empty="No weight entries yet." />}
-      {activeType === 'bp' && <DataGrid columns={BP_COLS} rows={bpRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-bp" empty="No blood-pressure readings yet." />}
-      {activeType === 'symptom' && <DataGrid columns={SYM_COLS} rows={symRows} rowKey={(r) => r.id ?? r.recordedAt} storageKey="apollo-tl-cols-symptom" empty="No symptom check-ins yet." />}
-      {activeType === 'lab' && <DataGrid columns={LAB_COLS} rows={labRows} rowKey={(r) => r.id ?? r.name} storageKey="apollo-tl-cols-lab" empty="No lab exams yet." />}
-      {activeType === 'file' && <DataGrid columns={FILE_COLS} rows={fileRows} rowKey={(r) => r.id ?? r.name} storageKey="apollo-tl-cols-file" empty="No files yet." />}
+      {activeType === 'injection' && <DataGrid columns={INJ_COLS} rows={injRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-injection" empty="No injections logged." onArchive={(r) => archiveOne('injections', r.inj.id)} />}
+      {activeType === 'weight' && <DataGrid columns={WEIGHT_COLS} rows={weightRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-weight" empty="No weight entries yet." onArchive={(r) => archiveOne('bodyMetrics', r.id)} />}
+      {activeType === 'bp' && <DataGrid columns={BP_COLS} rows={bpRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-bp" empty="No blood-pressure readings yet." onArchive={(r) => archiveOne('vitals', r.v.id)} />}
+      {activeType === 'symptom' && <DataGrid columns={SYM_COLS} rows={symRows} rowKey={(r) => r.id ?? r.recordedAt} storageKey="apollo-tl-cols-symptom" empty="No symptom check-ins yet." onArchive={(r) => archiveOne('symptoms', r.id)} />}
+      {activeType === 'lab' && <DataGrid columns={LAB_COLS} rows={labRows} rowKey={(r) => r.id ?? r.name} storageKey="apollo-tl-cols-lab" empty="No lab exams yet." onArchive={(r) => archiveExamEntry(r.id)} />}
+      {activeType === 'file' && <DataGrid columns={FILE_COLS} rows={fileRows} rowKey={(r) => r.id ?? r.name} storageKey="apollo-tl-cols-file" empty="No files yet." onArchive={(r) => archiveFileEntry(r.id)} />}
     </PanelCard>
   )
 }
