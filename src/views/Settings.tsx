@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Bell, BellOff, Download, FlaskConical, LogOut, Moon, Printer, RotateCcw, Send, Sparkles, Sun, Trash2, Upload, UserCircle } from 'lucide-react'
+import { AlertTriangle, Bell, BellOff, Download, FileText, FlaskConical, LogOut, Moon, Printer, RotateCcw, Send, Sparkles, Sun, Trash2, Upload, UserCircle } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -80,6 +80,7 @@ export function Settings({
   vitals,
   exams,
   protocols,
+  onExport,
 }: {
   auth: AuthBundle
   compounds?: Compound[]
@@ -87,6 +88,7 @@ export function Settings({
   vitals?: VitalLog[]
   exams?: LabExam[]
   protocols?: Protocol[]
+  onExport: () => void
 }) {
   return (
     <DashGrid>
@@ -100,6 +102,7 @@ export function Settings({
           vitals={vitals}
           exams={exams}
           protocols={protocols}
+          onExport={onExport}
         />
       </div>
       <div className="md:col-span-1 xl:col-span-3"><FeedbackSettings auth={auth} /></div>
@@ -352,12 +355,14 @@ function BackupSettings({
   vitals,
   exams,
   protocols,
+  onExport,
 }: {
   compounds?: Compound[]
   injections?: InjectionLog[]
   vitals?: VitalLog[]
   exams?: LabExam[]
   protocols?: Protocol[]
+  onExport: () => void
 }) {
   const { isPro, openUpgrade } = usePlan()
   const [importing, setImporting] = useState(false)
@@ -380,24 +385,31 @@ function BackupSettings({
   }
 
   return (
-    <PanelCard className="h-full" subtitle="Backup &amp; export" title="Data export / import">
+    <PanelCard className="h-full" subtitle="Export & backup" title="Export your data">
       <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
-          Download a full JSON backup to transfer between devices, or import a backup file.
+          Export your log as a CSV sheet or PDF to share, for example with a doctor. You choose exactly what to include.
         </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={exportJson}>
-            <Download className="size-3.5" /> Download JSON
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <label className="cursor-pointer">
-              <input type="file" accept="application/json" hidden onChange={handleImport} disabled={importing} />
-              <Upload className="size-3.5" /> {importDone ? 'Imported ✓' : importing ? 'Importing…' : 'Import JSON'}
-            </label>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => (isPro ? window.print() : openUpgrade('Print report'))}>
-            <Printer className="size-3.5" /> Print report {!isPro && <Sparkles className="size-3 text-primary" />}
-          </Button>
+        <Button size="sm" className="self-start" onClick={onExport}>
+          <FileText className="size-3.5" /> Export CSV or PDF {!isPro && <Sparkles className="size-3" />}
+        </Button>
+
+        <div className="mt-1 border-t pt-3">
+          <p className="mb-2 text-xs text-muted-foreground">Full backup, to move everything to a new device.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={exportJson}>
+              <Download className="size-3.5" /> Backup file
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <label className="cursor-pointer">
+                <input type="file" accept="application/json" hidden onChange={handleImport} disabled={importing} />
+                <Upload className="size-3.5" /> {importDone ? 'Imported ✓' : importing ? 'Importing…' : 'Restore'}
+              </label>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => (isPro ? window.print() : openUpgrade('Print report'))}>
+              <Printer className="size-3.5" /> Print {!isPro && <Sparkles className="size-3 text-primary" />}
+            </Button>
+          </div>
         </div>
       </div>
       {/* Hidden print-only report — rendered in DOM, visible only when printing */}

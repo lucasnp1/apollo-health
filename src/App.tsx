@@ -378,6 +378,7 @@ function Shell({
               vitals={vitals}
               exams={exams}
               protocols={protocols}
+              onExport={() => (isPro ? setExportOpen(true) : openUpgrade('Doctor export'))}
             />
           )}
         </Suspense>
