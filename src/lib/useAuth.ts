@@ -34,11 +34,23 @@ export function useAuth() {
     })()
   }, [])
 
+  // After the login/signup POST sets the cookie, fetch /me so the user carries
+  // the full server state (plan + onboarded), not just the auth endpoint's
+  // partial response.
+  async function hydrate(fallback: ApiUser): Promise<ApiUser> {
+    try {
+      const me = await api.get<{ user: ApiUser | null }>('/api/auth/me')
+      return me.user ?? fallback
+    } catch {
+      return fallback
+    }
+  }
+
   const login = useCallback(async (payload: LoginPayload) => {
     setError('')
     try {
       const res = await api.post<{ user: ApiUser }>('/api/auth/login', payload)
-      setState({ status: 'authed', user: res.user })
+      setState({ status: 'authed', user: await hydrate(res.user) })
       return true
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed')
@@ -50,7 +62,7 @@ export function useAuth() {
     setError('')
     try {
       const res = await api.post<{ user: ApiUser }>('/api/auth/signup', payload)
-      setState({ status: 'authed', user: res.user })
+      setState({ status: 'authed', user: await hydrate(res.user) })
       return true
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Signup failed')

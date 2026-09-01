@@ -51,6 +51,8 @@ export type AuthedUser = {
   plan_kind?: string | null
   plan_until?: number | null
   is_pro?: boolean
+  // First-run onboarding — true once the account has seen it.
+  onboarded?: boolean
 }
 
 // PagesFunction handler type (matches Cloudflare's @cloudflare/workers-types).

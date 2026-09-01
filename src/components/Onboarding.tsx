@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { Check, MoreVertical, Share, ShieldCheck, Syringe } from 'lucide-react'
 import { BrandMark } from './BrandMark'
 import { Button } from '@/components/ui/button'
 import { spring } from './motion'
 import { useInstallPrompt } from '../lib/useInstallPrompt'
+import { api } from '../lib/api'
 
 export const ONBOARDED_KEY = 'apollo.onboarded'
 
@@ -14,6 +15,14 @@ export const ONBOARDED_KEY = 'apollo.onboarded'
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0)
   const { platform, standalone, canInstall, promptInstall } = useInstallPrompt()
+
+  // Mark onboarding done the moment it appears — on the account (so it never
+  // shows again on any device) and locally (offline fallback). This way closing
+  // it without finishing still counts as "seen once".
+  useEffect(() => {
+    try { localStorage.setItem(ONBOARDED_KEY, '1') } catch { /* ignore */ }
+    void api.post('/api/auth/onboarded').catch(() => {})
+  }, [])
 
   function finish() {
     try { localStorage.setItem(ONBOARDED_KEY, '1') } catch { /* ignore */ }

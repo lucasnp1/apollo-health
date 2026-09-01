@@ -40,10 +40,10 @@ import './index.css'
 function App() {
   const [activeView, setActiveView] = useState<View>('overview')
   const auth = useAuth()
-  // First-run onboarding is per-device: show it once until dismissed/completed.
-  const [onboardingDone, setOnboardingDone] = useState(() => {
-    try { return localStorage.getItem(ONBOARDED_KEY) === '1' } catch { return true }
-  })
+  // First-run onboarding is tracked per ACCOUNT (user.onboarded), with a local
+  // flag as an offline fallback. `dismissed` hides it for the current session
+  // the moment it's finished, before the account refresh lands.
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false)
   // Upgrade paywall — opened by any gated Pro feature.
   const [upgrade, setUpgrade] = useState<{ open: boolean; feature?: string }>({ open: false })
   const openUpgrade = useCallback((feature?: string) => setUpgrade({ open: true, feature }), [])
@@ -73,6 +73,11 @@ function App() {
   // Only 'authed' reaches Shell now — an account is required, so every user's
   // data syncs to the server (local-first, but always backed up).
 
+  const authedUser = auth.state.status === 'authed' ? auth.state.user : null
+  let localOnboarded = false
+  try { localOnboarded = localStorage.getItem(ONBOARDED_KEY) === '1' } catch { /* ignore */ }
+  const showOnboarding = !onboardingDismissed && authedUser != null && !authedUser.onboarded && !localOnboarded
+
   return (
     <ToastProvider>
       <PlanProvider value={{ isPro: auth.isPro, openUpgrade }}>
@@ -83,7 +88,7 @@ function App() {
         />
       </PlanProvider>
       <UpgradeDialog open={upgrade.open} feature={upgrade.feature} onClose={() => setUpgrade({ open: false })} />
-      {!onboardingDone && <Onboarding onDone={() => setOnboardingDone(true)} />}
+      {showOnboarding && <Onboarding onDone={() => setOnboardingDismissed(true)} />}
     </ToastProvider>
   )
 }

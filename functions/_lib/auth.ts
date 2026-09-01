@@ -32,12 +32,12 @@ export async function readSession(env: Env, request: Request): Promise<AuthedUse
 
   const row = await env.DB
     .prepare(
-      `SELECT u.id, u.email, u.is_admin, u.display_name, u.plan, u.plan_kind, u.plan_until, s.expires_at
+      `SELECT u.id, u.email, u.is_admin, u.display_name, u.plan, u.plan_kind, u.plan_until, u.onboarded_at, s.expires_at
        FROM sessions s JOIN users u ON s.user_id = u.id
        WHERE s.token = ?`,
     )
     .bind(token)
-    .first<{ id: string; email: string; is_admin: number; display_name: string | null; plan: string | null; plan_kind: string | null; plan_until: number | null; expires_at: number }>()
+    .first<{ id: string; email: string; is_admin: number; display_name: string | null; plan: string | null; plan_kind: string | null; plan_until: number | null; onboarded_at: number | null; expires_at: number }>()
 
   if (!row) return null
   if (row.expires_at < Date.now()) {
@@ -55,6 +55,7 @@ export async function readSession(env: Env, request: Request): Promise<AuthedUse
     plan_kind: row.plan_kind,
     plan_until: row.plan_until,
     is_pro: isProUser(env, row),
+    onboarded: row.onboarded_at != null,
   }
 }
 

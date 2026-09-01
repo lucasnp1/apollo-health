@@ -10,6 +10,7 @@ export type ApiUser = {
   plan_kind?: 'monthly' | 'yearly' | 'lifetime' | null
   plan_until?: number | null
   is_pro?: boolean
+  onboarded?: boolean
 }
 
 export class ApiError extends Error {
