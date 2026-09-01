@@ -76,7 +76,7 @@ export type LabExam = {
   labName?: string
   sourceFileId?: number
   notes?: string
-}
+} & SyncFields
 
 export type LabResult = {
   id?: number
@@ -90,7 +90,7 @@ export type LabResult = {
   status?: string
   notes?: string
   source?: string
-}
+} & SyncFields
 
 export type HealthFile = {
   id?: number

@@ -34,6 +34,7 @@ const AddInjection = lazy(() => import('./views/AddInjection').then(m => ({ defa
 const Labs      = lazy(() => import('./views/Labs').then(m => ({ default: m.Labs })))
 const Targets   = lazy(() => import('./views/Targets').then(m => ({ default: m.Targets })))
 const Timeline  = lazy(() => import('./views/Timeline').then(m => ({ default: m.Timeline })))
+const Files     = lazy(() => import('./views/Files').then(m => ({ default: m.Files })))
 const Settings  = lazy(() => import('./views/Settings').then(m => ({ default: m.Settings })))
 import './index.css'
 
@@ -244,7 +245,7 @@ function Shell({
     [], [],
   )
   const exams = useLiveQuery(
-    () => db.exams.orderBy('collectedAt').reverse().toArray(),
+    () => db.exams.orderBy('collectedAt').reverse().filter((e) => !e.deletedAtSync).toArray(),
     [], [],
   )
   // Duplicate detection: if an exam with the same source filename already
@@ -261,7 +262,7 @@ function Shell({
       : undefined
   }, [pdfReviewFile, exams])
   const results = useLiveQuery(
-    () => db.results.toArray(),
+    () => db.results.filter((r) => !r.deletedAtSync).toArray(),
     [], [],
   )
   // Kept for Settings export; protocol scheduling UI was removed.
@@ -271,7 +272,7 @@ function Shell({
   )
   const bodyMetrics = useLiveQuery(() => db.bodyMetrics.orderBy('measuredAt').reverse().limit(200).toArray(), [], [])
   const symptoms = useLiveQuery(() => db.symptoms.orderBy('recordedAt').reverse().limit(200).toArray(), [], [])
-  const files = useLiveQuery(() => db.files.orderBy('addedAt').reverse().toArray(), [], [])
+  const files = useLiveQuery(() => db.files.orderBy('addedAt').reverse().filter((f) => !f.deletedAtSync).toArray(), [], [])
 
   const examMap = useMemo(() => new Map(exams.map((e) => [e.id, e])), [exams])
   const enrichedResults = useMemo(
@@ -365,6 +366,9 @@ function Shell({
           {activeView === 'targets' && <Targets />}
           {activeView === 'timeline' && (
             <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} bodyMetrics={bodyMetrics} />
+          )}
+          {activeView === 'files' && (
+            <Files files={files ?? []} onReviewFile={(id) => setPdfReviewFileId(id)} />
           )}
           {activeView === 'settings' && (
             <Settings

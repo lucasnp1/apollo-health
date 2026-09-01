@@ -1,64 +1,38 @@
 import { useState } from 'react'
-import { CloudDownload, FileText, Trash2, UploadCloud } from 'lucide-react'
+import { CloudDownload, FileText, Trash2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { db } from '../lib/db'
-import { extractPdfText } from '../lib/pdf'
 import { ensureBlobAvailable } from '../lib/fileSync'
+import { usePlan } from '../lib/plan'
 import { DashGrid } from '../components/dashboard/Grid'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-
 import type { HealthFile } from '../lib/db'
+
 type StoredFile = HealthFile
+
+// Remove a synced row the sync-safe way: tombstone it (so the delete propagates
+// to the server and other devices) if it's ever synced, else hard-delete.
+async function softRemove(
+  table: { update: (id: number, mods: object) => Promise<number>; delete: (id: number) => Promise<void> },
+  row: { id?: number; serverId?: string },
+) {
+  if (row.id == null) return
+  if (row.serverId) await table.update(row.id, { deletedAtSync: Date.now(), dirty: 1, updatedAt: Date.now() })
+  else await table.delete(row.id)
+}
 
 export function Files({
   files,
+  onReviewFile,
 }: {
   files: Array<StoredFile>
+  onReviewFile?: (id: number) => void
 }) {
-  const [busy, setBusy] = useState(false)
-
-  async function onFileUpload(list: FileList | null) {
-    const file = list?.[0]
-    if (!file) return
-    setBusy(true)
-    try {
-      const extractedText = file.type === 'application/pdf' ? await extractPdfText(file) : ''
-      await db.files.add({
-        name: file.name,
-        type: file.type || 'application/octet-stream',
-        size: file.size,
-        addedAt: new Date().toISOString(),
-        status: extractedText ? 'Needs review' : 'Stored',
-        extractedText,
-        blob: file,
-      })
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <DashGrid>
-      <PanelCard
-        className="md:col-span-2 xl:col-span-2"
-        subtitle="Local extraction"
-        title="Upload exam"
-        action={<UploadCloud className="size-4 text-muted-foreground" />}
-      >
-        <div className="flex flex-col gap-3">
-          <Button asChild className="self-start">
-            <label className="cursor-pointer">
-              <input type="file" accept="application/pdf,image/*" hidden onChange={(e) => onFileUpload(e.target.files)} />
-              {busy ? 'Reading…' : 'Choose PDF or image'}
-            </label>
-          </Button>
-          <p className="text-xs text-muted-foreground">PDF text extraction runs in your browser. Nothing is uploaded.</p>
-        </div>
-      </PanelCard>
-
-      <PanelCard className="md:col-span-2 xl:col-span-4" subtitle="Storage" title="Local files">
+      <PanelCard className="md:col-span-2 xl:col-span-6" subtitle="Imported lab PDFs" title="Files">
         {files.length > 0 ? (
           <Table>
             <TableHeader>
@@ -67,55 +41,71 @@ export function Files({
                 <TableHead className="hidden md:table-cell">Size</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Added</TableHead>
-                <TableHead className="w-[120px] text-right">Actions</TableHead>
+                <TableHead className="w-[160px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {files.map((f) => <FileRow file={f} key={f.id} />)}
+              {files.map((f) => <FileRow file={f} key={f.id} onReviewFile={onReviewFile} />)}
             </TableBody>
           </Table>
         ) : (
-          <PanelEmpty icon={FileText} title="No files" detail="PDF lab reports get parsed and prepared for review." />
+          <PanelEmpty icon={FileText} title="No files yet" detail="Upload a lab PDF from the Lab results screen to import and manage it here." />
         )}
       </PanelCard>
     </DashGrid>
   )
 }
 
-function FileRow({ file }: { file: StoredFile }) {
+function FileRow({ file, onReviewFile }: { file: StoredFile; onReviewFile?: (id: number) => void }) {
+  const { isPro, openUpgrade } = usePlan()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const hasLocal = Boolean(file.blob)
   const hasRemote = Boolean(file.r2Key)
   const canOpen = hasLocal || hasRemote
   const location = !hasLocal && hasRemote ? 'in cloud' : hasLocal && !hasRemote ? 'local only' : null
+  const needsReview = file.status === 'Needs review'
 
   async function open() {
     setError(null)
     setBusy(true)
     try {
       const blob = hasLocal ? file.blob! : await ensureBlobAvailable(file)
-      if (!blob) {
-        setError('Blob unavailable')
-        return
-      }
+      if (!blob) { setError('File is unavailable'); return }
       const url = URL.createObjectURL(blob)
       window.open(url, '_blank', 'noopener')
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Open failed')
+      setError(e instanceof Error ? e.message : 'Could not open the file')
     } finally {
       setBusy(false)
     }
   }
 
+  // Delete the file AND everything it imported (its exam + results), so removing
+  // an import cleans up after itself.
   async function remove() {
     if (!file.id) return
-    if (file.serverId) {
-      await db.files.update(file.id, { deletedAtSync: Date.now(), dirty: 1 })
-    } else {
-      await db.files.delete(file.id)
+    const exams = await db.exams.where('sourceFileId').equals(file.id).filter((e) => !e.deletedAtSync).toArray()
+    const resultsByExam = new Map<number, Array<{ id?: number; serverId?: string }>>()
+    let resultCount = 0
+    for (const ex of exams) {
+      const rs = await db.results.where('examId').equals(ex.id!).filter((r) => !r.deletedAtSync).toArray()
+      resultsByExam.set(ex.id!, rs)
+      resultCount += rs.length
     }
+    const msg = exams.length
+      ? `Delete "${file.name}" and the ${resultCount} result${resultCount === 1 ? '' : 's'} imported from it? This cannot be undone.`
+      : `Delete "${file.name}"? This cannot be undone.`
+    if (!confirm(msg)) return
+
+    await db.transaction('rw', db.files, db.exams, db.results, async () => {
+      for (const ex of exams) {
+        for (const r of resultsByExam.get(ex.id!) ?? []) await softRemove(db.results, r)
+        await softRemove(db.exams, ex)
+      }
+      await softRemove(db.files, file)
+    })
   }
 
   return (
@@ -128,12 +118,15 @@ function FileRow({ file }: { file: StoredFile }) {
         {error && <p className="mt-0.5 text-xs text-destructive">{error}</p>}
       </TableCell>
       <TableCell className="hidden font-mono text-xs tabular-nums text-muted-foreground md:table-cell">{Math.round(file.size / 1024)} KB</TableCell>
-      <TableCell className="text-xs text-muted-foreground">
-        {file.status}{location ? ` · ${location}` : ''}
-      </TableCell>
+      <TableCell className="text-xs text-muted-foreground">{file.status}{location ? ` · ${location}` : ''}</TableCell>
       <TableCell className="hidden font-mono text-xs tabular-nums text-muted-foreground md:table-cell">{format(parseISO(file.addedAt), 'MMM d')}</TableCell>
       <TableCell className="text-right">
         <div className="flex justify-end gap-1">
+          {needsReview && onReviewFile && file.id != null && (
+            <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" onClick={() => (isPro ? onReviewFile(file.id!) : openUpgrade('Lab PDF import'))}>
+              Review
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs" disabled={!canOpen || busy} onClick={open}>
             {busy ? '…' : hasLocal ? 'Open' : <><CloudDownload className="size-3" /> Fetch</>}
           </Button>

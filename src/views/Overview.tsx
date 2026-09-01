@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { CalendarClock, FlaskConical, HeartPulse, Scale, Settings, Syringe } from 'lucide-react'
+import { CalendarClock, FlaskConical, FolderOpen, HeartPulse, Scale, Settings, Syringe } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { format } from 'date-fns'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '../lib/db'
@@ -27,6 +27,7 @@ const CARDS: LaunchItem[] = [
 // Bottom launcher — navigation to full pages (replaces the old sidebar).
 const BOTTOM_CARDS: LaunchItem[] = [
   { view: 'timeline', label: 'Timeline', sub: 'All your activity', icon: CalendarClock, chip: 'bg-violet-500/12 text-violet-600 dark:text-violet-400' },
+  { view: 'files', label: 'Files', sub: 'Manage imports', icon: FolderOpen, chip: 'bg-amber-500/12 text-amber-600 dark:text-amber-400' },
   { view: 'settings', label: 'Settings', sub: 'Account & data', icon: Settings, chip: 'bg-muted text-muted-foreground' },
 ]
 
