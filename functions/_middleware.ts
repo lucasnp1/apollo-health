@@ -26,7 +26,10 @@ const SECURITY_HEADERS: Record<string, string> = {
   // we've removed inline styles entirely.
   'Content-Security-Policy': [
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval' blob:",
+    // The sha256 allows the one inline <script> shared by public/privacy.html
+    // and public/terms.html (it applies the stored app theme before paint).
+    // Recompute the hash if that script ever changes.
+    "script-src 'self' 'wasm-unsafe-eval' blob: 'sha256-hZU8sZIrevirxTVVRCalYa/tp5CDe5Sy9hHVWkxilYQ='",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
