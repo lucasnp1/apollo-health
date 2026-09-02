@@ -14,6 +14,11 @@ export default defineConfig({
   build: {
     // Vite 8 / Rolldown chunk splitting
     rolldownOptions: {
+      // Two pages: the marketing landing at / and the app at /app/.
+      input: {
+        landing: fileURLToPath(new URL('./index.html', import.meta.url)),
+        app: fileURLToPath(new URL('./app/index.html', import.meta.url)),
+      },
       output: {
         advancedChunks: {
           groups: [
@@ -41,7 +46,10 @@ export default defineConfig({
         // never precached.
         globIgnores: ['ocr/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-        // Never serve the app shell for the API or the static legal pages.
+        // The app shell only answers navigations under /app/. The landing
+        // page, legal pages and the API always go to the network.
+        navigateFallback: '/app/index.html',
+        navigateFallbackAllowlist: [/^\/app(\/|$)/],
         navigateFallbackDenylist: [/^\/local-seed\//, /^\/api\//, /^\/privacy/, /^\/terms/],
       },
       manifest: {
@@ -53,7 +61,9 @@ export default defineConfig({
         theme_color: '#14161c',
         background_color: '#14161c',
         display: 'standalone',
-        start_url: '/',
+        id: '/app/',
+        start_url: '/app/',
+        scope: '/app/',
         icons: [
           { src: '/logo-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/logo-256.png', sizes: '256x256', type: 'image/png', purpose: 'any' },

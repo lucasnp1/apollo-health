@@ -38,5 +38,5 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   ])
 
   const origin = (env.APP_URL || new URL(request.url).origin).replace(/\/$/, '')
-  return jsonOk({ link: `${origin}/reset?token=${encodeURIComponent(token)}`, expiresAt: now + TTL_MS })
+  return jsonOk({ link: `${origin}/app/reset?token=${encodeURIComponent(token)}`, expiresAt: now + TTL_MS })
 })

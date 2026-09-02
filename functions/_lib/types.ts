@@ -2,6 +2,8 @@
 
 export type Env = {
   DB: D1Database
+  // Static assets of the deployment (Pages provides this binding).
+  ASSETS: { fetch: (request: Request) => Promise<Response> }
   FILES?: R2Bucket // optional until the bucket binding is configured.
   // Billing (Stripe). All optional; gating is off until BILLING_ENABLED === '1'
   // and STRIPE_SECRET_KEY is set. Add these as Cloudflare Pages secrets.

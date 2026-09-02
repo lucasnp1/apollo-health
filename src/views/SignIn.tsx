@@ -31,9 +31,23 @@ function lockedOutMailto(email: string): string {
   return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
+// The landing page's email forms land here as /app/?signup=1&email=...
+function landingIntent(): { mode: Mode; email: string } {
+  try {
+    const p = new URLSearchParams(window.location.search)
+    const email = p.get('email') ?? ''
+    const mode: Mode = p.get('signup') === '1' ? 'signup' : 'login'
+    if (p.has('signup') || p.has('email')) window.history.replaceState({}, '', window.location.pathname)
+    return { mode, email }
+  } catch {
+    return { mode: 'login', email: '' }
+  }
+}
+
 export function SignIn({ auth }: { auth: AuthBundle }) {
-  const [mode, setMode] = useState<Mode>('login')
-  const [email, setEmail] = useState('')
+  const [intent] = useState(landingIntent)
+  const [mode, setMode] = useState<Mode>(intent.mode)
+  const [email, setEmail] = useState(intent.email)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [displayName, setDisplayName] = useState('')

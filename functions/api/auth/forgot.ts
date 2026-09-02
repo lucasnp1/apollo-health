@@ -60,7 +60,7 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
       .run()
 
     const origin = env.APP_URL || new URL(request.url).origin
-    const link = `${origin.replace(/\/$/, '')}/reset?token=${encodeURIComponent(token)}`
+    const link = `${origin.replace(/\/$/, '')}/app/reset?token=${encodeURIComponent(token)}`
     try {
       await sendMail(env, { to: user.email, ...passwordResetMail(link) })
     } catch (err) {

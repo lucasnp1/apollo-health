@@ -57,7 +57,7 @@ function App() {
   // The emailed reset link lands on /reset?token=... It is handled before the
   // auth gate so it works whether or not a session exists on this device.
   const resetToken = useMemo(() => {
-    if (window.location.pathname !== '/reset') return null
+    if (!/^\/app\/reset\/?$/.test(window.location.pathname)) return null
     return new URLSearchParams(window.location.search).get('token')
   }, [])
   const [resetDone, setResetDone] = useState(false)
@@ -68,9 +68,9 @@ function App() {
     }
   }, [auth.state.status])
 
-  // A bare /reset (no token) is just the app.
+  // A bare /app/reset (no token) is just the app.
   useEffect(() => {
-    if (window.location.pathname === '/reset' && !resetToken) window.history.replaceState({}, '', '/')
+    if (/^\/app\/reset\/?$/.test(window.location.pathname) && !resetToken) window.history.replaceState({}, '', '/app/')
   }, [resetToken])
 
   if (resetToken && !resetDone) {
@@ -81,7 +81,7 @@ function App() {
             auth={auth}
             token={resetToken}
             onDone={() => {
-              window.history.replaceState({}, '', '/')
+              window.history.replaceState({}, '', '/app/')
               setResetDone(true)
             }}
           />

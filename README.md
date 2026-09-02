@@ -6,7 +6,7 @@
 
 <p align="center">
   Personal health record for protocols, injections, vitals, and lab biomarkers.<br />
-  Local-first, end-to-end at <a href="https://apollo-hq.pages.dev">apollo-hq.pages.dev</a>.
+  Local-first, end-to-end at <a href="https://apollo-hq.pages.dev">apollo-hq.pages.dev</a> (landing page) and <a href="https://apollo-hq.pages.dev/app/">/app/</a> (the app).
 </p>
 
 ---

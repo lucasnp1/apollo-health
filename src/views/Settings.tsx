@@ -484,7 +484,7 @@ function DeleteAccountDialog({ open, onClose, auth }: { open: boolean; onClose: 
     try {
       await auth.deleteAccount(password)
       // Hard reload so no in-memory state from the old account survives.
-      window.location.replace('/')
+      window.location.replace('/app/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete the account')
       setBusy(false)
