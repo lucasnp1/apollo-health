@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-ocr.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-ocr.mjs",
     "build": "tsc -b && vite build",
     "postbuild": "node scripts/remove-local-seed.mjs",
     "lint": "eslint .",
@@ -25,6 +27,7 @@
     "react-dom": "^19.2.6",
     "recharts": "^3.8.0",
     "tailwind-merge": "^3.6.0",
+    "tesseract.js": "^7.0.0",
     "vite-plugin-pwa": "^1.3.0"
   },
   "devDependencies": {

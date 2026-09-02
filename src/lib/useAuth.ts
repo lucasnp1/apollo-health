@@ -10,7 +10,13 @@ export type AuthState =
 export type ForgotResult = { ok: true; delivery: 'email' | 'unavailable' }
 
 export function useAuth() {
-  const [state, setState] = useState<AuthState>({ status: 'loading' })
+  // DEV ONLY: the dev server has no backend, so set localStorage
+  // apollo-dev-authed=1 to enter the app for UI work. Stripped from prod builds.
+  const [state, setState] = useState<AuthState>(() =>
+    import.meta.env.DEV && localStorage.getItem('apollo-dev-authed') === '1'
+      ? { status: 'authed', user: { id: 'dev-user', email: 'dev@local', is_admin: 0, display_name: 'Dev' } }
+      : { status: 'loading' },
+  )
   const [error, setError] = useState<string>('')
   const fetched = useRef(false)
 
@@ -21,12 +27,7 @@ export function useAuth() {
     // sign-in screen; their on-device data stays in IndexedDB and backfills up
     // to the account on first sync (see runBackfillOnce in sync.ts).
     localStorage.removeItem('apollo-local-mode')
-    // DEV ONLY: the dev server has no backend, so set localStorage
-    // apollo-dev-authed=1 to enter the app for UI work. Stripped from prod builds.
-    if (import.meta.env.DEV && localStorage.getItem('apollo-dev-authed') === '1') {
-      setState({ status: 'authed', user: { id: 'dev-user', email: 'dev@local', is_admin: 0, display_name: 'Dev' } })
-      return
-    }
+    if (import.meta.env.DEV && localStorage.getItem('apollo-dev-authed') === '1') return
     void (async () => {
       try {
         const me = await api.get<{ user: ApiUser | null }>('/api/auth/me')

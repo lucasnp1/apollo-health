@@ -37,6 +37,9 @@ export default defineConfig({
         clientsClaim: true,       // take control of all open tabs right away
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{css,html,js,json,mjs,svg,webmanifest}'],
+        // OCR runtime (worker + wasm + model, ~10 MB) is fetched on demand,
+        // never precached.
+        globIgnores: ['ocr/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // Never serve the app shell for the API or the static legal pages.
         navigateFallbackDenylist: [/^\/local-seed\//, /^\/api\//, /^\/privacy/, /^\/terms/],

@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
-import { extractPdfText, extractMarkersFromText, type ExtractedMarker } from './lib/pdf'
+import type { ExtractedMarker, ReadProgress } from './lib/pdf'
 import { ToastProvider, useToast } from './lib/toast'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
@@ -153,6 +153,7 @@ function Shell({
   // messages now route through the shared toast context (snackbar UI lives
   // in ToastProvider so any view can fire one without prop drilling).
   const [pdfParsingName, setPdfParsingName] = useState<string | null>(null)
+  const [pdfProgress, setPdfProgress] = useState<ReadProgress | null>(null)
   const [pdfReviewFileId, setPdfReviewFileId] = useState<number | null>(null)
   const { showToast } = useToast()
 
@@ -177,8 +178,11 @@ function Shell({
     e.target.value = ''
     if (!file) return
     setPdfParsingName(file.name)
+    setPdfProgress(null)
     try {
-      const extractedText = await extractPdfText(file)
+      // The reader (pdf.js, parser catalog, OCR) stays out of the main bundle.
+      const { readLabFile, extractMarkersFromText } = await import('./lib/pdf')
+      const { text: extractedText, usedOcr } = await readLabFile(file, setPdfProgress)
       const markers = extractedText ? extractMarkersFromText(extractedText) : []
       const id = await db.files.add({
         name: file.name,
@@ -195,22 +199,25 @@ function Shell({
       } else if (extractedText) {
         showToast({
           tone: 'warn',
-          message: `Stored "${file.name}" but no recognized lab markers were found. You can add results manually under Add result.`,
+          message: usedOcr
+            ? `Read "${file.name}" with OCR but couldn't find any lab markers. Try a sharper photo, or add the results under Add result.`
+            : `Stored "${file.name}" but no recognized lab markers were found. You can add results manually under Add result.`,
         })
       } else {
         showToast({
           tone: 'warn',
-          message: `Couldn't read text from "${file.name}". It may be a scanned image, so add the results manually under Add result.`,
+          message: `Couldn't read any text in "${file.name}". Try a clearer scan or photo, or add the results under Add result.`,
         })
       }
     } catch (err) {
-      console.error('PDF upload failed', err)
+      console.error('Lab file upload failed', err)
       showToast({
         tone: 'error',
-        message: `Couldn't read "${file.name}". Try a different PDF or add results manually.`,
+        message: `Couldn't read "${file.name}". Try a different file or add results manually.`,
       })
     } finally {
       setPdfParsingName(null)
+      setPdfProgress(null)
     }
   }
 
@@ -223,16 +230,16 @@ function Shell({
   async function commitPdfImport(items: ExtractedMarker[], collectedAt: string) {
     if (!pdfReviewFile?.id || items.length === 0) return
     const examId = await db.exams.add({
-      name: pdfReviewFile.name.replace(/\.pdf$/i, ''),
+      name: pdfReviewFile.name.replace(/\.(pdf|jpe?g|png|webp|heic|gif|bmp|tiff?)$/i, ''),
       collectedAt,
-      labName: 'PDF import',
+      labName: pdfReviewFile.type.startsWith('image/') ? 'Photo import' : 'PDF import',
       sourceFileId: pdfReviewFile.id,
     })
     await db.results.bulkAdd(items.map((item) => ({
       examId,
       marker: item.marker,
       value: item.value,
-      rawValue: String(item.value),
+      rawValue: item.rawValue ?? String(item.value),
       unit: item.unit,
       // Persist the reference range from the PDF so the Labs view can
       // show HIGH/LOW status. Without these the row falls through to
@@ -361,8 +368,8 @@ function Shell({
               <>
                 {isPro ? (
                   <Button asChild variant="outline" size="sm">
-                    <label className="cursor-pointer" title="Upload PDF">
-                      <input type="file" accept="application/pdf" hidden onChange={handleLabPdfUpload} />
+                    <label className="cursor-pointer" title="Upload a lab PDF or photo">
+                      <input type="file" accept="application/pdf,image/*" hidden onChange={handleLabPdfUpload} />
                       <Upload className="size-4" /> <span className="hidden sm:inline">Upload</span>
                     </label>
                   </Button>
@@ -455,7 +462,13 @@ function Shell({
           <div className="pdf-parse-card">
             <div className="pdf-parse-spinner" aria-hidden="true" />
             <div className="pdf-parse-card-text">
-              <strong>Reading PDF…</strong>
+              <strong>
+                {pdfProgress?.stage === 'ocr'
+                  ? `Reading page ${pdfProgress.page} of ${pdfProgress.pages} with OCR${pdfProgress.pct ? ` · ${pdfProgress.pct}%` : '…'}`
+                  : pdfProgress && pdfProgress.pages > 1
+                    ? `Reading page ${pdfProgress.page} of ${pdfProgress.pages}…`
+                    : 'Reading file…'}
+              </strong>
               <span>{pdfParsingName}</span>
             </div>
           </div>

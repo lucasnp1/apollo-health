@@ -32,3 +32,8 @@ graphify-out/
 
 # wrangler local dev state (miniflare D1/cache)
 .wrangler/
+
+# OCR runtime copied from node_modules by scripts/copy-ocr.mjs (the model
+# file eng.traineddata.gz IS tracked)
+public/ocr/*.js
+public/ocr/*.wasm

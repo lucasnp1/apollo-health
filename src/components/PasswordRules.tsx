@@ -1,12 +1,7 @@
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Live password requirements. Mirrors the server rule in
-// functions/_lib/password.ts (10+ chars, upper + lower, a number).
-export function passwordOk(password: string): boolean {
-  return password.length >= 10 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password)
-}
-
+// Live password requirements checklist. The rule itself lives in lib/password.ts.
 function Req({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
     <li className={cn('flex items-center gap-1.5 transition-colors', ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
