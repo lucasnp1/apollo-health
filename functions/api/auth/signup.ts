@@ -3,6 +3,7 @@ import { deriveArgon2Hash, randomSalt, randomToken, serializeSalt, uuid } from '
 import { ipHash, jsonError, jsonOk, sessionCookie, sessionTtlMs } from '../../_lib/auth'
 import { wrap } from '../../_lib/handler'
 import { passwordProblem } from '../../_lib/password'
+import { issueCodes } from '../../_lib/recovery'
 
 export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env }) => {
   let body: { email?: string; password?: string; displayName?: string; inviteCode?: string }
@@ -97,6 +98,9 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
     }
   }
 
+  // Recovery codes: shown once on the "save these" screen after sign-up.
+  const recoveryCodes = await issueCodes(env, userId)
+
   // Create session
   const token = randomToken()
   const expiresAt = now + sessionTtlMs()
@@ -115,7 +119,7 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
     .run()
 
   return jsonOk(
-    { user: { id: userId, email, is_admin: isAdmin, display_name: displayName } },
+    { user: { id: userId, email, is_admin: isAdmin, display_name: displayName }, recoveryCodes },
     { headers: { 'Set-Cookie': sessionCookie(token) } },
   )
 })

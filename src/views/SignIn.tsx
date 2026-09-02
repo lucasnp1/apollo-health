@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogIn, Mail, UserPlus } from 'lucide-react'
+import { KeyRound, LogIn, Mail, UserPlus } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark'
 import { PasswordRules } from '../components/PasswordRules'
 import { passwordOk } from '../lib/password'
@@ -14,23 +14,41 @@ import type { useAuth } from '../lib/useAuth'
 type AuthBundle = ReturnType<typeof useAuth>
 type Mode = 'login' | 'signup' | 'forgot'
 
+// Prefilled "I'm locked out" email for people who lost their recovery codes.
+function lockedOutMailto(email: string): string {
+  const subject = 'Apollo Health: locked out of my account'
+  const body = [
+    'Hi,',
+    '',
+    "I can't sign in to Apollo Health and I don't have my recovery codes.",
+    '',
+    `Account email: ${email || '(type it here)'}`,
+    `Device: ${typeof navigator !== 'undefined' ? navigator.userAgent : ''}`,
+    `Date: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`,
+    '',
+    'Please send me a link to set a new password.',
+  ].join('\n')
+  return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+}
+
 export function SignIn({ auth }: { auth: AuthBundle }) {
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [displayName, setDisplayName] = useState('')
+  const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
-  // Result of a reset request: which delivery path the server used.
-  const [forgotSent, setForgotSent] = useState<'email' | 'unavailable' | null>(null)
 
   const mismatch = confirm.length > 0 && password !== confirm
   const signupReady = passwordOk(password) && password === confirm && email.includes('@')
+  const forgotReady = email.includes('@') && code.replace(/[^A-Za-z0-9]/g, '').length >= 8 && passwordOk(password) && password === confirm
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (busy) return
     if (mode === 'signup' && !signupReady) return
+    if (mode === 'forgot' && !forgotReady) return
     setBusy(true)
     try {
       if (mode === 'login') {
@@ -38,8 +56,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
       } else if (mode === 'signup') {
         await auth.signup({ email, password, displayName: displayName || undefined })
       } else {
-        const res = await auth.forgot(email)
-        if (res) setForgotSent(res.delivery)
+        await auth.recoverWithCode(email, code, password)
       }
     } finally {
       setBusy(false)
@@ -48,13 +65,15 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
 
   function switchMode(next: Mode) {
     setMode(next)
-    setForgotSent(null)
+    setPassword('')
+    setConfirm('')
+    setCode('')
   }
 
   const subtitle =
     mode === 'login' ? 'Sign in to sync across devices.'
     : mode === 'signup' ? 'Create a free account to back up your data.'
-    : "Enter your email and we'll send you a link to choose a new password."
+    : 'Enter one of your recovery codes and choose a new password.'
 
   return (
     <div className="min-h-dvh grid place-items-center bg-background px-4">
@@ -78,62 +97,67 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
           </Tabs>
         )}
 
-        {mode === 'forgot' && forgotSent ? (
-          <div className="mt-5 flex flex-col gap-3">
-            {forgotSent === 'email' ? (
-              <p className="text-sm text-muted-foreground">
-                If there's an account for <span className="text-foreground">{email}</span>, a reset link is on its way. Check your inbox and spam folder. The link works for 60 minutes.
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Reset by email isn't ready yet. Write to <a className="text-foreground underline underline-offset-2" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> from the email you signed up with and we'll sort it out.
-              </p>
-            )}
-            <Button variant="outline" className="w-full" onClick={() => switchMode('login')}>Back to sign in</Button>
-          </div>
-        ) : (
         <form className="mt-4 flex flex-col gap-3" onSubmit={submit}>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="email" className="sr-only">Email</Label>
             <Input id="email" type="email" placeholder="Email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
 
-          {mode !== 'forgot' && (
+          {mode === 'forgot' && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password" className="sr-only">Password</Label>
+              <Label htmlFor="code" className="sr-only">Recovery code</Label>
               <Input
-                id="password"
-                type="password"
-                placeholder="Password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                minLength={mode === 'signup' ? 10 : 8}
+                id="code"
+                type="text"
+                placeholder="Recovery code (XXXX-XXXX-XXXX)"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                className="font-mono tracking-wide"
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
               />
             </div>
           )}
 
-          {mode === 'signup' && (
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="password" className="sr-only">{mode === 'login' ? 'Password' : 'New password'}</Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder={mode === 'login' ? 'Password' : mode === 'signup' ? 'Password' : 'New password'}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              minLength={mode === 'login' ? 8 : 10}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          {mode !== 'login' && (
             <>
               <PasswordRules password={password} className="-mt-0.5" />
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="confirm" className="sr-only">Confirm password</Label>
-                <Input id="confirm" type="password" placeholder="Confirm password" autoComplete="new-password" aria-invalid={mismatch} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                <Input id="confirm" type="password" placeholder={mode === 'signup' ? 'Confirm password' : 'Confirm new password'} autoComplete="new-password" aria-invalid={mismatch} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 {mismatch && <p className="px-0.5 text-[11px] text-destructive">Passwords don't match.</p>}
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="display" className="sr-only">Display name</Label>
-                <Input id="display" type="text" placeholder="Display name (optional)" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
               </div>
             </>
           )}
 
+          {mode === 'signup' && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="display" className="sr-only">Display name</Label>
+              <Input id="display" type="text" placeholder="Display name (optional)" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            </div>
+          )}
+
           {auth.error && <p className="text-sm text-destructive">{auth.error}</p>}
 
-          <Button type="submit" disabled={busy || (mode === 'signup' && !signupReady)} className="w-full">
-            {mode === 'login' ? <LogIn className="size-4" /> : mode === 'signup' ? <UserPlus className="size-4" /> : <Mail className="size-4" />}
-            {busy ? 'Working…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
+          <Button type="submit" disabled={busy || (mode === 'signup' && !signupReady) || (mode === 'forgot' && !forgotReady)} className="w-full">
+            {mode === 'login' ? <LogIn className="size-4" /> : mode === 'signup' ? <UserPlus className="size-4" /> : <KeyRound className="size-4" />}
+            {busy ? 'Working…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Set new password'}
           </Button>
 
           {mode === 'login' && (
@@ -147,9 +171,18 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
             </button>
           )}
         </form>
+
+        {mode === 'forgot' && (
+          <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Lost your recovery codes? Email us from the address you signed up with and we'll send you a link to set a new password.
+            </p>
+            <Button asChild variant="outline" size="sm" className="mt-2">
+              <a href={lockedOutMailto(email)}><Mail className="size-3.5" /> Email us</a>
+            </Button>
+          </div>
         )}
 
-        {!(mode === 'forgot' && forgotSent === 'unavailable') && (
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
           {mode === 'signup' ? (
             <>
@@ -159,10 +192,9 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
           ) : mode === 'login' ? (
             <>Data syncs to your account on Cloudflare over HTTPS. No third-party trackers or analytics. <LegalLink href="/privacy">Privacy</LegalLink> · <LegalLink href="/terms">Terms</LegalLink></>
           ) : (
-            <>For your safety, the link signs out every other device once you set a new password.</>
+            <>Each recovery code works once. Setting a new password signs out every other device.</>
           )}
         </p>
-        )}
       </div>
       </Reveal>
     </div>

@@ -15,7 +15,7 @@ import { stripeApi, stripeConfigured } from '../../_lib/stripe'
 const USER_TABLES = [
   'compounds', 'injections', 'vitals', 'exams', 'results', 'files',
   'protocols', 'protocol_doses', 'vials', 'symptoms', 'marker_targets',
-  'goals', 'body_metrics', 'password_resets', 'feedback', 'audit_log', 'sessions',
+  'goals', 'body_metrics', 'password_resets', 'recovery_codes', 'feedback', 'audit_log', 'sessions',
 ]
 
 export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env }) => {

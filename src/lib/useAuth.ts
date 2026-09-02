@@ -7,8 +7,6 @@ export type AuthState =
   | { status: 'guest' }     // unauthenticated, sign-in screen shown
   | { status: 'authed'; user: ApiUser }
 
-export type ForgotResult = { ok: true; delivery: 'email' | 'unavailable' }
-
 export function useAuth() {
   // DEV ONLY: the dev server has no backend, so set localStorage
   // apollo-dev-authed=1 to enter the app for UI work. Stripped from prod builds.
@@ -18,6 +16,8 @@ export function useAuth() {
       : { status: 'loading' },
   )
   const [error, setError] = useState<string>('')
+  // Fresh recovery codes from sign-up, shown once on the "save these" screen.
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
   const fetched = useRef(false)
 
   useEffect(() => {
@@ -65,8 +65,10 @@ export function useAuth() {
   const signup = useCallback(async (payload: SignupPayload) => {
     setError('')
     try {
-      const res = await api.post<{ user: ApiUser }>('/api/auth/signup', payload)
-      setState({ status: 'authed', user: await hydrate(res.user) })
+      const res = await api.post<{ user: ApiUser; recoveryCodes?: string[] }>('/api/auth/signup', payload)
+      const user = await hydrate(res.user)
+      setRecoveryCodes(res.recoveryCodes?.length ? res.recoveryCodes : null)
+      setState({ status: 'authed', user })
       return true
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Signup failed')
@@ -82,17 +84,20 @@ export function useAuth() {
     }
   }, [])
 
-  // Ask for a password-reset email. Never reveals whether the email exists;
-  // `delivery` only says whether the server can send mail at all.
-  const forgot = useCallback(async (email: string): Promise<ForgotResult | null> => {
+  // Password reset with a one-time recovery code. Signs this device in.
+  const recoverWithCode = useCallback(async (email: string, code: string, password: string) => {
     setError('')
     try {
-      return await api.post<ForgotResult>('/api/auth/forgot', { email })
+      const res = await api.post<{ user: ApiUser }>('/api/auth/recovery/reset', { email, code, password })
+      setState({ status: 'authed', user: await hydrate(res.user) })
+      return true
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not send the reset link')
-      return null
+      setError(e instanceof Error ? e.message : 'Could not reset the password')
+      return false
     }
   }, [])
+
+  const clearRecoveryCodes = useCallback(() => setRecoveryCodes(null), [])
 
   // Consume a reset link. On success the server signs this device in.
   const resetPassword = useCallback(async (token: string, password: string) => {
@@ -144,5 +149,5 @@ export function useAuth() {
         : state.user.is_pro ?? true
       : false
 
-  return { state, error, login, signup, logout, forgot, resetPassword, changePassword, deleteAccount, refresh, isPro }
+  return { state, error, login, signup, logout, recoverWithCode, recoveryCodes, clearRecoveryCodes, resetPassword, changePassword, deleteAccount, refresh, isPro }
 }

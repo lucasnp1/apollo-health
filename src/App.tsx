@@ -25,6 +25,7 @@ import { PlanProvider, usePlan } from './lib/plan'
 const ExportPage       = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportPage })))
 const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
 const ResetPassword    = lazy(() => import('./views/ResetPassword').then(m => ({ default: m.ResetPassword })))
+const RecoveryCodesScreen = lazy(() => import('./components/RecoveryCodes').then(m => ({ default: m.RecoveryCodesScreen })))
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
 // Overview (the launcher) is eager — everything else is lazy
@@ -109,6 +110,17 @@ function App() {
   // data syncs to the server (local-first, but always backed up).
 
   const authedUser = auth.state.status === 'authed' ? auth.state.user : null
+
+  // Right after sign-up: the one-time "save your recovery codes" step.
+  if (auth.recoveryCodes) {
+    return (
+      <ToastProvider>
+        <Suspense fallback={null}>
+          <RecoveryCodesScreen codes={auth.recoveryCodes} email={authedUser?.email} onDone={auth.clearRecoveryCodes} />
+        </Suspense>
+      </ToastProvider>
+    )
+  }
   let localOnboarded = false
   try { localOnboarded = localStorage.getItem(ONBOARDED_KEY) === '1' } catch { /* ignore */ }
   const showOnboarding = !onboardingDismissed && authedUser != null && !authedUser.onboarded && !localOnboarded

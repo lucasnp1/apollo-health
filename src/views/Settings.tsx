@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { AlertTriangle, Archive as ArchiveIcon, Bell, BellOff, Download, FileText, KeyRound, LogOut, Send, Sparkles, Trash2, Upload, UserX } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, Archive as ArchiveIcon, Bell, BellOff, Copy, Download, FileText, KeyRound, LifeBuoy, LogOut, Send, ShieldCheck, Sparkles, Trash2, Upload, UserX } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -14,6 +14,7 @@ import { PanelCard } from '../components/dashboard/PanelCard'
 import { PasswordRules } from '../components/PasswordRules'
 import { passwordOk } from '../lib/password'
 import { LegalLink } from '../components/LegalLink'
+import { RecoveryCodesList } from '../components/RecoveryCodes'
 import { usePlan } from '../lib/plan'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -93,11 +94,13 @@ export function Settings({
   onExport: () => void
   onOpenArchive: () => void
 }) {
+  const isAdmin = auth.state.status === 'authed' && auth.state.user.is_admin === 1
   return (
     <div className="flex flex-col gap-6">
       <DashGrid>
         <div className="md:col-span-1 xl:col-span-3"><AccountSettings auth={auth} /></div>
         <div className="md:col-span-1 xl:col-span-3"><NotificationSettings /></div>
+        {isAdmin && <div className="md:col-span-2 xl:col-span-6"><SupportSettings /></div>}
         <div className="md:col-span-1 xl:col-span-3">
           <BackupSettings
             compounds={compounds}
@@ -206,6 +209,7 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
   const { isPro, openUpgrade } = usePlan()
   const planLabel = isPro ? (user?.plan_kind ? `Apollo Pro · ${user.plan_kind}` : 'Apollo Pro') : 'Free plan'
   const [pwOpen, setPwOpen] = useState(false)
+  const [codesOpen, setCodesOpen] = useState(false)
   const [delOpen, setDelOpen] = useState(false)
   return (
     <PanelCard
@@ -230,12 +234,16 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
           <Button variant="outline" size="sm" onClick={() => setPwOpen(true)}>
             <KeyRound className="size-3.5" /> Change password
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setCodesOpen(true)}>
+            <ShieldCheck className="size-3.5" /> Recovery codes
+          </Button>
           <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDelOpen(true)}>
             <UserX className="size-3.5" /> Delete account
           </Button>
         </div>
       </div>
       <ChangePasswordDialog open={pwOpen} onClose={() => setPwOpen(false)} auth={auth} />
+      <RecoveryCodesDialog open={codesOpen} onClose={() => setCodesOpen(false)} auth={auth} />
       <DeleteAccountDialog open={delOpen} onClose={() => setDelOpen(false)} auth={auth} />
     </PanelCard>
   )
@@ -307,6 +315,150 @@ function ChangePasswordDialog({ open, onClose, auth }: { open: boolean; onClose:
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Recovery codes: see how many are left, or mint a fresh set (needs the password).
+function RecoveryCodesDialog({ open, onClose, auth }: { open: boolean; onClose: () => void; auth: AuthBundle }) {
+  const user = auth.state.status === 'authed' ? auth.state.user : null
+  const [status, setStatus] = useState<{ remaining: number; total: number } | null>(null)
+  const [password, setPassword] = useState('')
+  const [codes, setCodes] = useState<string[] | null>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    api.get<{ remaining: number; total: number }>('/api/auth/recovery/status')
+      .then((s) => { if (!cancelled) setStatus(s) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [open])
+
+  function close() {
+    if (busy) return
+    setPassword(''); setCodes(null); setError(''); setStatus(null)
+    onClose()
+  }
+
+  async function generate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!password || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await api.post<{ codes: string[] }>('/api/auth/recovery/generate', { password })
+      setCodes(res.codes)
+      setPassword('')
+      setStatus({ remaining: res.codes.length, total: res.codes.length })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not generate codes')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const intro = codes
+    ? 'Save these somewhere safe, like your password manager. Any older codes no longer work.'
+    : status
+      ? status.remaining > 0
+        ? `You have ${status.remaining} of ${status.total} codes left. Each one works once and gets you back in if you forget your password.`
+        : 'You have no recovery codes yet. Generate a set and save it: there is no email reset.'
+      : 'Checking your codes…'
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) close() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><ShieldCheck className="size-4 text-primary" /> Recovery codes</DialogTitle>
+          <DialogDescription>{intro}</DialogDescription>
+        </DialogHeader>
+        {codes ? (
+          <>
+            <RecoveryCodesList codes={codes} email={user?.email} />
+            <DialogFooter>
+              <Button onClick={close}>Done</Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <form onSubmit={generate} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="codes-password">Your password</Label>
+              <Input id="codes-password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <p className="text-xs text-muted-foreground">Generating a new set replaces the codes you have now.</p>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={close} disabled={busy}>Cancel</Button>
+              <Button type="submit" disabled={!password || busy}>
+                <ShieldCheck className="size-3.5" /> {busy ? 'Generating…' : 'Generate new codes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Admin only: create a one-time reset link for someone who lost their
+// password and their recovery codes, and send it to them by hand.
+function SupportSettings() {
+  const { showToast } = useToast()
+  const [email, setEmail] = useState('')
+  const [link, setLink] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function create(e: React.FormEvent) {
+    e.preventDefault()
+    if (!email.trim() || busy) return
+    setBusy(true)
+    setError('')
+    setLink('')
+    try {
+      const res = await api.post<{ link: string }>('/api/admin/reset-link', { email: email.trim() })
+      setLink(res.link)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create the link')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(link)
+      showToast({ message: 'Link copied.' })
+    } catch {
+      showToast({ tone: 'error', message: 'Could not copy. Select the link and copy it by hand.' })
+    }
+  }
+
+  return (
+    <PanelCard subtitle="Admin" title="Support tools" action={<LifeBuoy className="size-4 text-muted-foreground" />}>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-muted-foreground">
+          Someone locked out without their recovery codes? Create a one-time link and send it to them. It works for 24 hours; they choose a new password and every other session of theirs is signed out.
+        </p>
+        <form onSubmit={create} className="flex flex-wrap items-center gap-2">
+          <Input type="email" placeholder="Account email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 max-w-xs" />
+          <Button type="submit" size="sm" disabled={!email.trim() || busy}>
+            <KeyRound className="size-3.5" /> {busy ? 'Creating…' : 'Create reset link'}
+          </Button>
+        </form>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {link && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Input readOnly value={link} onFocus={(e) => e.currentTarget.select()} className="h-9 min-w-0 flex-1 font-mono text-xs" />
+            <Button type="button" variant="outline" size="sm" onClick={copy}>
+              <Copy className="size-3.5" /> Copy
+            </Button>
+          </div>
+        )}
+      </div>
+    </PanelCard>
   )
 }
 
