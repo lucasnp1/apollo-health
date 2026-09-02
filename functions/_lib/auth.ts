@@ -16,6 +16,12 @@ export function expiredCookie(): string {
   return `${COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`
 }
 
+// The raw session token from the request cookie (used to keep the current
+// session alive when revoking all others, e.g. after a password change).
+export function readSessionToken(request: Request): string | null {
+  return readCookie(request, COOKIE_NAME)
+}
+
 function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get('Cookie')
   if (!header) return null

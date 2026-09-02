@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type ApiUser, type LoginPayload, type SignupPayload } from './api'
+import { wipeAllLocalData } from './lock'
 
 export type AuthState =
   | { status: 'loading' }
   | { status: 'guest' }     // unauthenticated, sign-in screen shown
   | { status: 'authed'; user: ApiUser }
+
+export type ForgotResult = { ok: true; delivery: 'email' | 'unavailable' }
 
 export function useAuth() {
   const [state, setState] = useState<AuthState>({ status: 'loading' })
@@ -78,6 +81,49 @@ export function useAuth() {
     }
   }, [])
 
+  // Ask for a password-reset email. Never reveals whether the email exists;
+  // `delivery` only says whether the server can send mail at all.
+  const forgot = useCallback(async (email: string): Promise<ForgotResult | null> => {
+    setError('')
+    try {
+      return await api.post<ForgotResult>('/api/auth/forgot', { email })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not send the reset link')
+      return null
+    }
+  }, [])
+
+  // Consume a reset link. On success the server signs this device in.
+  const resetPassword = useCallback(async (token: string, password: string) => {
+    setError('')
+    try {
+      const res = await api.post<{ user: ApiUser }>('/api/auth/reset', { token, password })
+      setState({ status: 'authed', user: await hydrate(res.user) })
+      return true
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not reset the password')
+      return false
+    }
+  }, [])
+
+  // Signed-in password change. Throws with a user-facing message on failure.
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    await api.post('/api/auth/password', { currentPassword, newPassword })
+  }, [])
+
+  // Permanently delete the account server-side, then clear this device.
+  // Throws with a user-facing message on failure (wrong password etc).
+  const deleteAccount = useCallback(async (password: string) => {
+    await api.post('/api/auth/delete', { password })
+    try {
+      await wipeAllLocalData()
+      localStorage.removeItem('apollo.onboarded')
+    } catch (e) {
+      console.warn('Local wipe after account deletion failed', e)
+    }
+    setState({ status: 'guest' })
+  }, [])
+
   // Re-fetch the account (e.g. after returning from Stripe checkout) so a plan
   // change is reflected without a full reload.
   const refresh = useCallback(async () => {
@@ -97,5 +143,5 @@ export function useAuth() {
         : state.user.is_pro ?? true
       : false
 
-  return { state, error, login, signup, logout, refresh, isPro }
+  return { state, error, login, signup, logout, forgot, resetPassword, changePassword, deleteAccount, refresh, isPro }
 }

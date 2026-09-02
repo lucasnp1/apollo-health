@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Archive as ArchiveIcon, Bell, BellOff, Download, FileText, LogOut, Send, Sparkles, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Archive as ArchiveIcon, Bell, BellOff, Download, FileText, KeyRound, LogOut, Send, Sparkles, Trash2, Upload, UserX } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -11,6 +11,8 @@ import type { useAuth } from '../lib/useAuth'
 import type { Compound, InjectionLog, LabExam, Protocol, VitalLog } from '../lib/db'
 import { DashGrid } from '../components/dashboard/Grid'
 import { PanelCard } from '../components/dashboard/PanelCard'
+import { PasswordRules, passwordOk } from '../components/PasswordRules'
+import { LegalLink } from '../components/LegalLink'
 import { usePlan } from '../lib/plan'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -112,10 +114,15 @@ export function Settings({
       </DashGrid>
 
       {/* Sign out — floating, no container, red. */}
-      <div className="flex justify-center pb-2">
+      <div className="flex flex-col items-center gap-3 pb-2">
         <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => auth.logout()}>
           <LogOut className="size-3.5" /> Sign out
         </Button>
+        <p className="text-[11px] text-muted-foreground">
+          <LegalLink href="/privacy" className="text-muted-foreground">Privacy</LegalLink>
+          {' · '}
+          <LegalLink href="/terms" className="text-muted-foreground">Terms</LegalLink>
+        </p>
       </div>
     </div>
   )
@@ -197,6 +204,8 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
   const user = auth.state.status === 'authed' ? auth.state.user : null
   const { isPro, openUpgrade } = usePlan()
   const planLabel = isPro ? (user?.plan_kind ? `Apollo Pro · ${user.plan_kind}` : 'Apollo Pro') : 'Free plan'
+  const [pwOpen, setPwOpen] = useState(false)
+  const [delOpen, setDelOpen] = useState(false)
   return (
     <PanelCard
       className="h-full"
@@ -208,14 +217,162 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
         </span>
       }
     >
-      {isPro ? (
-        <p className="text-sm text-muted-foreground">You're on Apollo Pro. Thanks for the support.</p>
-      ) : (
-        <Button size="sm" className="self-start" onClick={() => openUpgrade()}>
-          <Sparkles className="size-3.5" /> Upgrade to Pro
-        </Button>
-      )}
+      <div className="flex flex-col gap-3">
+        {isPro ? (
+          <p className="text-sm text-muted-foreground">You're on Apollo Pro. Thanks for the support.</p>
+        ) : (
+          <Button size="sm" className="self-start" onClick={() => openUpgrade()}>
+            <Sparkles className="size-3.5" /> Upgrade to Pro
+          </Button>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setPwOpen(true)}>
+            <KeyRound className="size-3.5" /> Change password
+          </Button>
+          <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setDelOpen(true)}>
+            <UserX className="size-3.5" /> Delete account
+          </Button>
+        </div>
+      </div>
+      <ChangePasswordDialog open={pwOpen} onClose={() => setPwOpen(false)} auth={auth} />
+      <DeleteAccountDialog open={delOpen} onClose={() => setDelOpen(false)} auth={auth} />
     </PanelCard>
+  )
+}
+
+function ChangePasswordDialog({ open, onClose, auth }: { open: boolean; onClose: () => void; auth: AuthBundle }) {
+  const { showToast } = useToast()
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const mismatch = confirm.length > 0 && next !== confirm
+  const ready = current.length > 0 && passwordOk(next) && next === confirm
+
+  function close() {
+    setCurrent(''); setNext(''); setConfirm(''); setError('')
+    onClose()
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!ready || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await auth.changePassword(current, next)
+      showToast({ message: 'Password updated. Your other devices were signed out.' })
+      close()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change the password')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) close() }}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>Change password</DialogTitle>
+            <DialogDescription>Every other device will be signed out. This one stays signed in.</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pw-current">Current password</Label>
+              <Input id="pw-current" type="password" autoComplete="current-password" autoFocus value={current} onChange={(e) => setCurrent(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pw-next">New password</Label>
+              <Input id="pw-next" type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+              <PasswordRules password={next} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pw-confirm">Confirm new password</Label>
+              <Input id="pw-confirm" type="password" autoComplete="new-password" aria-invalid={mismatch} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              {mismatch && <p className="text-[11px] text-destructive">Passwords don't match.</p>}
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={close} disabled={busy}>Cancel</Button>
+            <Button type="submit" disabled={!ready || busy}>
+              <KeyRound className="size-3.5" /> {busy ? 'Saving…' : 'Save password'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function DeleteAccountDialog({ open, onClose, auth }: { open: boolean; onClose: () => void; auth: AuthBundle }) {
+  const [password, setPassword] = useState('')
+  const [confirmText, setConfirmText] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const confirmed = confirmText.trim().toUpperCase() === 'DELETE' && password.length > 0
+
+  function close() {
+    if (busy) return
+    setPassword(''); setConfirmText(''); setError('')
+    onClose()
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!confirmed || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await auth.deleteAccount(password)
+      // Hard reload so no in-memory state from the old account survives.
+      window.location.replace('/')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the account')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) close() }}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-4 text-destructive" /> Delete your account?
+            </DialogTitle>
+            <DialogDescription>
+              This permanently deletes your account and everything in it from our servers: injections, blood pressure, weight, symptoms, labs, uploaded files and any subscription. The copy on this device is removed too.
+              {' '}<strong className="text-destructive">There is no undo.</strong> If you want a copy first, export a backup from Settings before you continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="del-password">Your password</Label>
+              <Input id="del-password" type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="del-confirm">
+                Type <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">DELETE</code> to confirm
+              </Label>
+              <Input id="del-confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="DELETE" className="font-mono tracking-widest" />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={close} disabled={busy}>Cancel</Button>
+            <Button type="submit" variant="destructive" disabled={!confirmed || busy}>
+              <UserX className="size-3.5" /> {busy ? 'Deleting…' : 'Delete my account'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 

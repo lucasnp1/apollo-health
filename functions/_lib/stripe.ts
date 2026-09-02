@@ -31,7 +31,7 @@ export function isProUser(
 // Minimal form-encoded Stripe API call.
 export async function stripeApi<T = Record<string, unknown>>(
   env: Env,
-  method: 'GET' | 'POST',
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
   params?: Record<string, string>,
 ): Promise<T> {

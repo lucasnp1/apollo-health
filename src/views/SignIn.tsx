@@ -1,39 +1,30 @@
 import { useState } from 'react'
-import { Check, LogIn, UserPlus } from 'lucide-react'
+import { LogIn, Mail, UserPlus } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark'
+import { PasswordRules, passwordOk } from '../components/PasswordRules'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Reveal } from '../components/motion'
-import { cn } from '@/lib/utils'
+import { LegalLink, SUPPORT_EMAIL } from '../components/LegalLink'
 import type { useAuth } from '../lib/useAuth'
 
 type AuthBundle = ReturnType<typeof useAuth>
-
-// Live password requirement (mirrors the server rule in functions/api/auth/signup.ts)
-function Req({ ok, children }: { ok: boolean; children: React.ReactNode }) {
-  return (
-    <li className={cn('flex items-center gap-1.5 transition-colors', ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
-      <Check className={cn('size-3 shrink-0', ok ? 'opacity-100' : 'opacity-30')} />
-      {children}
-    </li>
-  )
-}
+type Mode = 'login' | 'signup' | 'forgot'
 
 export function SignIn({ auth }: { auth: AuthBundle }) {
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [busy, setBusy] = useState(false)
+  // Result of a reset request: which delivery path the server used.
+  const [forgotSent, setForgotSent] = useState<'email' | 'unavailable' | null>(null)
 
-  const lenOk = password.length >= 10
-  const caseOk = /[a-z]/.test(password) && /[A-Z]/.test(password)
-  const numOk = /\d/.test(password)
   const mismatch = confirm.length > 0 && password !== confirm
-  const signupReady = lenOk && caseOk && numOk && password === confirm && email.includes('@')
+  const signupReady = passwordOk(password) && password === confirm && email.includes('@')
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -43,13 +34,26 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
     try {
       if (mode === 'login') {
         await auth.login({ email, password })
-      } else {
+      } else if (mode === 'signup') {
         await auth.signup({ email, password, displayName: displayName || undefined })
+      } else {
+        const res = await auth.forgot(email)
+        if (res) setForgotSent(res.delivery)
       }
     } finally {
       setBusy(false)
     }
   }
+
+  function switchMode(next: Mode) {
+    setMode(next)
+    setForgotSent(null)
+  }
+
+  const subtitle =
+    mode === 'login' ? 'Sign in to sync across devices.'
+    : mode === 'signup' ? 'Create a free account to back up your data.'
+    : "Enter your email and we'll send you a link to choose a new password."
 
   return (
     <div className="min-h-dvh grid place-items-center bg-background px-4">
@@ -59,47 +63,59 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
         <div className="flex items-center gap-3">
           <BrandMark size={44} />
           <div>
-            <h1 className="font-display text-2xl font-semibold leading-none">Apollo Health</h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              {mode === 'login' ? 'Sign in to sync across devices.' : 'Create a free account to back up your data.'}
-            </p>
+            <h1 className="font-display text-2xl font-semibold leading-none">{mode === 'forgot' ? 'Reset password' : 'Apollo Health'}</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
           </div>
         </div>
 
-        <Tabs value={mode} onValueChange={(v) => setMode(v as 'login' | 'signup')} className="mt-5">
-          <TabsList className="w-full">
-            <TabsTrigger value="login" className="flex-1">Sign in</TabsTrigger>
-            <TabsTrigger value="signup" className="flex-1">Sign up</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {mode !== 'forgot' && (
+          <Tabs value={mode} onValueChange={(v) => switchMode(v as Mode)} className="mt-5">
+            <TabsList className="w-full">
+              <TabsTrigger value="login" className="flex-1">Sign in</TabsTrigger>
+              <TabsTrigger value="signup" className="flex-1">Sign up</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
+        {mode === 'forgot' && forgotSent ? (
+          <div className="mt-5 flex flex-col gap-3">
+            {forgotSent === 'email' ? (
+              <p className="text-sm text-muted-foreground">
+                If there's an account for <span className="text-foreground">{email}</span>, a reset link is on its way. Check your inbox and spam folder. The link works for 60 minutes.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Reset by email isn't ready yet. Write to <a className="text-foreground underline underline-offset-2" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> from the email you signed up with and we'll sort it out.
+              </p>
+            )}
+            <Button variant="outline" className="w-full" onClick={() => switchMode('login')}>Back to sign in</Button>
+          </div>
+        ) : (
         <form className="mt-4 flex flex-col gap-3" onSubmit={submit}>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="email" className="sr-only">Email</Label>
             <Input id="email" type="email" placeholder="Email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="password" className="sr-only">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Password"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              minLength={mode === 'signup' ? 10 : 8}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="password" className="sr-only">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Password"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                minLength={mode === 'signup' ? 10 : 8}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          )}
 
           {mode === 'signup' && (
             <>
-              <ul className="-mt-0.5 flex flex-col gap-1 px-0.5 text-[11px]">
-                <Req ok={lenOk}>At least 10 characters</Req>
-                <Req ok={caseOk}>Upper and lowercase letters</Req>
-                <Req ok={numOk}>A number</Req>
-              </ul>
+              <PasswordRules password={password} className="-mt-0.5" />
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="confirm" className="sr-only">Confirm password</Label>
                 <Input id="confirm" type="password" placeholder="Confirm password" autoComplete="new-password" aria-invalid={mismatch} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
@@ -115,15 +131,34 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
           {auth.error && <p className="text-sm text-destructive">{auth.error}</p>}
 
           <Button type="submit" disabled={busy || (mode === 'signup' && !signupReady)} className="w-full">
-            {mode === 'login' ? <LogIn className="size-4" /> : <UserPlus className="size-4" />}
-            {busy ? 'Working…' : mode === 'login' ? 'Sign in' : 'Create account'}
+            {mode === 'login' ? <LogIn className="size-4" /> : mode === 'signup' ? <UserPlus className="size-4" /> : <Mail className="size-4" />}
+            {busy ? 'Working…' : mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
           </Button>
+
+          {mode === 'login' && (
+            <button type="button" onClick={() => switchMode('forgot')} className="self-center text-xs text-muted-foreground underline-offset-2 hover:underline">
+              Forgot your password?
+            </button>
+          )}
+          {mode === 'forgot' && (
+            <button type="button" onClick={() => switchMode('login')} className="self-center text-xs text-muted-foreground underline-offset-2 hover:underline">
+              Back to sign in
+            </button>
+          )}
         </form>
+        )}
 
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-          {mode === 'signup'
-            ? 'Your data is backed up to your private account. Anything already saved on this device is kept and backed up too. No third-party trackers or analytics.'
-            : 'Data syncs to your account on Cloudflare over HTTPS. No third-party trackers or analytics.'}
+          {mode === 'signup' ? (
+            <>
+              Your data is backed up to your private account. Anything already saved on this device is kept and backed up too. No third-party trackers or analytics.
+              {' '}By creating an account you agree to the <LegalLink href="/terms">Terms</LegalLink> and <LegalLink href="/privacy">Privacy Policy</LegalLink>.
+            </>
+          ) : mode === 'login' ? (
+            <>Data syncs to your account on Cloudflare over HTTPS. No third-party trackers or analytics. <LegalLink href="/privacy">Privacy</LegalLink> · <LegalLink href="/terms">Terms</LegalLink></>
+          ) : (
+            <>For your safety, the link signs out every other device once you set a new password.</>
+          )}
         </p>
       </div>
       </Reveal>

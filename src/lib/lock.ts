@@ -77,6 +77,14 @@ export async function wipeLocalDatabase() {
   })
 }
 
+// Clears every local table (data, sync cursors, meta). Used after the account
+// is deleted server-side so nothing personal is left on the device.
+export async function wipeAllLocalData() {
+  await db.transaction('rw', db.tables, async () => {
+    await Promise.all(db.tables.map((t) => t.clear()))
+  })
+}
+
 async function deriveHash(passphrase: string, salt: Uint8Array<ArrayBuffer>, rounds: number) {
   const keyMaterial = await crypto.subtle.importKey('raw', encoder.encode(passphrase), 'PBKDF2', false, ['deriveBits'])
   const bits = await crypto.subtle.deriveBits(

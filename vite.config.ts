@@ -38,7 +38,8 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{css,html,js,json,mjs,svg,webmanifest}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-        navigateFallbackDenylist: [/^\/local-seed\//],
+        // Never serve the app shell for the API or the static legal pages.
+        navigateFallbackDenylist: [/^\/local-seed\//, /^\/api\//, /^\/privacy/, /^\/terms/],
       },
       manifest: {
         name: 'Apollo Health',

@@ -2,6 +2,7 @@ import type { PagesFunction, Env } from '../../_lib/types'
 import { deriveArgon2Hash, randomSalt, randomToken, serializeSalt, uuid } from '../../_lib/crypto'
 import { ipHash, jsonError, jsonOk, sessionCookie, sessionTtlMs } from '../../_lib/auth'
 import { wrap } from '../../_lib/handler'
+import { passwordProblem } from '../../_lib/password'
 
 export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env }) => {
   let body: { email?: string; password?: string; displayName?: string; inviteCode?: string }
@@ -19,13 +20,9 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   // Validation errors are intentionally generic — never disclose whether an
   // email is already registered (prevents email enumeration via signup).
   if (!email || !email.includes('@')) return jsonError('Could not create account', 400)
-  // Password rules: ≥10 chars + at least one lowercase + uppercase + digit.
-  // Kept dep-free; zxcvbn or similar can be layered on the client for a
-  // strength meter without changing the server contract.
-  if (password.length < 10) return jsonError('Password must be at least 10 characters', 400)
-  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
-    return jsonError('Password must include lowercase, uppercase, and a number', 400)
-  }
+  // Password rules live in _lib/password.ts (shared with reset + change).
+  const problem = passwordProblem(password)
+  if (problem) return jsonError(problem, 400)
 
   const now = Date.now()
 

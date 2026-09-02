@@ -24,6 +24,7 @@ import { PlanProvider, usePlan } from './lib/plan'
 // Modals / add-pages are lazy — only loaded when first opened
 const ExportPage       = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportPage })))
 const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
+const ResetPassword    = lazy(() => import('./views/ResetPassword').then(m => ({ default: m.ResetPassword })))
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
 // Overview (the launcher) is eager — everything else is lazy
@@ -52,12 +53,41 @@ function App() {
   // Upgrade paywall — opened by any gated Pro feature.
   const [upgrade, setUpgrade] = useState<{ open: boolean; feature?: string }>({ open: false })
   const openUpgrade = useCallback((feature?: string) => setUpgrade({ open: true, feature }), [])
+  // The emailed reset link lands on /reset?token=... It is handled before the
+  // auth gate so it works whether or not a session exists on this device.
+  const resetToken = useMemo(() => {
+    if (window.location.pathname !== '/reset') return null
+    return new URLSearchParams(window.location.search).get('token')
+  }, [])
+  const [resetDone, setResetDone] = useState(false)
 
   useEffect(() => {
     if (auth.state.status !== 'loading') {
       void seedIfEmpty()
     }
   }, [auth.state.status])
+
+  // A bare /reset (no token) is just the app.
+  useEffect(() => {
+    if (window.location.pathname === '/reset' && !resetToken) window.history.replaceState({}, '', '/')
+  }, [resetToken])
+
+  if (resetToken && !resetDone) {
+    return (
+      <ToastProvider>
+        <Suspense fallback={null}>
+          <ResetPassword
+            auth={auth}
+            token={resetToken}
+            onDone={() => {
+              window.history.replaceState({}, '', '/')
+              setResetDone(true)
+            }}
+          />
+        </Suspense>
+      </ToastProvider>
+    )
+  }
 
   if (auth.state.status === 'loading') {
     return (
