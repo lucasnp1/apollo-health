@@ -59,7 +59,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
     <div className="min-h-dvh grid place-items-center bg-background px-4">
       <Reveal className="w-full max-w-sm">
       <div className="w-full rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-lift)]">
-        <p className="eyebrow mb-4">Local-first · encrypted sync</p>
+        <p className="eyebrow mb-4">Local-first · private sync</p>
         <div className="flex items-center gap-3">
           <BrandMark size={44} />
           <div>
@@ -148,6 +148,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
         </form>
         )}
 
+        {!(mode === 'forgot' && forgotSent === 'unavailable') && (
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
           {mode === 'signup' ? (
             <>
@@ -160,6 +161,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
             <>For your safety, the link signs out every other device once you set a new password.</>
           )}
         </p>
+        )}
       </div>
       </Reveal>
     </div>

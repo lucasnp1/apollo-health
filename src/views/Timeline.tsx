@@ -501,7 +501,7 @@ export function Timeline({
         date: parseISO(e.collectedAt),
         icon: FlaskConical,
         title: e.name,
-        detail: e.labName ?? 'Lab exam',
+        detail: e.labName ?? 'Lab panel',
         type: 'lab' as EventType,
       })),
       ...fileRows.map((f) => ({
@@ -618,9 +618,9 @@ export function Timeline({
       {activeType === null && <TimelineGrouped events={events} />}
       {activeType === 'injection' && <DataGrid columns={INJ_COLS} rows={injRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-injection" empty="No injections logged." onArchive={(r) => archiveOne('injections', r.inj.id)} />}
       {activeType === 'weight' && <DataGrid columns={WEIGHT_COLS} rows={weightRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-weight" empty="No weight entries yet." onArchive={(r) => archiveOne('bodyMetrics', r.id)} />}
-      {activeType === 'bp' && <DataGrid columns={BP_COLS} rows={bpRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-bp" empty="No blood-pressure readings yet." onArchive={(r) => archiveOne('vitals', r.v.id)} />}
+      {activeType === 'bp' && <DataGrid columns={BP_COLS} rows={bpRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-bp" empty="No blood pressure readings yet." onArchive={(r) => archiveOne('vitals', r.v.id)} />}
       {activeType === 'symptom' && <DataGrid columns={SYM_COLS} rows={symRows} rowKey={(r) => r.id ?? r.recordedAt} storageKey="apollo-tl-cols-symptom" empty="No symptom check-ins yet." onArchive={(r) => archiveOne('symptoms', r.id)} />}
-      {activeType === 'lab' && <DataGrid columns={LAB_COLS} rows={labRows} rowKey={(r) => r.id ?? r.name} storageKey="apollo-tl-cols-lab" empty="No lab exams yet." onArchive={(r) => archiveExamEntry(r.id)} />}
+      {activeType === 'lab' && <DataGrid columns={LAB_COLS} rows={labRows} rowKey={(r) => r.id ?? r.name} storageKey="apollo-tl-cols-lab" empty="No lab panels yet." onArchive={(r) => archiveExamEntry(r.id)} />}
       {activeType === 'file' && <DataGrid columns={FILE_COLS} rows={fileRows} rowKey={(r) => r.id ?? r.name} storageKey="apollo-tl-cols-file" empty="No files yet." onArchive={(r) => archiveFileEntry(r.id)} />}
     </PanelCard>
   )

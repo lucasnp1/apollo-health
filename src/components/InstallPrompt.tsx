@@ -42,7 +42,7 @@ export function InstallPrompt() {
             <strong>Add to Home Screen</strong>.
           </span>
         ) : (
-          <span className="mt-0.5 block text-[11px] text-muted-foreground">Tap install to add it as an app. It works offline.</span>
+          <span className="mt-0.5 block text-[11px] text-muted-foreground">Tap Install to add it as an app. It works offline too.</span>
         )}
       </div>
       {canInstall && (

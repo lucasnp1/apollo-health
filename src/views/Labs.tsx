@@ -678,7 +678,7 @@ export function Labs({
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 flex flex-col gap-1.5">
-              <Label htmlFor="m-exam">Exam / panel name</Label>
+              <Label htmlFor="m-exam">Panel name</Label>
               <Input id="m-exam" value={examName} onChange={e => setExamName(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">

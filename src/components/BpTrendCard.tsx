@@ -121,14 +121,14 @@ function bpInsight(status: BpStatus): { title: string; body: string; cls: string
   if (status === 'danger') {
     return {
       title: '⚠ Action needed',
-      body: 'This is too high on-cycle. Consider a blast break, reduce dose/compound count, add cardio, and see a doctor. Check haematocrit ASAP.',
+      body: 'This is too high on-cycle. Consider a blast break, reduce dose/compound count, add cardio, and see a doctor. Check hematocrit ASAP.',
       cls: 'border-destructive bg-destructive/8',
     }
   }
   if (status === 'high') {
     return {
       title: 'BP is high',
-      body: 'Common on high-dose blasts or compounds like Tren, Anadrol, or Deca. Reduce sodium, increase cardio, consider an AI or dose cut. Check haematocrit next bloods.',
+      body: 'Common on high-dose blasts or compounds like Tren, Anadrol, or Deca. Reduce sodium, increase cardio, consider an AI or dose cut. Check hematocrit next bloods.',
       cls: 'border-destructive bg-destructive/8',
     }
   }

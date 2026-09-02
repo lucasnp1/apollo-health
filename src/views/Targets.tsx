@@ -129,7 +129,7 @@ function GoalEditor() {
           </Table>
         </div>
       ) : (
-        <PanelEmpty icon={Target} title="No goals yet" detail="A goal turns into progress bars and remaining-delta callouts across the app." />
+        <PanelEmpty icon={Target} title="No goals yet" detail="Set a goal and the app shows your progress and how far you have left." />
       )}
 
       <div className="grid grid-cols-2 gap-3 border-t pt-4">
@@ -267,7 +267,7 @@ function MarkerTargetEditor() {
     <PanelCard
       subtitle="Personal optimal"
       title="Marker targets"
-      action={<Badge variant="secondary">Overrides catalog ranges in Labs</Badge>}
+      action={<Badge variant="secondary">Replaces the default ranges in Lab results</Badge>}
     >
       <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
         Default ranges from the catalog (e.g. E2 20–40 pg/mL) are starting points. Override them here when you want a tighter
@@ -314,7 +314,7 @@ function MarkerTargetEditor() {
           </Table>
         </div>
       ) : (
-        <PanelEmpty icon={Target} title="No personal ranges" detail="Catalog defaults are used until you set your own." />
+        <PanelEmpty icon={Target} title="No personal ranges" detail="Default ranges are used until you set your own." />
       )}
 
       <div className="grid grid-cols-3 gap-3 border-t pt-4">

@@ -45,7 +45,7 @@ export function Archive() {
       <div className="mb-5">
         <p className="eyebrow">Archive</p>
         <h2 className="mt-1 font-display text-2xl font-semibold tracking-[-0.01em]">Archive</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Archived items are hidden from your log but kept. Restore anything back.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Archived items are hidden from your log but never deleted. Restore anything whenever you want.</p>
       </div>
 
       {groups.length === 0 ? (

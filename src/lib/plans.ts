@@ -20,6 +20,6 @@ export const PRO_PLANS: Array<{
 export const PRO_FEATURES = [
   'Import lab results straight from a PDF',
   'Smart lab analysis: heart, hormones, blood, liver',
-  'Doctor-ready export and print report',
-  'Injection reminders',
+  'Doctor-ready CSV and PDF export',
+  'Injection reminders (coming soon)',
 ]

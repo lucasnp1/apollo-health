@@ -39,7 +39,7 @@ export function useUndoableDelete() {
         console.error('Delete failed', err)
         showToast({
           tone: 'error',
-          message: 'Could not delete. Please try again.',
+          message: 'Could not archive. Please try again.',
         })
         return
       }

@@ -102,7 +102,7 @@ function buildCardio(map: Map<string, EnrichedResult>): CompositePanel {
     const s: Status = ldl.value < 2.6 ? 'good' : ldl.value < 3.4 ? 'warn' : 'bad'
     pills.push({ label: 'LDL', display: `${ldl.value} ${ldl.unit}`, status: s })
     if (s !== 'good') recs.push({
-      text: 'Elevated LDL: consider plant sterols, soluble fibre (oats, psyllium), and discuss statin therapy if persistently elevated.',
+      text: 'Elevated LDL: consider plant sterols, soluble fiber (oats, psyllium), and discuss statin therapy if persistently elevated.',
       source: 'ESC/EAS Dyslipidaemia Guidelines',
     })
   }
@@ -199,7 +199,7 @@ function buildBlood(map: Map<string, EnrichedResult>): CompositePanel {
       source: 'AUA/Endocrine Society TRT Guidelines',
     })
     if (pct >= 50 && pct < 52) recs.push({
-      text: 'HCT approaching threshold. Drink 3+ litres of water daily. Reduce red meat. Monitor monthly.',
+      text: 'HCT approaching threshold. Drink 3+ liters of water daily. Reduce red meat. Monitor monthly.',
       source: 'AUA TRT Guidelines',
     })
   }

@@ -221,7 +221,7 @@ export function buildCorrelationInsights(
   return [
     describeCorrelation('BP vs weight', bpWeightPairs, 'Pairs each BP reading with the closest logged weight within 21 days.'),
     describeCorrelation('BP vs hematocrit', bpHematocritPairs, 'Pairs blood pressure with the closest hematocrit result within 45 days.'),
-    describeCorrelation('Test estimate vs estradiol', testEstradiolPairs, 'Compares estimated testosterone load at exam date with estradiol/oestradiol.'),
+    describeCorrelation('Testosterone estimate vs estradiol', testEstradiolPairs, 'Compares the estimated testosterone load on the exam date with estradiol.'),
   ]
 }
 

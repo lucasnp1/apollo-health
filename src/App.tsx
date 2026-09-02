@@ -292,7 +292,7 @@ function Shell({
       (e) => e.name.toLowerCase() === base && e.sourceFileId !== pdfReviewFile.id,
     )
     return match
-      ? `You already imported a PDF named "${pdfReviewFile.name}" on ${new Date(match.collectedAt).toLocaleDateString()}. Importing again will create a duplicate exam.`
+      ? `You already imported a PDF named "${pdfReviewFile.name}" on ${new Date(match.collectedAt).toLocaleDateString()}. Importing again will create a duplicate panel.`
       : undefined
   }, [pdfReviewFile, exams])
   const results = useLiveQuery(
@@ -473,7 +473,7 @@ function titleFor(view: View) {
     'add-injection': 'Add injection',
     'add-weight': 'Add weight',
     'add-bp': 'Add blood pressure',
-    labs: 'Labs',
+    labs: 'Lab results',
     targets: 'Targets',
     timeline: 'Timeline',
     files: 'Files',
