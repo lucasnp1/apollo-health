@@ -59,8 +59,8 @@ export function RecoveryCodesScreen({ codes, email, onDone }: { codes: string[];
           <div className="flex items-center gap-3">
             <BrandMark size={44} />
             <div>
-              <h1 className="font-display text-2xl font-semibold leading-none">Save your recovery codes</h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">They get you back in if you ever forget your password.</p>
+              <h1 className="font-display text-2xl font-semibold leading-none">Take a screenshot of this screen</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">These recovery codes get you back in if you ever forget your password. We won't show them again.</p>
             </div>
           </div>
 
@@ -69,11 +69,11 @@ export function RecoveryCodesScreen({ codes, email, onDone }: { codes: string[];
           </div>
 
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-            Each code works once. Put them in your password manager or notes app. There is no email reset, so these codes are your way back in. You can make a new set any time from Settings.
+            Each code works once. A screenshot in your photos is enough; copying them into your password manager is even better. There is no email reset, so these codes are your way back in. You can make a new set any time from Settings.
           </p>
 
           <Button className="mt-5 w-full" onClick={onDone}>
-            <ShieldCheck className="size-4" /> I've saved them
+            <ShieldCheck className="size-4" /> Done, I have them
           </Button>
         </div>
       </Reveal>
