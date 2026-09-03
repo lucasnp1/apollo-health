@@ -13,8 +13,8 @@ export const PRO_PLANS: Array<{
   note?: string
   highlight?: boolean
 }> = [
-  { kind: 'monthly', label: 'Monthly', price: '$4.99', cadence: 'per month', note: 'First month free', highlight: true },
-  { kind: 'lifetime', label: 'Lifetime', price: '$99', cadence: 'one time', note: 'Pay once' },
+  { kind: 'monthly', label: 'Monthly', price: '£4.99', cadence: 'per month', note: 'First month free', highlight: true },
+  { kind: 'lifetime', label: 'Lifetime', price: '£99', cadence: 'one time', note: 'Pay once' },
 ]
 
 export const PRO_FEATURES = [
