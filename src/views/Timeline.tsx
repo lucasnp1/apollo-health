@@ -9,21 +9,14 @@ import { archiveRow, restoreRow, setExamArchived, setFileArchived } from '../lib
 import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
+import { FeedList, FeedRow, type FeedStatus } from '../components/FeedList'
 import { cn } from '@/lib/utils'
 
 type EventType = 'injection' | 'weight' | 'bp' | 'lab' | 'file' | 'symptom'
 
 // Status chip on the right of a feed row.
-type Tone = 'neutral' | 'good' | 'warn' | 'bad' | 'accent'
-type Status = { label: string; tone: Tone; icon: LucideIcon }
+type Status = FeedStatus
 const LOGGED: Status = { label: 'Logged', tone: 'neutral', icon: Check }
-const STATUS_TONE: Record<Tone, string> = {
-  neutral: 'bg-secondary text-muted-foreground',
-  good: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
-  warn: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-  bad: 'bg-destructive/12 text-destructive',
-  accent: 'bg-primary/12 text-primary',
-}
 
 // One row of the "All" feed: title · when, a one-line sub, a status chip,
 // the note left at the time, and a few small facts.
@@ -202,7 +195,7 @@ function DataGrid<T>({
                     <th
                       key={c.key}
                       className={cn(
-                        'whitespace-nowrap border-b border-border px-3 py-2 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground',
+                        'whitespace-nowrap border-b border-border px-3 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground',
                         c.num ? 'text-right' : 'text-left',
                       )}
                     >
@@ -325,55 +318,15 @@ const FILE_COLS: Col<FileRow>[] = [
 
 // ── The "All" feed: one structured row per entry, newest first ───────────────
 
-function FeedRow({ e, when }: { e: TimelineEvent; when: string }) {
-  const StatusIcon = e.status.icon
-  return (
-    <li className="flex items-start gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-muted/40">
-      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground ring-1 ring-border/70">
-        <e.icon className="size-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-start gap-2">
-          <div className="min-w-0 flex-1">
-            {/* Phones: the time sits under the title so the title keeps its room. */}
-            <div className="flex min-w-0 items-center gap-1.5 text-[13px]">
-              <span className="min-w-0 truncate font-semibold text-foreground">{e.title}</span>
-              <span className="hidden shrink-0 text-muted-foreground/50 sm:inline">·</span>
-              <time className="hidden shrink-0 whitespace-nowrap text-muted-foreground sm:inline">{when}</time>
-            </div>
-            <div className={cn('truncate text-[12px] leading-4 text-muted-foreground', !e.sub && 'sm:hidden')}>
-              <time className="sm:hidden">{when}</time>
-              {e.sub && <><span className="sm:hidden"> · </span>{e.sub}</>}
-            </div>
-          </div>
-          <span className={cn('inline-flex max-w-[46%] shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[10.5px] font-medium leading-none', STATUS_TONE[e.status.tone])}>
-            <StatusIcon className="size-3 shrink-0" />
-            <span className="truncate">{e.status.label}</span>
-          </span>
-        </div>
-        {e.note && <p className="mt-1 line-clamp-3 break-words text-[13px] leading-[1.35] text-foreground/85">{e.note}</p>}
-        {e.facts.length > 0 && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-muted-foreground">
-            {e.facts.map((f, i) => (
-              <span key={i} className="inline-flex items-center gap-1 tabular-nums">
-                <span className="size-1 rounded-full bg-muted-foreground/40" />
-                <span>{f}</span>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    </li>
-  )
-}
-
 function TimelineFeed({ events }: { events: TimelineEvent[] }) {
   if (events.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">Nothing logged yet.</p>
   const now = new Date()
   return (
-    <ul className="-mx-2 flex flex-col divide-y divide-border/60">
-      {events.map((e) => <FeedRow key={e.id} e={e} when={whenLabel(e.date, now)} />)}
-    </ul>
+    <FeedList>
+      {events.map((e) => (
+        <FeedRow key={e.id} icon={e.icon} title={e.title} when={whenLabel(e.date, now)} sub={e.sub} status={e.status} note={e.note} clampNote facts={e.facts} />
+      ))}
+    </FeedList>
   )
 }
 
@@ -644,7 +597,7 @@ export function Timeline({
               {Icon && <Icon className="size-3" />}
               {tab.label}
               <span className={cn(
-                'rounded-full px-1.5 text-[10px] font-bold leading-4 tabular-nums',
+                'rounded-full px-1.5 text-xs font-bold leading-4 tabular-nums',
                 active ? 'bg-background/20 text-background' : 'bg-secondary text-muted-foreground',
               )}>{tab.count}</span>
             </button>
@@ -655,7 +608,7 @@ export function Timeline({
       {/* Injection compound sub-filter */}
       {activeType === 'injection' && injectionCompounds.length > 1 && (
         <div className="mb-4 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-[11px] text-muted-foreground">Compound:</span>
+          <span className="mr-1 text-xs text-muted-foreground">Compound:</span>
           {injectionCompounds.map((c) => {
             const on = activeCompoundId === c.id
             return (
@@ -664,7 +617,7 @@ export function Timeline({
                 type="button"
                 onClick={() => setActiveCompoundId(on ? null : c.id!)}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-colors',
+                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
                   on ? 'border-foreground bg-accent text-foreground' : 'border-border text-muted-foreground hover:bg-accent',
                 )}
               >

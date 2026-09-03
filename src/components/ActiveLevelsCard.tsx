@@ -300,7 +300,7 @@ export function ActiveLevelsCard({
             {totalsView === '7d' ? 'Nothing injected in the last 7 days.' : 'Nothing injected yet this week.'}
           </p>
         )}
-        <p className="mt-1.5 text-[11px] text-muted-foreground/70">
+        <p className="mt-1.5 text-xs text-muted-foreground/70">
           {totalsView === '7d' ? 'Rolling 7-day window.' : 'Since Sunday.'}
         </p>
       </div>

@@ -168,7 +168,7 @@ export function PdfReviewSheet({
             <Label htmlFor="pdf-date" className="eyebrow">Collection date</Label>
             <Input id="pdf-date" type="date" value={collectedAt} onChange={(e) => setCollectedAt(e.target.value)} className="h-8 w-40 text-sm" />
           </div>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {usingDetected ? "Found in the report. Edit if it's wrong." : detectedDate ? 'Set by you.' : "Not found in the report, so today's date is filled in."}
           </span>
         </div>
@@ -192,7 +192,7 @@ export function PdfReviewSheet({
               <Button variant="outline" size="sm" onClick={() => setRows((prev) => prev.map((r) => ({ ...r, include: !allSelected })))}>
                 {allSelected ? 'Deselect all' : 'Select all'}
               </Button>
-              <span className="flex items-center gap-3 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-emerald-500" /> clean</span>
                 <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-amber-500" /> glance</span>
                 <span className="flex items-center gap-1"><span className="size-2 rounded-full bg-destructive" /> check</span>
@@ -205,7 +205,7 @@ export function PdfReviewSheet({
                   const conf = r.confidence ?? 'low'
                   return (
                     <li key={r.id} className={cn('flex flex-col gap-1.5 border-b py-2.5 last:border-b-0', !r.include && 'opacity-45')}>
-                      {header && <p className="eyebrow -mb-0.5 pt-1 text-[10px]">{r.panel}</p>}
+                      {header && <p className="eyebrow -mb-0.5 pt-1 text-[11px]">{r.panel}</p>}
                       <div className="flex items-center gap-2">
                         <Checkbox checked={r.include} onCheckedChange={(v) => updateRow(r.id, { include: v === true })} aria-label="Include this row" />
                         <span className={cn('size-2 shrink-0 rounded-full', CONF_DOT[conf])} title={CONF_TITLE[conf]} aria-label={CONF_TITLE[conf]} />
@@ -219,7 +219,7 @@ export function PdfReviewSheet({
                           aria-label="Marker name"
                         />
                         {r.flag && (
-                          <span className={cn('rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold', r.flag === 'H' ? 'bg-destructive/12 text-destructive' : 'bg-blue-500/12 text-blue-600 dark:text-blue-400')} title={r.flag === 'H' ? 'Flagged high by the lab' : 'Flagged low by the lab'}>
+                          <span className={cn('rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold', r.flag === 'H' ? 'bg-destructive/12 text-destructive' : 'bg-blue-500/12 text-blue-600 dark:text-blue-400')} title={r.flag === 'H' ? 'Flagged high by the lab' : 'Flagged low by the lab'}>
                             {r.flag}
                           </span>
                         )}

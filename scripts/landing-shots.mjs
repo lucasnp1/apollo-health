@@ -4,19 +4,24 @@
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
 
+// DESKTOP=1 captures a 1280px-wide review set into OUT instead of the phone
+// shots the landing page uses.
+const DESKTOP = process.env.DESKTOP === '1'
 const BASE = process.env.BASE ?? 'http://localhost:5173'
-const OUT = process.env.OUT ?? '/Users/lucasnp/apollo-health/public/landing/inside'
+const OUT = process.env.OUT ?? (DESKTOP ? '/tmp/apollo-desktop-shots' : '/Users/lucasnp/apollo-health/public/landing/inside')
 fs.mkdirSync(OUT, { recursive: true })
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true })
-const ctx = await browser.newContext({
-  viewport: { width: 390, height: 844 },
-  deviceScaleFactor: 2,
-  colorScheme: 'dark',
-  isMobile: true,
-  hasTouch: true,
-  reducedMotion: 'reduce',
-})
+const ctx = await browser.newContext(DESKTOP
+  ? { viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, colorScheme: 'dark', reducedMotion: 'reduce' }
+  : {
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 2,
+      colorScheme: 'dark',
+      isMobile: true,
+      hasTouch: true,
+      reducedMotion: 'reduce',
+    })
 const page = await ctx.newPage()
 page.on('pageerror', (e) => console.log('pageerror:', e.message))
 await page.addInitScript(() => {
@@ -202,8 +207,15 @@ await shot('timeline')
 await home()
 await page.getByRole('button', { name: /^Lab results/ }).first().click()
 await page.waitForTimeout(1500)
-await scrollToCard(page.locator('h3, h2, p', { hasText: /^Composites$/ }).first(), 900)
+await scrollToCard(page.locator('h3, h2, p', { hasText: /^Analysis$/ }).first(), 900)
 await shot('analysis')
+if (DESKTOP) {
+  // Open the first analysis row so the causes and practices block is in the review set.
+  const first = page.locator('button[aria-expanded]').first()
+  if (await first.count()) { await first.click(); await page.waitForTimeout(500); await shot('analysis-open') }
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await shot('labs-top')
+}
 await scrollToCard(page.locator('h3', { hasText: /Sex Hormones/ }).first(), 1400)
 await shot('bloods')
 

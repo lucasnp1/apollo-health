@@ -382,7 +382,7 @@ export function ExportPage({
             <Button size="lg" variant="outline" className="w-full" onClick={exportPdf} disabled={!anySelected || busy !== null}>
               <FileText className="size-4" /> {busy === 'pdf' ? 'Opening…' : 'Save as PDF'}
             </Button>
-            <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+            <p className="text-center text-xs leading-relaxed text-muted-foreground">
               CSV opens in Sheets or Excel and is easy to share. PDF opens a clean document to save or print.
             </p>
           </div>

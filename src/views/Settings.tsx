@@ -122,7 +122,7 @@ export function Settings({
         <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => auth.logout()}>
           <LogOut className="size-3.5" /> Sign out
         </Button>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           <LegalLink href="/privacy" className="text-muted-foreground">Privacy</LegalLink>
           {' · '}
           <LegalLink href="/terms" className="text-muted-foreground">Terms</LegalLink>
@@ -302,7 +302,7 @@ function ChangePasswordDialog({ open, onClose, auth }: { open: boolean; onClose:
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="pw-confirm">Confirm new password</Label>
               <Input id="pw-confirm" type="password" autoComplete="new-password" aria-invalid={mismatch} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-              {mismatch && <p className="text-[11px] text-destructive">Passwords don't match.</p>}
+              {mismatch && <p className="text-xs text-destructive">Passwords don't match.</p>}
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>

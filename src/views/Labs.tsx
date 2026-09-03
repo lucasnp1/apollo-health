@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, CircleCheck, CircleDashed,
-  Droplet, Edit2, FileText, FlaskConical, Lock, Plus, Sparkles, Trash2, TriangleAlert, X,
+  ChevronDown, ChevronRight, CircleCheck, CircleDashed, Droplet, Edit2, FileText, FlaskConical,
+  Lock, Plus, Sparkles, Trash2, TriangleAlert, X,
 } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
@@ -12,10 +12,11 @@ import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { archiveRow, restoreRow } from '../lib/archive'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
-import { LabComposites } from '../components/LabComposites'
+import { LabAnalysisCard, LabSummaryCard } from '../components/LabAnalysis'
+import { useLabFindings } from '../lib/labFindings'
+import { FeedList, FeedRow, type FeedStatus } from '../components/FeedList'
 import { usePlan } from '../lib/plan'
-import { DashGrid, StatRow } from '../components/dashboard/Grid'
-import { StatCard } from '../components/dashboard/StatCard'
+import { DashGrid } from '../components/dashboard/Grid'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -93,10 +94,10 @@ function MarkerRow({
     : 'no reference range'
   const dateText = latest ? format(parseISO(latest.date), 'MMM d, yyyy') : undefined
 
-  const chip =
-    status === 'good' ? { label: 'In range', cls: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400', Icon: CircleCheck }
-    : status === 'warn' ? { label: above ? 'High' : 'Low', cls: 'bg-destructive/12 text-destructive', Icon: TriangleAlert }
-    : { label: 'No range', cls: 'bg-secondary text-muted-foreground', Icon: CircleDashed }
+  const chip: FeedStatus =
+    status === 'good' ? { label: 'In range', tone: 'good', icon: CircleCheck }
+    : status === 'warn' ? { label: above ? 'High' : 'Low', tone: 'bad', icon: TriangleAlert }
+    : { label: 'No range', tone: 'neutral', icon: CircleDashed }
 
   const valueText = val !== undefined ? (latest.rawValue || String(val)) : '—'
   const title = `${summary.label} ${valueText}${summary.unit && val !== undefined ? ` ${summary.unit}` : ''}`
@@ -110,58 +111,18 @@ function MarkerRow({
   ].filter((f): f is string => typeof f === 'string' && f.length > 0)
 
   return (
-    <li>
-      <button
-        type="button"
-        onClick={onClick}
-        aria-pressed={selected}
-        className={cn(
-          'flex w-full items-start gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-          selected && 'bg-accent/50 hover:bg-accent/50',
-        )}
-      >
-        <span className={cn('grid size-9 shrink-0 place-items-center rounded-full bg-secondary ring-1 ring-border/70', status === 'warn' ? 'text-destructive' : 'text-muted-foreground')}>
-          <Droplet className="size-4" />
-        </span>
-        <span className="block min-w-0 flex-1">
-          <span className="flex min-w-0 items-start gap-2">
-            <span className="block min-w-0 flex-1">
-              <span className="flex min-w-0 items-center gap-1.5 text-[13px]">
-                <span className="min-w-0 truncate font-semibold text-foreground">{title}</span>
-                {dateText && (
-                  <>
-                    <span className="hidden shrink-0 text-muted-foreground/50 sm:inline">·</span>
-                    <time className="hidden shrink-0 whitespace-nowrap text-muted-foreground sm:inline">{dateText}</time>
-                  </>
-                )}
-              </span>
-              {/* Phones: the date sits under the title so the title keeps its room. */}
-              <span className="block truncate text-[12px] leading-4 text-muted-foreground">
-                {dateText && <span className="sm:hidden">{dateText} · </span>}
-                {sub}
-              </span>
-            </span>
-            <span className="flex shrink-0 items-center gap-1.5">
-              <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10.5px] font-medium leading-none', chip.cls)}>
-                <chip.Icon className="size-3 shrink-0" />
-                <span>{chip.label}</span>
-              </span>
-              {selected ? <ChevronDown className="size-3.5 text-muted-foreground/70" aria-hidden="true" /> : <ChevronRight className="size-3.5 text-muted-foreground/70" aria-hidden="true" />}
-            </span>
-          </span>
-          {facts.length > 0 && (
-            <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-muted-foreground">
-              {facts.map((f, i) => (
-                <span key={i} className="inline-flex items-center gap-1 tabular-nums">
-                  <span className="size-1 rounded-full bg-muted-foreground/40" />
-                  <span>{f}</span>
-                </span>
-              ))}
-            </span>
-          )}
-        </span>
-      </button>
-    </li>
+    <FeedRow
+      icon={Droplet}
+      iconTone={status === 'warn' ? 'bad' : 'neutral'}
+      title={title}
+      when={dateText}
+      whenShort={latest ? format(parseISO(latest.date), 'MMM d') : undefined}
+      sub={sub}
+      status={chip}
+      facts={facts}
+      onClick={onClick}
+      selected={selected}
+    />
   )
 }
 
@@ -178,7 +139,7 @@ function MarkerList({
   keyPrefix?: string
 }) {
   return (
-    <ul className="-mx-2 flex flex-col divide-y divide-border/60">
+    <FeedList>
       {summaries.map(s => (
         <MarkerRow
           key={keyPrefix + s.key}
@@ -187,7 +148,7 @@ function MarkerList({
           onClick={() => onSelect(s.key)}
         />
       ))}
-    </ul>
+    </FeedList>
   )
 }
 
@@ -280,15 +241,15 @@ function MarkerHistoryPane({
             >
               <div className="min-w-0 flex-1">
                 <p className="text-sm">{format(parseISO(entry.date), 'MMM d, yyyy')}</p>
-                <p className="truncate text-[11px] text-muted-foreground">{entry.examName}</p>
+                <p className="truncate text-xs text-muted-foreground">{entry.examName}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <span className={cn('font-mono text-sm font-medium tabular-nums', status === 'warn' && 'text-destructive')}>
                   {entry.rawValue}
-                  {entry.unit && <span className="ml-1 text-[11px] font-normal text-muted-foreground">{entry.unit}</span>}
+                  {entry.unit && <span className="ml-1 text-xs font-normal text-muted-foreground">{entry.unit}</span>}
                 </span>
                 {delta !== undefined && Math.abs(delta) > 0.05 && (
-                  <span className="text-[11px] font-semibold text-muted-foreground">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     {delta > 0 ? '▲' : '▼'} {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
                   </span>
                 )}
@@ -296,7 +257,7 @@ function MarkerHistoryPane({
                   <Badge
                     variant="secondary"
                     className={cn(
-                      'px-1.5 text-[10px] font-bold',
+                      'px-1.5 text-xs font-bold',
                       status === 'good' ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400' : 'bg-destructive/12 text-destructive',
                     )}
                   >
@@ -513,10 +474,12 @@ export function Labs({
     () => allSummaries.filter(s => rangeStatus(s.entries[0]?.value, s.entries[0]?.low, s.entries[0]?.high) === 'good').length,
     [allSummaries],
   )
-  const lastTestDate = useMemo(
-    () => exams.length > 0 ? [...exams].sort((a, b) => b.collectedAt.localeCompare(a.collectedAt))[0]?.collectedAt : undefined,
+  const latestExam = useMemo(
+    () => exams.length > 0 ? [...exams].sort((a, b) => b.collectedAt.localeCompare(a.collectedAt))[0] : undefined,
     [exams],
   )
+  const lastTestDate = latestExam?.collectedAt
+  const findings = useLabFindings(results, exams)
 
   return (
     <div className="flex flex-col gap-5">
@@ -536,22 +499,23 @@ export function Labs({
         </div>
       )}
 
-      {/* ── KPI row ── */}
+      <DashGrid>
+      {/* ── The read: disclaimer, written summary, counts ── */}
       {hasData && (
-        <StatRow className="md:grid-cols-4 2xl:grid-cols-4">
-          <StatCard icon={FlaskConical} label="Markers tracked" value={allSummaries.length} tone="primary" />
-          <StatCard icon={CheckCircle2} label="In range" value={inRangeCount} tone="good" colorValue />
-          <StatCard icon={AlertTriangle} label="Out of range" value={outOfRangeSummaries.length} tone={outOfRangeSummaries.length > 0 ? 'bad' : 'neutral'} colorValue={outOfRangeSummaries.length > 0} />
-          <StatCard icon={CalendarDays} label="Last test" value={lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : '—'} tone="info" />
-        </StatRow>
+        <div className="md:col-span-2 xl:col-span-6">
+          <LabSummaryCard
+            stats={{ markers: allSummaries.length, inRange: inRangeCount, outOfRange: outOfRangeSummaries.length, lastTest: lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : undefined }}
+            findings={isPro ? findings : null}
+            subtitle={latestExam ? [latestExam.name, latestExam.labName, format(parseISO(latestExam.collectedAt), 'MMM d, yyyy')].filter(Boolean).join(' · ') : undefined}
+          />
+        </div>
       )}
 
-      <DashGrid>
-      {/* ── Health composites (Pro) ── */}
+      {/* ── Panel-by-panel analysis (Pro) ── */}
       {hasData && (
         <div className="md:col-span-2 xl:col-span-6">
           {isPro ? (
-            <LabComposites results={results} exams={exams} />
+            <LabAnalysisCard findings={findings} />
           ) : (
             <ProCompositesTeaser onUpgrade={() => openUpgrade('Smart lab analysis')} />
           )}
@@ -594,17 +558,17 @@ export function Labs({
           <PanelCard key={panel} className="md:col-span-2 xl:col-span-6">
             <button
               type="button"
-              className="flex w-full items-center gap-2 text-left"
+              className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 text-left"
               onClick={() => togglePanel(panel)}
               aria-expanded={!collapsed}
             >
               {collapsed
-                ? <ChevronRight className="size-3.5 text-muted-foreground" />
-                : <ChevronDown className="size-3.5 text-muted-foreground" />}
-              <h3 className="font-display text-lg font-semibold">{panel}</h3>
-              <span className="text-[11px] text-muted-foreground">· {summaries.length} marker{summaries.length === 1 ? '' : 's'}</span>
+                ? <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" />
+                : <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />}
+              <h3 className="whitespace-nowrap font-display text-lg font-semibold">{panel}</h3>
+              <span className="whitespace-nowrap text-xs text-muted-foreground">· {summaries.length} marker{summaries.length === 1 ? '' : 's'}</span>
               {outCount > 0 && (
-                <Badge variant="secondary" className="bg-destructive/12 text-[10px] text-destructive">
+                <Badge variant="secondary" className="ml-auto whitespace-nowrap bg-destructive/12 text-xs text-destructive">
                   {outCount} out of range
                 </Badge>
               )}
@@ -639,11 +603,11 @@ export function Labs({
                   <div className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border bg-muted/50 p-3">
                     <p className="w-full text-xs font-medium">Personal range for {selectedSummary.label}</p>
                     <div className="flex flex-col gap-1">
-                      <Label htmlFor="t-low" className="text-[11px]">Low</Label>
+                      <Label htmlFor="t-low" className="text-xs">Low</Label>
                       <Input id="t-low" inputMode="decimal" placeholder="e.g. 700" className="h-8 w-24 text-xs" value={targetLow} onChange={e => setTargetLow(e.target.value)} />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <Label htmlFor="t-high" className="text-[11px]">High</Label>
+                      <Label htmlFor="t-high" className="text-xs">High</Label>
                       <Input id="t-high" inputMode="decimal" placeholder="e.g. 1000" className="h-8 w-24 text-xs" value={targetHigh} onChange={e => setTargetHigh(e.target.value)} />
                     </div>
                     <Button size="sm" className="h-8" onClick={() => void saveTarget(selectedSummary.key, selectedSummary.unit)}>Save</Button>

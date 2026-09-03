@@ -13,7 +13,7 @@ function Req({ ok, children }: { ok: boolean; children: React.ReactNode }) {
 
 export function PasswordRules({ password, className }: { password: string; className?: string }) {
   return (
-    <ul className={cn('flex flex-col gap-1 px-0.5 text-[11px]', className)}>
+    <ul className={cn('flex flex-col gap-1 px-0.5 text-xs', className)}>
       <Req ok={password.length >= 10}>At least 10 characters</Req>
       <Req ok={/[a-z]/.test(password) && /[A-Z]/.test(password)}>Upper and lowercase letters</Req>
       <Req ok={/\d/.test(password)}>A number</Req>

@@ -155,7 +155,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="confirm" className="sr-only">Confirm password</Label>
                 <Input id="confirm" type="password" placeholder={mode === 'signup' ? 'Confirm password' : 'Confirm new password'} autoComplete="new-password" aria-invalid={mismatch} required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-                {mismatch && <p className="px-0.5 text-[11px] text-destructive">Passwords don't match.</p>}
+                {mismatch && <p className="px-0.5 text-xs text-destructive">Passwords don't match.</p>}
               </div>
             </>
           )}

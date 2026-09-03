@@ -37,12 +37,12 @@ export function InstallPrompt() {
       <div className="min-w-0 flex-1">
         <strong className="block text-[13px]">Install Apollo on your phone</strong>
         {platform === 'ios' ? (
-          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+          <span className="mt-0.5 block text-xs text-muted-foreground">
             Tap <Share className="inline size-3 align-[-1px]" /> Share, then{' '}
             <strong>Add to Home Screen</strong>.
           </span>
         ) : (
-          <span className="mt-0.5 block text-[11px] text-muted-foreground">Tap Install to add it as an app. It works offline too.</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">Tap Install to add it as an app. It works offline too.</span>
         )}
       </div>
       {canInstall && (

@@ -183,6 +183,14 @@
   color: var(--muted-foreground);
 }
 
+/* Feed rows (Timeline, lab lists, analysis): one type scale so every list in
+   the app reads the same. Sizes sit a step above the old 13/12/11px set. */
+@utility feed-title { font-size: 0.9375rem; line-height: 1.25rem; font-weight: 600; letter-spacing: -0.005em; }   /* 15px */
+@utility feed-meta  { font-size: 0.8125rem; line-height: 1.125rem; }                                              /* 13px */
+@utility feed-note  { font-size: 0.875rem;  line-height: 1.45; }                                                  /* 14px */
+@utility feed-facts { font-size: 0.75rem;   line-height: 1rem; font-weight: 500; }                                /* 12px */
+@utility feed-chip  { font-size: 0.6875rem; line-height: 1; font-weight: 500; }                                   /* 11px */
+
 @layer components {
   /* Brand medallion badge — the logo art is square-cropped on yellow; frame it
      in a soft rounded badge so it reads as crafted next to the wordmark. */

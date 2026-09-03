@@ -57,20 +57,20 @@ export function UpgradeDialog({ open, onClose, feature }: { open: boolean; onClo
               <span className="min-w-0">
                 <span className="flex items-center gap-2 font-medium">
                   {p.label}
-                  {p.note && <span className="rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-semibold text-primary">{p.note}</span>}
+                  {p.note && <span className="rounded-full bg-primary/12 px-2 py-0.5 text-xs font-semibold text-primary">{p.note}</span>}
                 </span>
                 <span className="mt-0.5 block text-xs text-muted-foreground">{p.cadence}</span>
               </span>
               <span className="shrink-0 text-right">
                 <span className="font-mono text-lg font-semibold tabular-nums">{p.price}</span>
-                {busy === p.kind && <span className="block text-[11px] text-muted-foreground">Starting…</span>}
+                {busy === p.kind && <span className="block text-xs text-muted-foreground">Starting…</span>}
               </span>
             </button>
           ))}
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
+        <p className="text-xs leading-relaxed text-muted-foreground">
           Secure checkout by Stripe. Your logging, timeline, and cloud backup stay free forever.
         </p>
       </DialogContent>

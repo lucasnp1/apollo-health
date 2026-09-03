@@ -60,7 +60,7 @@ export function StatCard({
         <p className={cn('truncate text-lg font-semibold tabular-nums leading-tight md:text-xl', colorValue ? TONE_VALUE[tone] : 'text-foreground')}>
           {value}
         </p>
-        {sub && <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{sub}</p>}
+        {sub && <p className="mt-0.5 truncate text-xs text-muted-foreground">{sub}</p>}
       </div>
     </motion.div>
   )
