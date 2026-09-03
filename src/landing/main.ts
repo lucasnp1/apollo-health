@@ -6,15 +6,6 @@ const $ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = docu
 const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)]
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
 
-// ── Email forms → the app's sign-up screen, prefilled ─────────────────────
-for (const form of $$<HTMLFormElement>('form[data-signup]')) {
-  form.addEventListener('submit', (e) => {
-    e.preventDefault()
-    const email = (form.querySelector<HTMLInputElement>('input[type=email]')?.value ?? '').trim()
-    location.href = `/app/?signup=1${email ? `&email=${encodeURIComponent(email)}` : ''}`
-  })
-}
-
 // ── How it works: amber rail fills as the steps scroll past ───────────────
 const rail = $('#how-rail-fill')
 const steps = $('#how-steps')
@@ -99,6 +90,38 @@ if (pills.length && !reduced) {
     pills[i].classList.remove('scale-95', 'opacity-55')
     pills[i].classList.add('scale-[1.04]', 'opacity-100')
   }, 1600)
+}
+
+// ── Inside Apollo: screens cycle while in view, until someone picks one ───
+const insideStrip = $('#inside-tabs')
+const insideTabs = $$<HTMLButtonElement>('#inside-tabs [data-shot]')
+const insideImgs = $$<HTMLImageElement>('#inside-screen [data-shot-img]')
+if (insideStrip && insideTabs.length && insideImgs.length) {
+  let idx = 0
+  let timer = 0
+  let pinned = false
+  const apply = (i: number) => {
+    idx = i
+    insideTabs.forEach((t, j) => t.setAttribute('aria-selected', String(j === i)))
+    insideImgs.forEach((im, j) => im.classList.toggle('opacity-0', j !== i))
+    // Mobile: the strip scrolls sideways, so keep the active tab in view. Never
+    // scroll the page itself (this also runs while the visitor reads elsewhere).
+    if (insideStrip.scrollWidth > insideStrip.clientWidth) {
+      insideStrip.scrollTo({ left: Math.max(0, insideTabs[i].offsetLeft - 24), behavior: reduced ? 'auto' : 'smooth' })
+    }
+  }
+  // Screens past the first load lazily; fetch and decode before the crossfade
+  // so the phone never shows an empty screen.
+  const show = (i: number) => {
+    const im = insideImgs[i]
+    if (im.complete && im.naturalWidth > 0) { apply(i); return }
+    im.loading = 'eager'
+    im.decode().catch(() => undefined).then(() => apply(i))
+  }
+  const stop = () => { clearInterval(timer); timer = 0 }
+  const start = () => { if (!timer && !pinned && !reduced) timer = window.setInterval(() => show((idx + 1) % insideTabs.length), 3800) }
+  insideTabs.forEach((t, i) => t.addEventListener('click', () => { pinned = true; stop(); show(i) }))
+  new IntersectionObserver((entries) => { if (entries[0].isIntersecting) start(); else stop() }, { threshold: 0.35 }).observe(insideStrip)
 }
 
 // ── Pricing: monthly / annual toggle ──────────────────────────────────────

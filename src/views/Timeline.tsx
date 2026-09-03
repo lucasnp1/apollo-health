@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Archive as ArchiveIcon, Brain, FileText, FlaskConical, HeartPulse, Scale, SlidersHorizontal, Syringe } from 'lucide-react'
+import { Archive as ArchiveIcon, Brain, Check, CircleCheck, Clock, Eye, FileText, FlaskConical, HeartPulse, Scale, SlidersHorizontal, Syringe, TriangleAlert } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { format, parseISO, startOfDay, startOfWeek, differenceInCalendarDays, isThisWeek, isToday, isYesterday } from 'date-fns'
+import { format, parseISO, differenceInCalendarDays, isToday, isYesterday } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type Symptom, type VitalLog } from '../lib/db'
 import { ALL_SYMPTOMS, chipTone } from '../lib/symptoms'
@@ -9,17 +9,33 @@ import { archiveRow, restoreRow, setExamArchived, setFileArchived } from '../lib
 import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 type EventType = 'injection' | 'weight' | 'bp' | 'lab' | 'file' | 'symptom'
 
+// Status chip on the right of a feed row.
+type Tone = 'neutral' | 'good' | 'warn' | 'bad' | 'accent'
+type Status = { label: string; tone: Tone; icon: LucideIcon }
+const LOGGED: Status = { label: 'Logged', tone: 'neutral', icon: Check }
+const STATUS_TONE: Record<Tone, string> = {
+  neutral: 'bg-secondary text-muted-foreground',
+  good: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
+  warn: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  bad: 'bg-destructive/12 text-destructive',
+  accent: 'bg-primary/12 text-primary',
+}
+
+// One row of the "All" feed: title · when, a one-line sub, a status chip,
+// the note left at the time, and a few small facts.
 type TimelineEvent = {
   id: string
   date: Date
   icon: LucideIcon
   title: string
-  detail: string
+  sub?: string
+  status: Status
+  note?: string
+  facts: string[]
   type: EventType
   compoundId?: number
 }
@@ -55,6 +71,26 @@ const TONE_BG: Record<BpTone, string> = {
   good: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
   warn: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
   bad: 'bg-destructive/12 text-destructive',
+}
+function bpFeedStatus(sys: number, dia: number): Status {
+  const s = bpStatus(sys, dia)
+  if (s.tone === 'good') return { label: 'In range', tone: 'good', icon: CircleCheck }
+  if (s.tone === 'warn') return { label: 'Monitor', tone: 'warn', icon: Clock }
+  return { label: s.label, tone: 'bad', icon: TriangleAlert }
+}
+
+// "today at 8:12 AM", "yesterday at …", "Thursday at …", then "Sep 1 at …".
+function whenLabel(d: Date, now: Date): string {
+  const t = format(d, 'h:mm a')
+  if (isToday(d)) return `today at ${t}`
+  if (isYesterday(d)) return `yesterday at ${t}`
+  const days = differenceInCalendarDays(now, d)
+  if (days > 0 && days < 7) return `${format(d, 'EEEE')} at ${t}`
+  return `${format(d, d.getFullYear() === now.getFullYear() ? 'MMM d' : 'MMM d, yyyy')} at ${t}`
+}
+
+function arrow(v: number, digits = 1, unit = ''): string {
+  return `${v > 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(digits)}${unit ? ` ${unit}` : ''}`
 }
 
 // Signed change with an arrow. `lowerBetter` colours it (BP: down = good).
@@ -287,108 +323,76 @@ const FILE_COLS: Col<FileRow>[] = [
   { key: 'status', label: 'Status', render: (r) => r.status },
 ]
 
-// ── Day/week grouped rendering (the "All" overview) ──────────────────────────
+// ── The "All" feed: one structured row per entry, newest first ───────────────
 
-type Group = { label: string; subLabel?: string; events: TimelineEvent[] }
-
-function groupEvents(events: TimelineEvent[]): Group[] {
-  const now = new Date()
-  const groups = new Map<string, Group>()
-  const order: string[] = []
-
-  for (const e of events) {
-    const d = startOfDay(e.date)
-    const key = d.toISOString()
-
-    if (!groups.has(key)) {
-      let label: string
-      let subLabel: string | undefined
-      const daysAgo = differenceInCalendarDays(now, d)
-
-      if (isToday(d)) {
-        label = 'Today'
-        subLabel = format(d, 'EEE, MMM d')
-      } else if (isYesterday(d)) {
-        label = 'Yesterday'
-        subLabel = format(d, 'EEE, MMM d')
-      } else if (daysAgo < 7) {
-        label = format(d, 'EEEE')
-        subLabel = format(d, 'MMM d')
-      } else if (isThisWeek(startOfWeek(d))) {
-        label = `This week`
-        subLabel = format(d, 'MMM d')
-      } else {
-        const weekStart = startOfWeek(d, { weekStartsOn: 1 })
-        const weekKey = weekStart.toISOString()
-        const weekLabel = `Week of ${format(weekStart, 'MMM d')}`
-        if (!groups.has(weekKey)) {
-          groups.set(weekKey, { label: weekLabel, events: [] })
-          order.push(weekKey)
-        }
-        groups.get(weekKey)!.events.push(e)
-        continue
-      }
-
-      groups.set(key, { label, subLabel, events: [] })
-      order.push(key)
-    }
-    groups.get(key)!.events.push(e)
-  }
-
-  return order.map((k) => groups.get(k)!)
-}
-
-function TimelineGrouped({ events }: { events: TimelineEvent[] }) {
-  const groups = useMemo(() => groupEvents(events), [events])
-  if (events.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">Nothing logged yet.</p>
-
+function FeedRow({ e, when }: { e: TimelineEvent; when: string }) {
+  const StatusIcon = e.status.icon
   return (
-    <div className="flex flex-col gap-6">
-      {groups.map((group, gi) => (
-        <div key={gi}>
-          <div className="mb-2 flex items-baseline gap-2">
-            <span className="text-sm font-semibold">{group.label}</span>
-            {group.subLabel && <span className="text-xs text-muted-foreground">{group.subLabel}</span>}
+    <li className="flex items-start gap-3 rounded-xl px-2 py-3 transition-colors hover:bg-muted/40">
+      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground ring-1 ring-border/70">
+        <e.icon className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-start gap-2">
+          <div className="min-w-0 flex-1">
+            {/* Phones: the time sits under the title so the title keeps its room. */}
+            <div className="flex min-w-0 items-center gap-1.5 text-[13px]">
+              <span className="min-w-0 truncate font-semibold text-foreground">{e.title}</span>
+              <span className="hidden shrink-0 text-muted-foreground/50 sm:inline">·</span>
+              <time className="hidden shrink-0 whitespace-nowrap text-muted-foreground sm:inline">{when}</time>
+            </div>
+            <div className={cn('truncate text-[12px] leading-4 text-muted-foreground', !e.sub && 'sm:hidden')}>
+              <time className="sm:hidden">{when}</time>
+              {e.sub && <><span className="sm:hidden"> · </span>{e.sub}</>}
+            </div>
           </div>
-          <Table>
-            <TableBody>
-              {group.events.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell className="w-[44px]">
-                    <span className="grid size-7 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground">
-                      <e.icon className="size-3.5" />
-                    </span>
-                  </TableCell>
-                  <TableCell><p className="truncate font-medium">{e.title}</p></TableCell>
-                  <TableCell className="text-muted-foreground"><p className="truncate text-xs">{e.detail}</p></TableCell>
-                  <TableCell className="w-[60px] text-right font-mono text-xs tabular-nums text-muted-foreground">
-                    {format(e.date, 'HH:mm')}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <span className={cn('inline-flex max-w-[46%] shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-[10.5px] font-medium leading-none', STATUS_TONE[e.status.tone])}>
+            <StatusIcon className="size-3 shrink-0" />
+            <span className="truncate">{e.status.label}</span>
+          </span>
         </div>
-      ))}
-    </div>
+        {e.note && <p className="mt-1 line-clamp-3 break-words text-[13px] leading-[1.35] text-foreground/85">{e.note}</p>}
+        {e.facts.length > 0 && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-muted-foreground">
+            {e.facts.map((f, i) => (
+              <span key={i} className="inline-flex items-center gap-1 tabular-nums">
+                <span className="size-1 rounded-full bg-muted-foreground/40" />
+                <span>{f}</span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </li>
   )
 }
 
-// Summarise one symptom check-in into the notable highs/lows for the All view.
-function symptomDetail(s: Symptom): string {
-  const good: string[] = []
+function TimelineFeed({ events }: { events: TimelineEvent[] }) {
+  if (events.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">Nothing logged yet.</p>
+  const now = new Date()
+  return (
+    <ul className="-mx-2 flex flex-col divide-y divide-border/60">
+      {events.map((e) => <FeedRow key={e.id} e={e} when={whenLabel(e.date, now)} />)}
+    </ul>
+  )
+}
+
+// One symptom check-in, summarised: the first few ratings and what to watch.
+function symptomSummary(s: Symptom): { rated: number; first: string[]; watch: string[]; good: number } {
+  const first: string[] = []
   const watch: string[] = []
+  let rated = 0
+  let good = 0
   for (const def of ALL_SYMPTOMS) {
     const v = s[def.key]
     if (typeof v !== 'number') continue
+    rated += 1
+    if (first.length < 3) first.push(`${def.label} ${v}`)
     const t = chipTone(v, def.direction)
-    if (t === 'good') good.push(def.label)
+    if (t === 'good') good += 1
     else if (t === 'bad' || t === 'warn') watch.push(def.label)
   }
-  const parts: string[] = []
-  if (good.length) parts.push(`Good: ${good.join(', ')}`)
-  if (watch.length) parts.push(`Watch: ${watch.join(', ')}`)
-  return parts.length ? parts.join(' · ') : 'Steady check-in'
+  return { rated, first, watch, good }
 }
 
 export function Timeline({
@@ -402,6 +406,22 @@ export function Timeline({
   bodyMetrics: BodyMetric[]
 }) {
   const symptoms = useLiveQuery(() => db.symptoms.filter((s) => !s.archivedAt).toArray(), [], [])
+  // Lab results, so each panel row can say how many markers it holds and how
+  // many sit outside the lab's range.
+  const results = useLiveQuery(() => db.results.filter((r) => !r.archivedAt).toArray(), [], [])
+  const examStats = useMemo(() => {
+    const m = new Map<number, { n: number; ranged: number; flagged: number }>()
+    for (const r of results) {
+      const s = m.get(r.examId) ?? { n: 0, ranged: 0, flagged: 0 }
+      s.n += 1
+      if (r.value !== undefined && (r.low !== undefined || r.high !== undefined)) {
+        s.ranged += 1
+        if ((r.low !== undefined && r.value < r.low) || (r.high !== undefined && r.value > r.high)) s.flagged += 1
+      }
+      m.set(r.examId, s)
+    }
+    return m
+  }, [results])
 
   // Archiving an entry (never a delete) with an Undo toast. Restore is symmetric.
   const undo = useUndoableDelete()
@@ -470,60 +490,101 @@ export function Timeline({
 
   // ── "All" overview events + tab counts ──
   const events = useMemo<TimelineEvent[]>(() => {
+    const facts = (...xs: Array<string | undefined | false>) => xs.filter((x): x is string => typeof x === 'string' && x.length > 0)
     return [
-      ...injections.map((i) => ({
-        id: `i-${i.id}`,
-        date: parseISO(i.takenAt),
-        icon: Syringe,
-        title: compoundMap.get(i.compoundId)?.name ?? 'Injection',
-        detail: `${i.rawDose ?? `${i.dose ?? ''} ${i.unit}${i.site ? ` · ${i.site}` : ''}${i.weightKg ? ` · ${i.weightKg} kg` : ''}`}${i.notes ? ` · ${i.notes}` : ''}`,
-        type: 'injection' as EventType,
-        compoundId: i.compoundId,
-      })),
-      ...weightRows.map((w) => ({
-        id: w.key,
-        date: parseISO(w.at),
-        icon: Scale,
-        title: 'Weight',
-        detail: `${w.kg} kg${w.delta !== undefined && Math.abs(w.delta) >= 0.05 ? ` · ${w.delta > 0 ? '+' : '−'}${Math.abs(w.delta).toFixed(1)} kg` : ''}${w.notes ? ` · ${w.notes}` : ''}`,
-        type: 'weight' as EventType,
-      })),
-      ...vitals.map((v) => ({
-        id: `v-${v.id}`,
-        date: parseISO(v.measuredAt),
-        icon: HeartPulse,
-        title: 'Blood pressure',
-        detail: `${v.systolic}/${v.diastolic}${v.pulse ? ` · ${v.pulse} bpm` : ''} · ${bpStatus(v.systolic, v.diastolic).label}${v.notes ? ` · ${v.notes}` : ''}`,
-        type: 'bp' as EventType,
-      })),
-      ...exams.map((e) => ({
-        id: `e-${e.id}`,
-        date: parseISO(e.collectedAt),
-        icon: FlaskConical,
-        title: e.name,
-        detail: e.labName ?? 'Lab panel',
-        type: 'lab' as EventType,
-      })),
-      ...fileRows.map((f) => ({
+      ...injections.map((i): TimelineEvent => {
+        const name = compoundMap.get(i.compoundId)?.name ?? 'Injection'
+        const dose = i.rawDose ?? (i.dose != null ? `${i.dose} ${i.unit}` : undefined)
+        return {
+          id: `i-${i.id}`,
+          date: parseISO(i.takenAt),
+          icon: Syringe,
+          title: dose ? `${name} · ${dose}` : name,
+          sub: facts(i.site, i.route).join(' · ') || undefined,
+          status: LOGGED,
+          note: i.notes || undefined,
+          facts: facts(dose, i.site, i.route, i.weightKg ? `${i.weightKg} kg` : undefined),
+          type: 'injection',
+          compoundId: i.compoundId,
+        }
+      }),
+      ...weightRows.map((w): TimelineEvent => {
+        const moved = w.delta !== undefined && Math.abs(w.delta) >= 0.05
+        return {
+          id: w.key,
+          date: parseISO(w.at),
+          icon: Scale,
+          title: `Weight ${w.kg} kg`,
+          sub: w.delta === undefined ? 'first entry' : moved ? `${arrow(w.delta, 1, 'kg')} vs last` : 'no change vs last',
+          status: LOGGED,
+          note: w.notes || undefined,
+          facts: facts(`${w.kg} kg`, moved ? arrow(w.delta!, 1) : undefined, w.source !== 'manual' ? SOURCE_LABEL[w.source] ?? w.source : undefined),
+          type: 'weight',
+        }
+      }),
+      ...vitals.map((v): TimelineEvent => {
+        const status = bpFeedStatus(v.systolic, v.diastolic)
+        return {
+          id: `v-${v.id}`,
+          date: parseISO(v.measuredAt),
+          icon: HeartPulse,
+          title: `Blood pressure ${v.systolic}/${v.diastolic}`,
+          sub: facts(v.pulse ? `pulse ${v.pulse}` : undefined, bpStatus(v.systolic, v.diastolic).label.toLowerCase()).join(' · '),
+          status,
+          note: v.notes || undefined,
+          facts: facts(String(v.systolic), String(v.diastolic), v.pulse ? `${v.pulse} bpm` : undefined),
+          type: 'bp',
+        }
+      }),
+      ...exams.map((e): TimelineEvent => {
+        const s = examStats.get(e.id!) ?? { n: 0, ranged: 0, flagged: 0 }
+        const markers = `${s.n} marker${s.n === 1 ? '' : 's'}`
+        const status: Status = s.flagged > 0
+          ? { label: `${s.flagged} flagged`, tone: 'bad', icon: TriangleAlert }
+          : s.ranged > 0 ? { label: 'In range', tone: 'good', icon: CircleCheck } : LOGGED
+        return {
+          id: `e-${e.id}`,
+          date: parseISO(e.collectedAt),
+          icon: FlaskConical,
+          title: e.name,
+          sub: facts(e.labName ?? 'Lab panel', s.n > 0 ? markers : undefined).join(' · '),
+          status,
+          note: e.notes || undefined,
+          facts: facts(s.n > 0 ? markers : undefined, s.flagged > 0 ? `${s.flagged} out of range` : s.ranged > 0 ? 'all in range' : undefined, e.examType),
+          type: 'lab',
+        }
+      }),
+      ...fileRows.map((f): TimelineEvent => ({
         id: `f-${f.id ?? f.name}-${f.addedAt}`,
         date: parseISO(f.addedAt),
         icon: FileText,
         title: f.name,
-        detail: f.status,
-        type: 'file' as EventType,
+        sub: f.status,
+        status: f.status === 'Needs review' ? { label: 'Review', tone: 'accent', icon: Eye } : LOGGED,
+        facts: facts(f.status),
+        type: 'file',
       })),
-      ...symptoms.map((s) => ({
-        id: `s-${s.id}`,
-        date: parseISO(s.recordedAt),
-        icon: Brain,
-        title: 'Symptom check-in',
-        detail: symptomDetail(s),
-        type: 'symptom' as EventType,
-      })),
+      ...symptoms.map((s): TimelineEvent => {
+        const sum = symptomSummary(s)
+        const status: Status = sum.watch.length > 0
+          ? { label: `${sum.watch.length} to watch`, tone: 'warn', icon: Clock }
+          : sum.good > 0 ? { label: 'Feeling good', tone: 'good', icon: CircleCheck } : LOGGED
+        return {
+          id: `s-${s.id}`,
+          date: parseISO(s.recordedAt),
+          icon: Brain,
+          title: 'Symptom check-in',
+          sub: sum.first.join(' · ') || undefined,
+          status,
+          note: s.notes || undefined,
+          facts: facts(`${sum.rated} rated`, ...sum.watch.slice(0, 2)),
+          type: 'symptom',
+        }
+      }),
     ]
       .filter((e) => e.date.getTime() <= now)
       .sort((a, b) => b.date.getTime() - a.date.getTime())
-  }, [injections, vitals, exams, fileRows, symptoms, compoundMap, weightRows, now])
+  }, [injections, vitals, exams, examStats, fileRows, symptoms, compoundMap, weightRows, now])
 
   const counts = useMemo<Record<EventType, number>>(() => ({
     injection: injections.length,
@@ -615,7 +676,7 @@ export function Timeline({
         </div>
       )}
 
-      {activeType === null && <TimelineGrouped events={events} />}
+      {activeType === null && <TimelineFeed events={events} />}
       {activeType === 'injection' && <DataGrid columns={INJ_COLS} rows={injRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-injection" empty="No injections logged." onArchive={(r) => archiveOne('injections', r.inj.id)} />}
       {activeType === 'weight' && <DataGrid columns={WEIGHT_COLS} rows={weightRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-weight" empty="No weight entries yet." onArchive={(r) => archiveOne('bodyMetrics', r.id)} />}
       {activeType === 'bp' && <DataGrid columns={BP_COLS} rows={bpRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-bp" empty="No blood pressure readings yet." onArchive={(r) => archiveOne('vitals', r.v.id)} />}

@@ -15,12 +15,18 @@
   --color-apollo: #E9A23B;
   /* Deeper amber for text on white (contrast). */
   --color-apollo-ink: #C4811C;
+  /* Page ground: a hair off pure white so long reads don't glare. Cards stay white. */
+  --color-page: #f8f8f7;
+  /* Body greys nudged a touch darker than stock zinc for contrast on the off-white ground. */
+  --color-zinc-400: #96969f;
+  --color-zinc-500: #64646d;
 }
 
 :root {
   --font-fraunces: "Fraunces", Georgia, "Times New Roman", serif;
   --apollo: #E9A23B;
   --apollo-ink: #C4811C;
+  --page: #f8f8f7;
 }
 
 html { scroll-behavior: smooth; }
@@ -68,7 +74,7 @@ details > summary::-webkit-details-marker { display: none; }
 
 /* ── Footer: giant wordmark + amber magnifier lens (pointer driven) ── */
 .apollo-footer {
-  --footer-bg: #fbfbfa;
+  --footer-bg: var(--page);
   --footer-lens-size: clamp(96px, 12vw, 180px);
   --footer-lens-radius: calc(var(--footer-lens-size) * .5);
   --footer-lens-border: clamp(5px, .7vw, 8px);
@@ -99,11 +105,17 @@ details > summary::-webkit-details-marker { display: none; }
 .apollo-footer-magnifier-rim:before { content: ""; inset: var(--footer-lens-border); border-radius: inherit; opacity: .58; pointer-events: none; background: radial-gradient(circle at 27% 22%, rgba(255, 255, 255, .36), rgba(255, 255, 255, .12) 22%, transparent 42%), linear-gradient(135deg, rgba(255, 255, 255, .22), transparent 38%, rgba(255, 255, 255, .08) 72%, transparent); position: absolute }
 .apollo-footer-magnifier-handle { z-index: 1; transform-origin: top; background: #11110f; border-radius: 3px 3px 999px 999px; width: clamp(9px, 1.2vw, 15px); height: 60%; position: absolute; top: 86%; left: 80%; transform: rotate(-45deg); box-shadow: 0 18px 38px rgba(0, 0, 0, .46), inset 3px 0 rgba(255, 255, 255, .14) }
 
-/* ── Phone mock in the "Inside Apollo" section ── */
-.apollo-phone { width: 300px; height: 620px; border-radius: 44px; background: #0b0c10; box-shadow: 0 0 0 2px #2a2d36, 0 0 0 6px #0b0c10, 0 40px 80px -30px rgba(0, 0, 0, .9); padding: 12px; position: relative }
+/* ── Phone frame in the "Inside Apollo" section (real screenshots inside) ── */
+.apollo-phone { width: min(300px, 78vw); aspect-ratio: 300 / 620; border-radius: 44px; background: #0b0c10; box-shadow: 0 0 0 2px #2a2d36, 0 0 0 6px #0b0c10, 0 40px 80px -30px rgba(0, 0, 0, .9); padding: 12px; position: relative }
 .apollo-phone-screen { position: absolute; inset: 12px; border-radius: 34px; overflow: hidden; background: #14161c; color: #f2f3f5 }
 .apollo-phone-notch { position: absolute; top: 10px; left: 50%; width: 92px; height: 26px; border-radius: 999px; background: #0b0c10; transform: translateX(-50%); z-index: 3 }
-.apollo-mono { font-family: ui-monospace, "JetBrains Mono", Menlo, monospace }
+/* Screen tabs: quiet until selected, then a white card with an amber number. */
+.apollo-inside-tab { border-color: transparent; background: transparent }
+.apollo-inside-tab:hover:not([aria-selected=true]) { background: rgba(255, 255, 255, .55); border-color: rgba(228, 228, 231, .6) }
+.apollo-inside-tab[aria-selected=true] { border-color: rgba(228, 228, 231, .9); background: #fff; box-shadow: 0 12px 32px -20px rgba(24, 24, 27, .35) }
+.apollo-inside-num { color: #71717a; background: #fff; box-shadow: 0 0 0 1px #e4e4e7 }
+.apollo-inside-tab[aria-selected=true] .apollo-inside-num { color: #18181b; background: var(--apollo); box-shadow: none }
+#inside-tabs::-webkit-scrollbar { display: none }
 
 /* ── Reduced motion: still, but complete ── */
 @media (prefers-reduced-motion: reduce) {

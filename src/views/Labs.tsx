@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ChevronUp,
-  Edit2, FileText, FlaskConical, Lock, Plus, Sparkles, Trash2, X,
+  AlertTriangle, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, CircleCheck, CircleDashed,
+  Droplet, Edit2, FileText, FlaskConical, Lock, Plus, Sparkles, Trash2, TriangleAlert, X,
 } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, XAxis, YAxis, ReferenceLine } from 'recharts'
 import { format, parseISO } from 'date-fns'
@@ -23,7 +23,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -61,24 +60,13 @@ function rangeStatus(v: number | undefined, low?: number, high?: number): 'good'
   return 'good'
 }
 
-// 0–1 position within [low, high]; synthesises a band for single-bounded
-// ranges ("< 5" → 0..5, "> 1" → 1..2) so the dot still renders sensibly.
-function rangePos(v: number, low?: number, high?: number): number | null {
-  if (low === undefined && high === undefined) return null
-  let lo = low
-  let hi = high
-  if (lo === undefined && hi !== undefined) {
-    lo = hi >= 0 ? 0 : hi * 2
-  } else if (hi === undefined && lo !== undefined) {
-    hi = lo > 0 ? lo * 2 : lo / 2
-  }
-  if (lo === undefined || hi === undefined) return null
-  const range = hi - lo
-  if (range <= 0) return null
-  return Math.max(0, Math.min(1, (v - lo) / range))
+// Short number for range text: 0.37, 12, 159.
+function fmtNum(n: number): string {
+  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)))
 }
 
-// ── Marker row — portfolio-statement style line item, as a shadcn TableRow ──
+// ── Marker row — one structured line per marker: name + value · date, the
+// range it was read against, a status chip, and a few facts underneath ────
 function MarkerRow({
   summary,
   selected,
@@ -92,90 +80,114 @@ function MarkerRow({
   const prev   = summary.entries[1]
   const val    = latest?.value
   const status = rangeStatus(val, latest?.low, latest?.high)
-  const pos    = val !== undefined ? rangePos(val, latest?.low, latest?.high) : null
+  const above  = status === 'warn' && latest?.high !== undefined && val !== undefined && val > latest.high
   const delta  = val !== undefined && prev?.value !== undefined ? val - prev.value : undefined
+  const pct    = delta !== undefined && prev?.value ? Math.round((delta / Math.abs(prev.value)) * 100) : undefined
 
-  const badgeLabel =
-    status === 'good' ? 'OK'
-    : status === 'warn' && latest?.high !== undefined && val !== undefined && val > latest.high ? 'HIGH'
-    : status === 'warn' ? 'LOW'
-    : null
+  const lo = latest?.low !== undefined ? fmtNum(latest.low) : undefined
+  const hi = latest?.high !== undefined ? fmtNum(latest.high) : undefined
+  const sub =
+    lo && hi ? (status === 'warn' ? `${above ? 'above' : 'below'} range ${lo} to ${hi}` : `range ${lo} to ${hi}`)
+    : hi ? (status === 'warn' ? `over the ${hi} limit` : `under ${hi}`)
+    : lo ? (status === 'warn' ? `under the ${lo} floor` : `over ${lo}`)
+    : 'no reference range'
+  const dateText = latest ? format(parseISO(latest.date), 'MMM d, yyyy') : undefined
+
+  const chip =
+    status === 'good' ? { label: 'In range', cls: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400', Icon: CircleCheck }
+    : status === 'warn' ? { label: above ? 'High' : 'Low', cls: 'bg-destructive/12 text-destructive', Icon: TriangleAlert }
+    : { label: 'No range', cls: 'bg-secondary text-muted-foreground', Icon: CircleDashed }
+
+  const valueText = val !== undefined ? (latest.rawValue || String(val)) : '—'
+  const title = `${summary.label} ${valueText}${summary.unit && val !== undefined ? ` ${summary.unit}` : ''}`
+  const change = delta !== undefined && Math.abs(delta) > 0.05
+    ? `${delta > 0 ? '▲' : '▼'} ${pct !== undefined && Math.abs(pct) >= 1 ? `${Math.abs(pct)}%` : Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}`
+    : undefined
+  const facts = [
+    change,
+    prev?.value !== undefined ? `prev ${prev.rawValue || prev.value}` : undefined,
+    latest?.examName,
+  ].filter((f): f is string => typeof f === 'string' && f.length > 0)
 
   return (
-    <TableRow
-      onClick={onClick}
-      aria-pressed={selected}
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      className={cn('cursor-pointer', selected && 'bg-accent/50')}
-    >
-      <TableCell className="font-medium">{summary.label}</TableCell>
-      <TableCell>
-        <span className="inline-flex items-baseline gap-1.5 tabular-nums">
-          <span className="font-mono text-[15px] font-medium">{val !== undefined ? (latest.rawValue || String(val)) : '—'}</span>
-          {summary.unit && val !== undefined && <span className="text-[11px] text-muted-foreground">{summary.unit}</span>}
-          {delta !== undefined && Math.abs(delta) > 0.05 && (
-            <span className="ml-1 inline-flex items-center text-[11px] font-semibold text-muted-foreground">
-              {delta > 0 ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-              {Math.abs(delta).toFixed(Math.abs(delta) < 10 ? 1 : 0)}
+    <li>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={selected}
+        className={cn(
+          'flex w-full items-start gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+          selected && 'bg-accent/50 hover:bg-accent/50',
+        )}
+      >
+        <span className={cn('grid size-9 shrink-0 place-items-center rounded-full bg-secondary ring-1 ring-border/70', status === 'warn' ? 'text-destructive' : 'text-muted-foreground')}>
+          <Droplet className="size-4" />
+        </span>
+        <span className="block min-w-0 flex-1">
+          <span className="flex min-w-0 items-start gap-2">
+            <span className="block min-w-0 flex-1">
+              <span className="flex min-w-0 items-center gap-1.5 text-[13px]">
+                <span className="min-w-0 truncate font-semibold text-foreground">{title}</span>
+                {dateText && (
+                  <>
+                    <span className="hidden shrink-0 text-muted-foreground/50 sm:inline">·</span>
+                    <time className="hidden shrink-0 whitespace-nowrap text-muted-foreground sm:inline">{dateText}</time>
+                  </>
+                )}
+              </span>
+              {/* Phones: the date sits under the title so the title keeps its room. */}
+              <span className="block truncate text-[12px] leading-4 text-muted-foreground">
+                {dateText && <span className="sm:hidden">{dateText} · </span>}
+                {sub}
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1.5">
+              <span className={cn('inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10.5px] font-medium leading-none', chip.cls)}>
+                <chip.Icon className="size-3 shrink-0" />
+                <span>{chip.label}</span>
+              </span>
+              {selected ? <ChevronDown className="size-3.5 text-muted-foreground/70" aria-hidden="true" /> : <ChevronRight className="size-3.5 text-muted-foreground/70" aria-hidden="true" />}
+            </span>
+          </span>
+          {facts.length > 0 && (
+            <span className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-medium text-muted-foreground">
+              {facts.map((f, i) => (
+                <span key={i} className="inline-flex items-center gap-1 tabular-nums">
+                  <span className="size-1 rounded-full bg-muted-foreground/40" />
+                  <span>{f}</span>
+                </span>
+              ))}
             </span>
           )}
         </span>
-      </TableCell>
-      <TableCell className="hidden md:table-cell">
-        {pos !== null ? (
-          <span aria-hidden="true" className="relative block h-1.5 w-full rounded-full bg-secondary">
-            <span className="absolute inset-y-0 left-0 rounded-full bg-primary/55" style={{ width: `${pos * 100}%` }} />
-            <span
-              className={cn(
-                'absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-card shadow-sm',
-                status === 'warn' ? 'bg-destructive' : 'bg-foreground',
-              )}
-              style={{ left: `${pos * 100}%` }}
-            />
-          </span>
-        ) : (
-          <span aria-hidden="true" className="block h-1.5 w-full rounded-full bg-secondary/60" />
-        )}
-      </TableCell>
-      <TableCell className="w-[60px]">
-        {badgeLabel && (
-          <Badge
-            variant="secondary"
-            className={cn(
-              'px-2 text-[10px] font-bold tracking-wide',
-              status === 'good' ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400' : 'bg-destructive/12 text-destructive',
-            )}
-          >
-            {badgeLabel}
-          </Badge>
-        )}
-      </TableCell>
-      <TableCell className="hidden text-right font-mono text-[11px] tabular-nums text-muted-foreground md:table-cell">
-        {latest ? format(parseISO(latest.date), 'MMM d, yy') : '—'}
-      </TableCell>
-      <TableCell aria-hidden="true" className="w-[28px] text-right text-muted-foreground">
-        {selected ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-      </TableCell>
-    </TableRow>
+      </button>
+    </li>
   )
 }
 
-// Headers for both the "Out of range" panel and each per-panel section.
-function MarkerTableHeader() {
-  // Mono, 10px, tracked — the instrument header shared with the Timeline grids.
-  const th = 'font-mono text-[10px] tracking-[0.12em]'
+// The list used by both the "Needs attention" panel and each lab panel.
+function MarkerList({
+  summaries,
+  selectedKey,
+  onSelect,
+  keyPrefix = '',
+}: {
+  summaries: MarkerSummary[]
+  selectedKey: string | null
+  onSelect: (key: string) => void
+  keyPrefix?: string
+}) {
   return (
-    <TableHeader>
-      <TableRow className="hover:bg-transparent">
-        <TableHead className={th}>Marker</TableHead>
-        <TableHead className={th}>Value</TableHead>
-        <TableHead className={cn(th, 'hidden md:table-cell')}>Range</TableHead>
-        <TableHead className={cn(th, 'w-[60px]')}>Status</TableHead>
-        <TableHead className={cn(th, 'hidden text-right md:table-cell')}>Date</TableHead>
-        <TableHead className="w-[28px]" />
-      </TableRow>
-    </TableHeader>
+    <ul className="-mx-2 flex flex-col divide-y divide-border/60">
+      {summaries.map(s => (
+        <MarkerRow
+          key={keyPrefix + s.key}
+          summary={s}
+          selected={selectedKey === s.key}
+          onClick={() => onSelect(s.key)}
+        />
+      ))}
+    </ul>
   )
 }
 
@@ -344,9 +356,6 @@ export function Labs({
   addOpen,
   onAddClose,
   onReviewFile,
-  compounds: _c,
-  injections: _i,
-  vitals: _v,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
@@ -390,7 +399,7 @@ export function Labs({
       const confirmedHigh = personal?.high ?? r.high
 
       const cleanRaw = r.rawValue
-        ?.replace(/\s*[\[\(][0-9].*$/, '')
+        ?.replace(/\s*[[(][0-9].*$/, '')
         ?.replace(/\s*;.*$/, '')
         ?.trim()
 
@@ -552,19 +561,12 @@ export function Labs({
       {/* ── Needs attention ── */}
       {hasData && outOfRangeSummaries.length > 0 && (
         <PanelCard className="md:col-span-2 xl:col-span-6 border-l border-l-destructive" title={`${outOfRangeSummaries.length} out of range`} subtitle="Needs attention">
-          <Table>
-            <MarkerTableHeader />
-            <TableBody>
-              {outOfRangeSummaries.map(s => (
-                <MarkerRow
-                  key={`attn-${s.key}`}
-                  summary={s}
-                  selected={selectedKey === s.key}
-                  onClick={() => setSelectedKey(selectedKey === s.key ? null : s.key)}
-                />
-              ))}
-            </TableBody>
-          </Table>
+          <MarkerList
+            summaries={outOfRangeSummaries}
+            selectedKey={selectedKey}
+            keyPrefix="attn-"
+            onSelect={(key) => setSelectedKey(selectedKey === key ? null : key)}
+          />
         </PanelCard>
       )}
 
@@ -610,19 +612,11 @@ export function Labs({
 
             {!collapsed && (
               <div className="mt-2">
-                <Table>
-                  <MarkerTableHeader />
-                  <TableBody>
-                    {summaries.map(s => (
-                      <MarkerRow
-                        key={s.key}
-                        summary={s}
-                        selected={selectedKey === s.key}
-                        onClick={() => setSelectedKey(selectedKey === s.key ? null : s.key)}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
+                <MarkerList
+                  summaries={summaries}
+                  selectedKey={selectedKey}
+                  onSelect={(key) => setSelectedKey(selectedKey === key ? null : key)}
+                />
               </div>
             )}
 
