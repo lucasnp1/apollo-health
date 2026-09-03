@@ -11,7 +11,6 @@ export type Env = {
   STRIPE_SECRET_KEY?: string
   STRIPE_WEBHOOK_SECRET?: string
   STRIPE_PRICE_MONTHLY?: string
-  STRIPE_PRICE_YEARLY?: string
   STRIPE_PRICE_LIFETIME?: string
   APP_URL?: string // e.g. https://apollo-hq.pages.dev (checkout return URLs, reset links)
   // Transactional email (password resets) via Resend. Dormant until both are set.

@@ -7,7 +7,7 @@ export type ApiUser = {
   display_name: string | null
   // Billing — populated by the server. is_pro is the effective gate.
   plan?: 'free' | 'pro'
-  plan_kind?: 'monthly' | 'yearly' | 'lifetime' | null
+  plan_kind?: 'monthly' | 'lifetime' | null
   plan_until?: number | null
   is_pro?: boolean
   onboarded?: boolean

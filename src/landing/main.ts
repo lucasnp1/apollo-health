@@ -124,23 +124,6 @@ if (insideStrip && insideTabs.length && insideImgs.length) {
   new IntersectionObserver((entries) => { if (entries[0].isIntersecting) start(); else stop() }, { threshold: 0.35 }).observe(insideStrip)
 }
 
-// ── Pricing: monthly / annual toggle ──────────────────────────────────────
-const toggle = $$('#billing-toggle button')
-const priced = $$('[data-monthly]')
-const on = ['bg-white', 'text-zinc-900', 'shadow-[0_1px_2px_rgba(0,0,0,0.05)]']
-const off = ['text-zinc-500', 'hover:text-zinc-900']
-for (const btn of toggle) {
-  btn.addEventListener('click', () => {
-    const annual = btn.dataset.billing === 'annual'
-    toggle.forEach((b) => {
-      const isThis = b === btn
-      b.classList.remove(...(isThis ? off : on))
-      b.classList.add(...(isThis ? on : off))
-    })
-    for (const el of priced) el.textContent = annual ? el.dataset.annual ?? '' : el.dataset.monthly ?? ''
-  })
-}
-
 // ── Footer: amber magnifier lens follows the pointer over the wordmark ────
 const footer = $('#site-footer')
 const stage = $('#lens-stage')
