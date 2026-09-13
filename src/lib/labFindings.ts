@@ -374,7 +374,8 @@ function buildKidney(h: History): Finding {
   const cr = get(h, 'creatinine'); const egfr = get(h, 'egfr'); const cys = get(h, 'cystatin_c')
   const markers: MarkerVal[] = []
   if (cr) markers.push(mark('Creatinine', cr, bands(creatMgdl(cr), 1.3, 1.5)))
-  if (egfr) markers.push(mark('eGFR', egfr, bands(egfr.value, 90, 60, true)))
+  // 60 to 89 is "mildly decreased" on paper and normal for most adults; only flag under 80.
+  if (egfr) markers.push(mark('eGFR', egfr, bands(egfr.value, 80, 60, true)))
   if (cys) markers.push(mark('Cystatin C', cys, bands(cys.value, 1.0, 1.2)))
 
   const status = worst(...markers.map((m) => m.status))

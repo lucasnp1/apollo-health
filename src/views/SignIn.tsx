@@ -3,6 +3,7 @@ import { KeyRound, LogIn, Mail, UserPlus } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark'
 import { PasswordRules } from '../components/PasswordRules'
 import { passwordOk } from '../lib/password'
+import { captureRef } from '../lib/ref'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,14 +32,17 @@ function lockedOutMailto(email: string): string {
   return `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
-// The landing page's email forms land here as /app/?signup=1&email=...
-function landingIntent(): { mode: Mode; email: string } {
+// The landing page and the public /read tool land here as
+// /app/?signup=1&email=...&ref=read. The ref is kept (one word, first-party)
+// and stored on the account at sign-up; the query string is then cleared.
+function landingIntent(): { mode: Mode; email: string; ref?: string } {
   try {
+    const ref = captureRef()
     const p = new URLSearchParams(window.location.search)
     const email = p.get('email') ?? ''
     const mode: Mode = p.get('signup') === '1' ? 'signup' : 'login'
-    if (p.has('signup') || p.has('email')) window.history.replaceState({}, '', window.location.pathname)
-    return { mode, email }
+    if (p.has('signup') || p.has('email') || p.has('ref')) window.history.replaceState({}, '', window.location.pathname)
+    return { mode, email, ref }
   } catch {
     return { mode: 'login', email: '' }
   }
@@ -68,7 +72,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
       if (mode === 'login') {
         await auth.login({ email, password })
       } else if (mode === 'signup') {
-        await auth.signup({ email, password, displayName: displayName || undefined })
+        await auth.signup({ email, password, displayName: displayName || undefined, source: intent.ref })
       } else {
         await auth.recoverWithCode(email, code, password)
       }

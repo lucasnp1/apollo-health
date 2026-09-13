@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Archive as ArchiveIcon, Bell, BellOff, Copy, Download, FileText, KeyRound, LifeBuoy, LogOut, Send, ShieldCheck, Sparkles, Trash2, Upload, UserX } from 'lucide-react'
+import { AlertTriangle, Archive as ArchiveIcon, BarChart3, Bell, BellOff, Copy, Download, FileText, KeyRound, LifeBuoy, LogOut, Send, ShieldCheck, Sparkles, Trash2, Upload, UserX } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -100,6 +100,7 @@ export function Settings({
       <DashGrid>
         <div className="md:col-span-1 xl:col-span-3"><AccountSettings auth={auth} /></div>
         <div className="md:col-span-1 xl:col-span-3"><NotificationSettings /></div>
+        {isAdmin && <div className="md:col-span-2 xl:col-span-6"><AdminStats /></div>}
         {isAdmin && <div className="md:col-span-2 xl:col-span-6"><SupportSettings /></div>}
         <div className="md:col-span-1 xl:col-span-3">
           <BackupSettings
@@ -404,6 +405,94 @@ function RecoveryCodesDialog({ open, onClose, auth }: { open: boolean; onClose: 
 
 // Admin only: create a one-time reset link for someone who lost their
 // password and their recovery codes, and send it to them by hand.
+type AdminStatsData = {
+  generatedAt: string
+  users: { total: number; last7Days: number; withLabPanel: number; withInjection: number }
+  signupsPerDay: Array<{ day: string; n: number }>
+  signupsBySource: Array<{ source: string; n: number }>
+  plans: Array<{ plan: string; kind: string; n: number }>
+  feedbackCount: number
+  pageHits30Days: Array<{ path: string; n: number }>
+}
+
+// Sign-ups, where they came from, activation and plans. Counts only; the
+// same numbers the weekly digest reads.
+function AdminStats() {
+  const [data, setData] = useState<AdminStatsData | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let alive = true
+    api.get<AdminStatsData>('/api/admin/stats')
+      .then((d) => { if (alive) setData(d) })
+      .catch((err) => { if (alive) setError(err instanceof Error ? err.message : 'Could not load stats') })
+    return () => { alive = false }
+  }, [])
+
+  const pro = data?.plans.filter((p) => p.plan === 'pro').reduce((s, p) => s + p.n, 0) ?? 0
+  const maxDay = Math.max(1, ...(data?.signupsPerDay.map((d) => d.n) ?? [1]))
+  const tiles = data ? [
+    { label: 'Users', value: data.users.total },
+    { label: 'Last 7 days', value: data.users.last7Days },
+    { label: 'Imported bloods', value: data.users.withLabPanel },
+    { label: 'Logged a shot', value: data.users.withInjection },
+    { label: 'Pro', value: pro },
+    { label: 'Feedback', value: data.feedbackCount },
+  ] : []
+
+  return (
+    <PanelCard subtitle="Admin" title="Sign-ups and sources" action={<BarChart3 className="size-4 text-muted-foreground" />}>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {!data && !error && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {data && (
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
+            {tiles.map((t) => (
+              <div key={t.label} className="rounded-lg bg-muted/50 px-2.5 py-2">
+                <p className="feed-facts truncate text-muted-foreground">{t.label}</p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums leading-tight">{t.value}</p>
+              </div>
+            ))}
+          </div>
+          <div>
+            <p className="eyebrow">Sign-ups, last 30 days</p>
+            {data.signupsPerDay.length === 0 ? (
+              <p className="text-sm text-muted-foreground">None yet.</p>
+            ) : (
+              <div className="flex h-16 items-end gap-px">
+                {data.signupsPerDay.map((d) => (
+                  <span key={d.day} title={`${d.day}: ${d.n}`} className="min-w-[3px] flex-1 rounded-t bg-primary/70" style={{ height: `${Math.max(8, (d.n / maxDay) * 100)}%` }} />
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="eyebrow">By source</p>
+              <ul className="flex flex-col gap-1 text-sm">
+                {data.signupsBySource.map((s) => (
+                  <li key={s.source} className="flex items-center justify-between gap-3"><span className="truncate font-mono text-xs">{s.source}</span><span className="tabular-nums">{s.n}</span></li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="eyebrow">Page views, 30 days</p>
+              {data.pageHits30Days.length === 0 ? (
+                <p className="text-sm text-muted-foreground">None counted yet.</p>
+              ) : (
+                <ul className="flex flex-col gap-1 text-sm">
+                  {data.pageHits30Days.slice(0, 8).map((h) => (
+                    <li key={h.path} className="flex items-center justify-between gap-3"><span className="truncate font-mono text-xs">{h.path}</span><span className="tabular-nums">{h.n}</span></li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </PanelCard>
+  )
+}
+
 function SupportSettings() {
   const { showToast } = useToast()
   const [email, setEmail] = useState('')

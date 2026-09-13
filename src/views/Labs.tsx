@@ -12,7 +12,8 @@ import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { archiveRow, restoreRow } from '../lib/archive'
 import { type EnrichedResult } from '../lib/insights'
 import { canonicalize, metaForKey, PANEL_ORDER, type LabPanel } from '../lib/markers'
-import { LabAnalysisCard, LabSummaryCard } from '../components/LabAnalysis'
+import { LabAnalysisCard, LabSummaryCard, ShareReadButton } from '../components/LabAnalysis'
+import { rangeStatus } from '../lib/labStats'
 import { useLabFindings } from '../lib/labFindings'
 import { FeedList, FeedRow, type FeedStatus } from '../components/FeedList'
 import { usePlan } from '../lib/plan'
@@ -51,15 +52,7 @@ type MarkerSummary = {
 }
 
 // ── Range helpers ─────────────────────────────────────────────────────────────
-
-function rangeStatus(v: number | undefined, low?: number, high?: number): 'good' | 'warn' | 'none' {
-  if (v === undefined) return 'none'
-  // Without ANY reference range we can't claim in/out of range.
-  if (low === undefined && high === undefined) return 'none'
-  if (low !== undefined && v < low) return 'warn'
-  if (high !== undefined && v > high) return 'warn'
-  return 'good'
-}
+// rangeStatus lives in lib/labStats so the public /read page counts the same way.
 
 // Short number for range text: 0.37, 12, 159.
 function fmtNum(n: number): string {
@@ -507,6 +500,13 @@ export function Labs({
             stats={{ markers: allSummaries.length, inRange: inRangeCount, outOfRange: outOfRangeSummaries.length, lastTest: lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : undefined }}
             findings={isPro ? findings : null}
             subtitle={latestExam ? [latestExam.name, latestExam.labName, format(parseISO(latestExam.collectedAt), 'MMM d, yyyy')].filter(Boolean).join(' · ') : undefined}
+            action={isPro && findings.length > 0 ? (
+              <ShareReadButton
+                stats={{ markers: allSummaries.length, inRange: inRangeCount, outOfRange: outOfRangeSummaries.length, lastTest: lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : undefined }}
+                findings={findings}
+                subtitle={latestExam ? [latestExam.name, latestExam.labName].filter(Boolean).join(' · ') : undefined}
+              />
+            ) : undefined}
           />
         </div>
       )}

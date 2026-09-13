@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-ocr.mjs",
+    "predev": "node scripts/copy-ocr.mjs && node scripts/build-guides.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/copy-ocr.mjs",
+    "prebuild": "node scripts/copy-ocr.mjs && node scripts/build-guides.mjs",
     "build": "tsc -b && vite build",
     "postbuild": "node scripts/remove-local-seed.mjs",
     "lint": "eslint .",

@@ -3,11 +3,13 @@
  * list on the Lab results page. The reading itself lives in lib/labFindings.
  */
 
-import { useState } from 'react'
-import { CircleCheck, Clock, TriangleAlert } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { Check, CircleCheck, Clock, Share2, TriangleAlert } from 'lucide-react'
 import { PanelCard } from './dashboard/PanelCard'
 import { FeedChip, FeedList, FeedRow, type FeedFact, type FeedStatus, type FeedTone } from './FeedList'
 import { summarize, type Finding, type MarkerVal, type Status } from '../lib/labFindings'
+import type { LabStats } from '../lib/labStats'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 // ── UI ─────────────────────────────────────────────────────────────────────
@@ -35,9 +37,40 @@ export function Disclaimer({ className }: { className?: string }) {
   )
 }
 
-export type LabStats = { markers: number; inRange: number; outOfRange: number; lastTest?: string }
+export type { LabStats }
 
-export function LabSummaryCard({ stats, findings, subtitle }: { stats: LabStats; findings: Finding[] | null; subtitle?: string }) {
+// "Share this read": a branded PNG of the summary, through the share sheet on
+// phones and a download elsewhere. Lazy-loads the canvas code on first tap.
+export function ShareReadButton({ stats, findings, subtitle }: { stats: LabStats; findings: Finding[]; subtitle?: string }) {
+  const [state, setState] = useState<'idle' | 'busy' | 'shared' | 'downloaded' | 'failed'>('idle')
+  const share = async () => {
+    if (state === 'busy') return
+    setState('busy')
+    try {
+      const { drawShareCard, shareOrDownload } = await import('../lib/shareCard')
+      const blob = await drawShareCard({
+        paragraphs: summarize(findings),
+        stats,
+        findings: findings.map((f) => ({ label: f.label, headline: f.headline, status: f.status })),
+        subtitle,
+      })
+      const how = await shareOrDownload(blob, 'apollo-bloods.png', 'My bloods, read by Apollo')
+      setState(how)
+    } catch (err) {
+      // An abandoned share sheet rejects; that is not a failure worth flagging.
+      setState((err as { name?: string })?.name === 'AbortError' ? 'idle' : 'failed')
+    }
+    setTimeout(() => setState('idle'), 2500)
+  }
+  const label = state === 'busy' ? 'Drawing…' : state === 'shared' ? 'Shared' : state === 'downloaded' ? 'Saved' : state === 'failed' ? 'Could not share' : 'Share this read'
+  return (
+    <Button variant="outline" size="sm" onClick={() => void share()} disabled={state === 'busy'} title="Makes an image with your numbers on it">
+      {state === 'shared' || state === 'downloaded' ? <Check className="size-3.5" /> : <Share2 className="size-3.5" />} {label}
+    </Button>
+  )
+}
+
+export function LabSummaryCard({ stats, findings, subtitle, action }: { stats: LabStats; findings: Finding[] | null; subtitle?: string; action?: ReactNode }) {
   const paragraphs = findings ? summarize(findings) : []
   const cells = [
     { label: 'Markers', value: stats.markers, tone: 'neutral' as FeedTone },
@@ -46,7 +79,7 @@ export function LabSummaryCard({ stats, findings, subtitle }: { stats: LabStats;
     { label: 'Last test', value: stats.lastTest ?? '—', tone: 'neutral' as FeedTone },
   ]
   return (
-    <PanelCard title="Your bloods, read" subtitle={subtitle ?? 'Latest results'}>
+    <PanelCard title="Your bloods, read" subtitle={subtitle ?? 'Latest results'} action={action}>
       <Disclaimer />
       {paragraphs.length > 0 ? (
         <div className="mt-4 flex flex-col gap-2">

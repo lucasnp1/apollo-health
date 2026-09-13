@@ -4,6 +4,13 @@
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
 
+# The app shell and the API are not pages for search engines.
+/app/*
+  X-Robots-Tag: noindex
+
+/api/*
+  X-Robots-Tag: noindex
+
 /sw.js
   Cache-Control: no-store, no-cache, must-revalidate, max-age=0
 

@@ -1,10 +1,16 @@
 // Landing page behaviour. Small on purpose: the page is static HTML with CSS
 // animations; this file only handles the few things that need a script.
 import './landing.css'
+import { captureRef, withRef } from '../lib/ref'
 
 const $ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector<T>(sel)
 const $$ = <T extends Element = HTMLElement>(sel: string, root: ParentNode = document) => [...root.querySelectorAll<T>(sel)]
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+
+// ── First-party attribution: keep a ?ref= from our own links through to sign-up
+if (captureRef()) {
+  for (const a of $$<HTMLAnchorElement>('a[href^="/app/"], a[href^="/read"]')) a.href = withRef(a.getAttribute('href') ?? a.href)
+}
 
 // ── How it works: amber rail fills as the steps scroll past ───────────────
 const rail = $('#how-rail-fill')

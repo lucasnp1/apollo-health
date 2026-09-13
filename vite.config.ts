@@ -14,9 +14,11 @@ export default defineConfig({
   build: {
     // Vite 8 / Rolldown chunk splitting
     rolldownOptions: {
-      // Two pages: the marketing landing at / and the app at /app/.
+      // Three pages: the marketing landing at /, the public "Read my bloods"
+      // tool at /read, and the app at /app/.
       input: {
         landing: fileURLToPath(new URL('./index.html', import.meta.url)),
+        read: fileURLToPath(new URL('./read.html', import.meta.url)),
         app: fileURLToPath(new URL('./app/index.html', import.meta.url)),
       },
       output: {
@@ -44,13 +46,15 @@ export default defineConfig({
         globPatterns: ['**/*.{css,html,js,json,mjs,svg,webmanifest}'],
         // OCR runtime (worker + wasm + model, ~10 MB) is fetched on demand,
         // never precached.
-        globIgnores: ['ocr/**'],
+        // Guides are static SEO pages, never part of the app shell.
+        globIgnores: ['ocr/**', 'guides/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // The app shell only answers navigations under /app/. The landing
-        // page, legal pages and the API always go to the network.
+        // page, the /read tool, guides, legal pages and the API always go to
+        // the network.
         navigateFallback: '/app/index.html',
         navigateFallbackAllowlist: [/^\/app(\/|$)/],
-        navigateFallbackDenylist: [/^\/local-seed\//, /^\/api\//, /^\/privacy/, /^\/terms/],
+        navigateFallbackDenylist: [/^\/local-seed\//, /^\/api\//, /^\/privacy/, /^\/terms/, /^\/read/, /^\/guides/, /^\/sitemap/, /^\/robots/],
       },
       manifest: {
         name: 'Apollo Health',

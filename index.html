@@ -10,9 +10,14 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Apollo Health | Track your protocol, bloods and body" />
     <meta property="og:description" content="Injections, blood pressure, weight, symptoms and lab results in one private app. Your lab PDF read on your phone, with TRT-aware analysis." />
-    <meta property="og:image" content="https://apollo-hq.pages.dev/logo-512.png" />
+    <meta property="og:image" content="https://apollo-hq.pages.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:url" content="https://apollo-hq.pages.dev/" />
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Apollo Health | Track your protocol, bloods and body" />
+    <meta name="twitter:description" content="Injections, blood pressure, weight, symptoms and lab results in one private app. Your lab PDF read on your phone, with TRT-aware analysis." />
+    <meta name="twitter:image" content="https://apollo-hq.pages.dev/og.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/logo-32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/logo-192.png" />
     <link rel="apple-touch-icon" href="/logo-180.png" />
@@ -20,6 +25,8 @@
     <link rel="preload" href="/fonts/fraunces-italic.woff2" as="font" type="font/woff2" crossorigin />
     <!-- Installed home-screen app opens the old root address: send it straight to the app. Hash pinned in functions/_middleware.ts CSP. -->
     <script>if(matchMedia('(display-mode: standalone)').matches||navigator.standalone===true)location.replace('/app/')</script>
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Apollo Health", "url": "https://apollo-hq.pages.dev/", "applicationCategory": "HealthApplication", "operatingSystem": "iOS, Android, Web", "description": "Track injections, blood pressure, weight, symptoms and lab results in one private app. Your lab PDF read on your phone, with TRT-aware analysis.", "offers": [{"@type": "Offer", "price": "0", "priceCurrency": "GBP", "name": "Free"}, {"@type": "Offer", "price": "4.99", "priceCurrency": "GBP", "name": "Pro monthly, first month free"}, {"@type": "Offer", "price": "99", "priceCurrency": "GBP", "name": "Pro lifetime"}], "publisher": {"@type": "Organization", "name": "Apollo Health", "url": "https://apollo-hq.pages.dev/"}}</script>
+    <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What does Apollo track?", "acceptedAnswer": {"@type": "Answer", "text": "Injections (compound, dose, site, vial), blood pressure and pulse, weight and body measurements, symptom check-ins, and lab results with their reference ranges. Everything lands on one timeline so you can read the bloods against the doses."}}, {"@type": "Question", "name": "Is my data private?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Apollo is local-first: your data lives on your phone and syncs to your own account over HTTPS. There are no trackers, no analytics and no third-party SDKs. Lab reports are read on the device. You can export everything or delete the whole account from Settings at any time."}}, {"@type": "Question", "name": "Which lab reports work?", "acceptedAnswer": {"@type": "Answer", "text": "Any PDF with a text layer, and scanned PDFs or photos too, which Apollo reads with on-device OCR. It knows the naming used by UK, US and Brazilian labs, handles mmol/L and mg/dL, decimal commas, and values like \"<0.3\". You review every row before it is saved."}}, {"@type": "Question", "name": "Is this medical advice?", "acceptedAnswer": {"@type": "Answer", "text": "No. Apollo is a tracking tool with a smart second opinion built in. It flags what is out of a TRT-aware range and explains what usually matters, but every decision about your protocol belongs to you and a licensed clinician."}}, {"@type": "Question", "name": "Does it work on iPhone and Android?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Apollo is a web app you add to your home screen, so it opens like a native app on both, with no store required. Onboarding walks you through the two taps it takes."}}, {"@type": "Question", "name": "Does it work offline?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Logging, the timeline and your bloods all work without signal. Everything syncs the next time you are online."}}, {"@type": "Question", "name": "Can I share it with my doctor?", "acceptedAnswer": {"@type": "Answer", "text": "Pick a date range and what to include, then export a clean PDF or a CSV. Doses, blood pressure, weight, symptoms and every lab marker, in a format a clinic can actually read. Export is part of Pro."}}, {"@type": "Question", "name": "What if I forget my password?", "acceptedAnswer": {"@type": "Answer", "text": "When you sign up you get eight one-time recovery codes. Any one of them lets you set a new password. Lost those too? Email us from your account address and we will send you a one-time link."}}, {"@type": "Question", "name": "Can I cancel or delete my account?", "acceptedAnswer": {"@type": "Answer", "text": "Any time. Cancel Pro and you keep it until the end of what you paid for. Delete the account from Settings and everything is wiped from our servers straight away, along with the copy on your phone."}}, {"@type": "Question", "name": "What is free, exactly?", "acceptedAnswer": {"@type": "Answer", "text": "All the logging: injections, blood pressure, weight, symptoms, manual lab entry, timeline, archive and sync. Pro adds lab PDF and photo import, smart analysis with trends, and the doctor-ready PDF and CSV export."}}]}</script>
     <script type="module" src="/src/landing/main.ts"></script>
   </head>
   <body class="bg-page text-zinc-900">
@@ -36,6 +43,7 @@
             <a href="#bloods" class="transition-colors hover:text-zinc-900">Bloods</a>
             <a href="#pricing" class="transition-colors hover:text-zinc-900">Pricing</a>
             <a href="#faq" class="transition-colors hover:text-zinc-900">FAQ</a>
+            <a href="/guides/" class="transition-colors hover:text-zinc-900">Guides</a>
           </nav>
           <div class="flex items-center gap-4">
             <a href="/app/" class="hidden text-[14px] text-zinc-500 transition-colors hover:text-zinc-900 sm:inline">Sign in</a>
@@ -63,7 +71,7 @@
               <div style="animation-delay:210ms" class="apollo-fade-up mt-7">
                 <a href="/app/?signup=1" class="group inline-flex h-12 items-center justify-center gap-2 rounded-full bg-zinc-900 px-6 text-[15px] font-medium text-white shadow-[0_14px_38px_rgba(24,24,27,0.12)] transition-colors hover:bg-zinc-800">Start tracking <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4 transition-transform group-hover:translate-x-0.5"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
               </div>
-              <p style="animation-delay:320ms" class="apollo-fade-up mt-5 text-[12.5px] text-zinc-400">Free to log. No card needed.</p>
+              <p style="animation-delay:320ms" class="apollo-fade-up mt-5 text-[12.5px] text-zinc-400">Free to log. No card needed. Or <a href="/read" class="font-medium text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900">read your bloods first, no account</a>.</p>
             </div>
 
             <div style="animation-delay:300ms" class="apollo-fade-in relative w-full lg:min-w-[520px]">
@@ -372,7 +380,7 @@
               <h2 class="mt-7 text-balance text-[clamp(2.6rem,6vw,5.2rem)] font-semibold leading-[0.98] tracking-[-0.055em]">Your lab report, read in seconds. On your phone.</h2>
               <p class="mx-auto mt-7 max-w-[730px] text-pretty text-[16px] leading-7 text-zinc-400 md:text-[18px] md:leading-8">Upload the PDF or snap a photo. Apollo reads every marker on the device, checks it against TRT-aware ranges, compares it with your last test and tells you what needs attention. The reading happens on your phone, and the results sync only to your own account.</p>
               <div class="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-                <a href="/app/?signup=1" class="group inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full bg-white pl-5 pr-[18px] text-[13px] font-semibold text-zinc-950 transition-[background-color,transform] duration-150 hover:bg-zinc-200 active:scale-[0.96]">Import a report <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4 transition-transform group-hover:translate-x-0.5"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
+                <a href="/read" class="group inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full bg-white pl-5 pr-[18px] text-[13px] font-semibold text-zinc-950 transition-[background-color,transform] duration-150 hover:bg-zinc-200 active:scale-[0.96]">Read my bloods, free <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="h-4 w-4 transition-transform group-hover:translate-x-0.5"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></a>
                 <a href="#faq" class="inline-flex h-11 cursor-pointer items-center justify-center rounded-full bg-white/[0.04] px-5 text-[13px] font-semibold text-white shadow-[0_0_0_1px_rgba(255,255,255,0.14)] transition-[background-color,box-shadow,transform] duration-150 hover:bg-white/[0.08] hover:shadow-[0_0_0_1px_rgba(255,255,255,0.24)] active:scale-[0.96]">How it reads them</a>
               </div>
               <div class="mt-10 flex items-center justify-center gap-3 xl:hidden">

@@ -6,7 +6,7 @@ import { passwordProblem } from '../../_lib/password'
 import { issueCodes } from '../../_lib/recovery'
 
 export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env }) => {
-  let body: { email?: string; password?: string; displayName?: string; inviteCode?: string }
+  let body: { email?: string; password?: string; displayName?: string; inviteCode?: string; source?: string }
   try {
     body = await request.json()
   } catch {
@@ -71,12 +71,16 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   const hash = await deriveArgon2Hash(password, salt)
   const userId = uuid()
 
+  // First-party attribution: one short word naming which of our own links
+  // the person signed up from. Anything else is dropped.
+  const source = typeof body.source === 'string' && /^[a-z0-9_-]{1,32}$/.test(body.source) ? body.source : null
+
   await env.DB
     .prepare(
-      `INSERT INTO users (id, email, password_hash, password_salt, iterations, is_admin, display_name, algorithm, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, email, password_hash, password_salt, iterations, is_admin, display_name, algorithm, signup_source, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(userId, email, hash, serializeSalt(salt), 0, isAdmin, displayName, 'argon2id', now, now)
+    .bind(userId, email, hash, serializeSalt(salt), 0, isAdmin, displayName, 'argon2id', source, now, now)
     .run()
 
   // Atomically claim the invite code if one was provided. The WHERE clause
@@ -115,7 +119,7 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
 
   await env.DB
     .prepare('INSERT INTO audit_log (user_id, action, meta, ip_hash, at) VALUES (?, ?, ?, ?, ?)')
-    .bind(userId, 'signup', JSON.stringify({}), iph, now)
+    .bind(userId, 'signup', JSON.stringify({ source }), iph, now)
     .run()
 
   return jsonOk(

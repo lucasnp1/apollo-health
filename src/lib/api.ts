@@ -60,4 +60,5 @@ export const api = {
 
 export type AuthMe = { user: ApiUser | null }
 export type LoginPayload = { email: string; password: string }
-export type SignupPayload = { email: string; password: string; displayName?: string }
+// `source` is the one-word first-party ref ("read", "guide-hematocrit") captured by lib/ref.ts.
+export type SignupPayload = { email: string; password: string; displayName?: string; source?: string }
