@@ -267,7 +267,7 @@ function MarkerTargetEditor() {
     <PanelCard
       subtitle="Personal optimal"
       title="Marker targets"
-      action={<Badge variant="secondary">Replaces the default ranges in Lab results</Badge>}
+      action={<Badge variant="secondary">Overrides the lab ranges</Badge>}
     >
       <p className="mb-4 text-xs leading-relaxed text-muted-foreground">
         Default ranges from the catalog (e.g. E2 20–40 pg/mL) are starting points. Override them here when you want a tighter

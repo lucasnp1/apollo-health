@@ -31,6 +31,8 @@ type TimelineEvent = {
   facts: string[]
   type: EventType
   compoundId?: number
+  /** Lab panels carry a collection date, not a time of day. */
+  dateOnly?: boolean
 }
 
 const TYPE_LABELS: Record<EventType, string> = {
@@ -80,6 +82,15 @@ function whenLabel(d: Date, now: Date): string {
   const days = differenceInCalendarDays(now, d)
   if (days > 0 && days < 7) return `${format(d, 'EEEE')} at ${t}`
   return `${format(d, d.getFullYear() === now.getFullYear() ? 'MMM d' : 'MMM d, yyyy')} at ${t}`
+}
+
+// Same shape without the clock: "today", "yesterday", "Thursday", "Sep 1".
+function dayLabel(d: Date, now: Date): string {
+  if (isToday(d)) return 'today'
+  if (isYesterday(d)) return 'yesterday'
+  const days = differenceInCalendarDays(now, d)
+  if (days > 0 && days < 7) return format(d, 'EEEE')
+  return format(d, d.getFullYear() === now.getFullYear() ? 'MMM d' : 'MMM d, yyyy')
 }
 
 function arrow(v: number, digits = 1, unit = ''): string {
@@ -309,7 +320,7 @@ const LAB_COLS: Col<LabExam>[] = [
   { key: 'notes', label: 'Notes', defaultHidden: true, render: (r) => r.notes || '—' },
 ]
 
-type FileRow = { id?: number; name: string; addedAt: string; status: string }
+type FileRow = { id?: number; name: string; addedAt: string; status: string; type?: string; size?: number }
 const FILE_COLS: Col<FileRow>[] = [
   { key: 'date', label: 'Added', render: (r) => format(parseISO(r.addedAt), 'MMM d, yyyy HH:mm') },
   { key: 'name', label: 'File', render: (r) => <span className="font-medium">{r.name}</span> },
@@ -324,7 +335,7 @@ function TimelineFeed({ events }: { events: TimelineEvent[] }) {
   return (
     <FeedList>
       {events.map((e) => (
-        <FeedRow key={e.id} icon={e.icon} title={e.title} when={whenLabel(e.date, now)} sub={e.sub} status={e.status} note={e.note} clampNote facts={e.facts} />
+        <FeedRow key={e.id} icon={e.icon} title={e.title} when={e.dateOnly ? dayLabel(e.date, now) : whenLabel(e.date, now)} sub={e.sub} status={e.status} note={e.note} clampNote facts={e.facts} />
       ))}
     </FeedList>
   )
@@ -505,6 +516,7 @@ export function Timeline({
           note: e.notes || undefined,
           facts: facts(s.n > 0 ? markers : undefined, s.flagged > 0 ? `${s.flagged} out of range` : s.ranged > 0 ? 'all in range' : undefined, e.examType),
           type: 'lab',
+          dateOnly: true,
         }
       }),
       ...fileRows.map((f): TimelineEvent => ({
@@ -514,7 +526,7 @@ export function Timeline({
         title: f.name,
         sub: f.status,
         status: f.status === 'Needs review' ? { label: 'Review', tone: 'accent', icon: Eye } : LOGGED,
-        facts: facts(f.status),
+        facts: facts(f.type?.startsWith('image/') ? 'Photo' : 'PDF', f.size ? `${Math.round(f.size / 1024)} KB` : undefined),
         type: 'file',
       })),
       ...symptoms.map((s): TimelineEvent => {

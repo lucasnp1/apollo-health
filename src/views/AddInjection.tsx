@@ -238,9 +238,11 @@ export function AddInjection({
           vialId: activeVial?.id,
         })
       }
-      // Symptom check-in rides along with the injection (same moment).
+      // Symptom check-in rides along with the injection (same moment), but only
+      // when something was actually rated. A note alone belongs to the shot;
+      // it used to create an empty "0 rated" check-in on the Timeline as well.
       const anyFeel = [...POSITIVE, ...NEGATIVE].some((s) => typeof feel[s.key] === 'number')
-      if (anyFeel || notes) {
+      if (anyFeel) {
         await db.symptoms.add({ recordedAt: takenAt, ...feel, notes: notes || undefined })
       }
       onBack()

@@ -90,8 +90,9 @@ function worst(...statuses: Status[]): Status {
   return 'none'
 }
 
+// "32.1", not "32.10": fixed digits for rounding, trailing zeros dropped.
 function fmt(v: number, digits = 1) {
-  return v % 1 === 0 ? String(v) : v.toFixed(digits)
+  return v % 1 === 0 ? String(v) : String(Number(v.toFixed(digits)))
 }
 
 // Status from the lab's own reference range, for markers without a curated rule.

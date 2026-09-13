@@ -10,6 +10,15 @@
 
 import { db, type HealthFile } from './db'
 
+// Set once the server says blob storage is not configured (503). Remembered
+// for the tab session so a reload does not ask again; a new tab retries once.
+const UNAVAILABLE_KEY = 'apollo.blobs-unavailable'
+let storageUnavailable = (() => { try { return sessionStorage.getItem(UNAVAILABLE_KEY) === '1' } catch { return false } })()
+function markStorageUnavailable() {
+  storageUnavailable = true
+  try { sessionStorage.setItem(UNAVAILABLE_KEY, '1') } catch { /* ignore */ }
+}
+
 // Upload a single file's bytes to R2. Returns the r2Key if successful.
 export async function uploadFileBlob(file: HealthFile): Promise<string | undefined> {
   if (!file.id || !file.serverId || !file.blob) return undefined
@@ -26,6 +35,12 @@ export async function uploadFileBlob(file: HealthFile): Promise<string | undefin
     body: form,
     credentials: 'same-origin',
   })
+  if (response.status === 503) {
+    // File storage is not configured on the server. Nothing will change until
+    // the next page load, so stop retrying on every sync tick.
+    markStorageUnavailable()
+    throw new Error('File storage not configured')
+  }
   if (!response.ok) {
     throw new Error(`Upload failed (${response.status}): ${await response.text()}`)
   }
@@ -56,6 +71,7 @@ export async function ensureBlobAvailable(file: HealthFile): Promise<Blob | unde
 export async function pushUnuploadedBlobs(): Promise<{ uploaded: number; failed: number }> {
   let uploaded = 0
   let failed = 0
+  if (storageUnavailable) return { uploaded, failed }
   const candidates = await db.files
     .filter((f) => Boolean(f.blob && f.serverId && !f.r2Key))
     .toArray()

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { CalendarClock, FlaskConical, FolderOpen, HeartPulse, Scale, Settings, Syringe } from 'lucide-react'
+import { CalendarClock, FlaskConical, FolderOpen, HeartPulse, Scale, Settings, Syringe, Target } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { format } from 'date-fns'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '../lib/db'
@@ -28,6 +28,7 @@ const CARDS: LaunchItem[] = [
 const BOTTOM_CARDS: LaunchItem[] = [
   { view: 'timeline', label: 'Timeline', sub: 'All your activity', icon: CalendarClock, chip: 'bg-violet-500/12 text-violet-600 dark:text-violet-400' },
   { view: 'files', label: 'Files', sub: 'Manage imports', icon: FolderOpen, chip: 'bg-amber-500/12 text-amber-600 dark:text-amber-400' },
+  { view: 'targets', label: 'Targets', sub: 'Goals and ranges', icon: Target, chip: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' },
   { view: 'settings', label: 'Settings', sub: 'Account & data', icon: Settings, chip: 'bg-muted text-muted-foreground' },
 ]
 

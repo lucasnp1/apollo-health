@@ -130,6 +130,12 @@ async function applyServerRowsBatch(
       continue
     }
 
+    // Last-write-wins for real: a local edit that has not pushed yet (dirty)
+    // and is at least as new as the server copy stays put. Without this, the
+    // echo of our own earlier push could pull back over the newer local row
+    // (a PDF stayed "Needs review" after import for exactly this reason).
+    if (existing && existing.dirty === 1 && Number(existing.updatedAt ?? 0) >= (Number(row.updatedAt) || 0)) continue
+
     const localRow = translateFkSync(spec, row, fkCache)
     localRow.serverId = serverId
     localRow.updatedAt = Number(row.updatedAt) || Date.now()

@@ -457,6 +457,9 @@ export async function importBundledSeed(force = false): Promise<SeedImportResult
 }
 
 async function fetchLocalSeed() {
+  // The seed file only exists in dev (postbuild strips it), so production
+  // never asks for it; that request used to 404 on every load.
+  if (!import.meta.env.DEV) return undefined
   try {
     const response = await fetch('/local-seed/apollo-seed.json', { cache: 'no-store' })
     if (!response.ok) return undefined
