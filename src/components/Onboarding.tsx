@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'motion/react'
 import { Check, MoreVertical, Share, ShieldCheck, Syringe } from 'lucide-react'
 import { BrandMark } from './BrandMark'
 import { Button } from '@/components/ui/button'
-import { spring } from './motion'
+import { Reveal } from './motion'
 import { useInstallPrompt } from '../lib/useInstallPrompt'
 import { api } from '../lib/api'
 
@@ -120,9 +119,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         </div>
 
         <div className="flex flex-1 flex-col items-center justify-center">
-          <motion.div key={step} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="w-full">
+          {/* Keyed on `step` so each screen remounts and replays the reveal. */}
+          <Reveal key={step} y={8} className="w-full">
             {steps[step]}
-          </motion.div>
+          </Reveal>
         </div>
 
         <div className="flex flex-col gap-2 pt-4">

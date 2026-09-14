@@ -29,7 +29,7 @@ function markerFacts(markers: MarkerVal[]): FeedFact[] {
   })
 }
 
-export function Disclaimer({ className }: { className?: string }) {
+function Disclaimer({ className }: { className?: string }) {
   return (
     <p className={cn('feed-facts rounded-lg border border-primary/25 bg-primary/8 px-3 py-2 text-foreground/80', className)}>
       <span className="font-semibold text-primary">Not medical advice.</span> Apollo reads your numbers the way an experienced TRT user would and lists what people usually do about them. Check anything you act on with your doctor.

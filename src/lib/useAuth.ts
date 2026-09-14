@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type ApiUser, type LoginPayload, type SignupPayload } from './api'
-import { wipeAllLocalData } from './lock'
+import { wipeAllLocalData } from './db'
 
 export type AuthState =
   | { status: 'loading' }

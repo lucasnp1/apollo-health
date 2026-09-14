@@ -27,7 +27,7 @@ export type ExtractedMarker = {
 }
 
 // First line of extractedText when some or all pages were read with OCR.
-export const OCR_SENTINEL = '[[ocr]]'
+const OCR_SENTINEL = '[[ocr]]'
 
 export type ReadProgress = { stage: 'text' | 'ocr'; page: number; pages: number; pct?: number }
 
@@ -83,19 +83,6 @@ function hasUsableText(lines: string[]): boolean {
   const letters = (joined.match(/\p{L}/gu) || []).length
   const digits = (joined.match(/\d/g) || []).length
   return letters >= 40 && digits >= 3
-}
-
-// Text layer only (no OCR). Kept for callers that just want a quick read.
-export async function extractPdfText(file: File): Promise<string> {
-  const pdfjs = await loadPdfjs()
-  const document = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise
-  const pages: string[] = []
-  for (let n = 1; n <= document.numPages; n += 1) {
-    const page = await document.getPage(n)
-    const content = await page.getTextContent()
-    pages.push(itemsToLines(content.items as PdfTextItem[]).join('\n'))
-  }
-  return pages.join('\n\n')
 }
 
 // Full read: text layer per page, OCR for pages without one, or OCR for an

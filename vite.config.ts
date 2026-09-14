@@ -25,6 +25,10 @@ export default defineConfig({
         advancedChunks: {
           groups: [
             { name: 'vendor-react',  test: /node_modules\/(react|react-dom|scheduler)\// },
+            // Must come before vendor-charts: clsx is a recharts dependency, and
+            // grouping it with the charts would make every `cn()` call in the app
+            // a static import of all of recharts.
+            { name: 'vendor-ui',     test: /node_modules\/(clsx|tailwind-merge|class-variance-authority)\// },
             { name: 'vendor-charts', test: /node_modules\/(recharts|d3-|victory-)/ },
             { name: 'vendor-dexie',  test: /node_modules\/(dexie)/ },
             { name: 'vendor-dates',  test: /node_modules\/(date-fns)/ },

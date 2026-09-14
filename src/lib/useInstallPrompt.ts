@@ -25,7 +25,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('appinstalled', () => { deferred = null; notify() })
 }
 
-export function detectPlatform(): Platform {
+function detectPlatform(): Platform {
   const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
   if (/iPhone|iPad|iPod/i.test(ua)) return 'ios'
   // iPadOS 13+ reports as Mac; treat a touch-capable "Mac" as iOS.
@@ -35,7 +35,7 @@ export function detectPlatform(): Platform {
   return 'unknown'
 }
 
-export function isStandalone(): boolean {
+function isStandalone(): boolean {
   if (typeof window === 'undefined') return false
   return (
     window.matchMedia?.('(display-mode: standalone)').matches ||

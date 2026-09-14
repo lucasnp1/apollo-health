@@ -236,8 +236,3 @@ export const TABLES: TableSpec[] = [
   },
 ]
 
-export const SYNC_TABLE_NAMES = TABLES.map((t) => t.dexie)
-
-export function findTable(dexieName: string): TableSpec | undefined {
-  return TABLES.find((t) => t.dexie === dexieName)
-}

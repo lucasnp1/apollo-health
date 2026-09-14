@@ -173,8 +173,8 @@ export function normalizeUnit(raw: string): string {
 
 // Plausibility bounds per canonical marker, covering the common unit systems
 // (so the bound is wide). A value outside is almost always a misread.
-export type Plausibility = { min?: number; max?: number }
-export const PLAUSIBLE: Record<string, Plausibility> = {
+type Plausibility = { min?: number; max?: number }
+const PLAUSIBLE: Record<string, Plausibility> = {
   'Total Testosterone':   { min: 0.1,  max: 5000 },
   'Free Testosterone':    { min: 0.001, max: 2000 },
   'Testosterone':         { min: 0.1,  max: 5000 },

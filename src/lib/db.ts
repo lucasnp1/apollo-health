@@ -380,7 +380,7 @@ export async function seedIfEmpty() {
   return seedPromise
 }
 
-export async function importBundledSeed(force = false): Promise<SeedImportResult> {
+async function importBundledSeed(force = false): Promise<SeedImportResult> {
   const seed = await fetchLocalSeed()
   if (!seed) return { status: 'missing', counts: await recordCounts() }
 
@@ -469,7 +469,7 @@ async function fetchLocalSeed() {
   }
 }
 
-export async function recordCounts() {
+async function recordCounts() {
   const [compounds, injections, vitals, exams, results, files] = await Promise.all([
     db.compounds.count(),
     db.injections.count(),
@@ -480,4 +480,27 @@ export async function recordCounts() {
   ])
 
   return { compounds, injections, vitals, exams, results, files }
+}
+
+/** Clears the user's health data, keeping sync cursors and settings. */
+export async function wipeLocalDatabase() {
+  await db.transaction('rw', [db.compounds, db.injections, db.vitals, db.exams, db.results, db.files, db.meta], async () => {
+    await Promise.all([
+      db.compounds.clear(),
+      db.injections.clear(),
+      db.vitals.clear(),
+      db.exams.clear(),
+      db.results.clear(),
+      db.files.clear(),
+      db.meta.clear(),
+    ])
+  })
+}
+
+// Clears every local table (data, sync cursors, meta). Used after the account
+// is deleted server-side so nothing personal is left on the device.
+export async function wipeAllLocalData() {
+  await db.transaction('rw', db.tables, async () => {
+    await Promise.all(db.tables.map((t) => t.clear()))
+  })
 }

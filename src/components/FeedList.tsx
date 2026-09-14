@@ -51,7 +51,7 @@ export function FeedChip({ status, className }: { status: FeedStatus; className?
   )
 }
 
-export function FeedFacts({ facts, className }: { facts: FeedFact[]; className?: string }) {
+function FeedFacts({ facts, className }: { facts: FeedFact[]; className?: string }) {
   if (facts.length === 0) return null
   return (
     <span className={cn('feed-facts flex flex-wrap items-center gap-x-2.5 gap-y-1 text-muted-foreground', className)}>

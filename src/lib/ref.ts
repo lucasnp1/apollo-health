@@ -6,7 +6,7 @@
 const KEY = 'apollo.ref'
 const OK = /^[a-z0-9_-]{1,32}$/
 
-export function isValidRef(s: unknown): s is string {
+function isValidRef(s: unknown): s is string {
   return typeof s === 'string' && OK.test(s)
 }
 
@@ -28,7 +28,7 @@ export function captureRef(): string | undefined {
   }
 }
 
-export function storedRef(): string | undefined {
+function storedRef(): string | undefined {
   try {
     const s = sessionStorage.getItem(KEY) ?? ''
     return isValidRef(s) ? s : undefined

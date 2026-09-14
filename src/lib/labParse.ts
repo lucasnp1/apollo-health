@@ -157,7 +157,7 @@ function parseTail(tail: string): { row: Omit<ParsedRow, 'canonical' | 'line' | 
   return { row: { value, rawValue, unit, low, high, flag }, consumed: pos, unitKnown, hasRange }
 }
 
-export function parseLabLine(line: string, lineNo: number): ParsedRow[] {
+function parseLabLine(line: string, lineNo: number): ParsedRow[] {
   const rows: ParsedRow[] = []
   const aliases = aliasIndex()
   let cursor = 0

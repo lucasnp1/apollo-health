@@ -16,11 +16,11 @@ function applyTheme(t: Theme) {
 const saved = localStorage.getItem(STORAGE_KEY) as Theme | null
 applyTheme(saved === 'light' ? 'light' : 'dark')
 
-export function getTheme(): Theme {
+function getTheme(): Theme {
   return (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? 'dark'
 }
 
-export function setTheme(t: Theme) {
+function setTheme(t: Theme) {
   localStorage.setItem(STORAGE_KEY, t)
   applyTheme(t)
   // Dispatch event so other hooks can react
@@ -35,7 +35,7 @@ export function toggleTheme() {
  * Returns chart-safe color tokens — must be JS values because Recharts
  * doesn't read CSS variables from inline style strings.
  */
-export function getChartColors(dark: boolean) {
+function getChartColors(dark: boolean) {
   return {
     // Cool faint gridlines on the instrument surface.
     grid:          dark ? 'rgba(255,255,255,0.07)' : 'rgba(20,24,33,0.08)',

@@ -1,7 +1,5 @@
 import type { ReactNode } from 'react'
-import { motion, useReducedMotion } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { revealProps } from '../motion'
 
 /**
  * Chart container card — Horizon's "This month" pattern: header row with
@@ -26,11 +24,9 @@ export function ChartCard({
   children: ReactNode
   className?: string
 }) {
-  const reduce = useReducedMotion() ?? false
   return (
-    <motion.div
-      {...revealProps(reduce)}
-      className={cn('flex flex-col rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]', className)}
+    <div
+      className={cn('reveal flex flex-col rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]', className)}
     >
       {/* On mobile the control drops to its own row so it can never squeeze the
           title into a wrap; from sm up it sits inline on the right. */}
@@ -48,6 +44,6 @@ export function ChartCard({
         </div>
       )}
       <div className="mt-4 min-h-0 flex-1">{children}</div>
-    </motion.div>
+    </div>
   )
 }

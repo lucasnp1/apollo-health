@@ -13,7 +13,7 @@ export type ApiUser = {
   onboarded?: boolean
 }
 
-export class ApiError extends Error {
+class ApiError extends Error {
   status: number
   payload?: unknown
   constructor(message: string, status: number, payload?: unknown) {

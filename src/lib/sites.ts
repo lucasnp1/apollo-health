@@ -40,24 +40,6 @@ export const SUBQ_SITES: SiteGroup[] = [
   },
 ]
 
-// Flat ordered list — used for the datalist options.
-export const ALL_SITES: string[] = [
-  ...IM_SITES.flatMap((g) => g.sites),
-  ...SUBQ_SITES.flatMap((g) => g.sites),
-]
-
-// Most common starting choices surfaced first in quick-log.
-export const COMMON_SITES = [
-  'Ventrogluteal L',
-  'Ventrogluteal R',
-  'Vastus Lateralis L',
-  'Vastus Lateralis R',
-  'Deltoid L',
-  'Deltoid R',
-  'Abdomen L',
-  'Abdomen R',
-]
-
 // ── Quick-log rotation sites ────────────────────────────────────────────────
 // The curated top-to-bottom list shown on the Add Injection page. Each site
 // carries an adjacency `group`: the three deltoid heads on one arm share a

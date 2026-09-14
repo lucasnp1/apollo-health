@@ -1,40 +1,30 @@
-import { motion, useReducedMotion, type Transition } from 'motion/react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
-// One spring shared across the app so motion feels like a single system —
-// fast, physical, purposeful. (transitions.dev ethos, built on our `motion` dep.)
-export const spring: Transition = { type: 'spring', stiffness: 420, damping: 34, mass: 0.9 }
+// Motion is CSS-only. An animation library on the critical path bought us one
+// mount transition per card, so the springs now live in `.reveal` / `.lift`
+// (src/index.css) and reduced-motion is handled by a media query there.
 
-// Entrance props for a motion element; returns nothing when the viewer prefers
-// reduced motion, so callers get a static element. `delay` staggers siblings.
-export function revealProps(reduce: boolean, delay = 0, y = 10) {
-  return reduce
-    ? {}
-    : { initial: { opacity: 0, y }, animate: { opacity: 1, y: 0 }, transition: { ...spring, delay } }
+function revealStyle(delay: number, y: number): CSSProperties {
+  return { '--reveal-delay': `${delay}s`, '--reveal-y': `${y}px` } as CSSProperties
 }
 
-// Hover-lift + press preset for interactive surfaces (launch cards, buttons).
-// Spread onto a motion.* element. No-op visual weight; the spring carries it.
-export const lift = {
-  whileHover: { y: -3 },
-  whileTap: { scale: 0.98 },
-  transition: spring,
-}
-
-/** Rise + fade wrapper. Skips motion under prefers-reduced-motion. */
+/** Rise + fade wrapper. Static under prefers-reduced-motion. */
 export function Reveal({ children, delay = 0, y = 10, className }: { children: ReactNode; delay?: number; y?: number; className?: string }) {
-  const reduce = useReducedMotion() ?? false
   return (
-    <motion.div className={className} {...revealProps(reduce, delay, y)}>
+    <div className={className ? `reveal ${className}` : 'reveal'} style={revealStyle(delay, y)}>
       {children}
-    </motion.div>
+    </div>
   )
+}
+
+function prefersReducedMotion() {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 /** Count-up to `value` (easeOutCubic). Static under reduced motion. Set
  *  `animateOnMount` to count up from 0 the first time it appears. */
 export function AnimatedNumber({ value, decimals = 0, className, animateOnMount = false }: { value: number; decimals?: number; className?: string; animateOnMount?: boolean }) {
-  const reduce = useReducedMotion() ?? false
+  const reduce = prefersReducedMotion()
   const [display, setDisplay] = useState(() => (animateOnMount && !reduce ? 0 : value))
   const from = useRef(animateOnMount && !reduce ? 0 : value)
 

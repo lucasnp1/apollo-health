@@ -1,11 +1,10 @@
 import { lazy, Suspense, useMemo } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { CalendarClock, FlaskConical, FolderOpen, HeartPulse, Scale, Settings, Syringe, Target } from 'lucide-react'
-import { motion, useReducedMotion } from 'motion/react'
 import { format } from 'date-fns'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '../lib/db'
 import { ALL_SYMPTOMS, chipTone } from '../lib/symptoms'
-import { Reveal, spring } from '../components/motion'
+import { Reveal } from '../components/motion'
 import { cn } from '@/lib/utils'
 import type { View } from '../app/views'
 
@@ -33,17 +32,13 @@ const BOTTOM_CARDS: LaunchItem[] = [
 ]
 
 function LaunchCard({ card, onNavigate, delay = 0 }: { card: LaunchItem; onNavigate: (v: View) => void; delay?: number }) {
-  const reduce = useReducedMotion() ?? false
   return (
     <Reveal delay={delay} className="min-w-0">
-      <motion.button
+      <button
         type="button"
         onClick={() => onNavigate(card.view)}
-        whileHover={reduce ? undefined : { y: -3 }}
-        whileTap={reduce ? undefined : { scale: 0.98 }}
-        transition={spring}
         className={cn(
-          'group flex h-full min-h-[132px] w-full flex-col items-start gap-3 rounded-2xl border p-5 text-left transition-shadow focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+          'lift group flex h-full min-h-[132px] w-full flex-col items-start gap-3 rounded-2xl border p-5 text-left focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
           card.primary
             ? 'border-primary/45 bg-primary/[0.07] shadow-[var(--glow-accent)] hover:shadow-[var(--shadow-lift)]'
             : 'border-border bg-card shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-lift)]',
@@ -56,7 +51,7 @@ function LaunchCard({ card, onNavigate, delay = 0 }: { card: LaunchItem; onNavig
           <p className="font-display text-[15px] font-semibold leading-tight tracking-[-0.01em] text-foreground">{card.label}</p>
           <p className="mt-0.5 text-[13px] text-muted-foreground">{card.sub}</p>
         </div>
-      </motion.button>
+      </button>
     </Reveal>
   )
 }

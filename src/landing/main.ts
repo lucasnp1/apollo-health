@@ -12,6 +12,16 @@ if (captureRef()) {
   for (const a of $$<HTMLAnchorElement>('a[href^="/app/"], a[href^="/read"]')) a.href = withRef(a.getAttribute('href') ?? a.href)
 }
 
+// ── Hero feed: the marquee needs the list twice to loop seamlessly. Shipping
+// the second copy in the HTML cost ~33 KB, so clone it here instead.
+const feedLoop = $<HTMLUListElement>('ul[data-feed-loop]')
+if (feedLoop) {
+  const copy = feedLoop.cloneNode(true) as HTMLUListElement
+  copy.removeAttribute('data-feed-loop')
+  copy.setAttribute('aria-hidden', 'true')
+  feedLoop.after(copy)
+}
+
 // ── How it works: amber rail fills as the steps scroll past ───────────────
 const rail = $('#how-rail-fill')
 const steps = $('#how-steps')

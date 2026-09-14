@@ -20,7 +20,7 @@ function markStorageUnavailable() {
 }
 
 // Upload a single file's bytes to R2. Returns the r2Key if successful.
-export async function uploadFileBlob(file: HealthFile): Promise<string | undefined> {
+async function uploadFileBlob(file: HealthFile): Promise<string | undefined> {
   if (!file.id || !file.serverId || !file.blob) return undefined
   // Push the metadata row first so the server has something to authorize against.
   // The sync engine handles this on its normal tick; for fresh uploads we may

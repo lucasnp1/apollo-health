@@ -1,113 +1,5 @@
-import { addDays, addMinutes, endOfDay, isAfter, isBefore, parseISO, setHours, setMinutes, startOfDay, subDays } from 'date-fns'
-import type { InjectionLog, Protocol, ProtocolCadence, ProtocolDose } from './db'
-
-/**
- * Simple next-due calculation — no ProtocolDose dependency.
- * Looks at the last injection for each protocol's compound and adds the interval.
- * This is the primary "upcoming" calculation used in the UI.
- */
-export type SimpleScheduleItem = {
-  protocol: Protocol
-  nextDue: Date
-  lastInjectionDate: Date | null
-  isOverdue: boolean
-  daysUntil: number   // negative = overdue
-}
-
-export function simpleUpcomingSchedule(
-  protocols: Protocol[],
-  injections: InjectionLog[],
-  doses: ProtocolDose[] = [],
-): SimpleScheduleItem[] {
-  const now = Date.now()
-  const results: SimpleScheduleItem[] = []
-
-  // Per-protocol set of scheduledAt ISO strings the user has already
-  // resolved (logged as done OR explicitly skipped). When computing
-  // "what's next?" we advance past these — otherwise hitting Skip would
-  // leave the same slot showing.
-  const consumedByProto = new Map<number, Set<string>>()
-  for (const d of doses) {
-    if (d.status !== 'done' && d.status !== 'skipped') continue
-    const set = consumedByProto.get(d.protocolId) ?? new Set<string>()
-    set.add(d.scheduledAt)
-    consumedByProto.set(d.protocolId, set)
-  }
-
-  for (const p of protocols) {
-    if (p.archived || p.cadence.kind === 'asNeeded') continue
-    if (p.endsAt && Date.parse(p.endsAt) < now) continue
-
-    // Last injection for this compound (most recent)
-    const lastInj = injections
-      .filter(i => i.compoundId === p.compoundId)
-      .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0]
-    const lastDate = lastInj ? parseISO(lastInj.takenAt) : null
-
-    let nextDue = calcNextDue(p.cadence, lastDate, parseISO(p.startedAt))
-    if (!nextDue) continue
-
-    // Advance past doses the user has already resolved. Cap iterations as a
-    // safety net so a misconfigured cadence can't infinite-loop.
-    const consumed = consumedByProto.get(p.id ?? -1)
-    if (consumed) {
-      let safety = 60
-      while (nextDue && consumed.has(nextDue.toISOString()) && safety-- > 0) {
-        nextDue = calcNextDue(p.cadence, nextDue, parseISO(p.startedAt))
-      }
-      if (!nextDue) continue
-    }
-
-    results.push({
-      protocol: p,
-      nextDue,
-      lastInjectionDate: lastDate,
-      isOverdue: nextDue.getTime() < now,
-      daysUntil: (nextDue.getTime() - now) / 86_400_000,
-    })
-  }
-
-  return results.sort((a, b) => a.nextDue.getTime() - b.nextDue.getTime())
-}
-
-function calcNextDue(
-  cadence: ProtocolCadence,
-  lastDate: Date | null,
-  startDate: Date,
-): Date | null {
-  const now = new Date()
-
-  if (!lastDate) {
-    // Never injected — due on start date or now, whichever is later
-    const d = new Date(Math.max(startDate.getTime(), now.getTime()))
-    if (cadence.kind === 'everyNDays') return applyTime(d, cadence.timeOfDay)
-    if (cadence.kind === 'weekly') return applyTime(d, cadence.timeOfDay)
-    if (cadence.kind === 'daily')  return applyTime(d, cadence.timesOfDay?.[0])
-    return d
-  }
-
-  if (cadence.kind === 'everyNDays') {
-    return applyTime(addDays(lastDate, cadence.n), cadence.timeOfDay)
-  }
-
-  if (cadence.kind === 'weekly') {
-    const sorted = [...cadence.daysOfWeek].sort((a, b) => a - b)
-    // Walk forward from lastDate + 1 day until we hit a scheduled weekday
-    for (let offset = 1; offset <= 8; offset++) {
-      const candidate = addDays(lastDate, offset)
-      if (sorted.includes(candidate.getDay())) {
-        return applyTime(candidate, cadence.timeOfDay)
-      }
-    }
-    return null
-  }
-
-  if (cadence.kind === 'daily') {
-    return applyTime(addDays(lastDate, 1), cadence.timesOfDay?.[0])
-  }
-
-  return null
-}
+import { addDays, isAfter, isBefore, parseISO, setHours, setMinutes, startOfDay } from 'date-fns'
+import type { Protocol, ProtocolCadence } from './db'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -117,7 +9,11 @@ function applyTime(date: Date, timeOfDay?: string) {
   return setMinutes(setHours(date, h || 0), m || 0)
 }
 
-// Generate scheduled dose instants for a protocol between [from, to].
+/**
+ * Every instant a protocol schedules a dose between [from, to].
+ * The canonical scheduling primitive: a dose's identity is its ISO string here,
+ * so logging or skipping one round-trips exactly.
+ */
 export function generateDoseInstants(protocol: Protocol, from: Date, to: Date): Date[] {
   const out: Date[] = []
   const start = parseISO(protocol.startedAt)
@@ -163,71 +59,6 @@ export function generateDoseInstants(protocol: Protocol, from: Date, to: Date): 
   return out
 }
 
-export type ScheduledItem = {
-  protocol: Protocol
-  scheduledAt: Date
-  dose?: ProtocolDose
-}
-
-export function nextDose(
-  protocols: Protocol[],
-  doses: ProtocolDose[],
-  from = new Date(),
-  horizonDays = 30,
-): ScheduledItem | undefined {
-  return upcomingSchedule(protocols, doses, from, horizonDays)[0]
-}
-
-export function upcomingSchedule(
-  protocols: Protocol[],
-  doses: ProtocolDose[],
-  from = new Date(),
-  horizonDays = 14,
-): ScheduledItem[] {
-  const to = addMinutes(from, horizonDays * 24 * 60)
-  const persisted = new Map<string, ProtocolDose>()
-  for (const dose of doses) {
-    persisted.set(`${dose.protocolId}|${dose.scheduledAt}`, dose)
-  }
-  const items: ScheduledItem[] = []
-  for (const protocol of protocols.filter((p) => !p.archived)) {
-    for (const instant of generateDoseInstants(protocol, from, to)) {
-      const key = `${protocol.id}|${instant.toISOString()}`
-      const dose = persisted.get(key)
-      if (dose?.status === 'done' || dose?.status === 'skipped') continue
-      items.push({ protocol, scheduledAt: instant, dose })
-    }
-  }
-  return items.sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime())
-}
-
-// Doses that need action right now: pending (not done/skipped) instants from
-// the recent past through the END OF TODAY — i.e. overdue + due-today. Deduped
-// by compound (earliest pending instant wins) so the UI shows one row per drug.
-//
-// Every scheduledAt is a canonical generateDoseInstants() value, so logging or
-// skipping via that exact ISO string round-trips: upcomingSchedule() already
-// drops done/skipped instants, so a resolved dose stops appearing here.
-export function pendingDoses(
-  protocols: Protocol[],
-  doses: ProtocolDose[],
-  now = new Date(),
-  lookbackDays = 21,
-): ScheduledItem[] {
-  const from = subDays(startOfDay(now), lookbackDays)
-  const end = endOfDay(now)
-  const items = upcomingSchedule(protocols, doses, from, lookbackDays + 2)
-    .filter((it) => !isAfter(it.scheduledAt, end))
-
-  const byCompound = new Map<number, ScheduledItem>()
-  for (const it of items) {
-    const cid = it.protocol.compoundId
-    const cur = byCompound.get(cid)
-    if (!cur || it.scheduledAt < cur.scheduledAt) byCompound.set(cid, it)
-  }
-  return [...byCompound.values()].sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime())
-}
-
 export function describeCadence(cadence: ProtocolCadence): string {
   switch (cadence.kind) {
     case 'everyNDays':
@@ -241,19 +72,4 @@ export function describeCadence(cadence: ProtocolCadence): string {
     case 'asNeeded':
       return 'As needed'
   }
-}
-
-export function timeUntil(target: Date, from = new Date()): string {
-  const diff = target.getTime() - from.getTime()
-  if (diff < 0) {
-    const abs = Math.abs(diff)
-    if (abs < 60 * 60 * 1000) return `${Math.round(abs / 60000)}m overdue`
-    if (abs < DAY) return `${Math.round(abs / 3600000)}h overdue`
-    return `${Math.round(abs / DAY)}d overdue`
-  }
-  if (diff < 60 * 60 * 1000) return `in ${Math.round(diff / 60000)}m`
-  if (diff < DAY) return `in ${Math.round(diff / 3600000)}h`
-  const days = Math.floor(diff / DAY)
-  const hours = Math.round((diff % DAY) / 3600000)
-  return hours ? `in ${days}d ${hours}h` : `in ${days}d`
 }

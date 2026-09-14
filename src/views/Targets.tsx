@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Goal, type MarkerTarget } from '../lib/db'
-import { buildWeightDoseSeries, weightSummary } from '../lib/insights'
+import { latestWeightKg } from '../lib/insights'
 import { allMarkerMeta, metaForKey } from '../lib/markers'
 import { RangeBar } from '../components/RangeBar'
 import { DashGrid } from '../components/dashboard/Grid'
@@ -38,7 +38,6 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
 
 function GoalEditor() {
   const goals = useLiveQuery(() => db.goals.toArray(), [], [])
-  const compounds = useLiveQuery(() => db.compounds.toArray(), [], [])
   const injections = useLiveQuery(() => db.injections.toArray(), [], [])
   const vitals = useLiveQuery(() => db.vitals.orderBy('measuredAt').reverse().toArray(), [], [])
   const results = useLiveQuery(() => db.results.toArray(), [], [])
@@ -62,7 +61,7 @@ function GoalEditor() {
     setDraft({ kind: 'weight', label: '', target: '', marker: '' })
   }
 
-  const weightLatest = weightSummary(buildWeightDoseSeries(compounds, injections)).latest
+  const weightLatest = latestWeightKg(injections)
   const bpLatest = vitals[0]
 
   return (
