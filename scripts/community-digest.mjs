@@ -154,7 +154,7 @@ async function main() {
   if (threads.length === 0) lines.push('_No matching threads this week._', '')
   for (const t of threads) {
     const age = Math.max(0, Math.round((Date.now() - t.created) / 86_400_000))
-    lines.push(`## ${t.title}`, `r/${t.sub} · ${age}d ago · ${t.score} points · ${t.comments} comments`, t.url, t.keywords.length ? `Matched: ${t.keywords.join(', ')}` : '', t.text ? `> ${t.text}` : '', `Hint: ${t.hint}`, '', 'Draft reply:', '', '', '')
+    lines.push(`## ${t.title}`, `r/${t.sub} · ${age}d ago · ${t.score} points · ${t.comments} comments`, t.url, t.keywords.length ? `Matched: ${t.keywords.join(', ')}` : '', t.text ? `> ${t.text}` : '', `Hint: ${t.hint}`, '', 'Draft reply (to write, then post by hand):', '', '', '')
   }
   lines.push('## Stats', '')
   if (!s) lines.push('_skipped (set APOLLO_STATS_TOKEN)_')
@@ -168,6 +168,24 @@ async function main() {
   const dir = path.resolve('tmp/digest')
   fs.mkdirSync(dir, { recursive: true })
   const file = path.join(dir, `${day}.md`)
+
+  // Reddit 403s this machine intermittently, and the filename is date-only, so a
+  // second run on the same day used to replace a good digest with an empty one
+  // and still exit 0. Never trade content for nothing, and make the failure
+  // loud enough that a scheduled run cannot stay green while doing nothing.
+  if (threads.length === 0) {
+    const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+    if (existing.includes('## ')) {
+      console.error(`kept the existing ${file}; this run found no threads (Reddit likely blocked it)`)
+      process.exitCode = 2
+      return
+    }
+    fs.writeFileSync(file, lines.join('\n'))
+    console.error(`wrote ${file} but found NO threads (Reddit likely blocked it)`)
+    process.exitCode = 2
+    return
+  }
+
   fs.writeFileSync(file, lines.join('\n'))
   console.log(`wrote ${file} (${threads.length} threads, ${mode})`)
 }

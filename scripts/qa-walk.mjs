@@ -9,8 +9,8 @@ import path from 'node:path'
 const BASE = process.env.BASE ?? 'http://127.0.0.1:8788'
 const OUT = process.env.OUT ?? path.resolve('qa/run')
 const MOBILE = process.env.DESKTOP !== '1'
-const PDF = process.env.PDF ?? path.resolve('fixtures/medichecks-advanced-trt.pdf')
-const PHOTO = process.env.PHOTO ?? path.resolve('fixtures/medichecks-photo.png')
+const PDF = process.env.PDF ?? path.resolve('public/local-seed/fixtures/medichecks-advanced-trt.pdf')
+const PHOTO = process.env.PHOTO ?? path.resolve('public/local-seed/fixtures/medichecks-photo.png')
 fs.rmSync(OUT, { recursive: true, force: true })
 fs.mkdirSync(OUT, { recursive: true })
 
@@ -368,3 +368,6 @@ fs.writeFileSync(path.join(OUT, 'REPORT.md'), [
   '## Failed requests', ...(badRequests.length ? badRequests : ['none']), '',
 ].join('\n'))
 console.log(`\nfailures: ${failures.length}, console errors: ${consoleErrors.length}, bad requests: ${badRequests.length}`)
+// Exit non-zero so this can gate a deploy. Without it the script always exited 0
+// and CI could never fail on a broken walk.
+process.exitCode = failures.length ? 1 : 0
