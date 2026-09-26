@@ -20,6 +20,12 @@ export type PKCompound = {
 }
 
 // Full compound database — all 37 entries from steroidplanner.com
+// DNP (2,4-dinitrophenol) is deliberately absent. It is not a hormone, it is an
+// industrial uncoupler with no safe margin: the doses people take and the doses
+// that cause fatal hyperthermia overlap, and UK deaths are well documented.
+// Drawing it as a tidy release curve implies a dose can be managed like a
+// testosterone ester, which is the exact belief that kills people. It was in
+// this table until 26 Sept 2026. Do not re-add it.
 export const PK_COMPOUNDS: PKCompound[] = [
   { compound: 'Anadrol',                  form: '',                     halfLifeDays: 0.58, activeDosePct: 100 },
   { compound: 'Anavar',                   form: '',                     halfLifeDays: 0.42, activeDosePct: 100 },
@@ -28,8 +34,6 @@ export const PK_COMPOUNDS: PKCompound[] = [
   { compound: 'Boldenone',                form: 'Cypionate',            halfLifeDays: 5,    activeDosePct: 70  },
   { compound: 'Dianabol',                 form: '',                     halfLifeDays: 0.21, activeDosePct: 100 },
   { compound: 'Dihydroboldenone (DHB)',   form: 'Cypionate',            halfLifeDays: 5,    activeDosePct: 70  },
-  { compound: 'DNP',                      form: 'Crystal',              halfLifeDays: 1.5,  activeDosePct: 75  },
-  { compound: 'DNP',                      form: 'Powder',               halfLifeDays: 1.5,  activeDosePct: 100 },
   { compound: 'Epistane',                 form: '',                     halfLifeDays: 0.25, activeDosePct: 100 },
   { compound: 'Equipoise',               form: '',                     halfLifeDays: 14,   activeDosePct: 61  },
   { compound: 'Halotestin',              form: '',                     halfLifeDays: 0.29, activeDosePct: 100 },
