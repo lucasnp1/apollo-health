@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, Plus, TriangleAlert, X } from 'lucide-react'
 import { db, type Compound, type InjectionLog, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
+import { compoundGroups, findCompoundByName } from '../lib/compounds'
 import { parseConcentrationMgPerMl } from '../lib/vials'
 import { convertAmount, derive, type EntryMode } from '../lib/dose'
 import { NEGATIVE, POSITIVE, chipTone, type SymptomDef } from '../lib/symptoms'
@@ -75,14 +76,12 @@ export function AddInjection({
   injections: InjectionLog[]
   onBack: () => void
 }) {
-  const compounds = useMemo(() => {
-    const seen = new Map<string, Compound>()
-    for (const c of rawCompounds) {
-      const k = c.name.trim().toLowerCase()
-      if (!seen.has(k)) seen.set(k, c)
-    }
-    return [...seen.values()]
-  }, [rawCompounds])
+  // One row per compound name, picking the row actually in use rather than the
+  // lowest id, so the remembered dose and vial numbers come from the right one.
+  const compounds = useMemo(
+    () => compoundGroups(rawCompounds, injections).map((g) => g.canonical),
+    [rawCompounds, injections],
+  )
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
 
   // The last syringe you logged on a route = every compound sharing the most
@@ -139,8 +138,14 @@ export function AddInjection({
   }, [initial])
 
   // Compounds shown for the current route — SubQ hides IM oils and vice versa.
+  // Sort by route rather than filter by it. Hiding a compound saved on the
+  // other route is what pushed people into "＋ New…" and minted duplicates;
+  // the ones for this route still come first.
   const routeCompounds = useMemo(
-    () => compounds.filter((c) => c.defaultRoute === route || c.defaultRoute == null),
+    () => [...compounds].sort((a, b) => {
+      const rank = (c: Compound) => (c.defaultRoute === route || c.defaultRoute == null ? 0 : 1)
+      return rank(a) - rank(b)
+    }),
     [compounds, route],
   )
 
@@ -194,10 +199,17 @@ export function AddInjection({
       for (const r of validLines) {
         const recon = isPeptide && r.vialMg > 0 && r.water > 0 ? { vialMg: r.vialMg, reconstituteMl: r.water } : {}
         let compoundId: number
-        if (r.existing) {
-          compoundId = r.existing.id!
+        // Typing a name that already exists reuses that row. Without this,
+        // "＋ New compound…" mints a duplicate every time the picker fails to
+        // offer an existing one, which is how five Retatrutides happen.
+        const already = r.existing ?? (r.isNew ? findCompoundByName(rawCompounds, r.name) : undefined)
+        if (already) {
+          compoundId = already.id!
           await db.compounds.update(compoundId, {
-            concentrationMgPerMl: r.conc,
+            // Only write values we actually have: Dexie deletes a key when the
+            // value is undefined, which used to wipe a saved concentration
+            // whenever the vial/water pair was left blank.
+            ...(r.conc !== undefined && { concentrationMgPerMl: r.conc }),
             defaultRoute: route,
             lastDose: Number(r.d.doseInUnit!.toFixed(r.unit === 'mcg' ? 1 : 3)),
             ...recon,

@@ -3,6 +3,7 @@ import { Archive as ArchiveIcon, Brain, Check, CircleCheck, Clock, Eye, FileText
 import type { LucideIcon } from 'lucide-react'
 import { format, parseISO, differenceInCalendarDays, isToday, isYesterday } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { compoundGroups, groupByCompoundId, type CompoundGroup } from '../lib/compounds'
 import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type Symptom, type VitalLog } from '../lib/db'
 import { ALL_SYMPTOMS, chipTone } from '../lib/symptoms'
 import { archiveRow, restoreRow, setExamArchived, setFileArchived } from '../lib/archive'
@@ -403,9 +404,12 @@ export function Timeline({
   }
 
   const [activeType, setActiveType] = useState<EventType | null>(null)
-  const [activeCompoundId, setActiveCompoundId] = useState<number | null>(null)
+  const [activeCompoundKey, setActiveCompoundKey] = useState<string | null>(null)
 
-  const compoundMap = useMemo(() => new Map(compounds.map((c) => [c.id, c])), [compounds])
+  // Group duplicate rows so one drug reads as one compound, and resolve every
+  // per-id lookup through the group (see lib/compounds.ts).
+  const groups = useMemo(() => compoundGroups(compounds, injections), [compounds, injections])
+  const compoundMap = useMemo(() => groupByCompoundId(groups), [groups])
   const now = Date.now()
 
   // Deduped files (keep newest per filename), newest first.
@@ -421,12 +425,12 @@ export function Timeline({
   // ── Per-type detailed rows ──
   const injRows = useMemo<InjRow[]>(() => {
     return injections
-      .filter((i) => (activeCompoundId == null ? true : i.compoundId === activeCompoundId))
+      .filter((i) => (activeCompoundKey == null ? true : compoundMap.get(i.compoundId)?.key === activeCompoundKey))
       .map((i) => {
         const c = compoundMap.get(i.compoundId)
         return { key: `i-${i.id}`, inj: i, name: c?.name ?? 'Injection', color: c?.color ?? 'var(--primary)' }
       })
-  }, [injections, compoundMap, activeCompoundId])
+  }, [injections, compoundMap, activeCompoundKey])
 
   const weightRows = useMemo<WeightRow[]>(() => {
     const pts = bodyMetrics
@@ -561,22 +565,20 @@ export function Timeline({
   }), [injections, weightRows, vitals, exams, fileRows, symptoms])
 
   // Compounds that actually appear in the injection log (for the sub-filter).
+  // One chip per NAME, so five duplicate rows are one clickable compound.
   const injectionCompounds = useMemo(() => {
-    const seen = new Set<number>()
-    const out: Compound[] = []
+    const seen = new Set<string>()
+    const out: CompoundGroup[] = []
     for (const i of injections) {
-      if (i.compoundId !== undefined && !seen.has(i.compoundId)) {
-        seen.add(i.compoundId)
-        const c = compoundMap.get(i.compoundId)
-        if (c) out.push(c)
-      }
+      const g = i.compoundId === undefined ? undefined : compoundMap.get(i.compoundId)
+      if (g && !seen.has(g.key)) { seen.add(g.key); out.push(g) }
     }
     return out
   }, [injections, compoundMap])
 
   function selectTab(t: EventType | null) {
     setActiveType(t)
-    setActiveCompoundId(null)
+    setActiveCompoundKey(null)
   }
 
   const tabs: Array<{ id: EventType | null; label: string; count: number }> = [
@@ -622,12 +624,12 @@ export function Timeline({
         <div className="mb-4 flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-xs text-muted-foreground">Compound:</span>
           {injectionCompounds.map((c) => {
-            const on = activeCompoundId === c.id
+            const on = activeCompoundKey === c.key
             return (
               <button
-                key={c.id}
+                key={c.key}
                 type="button"
-                onClick={() => setActiveCompoundId(on ? null : c.id!)}
+                onClick={() => setActiveCompoundKey(on ? null : c.key)}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
                   on ? 'border-foreground bg-accent text-foreground' : 'border-border text-muted-foreground hover:bg-accent',
