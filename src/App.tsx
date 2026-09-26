@@ -37,7 +37,6 @@ import { AddWeight } from './views/AddWeight'
 import { AddBP } from './views/AddBP'
 const AddInjection = lazy(() => import('./views/AddInjection').then(m => ({ default: m.AddInjection })))
 const Labs      = lazy(() => import('./views/Labs').then(m => ({ default: m.Labs })))
-const Targets   = lazy(() => import('./views/Targets').then(m => ({ default: m.Targets })))
 const Timeline  = lazy(() => import('./views/Timeline').then(m => ({ default: m.Timeline })))
 const Files     = lazy(() => import('./views/Files').then(m => ({ default: m.Files })))
 const Archive   = lazy(() => import('./views/Archive').then(m => ({ default: m.Archive })))
@@ -421,7 +420,6 @@ function Shell({
           {activeView === 'labs' && (
             <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} onReviewFile={(id) => setPdfReviewFileId(id)} />
           )}
-          {activeView === 'targets' && <Targets />}
           {activeView === 'timeline' && (
             <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} bodyMetrics={bodyMetrics} />
           )}
@@ -499,7 +497,6 @@ function titleFor(view: View) {
     'add-weight': 'Add weight',
     'add-bp': 'Add blood pressure',
     labs: 'Lab results',
-    targets: 'Targets',
     timeline: 'Timeline',
     files: 'Files',
     export: 'Export',

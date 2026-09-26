@@ -137,6 +137,23 @@ async function applyServerRowsBatch(
     if (existing && existing.dirty === 1 && Number(existing.updatedAt ?? 0) >= (Number(row.updatedAt) || 0)) continue
 
     const localRow = translateFkSync(spec, row, fkCache)
+
+    // A data column the server has no value for must not erase the one we hold
+    // locally. translateFkSync maps a NULL column to undefined, and spreading
+    // that over the existing row deletes the key (Dexie treats undefined as
+    // delete). This bites whenever a column is newer than the rows in it:
+    // migration 0010 added the per-compound dosing fields, and every row
+    // already on the server has NULL for them, so an unguarded merge would wipe
+    // exactly the values the user asked us to remember. Runs before the sync
+    // fields below, which DO need their explicit undefined to clear a tombstone.
+    // Cost: a field cleared on one device no longer clears on another. Losing a
+    // saved value is the worse failure, so it stays this way.
+    if (existing) {
+      for (const k of Object.keys(localRow)) {
+        if (localRow[k] === undefined && existing[k] !== undefined) delete localRow[k]
+      }
+    }
+
     localRow.serverId = serverId
     localRow.updatedAt = Number(row.updatedAt) || Date.now()
     localRow.dirty = 0

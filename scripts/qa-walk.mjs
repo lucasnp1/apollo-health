@@ -227,7 +227,7 @@ await step('export-csv', async () => {
   say(`      csv: ${download ? download.suggestedFilename() : 'no download event (share sheet?)'}`)
 })
 
-// ── 4. Timeline, files, targets, archive
+// ── 4. Timeline, files, home widgets, archive
 await step('timeline', async () => {
   await home()
   await btn(/^Timeline/).click()
@@ -254,14 +254,27 @@ await step('files', async () => {
   await f.click()
   await page.getByText(/medichecks/i).first().waitFor()
 })
-await step('targets', async () => {
+await step('home-widgets', async () => {
+  // Targets/Goals was removed on 26 Sept. The bottom of Home now carries the
+  // weight trend and the wellbeing card with its standalone check-in.
   await home()
-  const t = btn(/^Targets|^Goals/)
-  if (!(await t.count())) throw new Error('no Targets launcher on Home')
-  await t.click()
+  await page.waitForTimeout(1200)
+  for (const t of ['Weight', 'Wellbeing']) {
+    if (!(await page.getByRole('heading', { name: t, exact: true }).count())) {
+      throw new Error(`no ${t} card on Home`)
+    }
+  }
+})
+await step('wellbeing-check-in', async () => {
+  await home()
   await page.waitForTimeout(800)
-  await btn(/Add goal/i).click()
-  await page.waitForTimeout(500)
+  await btn(/^Check in$/).click()
+  await page.waitForTimeout(600)
+  // Rate the first symptom, then save a standalone check-in.
+  await page.getByRole('radio', { name: '4' }).first().click()
+  await page.waitForTimeout(300)
+  await btn(/Save check-in/i).click()
+  await page.waitForTimeout(900)
 })
 await step('archive-view', async () => {
   await home()

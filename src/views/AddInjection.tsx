@@ -11,7 +11,8 @@ import { logInjection, pickActiveVial } from '../lib/injections'
 import { compoundGroups, findCompoundByName } from '../lib/compounds'
 import { parseConcentrationMgPerMl } from '../lib/vials'
 import { convertAmount, derive, type EntryMode } from '../lib/dose'
-import { NEGATIVE, POSITIVE, chipTone, type SymptomDef } from '../lib/symptoms'
+import { NEGATIVE, POSITIVE, ratingOf, withRating } from '../lib/symptoms'
+import { SymptomScale } from '../components/SymptomScale'
 import { IM_QUICK_SITES, SUBQ_QUICK_SITES, quickSiteFromUsed, siteGroup, type QuickSite } from '../lib/sites'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -244,7 +245,7 @@ export function AddInjection({
       // Symptom check-in rides along with the injection (same moment), but only
       // when something was actually rated. A note alone belongs to the shot;
       // it used to create an empty "0 rated" check-in on the Timeline as well.
-      const anyFeel = [...POSITIVE, ...NEGATIVE].some((s) => typeof feel[s.key] === 'number')
+      const anyFeel = [...POSITIVE, ...NEGATIVE].some((s) => ratingOf(feel, s) !== undefined)
       if (anyFeel) {
         await db.symptoms.add({ recordedAt: takenAt, ...feel, notes: notes || undefined })
       }
@@ -318,13 +319,13 @@ export function AddInjection({
             <div>
               <p className="mb-1 eyebrow">Positive · higher is better</p>
               {POSITIVE.map((s) => (
-                <SymptomScale key={s.key as string} def={s} value={feel[s.key] as number | undefined} onChange={(v) => setFeel((f) => ({ ...f, [s.key]: v }))} />
+                <SymptomScale key={s.key} def={s} value={ratingOf(feel, s)} onChange={(v) => setFeel((f) => withRating(f, s, v))} />
               ))}
             </div>
             <div>
               <p className="mb-1 eyebrow">Side effects · higher is worse</p>
               {NEGATIVE.map((s) => (
-                <SymptomScale key={s.key as string} def={s} value={feel[s.key] as number | undefined} onChange={(v) => setFeel((f) => ({ ...f, [s.key]: v }))} />
+                <SymptomScale key={s.key} def={s} value={ratingOf(feel, s)} onChange={(v) => setFeel((f) => withRating(f, s, v))} />
               ))}
             </div>
           </div>
@@ -479,43 +480,6 @@ function CompoundLine({
 }
 
 // ── Symptom 0-5 scale (shared shape with the old Symptoms page) ─────────────
-const SCALE_TONE: Record<'good' | 'warn' | 'bad' | 'neutral', string> = {
-  good: 'border-emerald-500 bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
-  warn: 'border-amber-500 bg-amber-500/12 text-amber-700 dark:text-amber-400',
-  bad: 'border-destructive bg-destructive/12 text-destructive',
-  neutral: 'border-foreground bg-accent text-foreground',
-}
-
-function SymptomScale({ def, value, onChange }: { def: SymptomDef; value: number | undefined; onChange: (v: number | undefined) => void }) {
-  return (
-    <div className="grid grid-cols-[minmax(120px,1.5fr)_auto] items-center gap-4 py-1.5 max-md:grid-cols-1 max-md:gap-1">
-      <span className="text-sm">{def.label}</span>
-      <div className="flex gap-1 max-md:w-full" role="radiogroup" aria-label={def.label}>
-        {[0, 1, 2, 3, 4, 5].map((n) => {
-          const selected = value === n
-          const tone = selected ? chipTone(n, def.direction) : 'neutral'
-          return (
-            <button
-              key={n}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              className={cn(
-                'size-8 rounded-md border text-[13px] tabular-nums transition-colors max-md:flex-1',
-                selected ? `font-semibold ${SCALE_TONE[tone]}` : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-              // Tap the selected value again to clear it — leaving it blank means "fine".
-              onClick={() => onChange(selected ? undefined : n)}
-            >
-              {n}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 const DAY = 86_400_000
 
 function dayLabel(d: number): string {

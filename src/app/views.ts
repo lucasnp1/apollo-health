@@ -5,7 +5,6 @@ export type View =
   | 'add-bp'
   | 'labs'
   | 'timeline'
-  | 'targets'
   | 'files'
   | 'export'
   | 'archive'

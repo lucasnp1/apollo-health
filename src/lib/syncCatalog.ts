@@ -41,6 +41,13 @@ export const TABLES: TableSpec[] = [
       halfLifeDays: 'real',
       peakHours: 'real',
       archived: 'bool',
+      // Per-compound values the injection logger remembers for next time.
+      // Device-local until migration 0010 put them on the server.
+      concentrationMgPerMl: 'real',
+      defaultRoute: 'text',
+      lastDose: 'real',
+      vialMg: 'real',
+      reconstituteMl: 'real',
     },
   },
   {
@@ -193,7 +200,8 @@ export const TABLES: TableSpec[] = [
       headache: 'int',
       notes: 'text',
       archivedAt: 'int',
-    },
+          extras: 'json',
+},
   },
   {
     slug: 'markerTargets',

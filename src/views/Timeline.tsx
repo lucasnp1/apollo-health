@@ -5,7 +5,7 @@ import { format, parseISO, differenceInCalendarDays, isToday, isYesterday } from
 import { useLiveQuery } from 'dexie-react-hooks'
 import { compoundGroups, groupByCompoundId, type CompoundGroup } from '../lib/compounds'
 import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type Symptom, type VitalLog } from '../lib/db'
-import { ALL_SYMPTOMS, chipTone } from '../lib/symptoms'
+import { ALL_SYMPTOMS, chipTone, ratingOf } from '../lib/symptoms'
 import { archiveRow, restoreRow, setExamArchived, setFileArchived } from '../lib/archive'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { PanelCard } from '../components/dashboard/PanelCard'
@@ -308,7 +308,7 @@ const SYM_COLS: Col<Symptom>[] = [
     key: def.key as string,
     label: def.label,
     num: true,
-    render: (r) => symptomCell(r[def.key], def.direction),
+    render: (r) => symptomCell(ratingOf(r, def), def.direction),
   })),
   { key: 'notes', label: 'Notes', render: (r) => r.notes || '—' },
 ]
@@ -349,7 +349,7 @@ function symptomSummary(s: Symptom): { rated: number; first: string[]; watch: st
   let rated = 0
   let good = 0
   for (const def of ALL_SYMPTOMS) {
-    const v = s[def.key]
+    const v = ratingOf(s, def)
     if (typeof v !== 'number') continue
     rated += 1
     if (first.length < 3) first.push(`${def.label} ${v}`)

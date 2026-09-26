@@ -42,7 +42,6 @@ async function importJson(file: File) {
   if (Array.isArray(dump.vials)         && dump.vials.length)         await db.vials.bulkPut(dump.vials)
   if (Array.isArray(dump.symptoms)      && dump.symptoms.length)      await db.symptoms.bulkPut(dump.symptoms)
   if (Array.isArray(dump.markerTargets) && dump.markerTargets.length) await db.markerTargets.bulkPut(dump.markerTargets)
-  if (Array.isArray(dump.goals)         && dump.goals.length)         await db.goals.bulkPut(dump.goals)
   if (Array.isArray(dump.bodyMetrics)   && dump.bodyMetrics.length)   await db.bodyMetrics.bulkPut(dump.bodyMetrics)
 }
 
@@ -60,7 +59,6 @@ async function exportJson() {
     vials: await db.vials.toArray(),
     symptoms: await db.symptoms.toArray(),
     markerTargets: await db.markerTargets.toArray(),
-    goals: await db.goals.toArray(),
     bodyMetrics: await db.bodyMetrics.toArray(),
   }
   const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' })

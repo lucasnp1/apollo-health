@@ -1,15 +1,19 @@
 import { lazy, Suspense, useMemo } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { CalendarClock, FlaskConical, FolderOpen, HeartPulse, Scale, Settings, Syringe, Target } from 'lucide-react'
+import { CalendarClock, FlaskConical, FolderOpen, HeartPulse, Scale, Settings, Syringe } from 'lucide-react'
 import { format } from 'date-fns'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '../lib/db'
-import { ALL_SYMPTOMS, chipTone } from '../lib/symptoms'
+import { ALL_SYMPTOMS, chipTone, ratingOf } from '../lib/symptoms'
 import { Reveal } from '../components/motion'
 import { cn } from '@/lib/utils'
 import type { View } from '../app/views'
 
 const ActiveLevelsCard = lazy(() => import('../components/ActiveLevelsCard').then((m) => ({ default: m.ActiveLevelsCard })))
 const BpTrendCard = lazy(() => import('../components/BpTrendCard').then((m) => ({ default: m.BpTrendCard })))
+// Lazy like the two above: these pull recharts, which must stay off the
+// app-shell critical path (see project_apollo_perf).
+const WeightTrendCard = lazy(() => import('../components/WeightTrendCard').then((m) => ({ default: m.WeightTrendCard })))
+const WellbeingCard = lazy(() => import('../components/WellbeingCard').then((m) => ({ default: m.WellbeingCard })))
 
 const DAY = 86_400_000
 
@@ -27,7 +31,6 @@ const CARDS: LaunchItem[] = [
 const BOTTOM_CARDS: LaunchItem[] = [
   { view: 'timeline', label: 'Timeline', sub: 'All your activity', icon: CalendarClock, chip: 'bg-violet-500/12 text-violet-600 dark:text-violet-400' },
   { view: 'files', label: 'Files', sub: 'Manage imports', icon: FolderOpen, chip: 'bg-amber-500/12 text-amber-600 dark:text-amber-400' },
-  { view: 'targets', label: 'Targets', sub: 'Goals and ranges', icon: Target, chip: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' },
   { view: 'settings', label: 'Settings', sub: 'Account & data', icon: Settings, chip: 'bg-muted text-muted-foreground' },
 ]
 
@@ -139,7 +142,7 @@ export function Overview({
     let watchCount = 0
     for (const s of recent) {
       for (const def of ALL_SYMPTOMS) {
-        const v = s[def.key]
+        const v = ratingOf(s, def)
         if (typeof v !== 'number') continue
         const t = chipTone(v, def.direction)
         if (t === 'good') goodCount += 1
@@ -229,6 +232,17 @@ export function Overview({
           <BpTrendCard vitals={vitals} />
         </Suspense>
       )}
+
+      {/* Body weight over time */}
+      <Suspense fallback={null}>
+        <WeightTrendCard bodyMetrics={bodyMetrics} injections={injections} />
+      </Suspense>
+
+      {/* Wellbeing — the trend, plus a standalone check-in so how you feel can
+          be logged on its own and not only alongside an injection. */}
+      <Suspense fallback={null}>
+        <WellbeingCard symptoms={symptoms} />
+      </Suspense>
 
       {/* Navigation launcher — replaces the sidebar */}
       <div>

@@ -25,7 +25,7 @@ export type Compound = {
   // the concentration. Stored so the vial maths pre-fills next time.
   vialMg?: number
   reconstituteMl?: number
-}
+} & SyncFields
 
 export type SyncFields = {
   // UUID assigned by the client on first save. Used as the row id on the server.
@@ -157,6 +157,8 @@ export type Vial = {
   archived?: boolean
 }
 
+export type SymptomExtra = { v: number; label: string; dir: 'positive' | 'negative' }
+
 export type Symptom = {
   id?: number
   recordedAt: string
@@ -169,6 +171,8 @@ export type Symptom = {
   nippleSensitivity?: number
   jointPain?: number
   headache?: number
+  /** User-defined symptoms, self-describing so they need no second table. */
+  extras?: Record<string, SymptomExtra>
   notes?: string
   archivedAt?: number
 }

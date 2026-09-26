@@ -13,7 +13,7 @@ import { format, parseISO, subMonths } from 'date-fns'
 import { Download, FileText, Share2 } from 'lucide-react'
 import type { BodyMetric, Compound, InjectionLog, LabExam, Symptom, VitalLog } from '../lib/db'
 import type { EnrichedResult } from '../lib/insights'
-import { ALL_SYMPTOMS } from '../lib/symptoms'
+import { ALL_SYMPTOMS, ratingOf } from '../lib/symptoms'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
@@ -114,7 +114,7 @@ function symptomsSection(symptoms: Symptom[], cutoff: Date | null): Section {
     .slice(0, 1000)
     .map((s) => [
       format(parseISO(s.recordedAt), 'dd/MM/yyyy'),
-      ...ALL_SYMPTOMS.map((def) => (typeof s[def.key] === 'number' ? String(s[def.key]) : '')),
+      ...ALL_SYMPTOMS.map((def) => { const v = ratingOf(s, def); return v === undefined ? '' : String(v) }),
       s.notes ?? '',
     ])
   return { title: 'Symptoms (0-5)', headers: ['Date', ...ALL_SYMPTOMS.map((d) => d.label), 'Notes'], rows }
