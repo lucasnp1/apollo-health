@@ -9,8 +9,9 @@ import { ChevronDown, ChevronUp, Plus, TriangleAlert, X } from 'lucide-react'
 import { db, type Compound, type InjectionLog, type Symptom, type Unit } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
 import { parseConcentrationMgPerMl } from '../lib/vials'
+import { convertAmount, derive, type EntryMode } from '../lib/dose'
 import { NEGATIVE, POSITIVE, chipTone, type SymptomDef } from '../lib/symptoms'
-import { IM_QUICK_SITES, SUBQ_QUICK_SITES, siteGroup, type QuickSite } from '../lib/sites'
+import { IM_QUICK_SITES, SUBQ_QUICK_SITES, quickSiteFromUsed, siteGroup, type QuickSite } from '../lib/sites'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from '../components/SiteCombobox'
@@ -21,25 +22,15 @@ import { Segmented } from '@/components/ui/segmented'
 import { cn } from '@/lib/utils'
 
 type Route = 'IM' | 'SubQ'
-const SYRINGE_UNITS_PER_ML = 100
 const NEW = '__new__'
 const COLORS = ['#f4c95c', '#2566c4', '#2f8b54', '#c43c2f', '#7c5cff', '#d98324', '#3aa5a0']
 
-// mg ⇄ units for one line, given its concentration. doseInUnit is in the
-// compound's own unit (mg or mcg) so it can be stored + re-shown next time.
-function derive(entryMode: 'dose' | 'units', amount: number, unit: Unit, conc?: number) {
-  const out = {} as { mg?: number; ml?: number; units?: number; doseInUnit?: number }
-  if (!Number.isFinite(amount) || amount <= 0) return out
-  if (entryMode === 'units') {
-    const ml = amount / SYRINGE_UNITS_PER_ML
-    const mg = conc ? ml * conc : undefined
-    const doseInUnit = mg === undefined ? undefined : unit === 'mcg' ? mg * 1000 : mg
-    return { mg, ml, units: amount, doseInUnit }
-  }
-  const mg = unit === 'mg' ? amount : unit === 'mcg' ? amount / 1000 : undefined
-  const ml = conc && mg !== undefined ? mg / conc : undefined
-  const units = ml !== undefined ? ml * SYRINGE_UNITS_PER_ML : undefined
-  return { mg, ml, units, doseInUnit: amount }
+// Moving between the "mg" and "units" tabs converts the value instead of
+// reinterpreting the same digits in the new unit. Returns the patch to apply.
+function switchEntryMode(line: Line, mode: EntryMode, unit: Unit, conc?: number): Partial<Line> {
+  if (mode === line.entryMode) return {}
+  const amount = convertAmount(line.amount, line.entryMode, mode, unit, conc)
+  return amount === undefined ? { entryMode: mode } : { entryMode: mode, amount }
 }
 
 type Line = {
@@ -49,7 +40,7 @@ type Line = {
   conc: string          // IM: direct mg/mL
   vialMg: string        // SubQ peptide: powder strength
   water: string         // SubQ peptide: bac water added (mL)
-  entryMode: 'dose' | 'units'
+  entryMode: EntryMode
   amount: string
 }
 
@@ -361,7 +352,9 @@ function CompoundLine({
   onRemove: () => void
 }) {
   const unit = (existing?.unit ?? 'mg') as Unit
-  const canUnits = unit === 'mg' || unit === 'mcg'
+  // Units mode needs a concentration to convert through. Without one `derive`
+  // returns nothing, which used to leave Save dead with no explanation.
+  const canUnits = (unit === 'mg' || unit === 'mcg') && conc !== undefined
   const overdraw = derived.ml !== undefined && derived.ml > 1
   const isNew = line.compoundId === NEW
 
@@ -426,7 +419,9 @@ function CompoundLine({
               {canUnits && (
                 <Segmented
                   value={line.entryMode}
-                  onChange={(m) => onChange({ entryMode: m })}
+                  // Switching the tab re-expresses what you already typed in the
+                  // other unit, so 20 mg becomes the units to draw and back again.
+                  onChange={(m) => onChange(switchEntryMode(line, m, unit, conc))}
                   options={[{ value: 'dose', label: unit }, { value: 'units', label: 'units' }]}
                 />
               )}
@@ -471,7 +466,7 @@ function CompoundLine({
   )
 }
 
-// ── Symptom 1-5 scale (shared shape with the old Symptoms page) ─────────────
+// ── Symptom 0-5 scale (shared shape with the old Symptoms page) ─────────────
 const SCALE_TONE: Record<'good' | 'warn' | 'bad' | 'neutral', string> = {
   good: 'border-emerald-500 bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
   warn: 'border-amber-500 bg-amber-500/12 text-amber-700 dark:text-amber-400',
@@ -484,7 +479,7 @@ function SymptomScale({ def, value, onChange }: { def: SymptomDef; value: number
     <div className="grid grid-cols-[minmax(120px,1.5fr)_auto] items-center gap-4 py-1.5 max-md:grid-cols-1 max-md:gap-1">
       <span className="text-sm">{def.label}</span>
       <div className="flex gap-1 max-md:w-full" role="radiogroup" aria-label={def.label}>
-        {[1, 2, 3, 4, 5].map((n) => {
+        {[0, 1, 2, 3, 4, 5].map((n) => {
           const selected = value === n
           const tone = selected ? chipTone(n, def.direction) : 'neutral'
           return (
@@ -519,16 +514,6 @@ function dayLabel(d: number): string {
 }
 
 // Friendly muscle name for an adjacency group — used in the "nearby used" warning.
-function groupMuscle(group: string): string {
-  if (group.startsWith('delt')) return 'deltoid'
-  if (group.startsWith('lat')) return 'lats'
-  if (group.startsWith('vl')) return 'vastus'
-  if (group.startsWith('abd')) return 'abdomen'
-  if (group.startsWith('glute')) return 'glute'
-  if (group.startsWith('thigh')) return 'thigh'
-  return 'that area'
-}
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 // rested → this spot is free. near → an ADJACENT spot on the same muscle was
 // used (soft warning, not blocked). caution / avoid → you actually used THIS
@@ -541,9 +526,11 @@ const DOT_CLASS: Record<'rested' | 'caution' | 'avoid', string> = {
   caution: 'bg-amber-500',
   avoid: 'bg-destructive',
 }
+// Amber means one thing only: you used THIS spot. A neighbour being used is a
+// softer signal, so it reads as muted text with the warning triangle instead.
 const LABEL_CLASS: Record<SiteStatus, string> = {
   rested: 'text-muted-foreground',
-  near: 'text-amber-700 dark:text-amber-400',
+  near: 'text-muted-foreground',
   caution: 'text-amber-700 dark:text-amber-400',
   avoid: 'text-destructive',
 }
@@ -553,7 +540,25 @@ function SitePicker({
 }: { route: Route; value: string; injections: InjectionLog[]; onChange: (s: string) => void }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const now = Date.now()
-  const quick: QuickSite[] = route === 'SubQ' ? SUBQ_QUICK_SITES : IM_QUICK_SITES
+
+  // The curated list for this route, plus every site actually used on it. The
+  // injection rows are the persistence: log a custom spot once and it stays on
+  // the list for good, with no extra table to keep in sync.
+  const quick: QuickSite[] = useMemo(() => {
+    const base = route === 'SubQ' ? SUBQ_QUICK_SITES : IM_QUICK_SITES
+    const seen = new Set(base.map((q) => q.site.trim().toLowerCase()))
+    const extra: QuickSite[] = []
+    for (const inj of injections) {
+      const site = inj.site?.trim()
+      if (!site) continue
+      if ((inj.route === 'SubQ' ? 'SubQ' : 'IM') !== route) continue
+      const k = site.toLowerCase()
+      if (seen.has(k)) continue
+      seen.add(k)
+      extra.push(quickSiteFromUsed(site))
+    }
+    return [...base, ...extra]
+  }, [route, injections])
 
   // Days since each exact site, plus the most-recent USED site per adjacency
   // group. The group is only used to warn neighbours — it never marks an
@@ -581,14 +586,18 @@ function SitePicker({
       const gr = groupRecent.get(q.group)
       let status: SiteStatus
       let label: string
-      if (exact < 4) { status = 'avoid'; label = `Used ${dayLabel(exact)}` }
-      else if (exact < 10) { status = 'caution'; label = `Used ${dayLabel(exact)}` }
+      // Each status says a different thing, so the four are told apart by words
+      // and not only by the colour of a dot.
+      if (exact < 4) { status = 'avoid'; label = `This exact spot, ${dayLabel(exact)}` }
+      else if (exact < 10) { status = 'caution'; label = `This exact spot, ${dayLabel(exact)}` }
       else if (gr && gr.days < 7 && gr.site !== q.site) {
         status = 'near'
-        label = `${cap(groupMuscle(q.group))} used nearby ${dayLabel(gr.days)}. Go carefully`
+        // Name the neighbour rather than the region: "Front Deltoid L" is
+        // actionable, "deltoid used nearby" is not.
+        label = `Not this spot, but ${gr.site} ${dayLabel(gr.days)}`
       } else {
         status = 'rested'
-        label = Number.isFinite(exact) ? `Used ${dayLabel(exact)}` : 'Rested'
+        label = Number.isFinite(exact) ? `Rested, last used ${dayLabel(exact)}` : 'Rested, never used'
       }
       const sortDays = status === 'near' ? (gr?.days ?? Infinity) : exact
       return { q, status, label, sortDays }
@@ -599,7 +608,7 @@ function SitePicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="px-0.5 text-xs text-muted-foreground">Most rested first. Red = you used that spot recently. Amber ⚠ = a nearby spot on the same muscle was used. Still usable, just go carefully.</p>
+      <p className="px-0.5 text-xs text-muted-foreground">Most rested first. Green = free. Amber = you used that exact spot. Red = you used it in the last few days. ⚠ = a neighbouring spot was used, this one is still free.</p>
       <div className="flex flex-col gap-1.5">
         {rows.map(({ q, status, label }) => {
           const selected = value === q.site
@@ -635,7 +644,7 @@ function SitePicker({
       )}
 
       {moreOpen ? (
-        <SiteCombobox value={value} onChange={onChange} />
+        <SiteCombobox value={value} onChange={onChange} route={route} />
       ) : (
         <button type="button" onClick={() => setMoreOpen(true)} className="self-start px-0.5 text-xs text-muted-foreground underline-offset-2 hover:underline">
           Other site / custom…

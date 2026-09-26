@@ -10,11 +10,16 @@ export function SiteCombobox({
   value,
   onChange,
   recentSites,
+  route,
 }: {
   value: string
   onChange: (site: string) => void
   recentSites?: string[]
+  /** Only offer this route's sites. Omit to offer both. */
+  route?: 'IM' | 'SubQ'
 }) {
+  const groups = route === 'SubQ' ? [] : IM_SITES
+  const subqGroups = route === 'IM' ? [] : SUBQ_SITES
   const allSites = [
     ...IM_SITES.flatMap((g) => g.sites),
     ...SUBQ_SITES.flatMap((g) => g.sites),
@@ -51,20 +56,24 @@ export function SiteCombobox({
             ))}
           </optgroup>
         )}
+        {groups.length > 0 && (
         <optgroup label="IM sites">
-          {IM_SITES.flatMap((g) =>
+          {groups.flatMap((g) =>
             g.sites.map((s) => (
               <option key={s} value={s}>{s} · {g.label}</option>
             ))
           )}
         </optgroup>
+        )}
+        {subqGroups.length > 0 && (
         <optgroup label="SubQ sites">
-          {SUBQ_SITES.flatMap((g) =>
+          {subqGroups.flatMap((g) =>
             g.sites.map((s) => (
               <option key={s} value={s}>{s} · {g.label}</option>
             ))
           )}
         </optgroup>
+        )}
         <option value={CUSTOM_VALUE}>Custom…</option>
       </select>
       {showCustom && (

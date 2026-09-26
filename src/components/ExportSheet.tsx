@@ -117,7 +117,7 @@ function symptomsSection(symptoms: Symptom[], cutoff: Date | null): Section {
       ...ALL_SYMPTOMS.map((def) => (typeof s[def.key] === 'number' ? String(s[def.key]) : '')),
       s.notes ?? '',
     ])
-  return { title: 'Symptoms (1-5)', headers: ['Date', ...ALL_SYMPTOMS.map((d) => d.label), 'Notes'], rows }
+  return { title: 'Symptoms (0-5)', headers: ['Date', ...ALL_SYMPTOMS.map((d) => d.label), 'Notes'], rows }
 }
 
 // ── HTML rendering (fixed: forces a light document so print isn't all-black) ─

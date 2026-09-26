@@ -28,7 +28,10 @@ export const NEGATIVE: SymptomDef[] = [
 
 export const ALL_SYMPTOMS: SymptomDef[] = [...POSITIVE, ...NEGATIVE]
 
-// Tone for a 1-5 value given the symptom direction.
+// Tone for a 0-5 value given the symptom direction. 3 stays the neutral midpoint
+// so every rating logged on the old 1-5 scale keeps the tone it has always had.
+// ponytail: that leaves the 0-5 scale slightly bottom-heavy (0,1,2 bad / 3 neutral /
+// 4,5 good). Re-tone only if the asymmetry actually bothers anyone reading a chart.
 export function chipTone(value: number, direction: Direction): 'good' | 'warn' | 'bad' | 'neutral' {
   if (value === 3) return 'neutral'
   if (direction === 'positive') return value >= 4 ? 'good' : 'bad'

@@ -62,11 +62,24 @@ export const IM_QUICK_SITES: QuickSite[] = [
 ]
 
 export const SUBQ_QUICK_SITES: QuickSite[] = [
-  { site: 'Abdomen L',    muscle: 'Abdomen',      side: 'L', group: 'abd-L' },
-  { site: 'Abdomen R',    muscle: 'Abdomen',      side: 'R', group: 'abd-R' },
-  { site: 'Glute SubQ L', muscle: 'Glute (SubQ)', side: 'L', group: 'glute-L' },
-  { site: 'Glute SubQ R', muscle: 'Glute (SubQ)', side: 'R', group: 'glute-R' },
+  { site: 'Abdomen L',     muscle: 'Abdomen',      side: 'L', group: 'abd-L' },
+  { site: 'Abdomen R',     muscle: 'Abdomen',      side: 'R', group: 'abd-R' },
+  { site: 'Love Handle L', muscle: 'Love handle',  side: 'L', group: 'abd-L' },
+  { site: 'Love Handle R', muscle: 'Love handle',  side: 'R', group: 'abd-R' },
+  { site: 'Upper Thigh L', muscle: 'Upper thigh',  side: 'L', group: 'thigh-L' },
+  { site: 'Upper Thigh R', muscle: 'Upper thigh',  side: 'R', group: 'thigh-R' },
+  { site: 'Glute SubQ L',  muscle: 'Glute (SubQ)', side: 'L', group: 'glute-L' },
+  { site: 'Glute SubQ R',  muscle: 'Glute (SubQ)', side: 'R', group: 'glute-R' },
 ]
+
+// A site the user typed themselves, turned into a quick-list row. Any site that
+// has actually been injected stays on the list from then on, so a custom spot
+// behaves like a built-in one instead of vanishing after the shot.
+export function quickSiteFromUsed(site: string): QuickSite {
+  const s = site.trim()
+  const side: 'L' | 'R' = /(\bR|\bright)\s*$/i.test(s) ? 'R' : 'L'
+  return { site: s, muscle: s, side, group: siteGroup(s) ?? `custom:${s.toLowerCase()}` }
+}
 
 // Map any logged site string (new or legacy, e.g. "Deltoid L") to an adjacency
 // group so recency can be scored per muscle-region-per-side, not per exact spot.
