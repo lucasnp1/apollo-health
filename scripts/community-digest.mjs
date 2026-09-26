@@ -6,7 +6,7 @@
 //
 //   node scripts/community-digest.mjs            → tmp/digest/YYYY-MM-DD.md
 //   node scripts/community-digest.mjs --json     → JSON on stdout
-//   APOLLO_STATS_TOKEN=... APOLLO_ORIGIN=https://apollo-hq.pages.dev  (optional stats section)
+//   APOLLO_STATS_TOKEN=... APOLLO_ORIGIN=https://magnohq.pages.dev  (optional stats section)
 //   REDDIT_FORCE_FALLBACK=1                      → skip search.json, exercise the fallbacks
 import fs from 'node:fs'
 import path from 'node:path'
@@ -115,7 +115,7 @@ function keywordHits(t) {
 
 async function stats() {
   const token = process.env.APOLLO_STATS_TOKEN
-  const origin = process.env.APOLLO_ORIGIN ?? 'https://apollo-hq.pages.dev'
+  const origin = process.env.APOLLO_ORIGIN ?? 'https://magnohq.pages.dev'
   if (!token) return null
   try {
     const res = await fetch(`${origin}/api/admin/stats`, { headers: { Authorization: `Bearer ${token}`, 'User-Agent': UA } })

@@ -15,7 +15,7 @@ export type Env = {
   // Optional bearer token that lets the weekly digest script read
   // /api/admin/stats without a browser session.
   ADMIN_STATS_TOKEN?: string
-  APP_URL?: string // e.g. https://apollo-hq.pages.dev (checkout return URLs, reset links)
+  APP_URL?: string // e.g. https://magnohq.pages.dev (checkout return URLs, reset links)
   // Transactional email (password resets) via Resend. Dormant until both are set.
   RESEND_API_KEY?: string
   MAIL_FROM?: string // e.g. "Magno <no-reply@example.com>"

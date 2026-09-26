@@ -1,4 +1,4 @@
-name = "apollo-hq"
+name = "magnohq"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-06-11"
 compatibility_flags = ["nodejs_compat"]
