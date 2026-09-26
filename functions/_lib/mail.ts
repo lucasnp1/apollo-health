@@ -2,7 +2,7 @@
 //
 // Dormant until the owner adds two Cloudflare Pages secrets:
 //   RESEND_API_KEY  — from resend.com (verify the sending domain first)
-//   MAIL_FROM       — e.g. "Apollo Health <no-reply@theos.studio>"
+//   MAIL_FROM       — e.g. "Magno <no-reply@theos.studio>"
 // While unset, mailConfigured() is false and callers degrade gracefully.
 
 import type { Env } from './types'
@@ -38,9 +38,9 @@ function escapeHtml(s: string): string {
 
 // The password-reset email. Plain, short, no tracking.
 export function passwordResetMail(link: string): { subject: string; text: string; html: string } {
-  const subject = 'Reset your Apollo Health password'
+  const subject = 'Reset your Magno password'
   const text = [
-    'Someone asked to reset the password for your Apollo Health account.',
+    'Someone asked to reset the password for your Magno account.',
     '',
     'Open this link to choose a new password. It works for 60 minutes and can be used once:',
     link,
@@ -50,9 +50,9 @@ export function passwordResetMail(link: string): { subject: string; text: string
   const safe = escapeHtml(link)
   const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#14161c;color:#f2f3f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.5">
 <div style="max-width:480px;margin:0 auto;background:#1d2027;border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:28px">
-<p style="margin:0 0 6px;font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#e7b45a">Apollo Health</p>
+<p style="margin:0 0 6px;font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#e7b45a">Magno</p>
 <h1 style="margin:0 0 16px;font-size:20px;font-weight:600">Reset your password</h1>
-<p style="margin:0 0 16px;color:#c9ccd3">Someone asked to reset the password for your Apollo Health account. Tap the button to choose a new one. The link works for 60 minutes and can be used once.</p>
+<p style="margin:0 0 16px;color:#c9ccd3">Someone asked to reset the password for your Magno account. Tap the button to choose a new one. The link works for 60 minutes and can be used once.</p>
 <p style="margin:0 0 20px"><a href="${safe}" style="display:inline-block;background:#e7b45a;color:#2a1f0a;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:6px">Choose a new password</a></p>
 <p style="margin:0 0 8px;font-size:13px;color:#9a9ea8">Or copy this link into your browser:</p>
 <p style="margin:0 0 20px;font-size:12px;word-break:break-all"><a href="${safe}" style="color:#e7b45a">${safe}</a></p>

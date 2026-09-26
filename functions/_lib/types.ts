@@ -18,7 +18,7 @@ export type Env = {
   APP_URL?: string // e.g. https://apollo-hq.pages.dev (checkout return URLs, reset links)
   // Transactional email (password resets) via Resend. Dormant until both are set.
   RESEND_API_KEY?: string
-  MAIL_FROM?: string // e.g. "Apollo Health <no-reply@example.com>"
+  MAIL_FROM?: string // e.g. "Magno <no-reply@example.com>"
 }
 
 // Minimal R2Bucket interface — avoids needing @cloudflare/workers-types here.

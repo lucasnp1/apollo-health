@@ -14,7 +14,7 @@ Most people on TRT have their bloods in three places: a PDF in an email, a photo
 - **Ranges.** The lab range on the PDF is the honest range for that assay. It should be kept with the result, not replaced by a generic one.
 - **Dates.** The collection date, not the report date, is when the blood was drawn.
 
-## How Apollo does it
+## How Magno does it
 
 Drop the PDF, or a photo of the page, into the app or into the free reader at [Read my bloods](/read). The file is read on your phone with the text layer, or with OCR for scans and photos; nothing is uploaded. Every row comes back as marker, value, unit and range with a confidence dot, you correct anything the parser doubted, and it saves.
 

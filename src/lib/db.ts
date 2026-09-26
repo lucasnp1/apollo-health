@@ -236,7 +236,7 @@ export type SeedImportResult = {
   seedVersion?: string
 }
 
-export class ApolloDatabase extends Dexie {
+export class MagnoDatabase extends Dexie {
   compounds!: Table<Compound, number>
   injections!: Table<InjectionLog, number>
   vitals!: Table<VitalLog, number>
@@ -323,7 +323,7 @@ export class ApolloDatabase extends Dexie {
   }
 }
 
-export const db = new ApolloDatabase()
+export const db = new MagnoDatabase()
 
 // --- Auto-stamping hooks --------------------------------------------------
 // Every syncable table gets `creating` and `updating` hooks so the sync engine

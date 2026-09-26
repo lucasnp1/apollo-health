@@ -17,7 +17,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
   }
 
   componentDidCatch(error: unknown) {
-    console.error('Apollo crashed:', error)
+    console.error('Magno crashed:', error)
   }
 
   render() {

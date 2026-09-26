@@ -32,7 +32,7 @@ function markerFacts(markers: MarkerVal[]): FeedFact[] {
 function Disclaimer({ className }: { className?: string }) {
   return (
     <p className={cn('feed-facts rounded-lg border border-primary/25 bg-primary/8 px-3 py-2 text-foreground/80', className)}>
-      <span className="font-semibold text-primary">Not medical advice.</span> Apollo reads your numbers the way an experienced TRT user would and lists what people usually do about them. Check anything you act on with your doctor.
+      <span className="font-semibold text-primary">Not medical advice.</span> Magno reads your numbers the way an experienced TRT user would and lists what people usually do about them. Check anything you act on with your doctor.
     </p>
   )
 }
@@ -54,7 +54,7 @@ export function ShareReadButton({ stats, findings, subtitle }: { stats: LabStats
         findings: findings.map((f) => ({ label: f.label, headline: f.headline, status: f.status })),
         subtitle,
       })
-      const how = await shareOrDownload(blob, 'apollo-bloods.png', 'My bloods, read by Apollo')
+      const how = await shareOrDownload(blob, 'apollo-bloods.png', 'My bloods, read by Magno')
       setState(how)
     } catch (err) {
       // An abandoned share sheet rejects; that is not a failure worth flagging.
@@ -89,7 +89,7 @@ export function LabSummaryCard({ stats, findings, subtitle, action }: { stats: L
         </div>
       ) : (
         <p className="feed-note mt-4 text-muted-foreground">
-          {findings ? 'Add a panel with reference ranges and Apollo will write it up here.' : 'Pro reads the panels together and writes up what they mean.'}
+          {findings ? 'Add a panel with reference ranges and Magno will write it up here.' : 'Pro reads the panels together and writes up what they mean.'}
         </p>
       )}
       <div className="mt-4 grid grid-cols-4 gap-2">

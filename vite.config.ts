@@ -61,8 +61,8 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/local-seed\//, /^\/api\//, /^\/privacy/, /^\/terms/, /^\/read/, /^\/guides/, /^\/sitemap/, /^\/robots/],
       },
       manifest: {
-        name: 'Apollo Health',
-        short_name: 'Apollo',
+        name: 'Magno',
+        short_name: 'Magno',
         description: 'Your private tracker for injections, blood pressure, weight, symptoms and lab results.',
         // Dark-first: match the app's near-black surface so the install splash
         // and task-switcher tint don't flash warm white (the old, rejected look).

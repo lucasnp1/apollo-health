@@ -17,11 +17,11 @@ type Mode = 'login' | 'signup' | 'forgot'
 
 // Prefilled "I'm locked out" email for people who lost their recovery codes.
 function lockedOutMailto(email: string): string {
-  const subject = 'Apollo Health: locked out of my account'
+  const subject = 'Magno: locked out of my account'
   const body = [
     'Hi,',
     '',
-    "I can't sign in to Apollo Health and I don't have my recovery codes.",
+    "I can't sign in to Magno and I don't have my recovery codes.",
     '',
     `Account email: ${email || '(type it here)'}`,
     `Device: ${typeof navigator !== 'undefined' ? navigator.userAgent : ''}`,
@@ -101,7 +101,7 @@ export function SignIn({ auth }: { auth: AuthBundle }) {
         <div className="flex items-center gap-3">
           <BrandMark size={44} />
           <div>
-            <h1 className="font-display text-2xl font-semibold leading-none">{mode === 'forgot' ? 'Reset password' : 'Apollo Health'}</h1>
+            <h1 className="font-display text-2xl font-semibold leading-none">{mode === 'forgot' ? 'Reset password' : 'Magno'}</h1>
             <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>
           </div>
         </div>

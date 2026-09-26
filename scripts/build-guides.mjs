@@ -10,7 +10,7 @@ const { allMarkerMeta, PANEL_ORDER } = await import('../src/lib/markers.ts')
 const { MARKER_COPY, PANEL_INTRO } = await import('../src/lib/labCopy.ts')
 
 const SITE = process.env.SITE_ORIGIN ?? 'https://apollo-hq.pages.dev'
-const BRAND = 'Apollo Health'
+const BRAND = 'Magno'
 const PUBLISHED = '2026-09-13'
 const today = new Date().toISOString().slice(0, 10)
 const outDir = path.join(root, 'public/guides')
@@ -91,13 +91,13 @@ function shell({ title, description, canonical, jsonld, body, ogImage = '/og.png
 </head>
 <body>
 <header class="site">
-  <a class="brand" href="/"><img src="/logo-128.png" alt="" width="28" height="28" />Apollo <span>Health</span></a>
+  <a class="brand" href="/"><img src="/logo-128.png" alt="" width="28" height="28" />Magno <span>Health</span></a>
   <nav><a href="/guides/">Guides</a><a href="/read">Read my bloods</a><a href="/app/?ref=guides">Open the app</a></nav>
 </header>
 <main>
 ${body}
 <footer>
-  <p>Not medical advice. Apollo reads numbers the way an experienced TRT user would and lists what people usually do; check anything you act on with your doctor.</p>
+  <p>Not medical advice. Magno reads numbers the way an experienced TRT user would and lists what people usually do; check anything you act on with your doctor.</p>
   <p><a href="/">${BRAND}</a> · <a href="/guides/">All guides</a> · <a href="/read">Read my bloods</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
 </footer>
 </main>
@@ -130,7 +130,7 @@ for (const [key, copy] of Object.entries(MARKER_COPY)) {
 <p class="eyebrow">${esc(meta.panel)}</p>
 <h1>${esc(meta.label)} on TRT</h1>
 <p class="standfirst">What the number means, why it moves on a protocol, and what people usually do about it.</p>
-<p class="meta">Updated ${today} · Part of the <a href="/guides/">Apollo guides</a></p>
+<p class="meta">Updated ${today} · Part of the <a href="/guides/">Magno guides</a></p>
 
 <h2>What it is</h2>
 <p>${esc(copy.what)}</p>
@@ -146,8 +146,8 @@ for (const [key, copy] of Object.entries(MARKER_COPY)) {
 
 <div class="box"><p class="eyebrow">What people usually do · not a recommendation</p><ul>${copy.practices.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
 
-<h2>How Apollo reads it</h2>
-<p>Import the PDF or a photo of the report and Apollo finds ${esc(meta.label)} on it, keeps every test on one line, shows the change since the last one, and reads it against TRT-aware thresholds rather than the lab's generic range. The panel it belongs to, ${esc(meta.panel)}, gets a written verdict with the probable causes and what people usually do.</p>
+<h2>How Magno reads it</h2>
+<p>Import the PDF or a photo of the report and Magno finds ${esc(meta.label)} on it, keeps every test on one line, shows the change since the last one, and reads it against TRT-aware thresholds rather than the lab's generic range. The panel it belongs to, ${esc(meta.panel)}, gets a written verdict with the probable causes and what people usually do.</p>
 ${ctaBlock(`guide-${slug}`)}
 
 <h2>Questions people ask</h2>
@@ -178,7 +178,7 @@ if (fs.existsSync(contentDir)) {
 <p class="eyebrow">${esc(meta.eyebrow ?? 'Guide')}</p>
 <h1>${esc(title)}</h1>
 ${description ? `<p class="standfirst">${esc(description)}</p>` : ''}
-<p class="meta">Updated ${today} · Part of the <a href="/guides/">Apollo guides</a></p>
+<p class="meta">Updated ${today} · Part of the <a href="/guides/">Magno guides</a></p>
 ${markdown(body)}
 ${ctaBlock(`guide-${slug}`)}
 ${disclaimerBox}

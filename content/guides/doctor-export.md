@@ -23,7 +23,7 @@ Forum theories, supplement lists longer than three items, and any result from a 
 
 Page one: the current protocol, blood pressure average, and the four markers that matter with their trend. Page two: the full marker table by panel, newest draw first. A doctor can read that in two minutes and spend the rest on you.
 
-## Doing it in Apollo
+## Doing it in Magno
 
 Open Export, pick a date range and what to include, and share a PDF or a CSV. Doses, blood pressure, weight, symptoms and every lab marker come out in that order, with ranges kept and units unchanged. It is the same record you read yourself, laid out for someone who has ten minutes.
 

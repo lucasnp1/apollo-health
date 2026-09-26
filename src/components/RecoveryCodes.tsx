@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '../lib/toast'
 
 function codesText(codes: string[], email?: string) {
-  return [`Apollo Health recovery codes${email ? ` for ${email}` : ''}`, 'Each code works once. Keep them somewhere safe.', '', ...codes].join('\n')
+  return [`Magno recovery codes${email ? ` for ${email}` : ''}`, 'Each code works once. Keep them somewhere safe.', '', ...codes].join('\n')
 }
 
 // The code grid plus copy/share, reused by the sign-up screen and Settings.
@@ -26,7 +26,7 @@ export function RecoveryCodesList({ codes, email }: { codes: string[]; email?: s
   }
   async function share() {
     try {
-      await navigator.share({ title: 'Apollo Health recovery codes', text: codesText(codes, email) })
+      await navigator.share({ title: 'Magno recovery codes', text: codesText(codes, email) })
     } catch { /* user cancelled */ }
   }
 

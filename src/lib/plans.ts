@@ -1,4 +1,4 @@
-// Display config for Apollo Pro. The PRICES here are for DISPLAY ONLY — the
+// Display config for Magno Pro. The PRICES here are for DISPLAY ONLY — the
 // actual charge comes from the Stripe Price you create for each plan. Keep the
 // numbers in sync with Stripe and with the landing page pricing cards (this is
 // the one file to edit on the app side).

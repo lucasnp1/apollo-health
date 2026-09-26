@@ -13,7 +13,7 @@
    remaining legacy styles toggle together from one source of truth. */
 @custom-variant dark (&:is([data-theme="dark"] *));
 
-/* ── Apollo theme — clinical instrument ───────────────────────────────────
+/* ── Magno theme — clinical instrument ───────────────────────────────────
    Clinical instrument, LIGHT companion: crisp cool near-white, cool ink,
    visible hairlines, a single sharp amber signal, mono data. Dark is the
    default (see below); this is the opt-in light skin. */

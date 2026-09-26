@@ -1,4 +1,4 @@
-// Apollo Health brand mark. Wraps the medallion logo image with a circular
+// Magno brand mark. Wraps the medallion logo image with a circular
 // frame so it sits visually consistently next to text — the logo art itself
 // is square-cropped against a yellow background, and the round container
 // gives it a clean badge feel at small sizes.

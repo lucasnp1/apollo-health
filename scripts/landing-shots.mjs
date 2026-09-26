@@ -1,4 +1,4 @@
-// Captures real Apollo screens for the landing page's "Inside Apollo" section.
+// Captures real Magno screens for the landing page's "Inside Magno" section.
 // Runs against the Vite dev server (DEV auth stub), seeds a realistic account
 // into IndexedDB, then screenshots each page at phone size, 2x, dark.
 import { chromium } from 'playwright-core'

@@ -52,7 +52,7 @@ if (typed && !reduced) {
   }, 2600)
 }
 
-// ── Step 03: a result card slides into the bucket Apollo picks ────────────
+// ── Step 03: a result card slides into the bucket Magno picks ────────────
 const card = $('#step3-card')
 const buckets = $$('#step3-buckets > div')
 const sorting = $('#step3-sorting')
@@ -108,7 +108,7 @@ if (pills.length && !reduced) {
   }, 1600)
 }
 
-// ── Inside Apollo: screens cycle while in view, until someone picks one ───
+// ── Inside Magno: screens cycle while in view, until someone picks one ───
 const insideStrip = $('#inside-tabs')
 const insideTabs = $$<HTMLButtonElement>('#inside-tabs [data-shot]')
 const insideImgs = $$<HTMLImageElement>('#inside-screen [data-shot-img]')

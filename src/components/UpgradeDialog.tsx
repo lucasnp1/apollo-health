@@ -28,11 +28,11 @@ export function UpgradeDialog({ open, onClose, feature }: { open: boolean; onClo
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="size-5 text-primary" /> Apollo Pro
+            <Sparkles className="size-5 text-primary" /> Magno Pro
           </DialogTitle>
         </DialogHeader>
 
-        {feature && <p className="-mt-1 text-sm text-muted-foreground">{feature} is part of Apollo Pro.</p>}
+        {feature && <p className="-mt-1 text-sm text-muted-foreground">{feature} is part of Magno Pro.</p>}
 
         <ul className="flex flex-col gap-2 py-1">
           {PRO_FEATURES.map((f) => (

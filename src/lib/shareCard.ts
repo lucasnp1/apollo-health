@@ -106,7 +106,7 @@ export async function drawShareCard(input: ShareCardInput): Promise<Blob> {
   ctx.fillStyle = INK
   ctx.font = `600 34px ${SANS}`
   ctx.textBaseline = 'alphabetic'
-  ctx.fillText('Apollo Health', PAD + 84, y + 42)
+  ctx.fillText('Magno', PAD + 84, y + 42)
   ctx.fillStyle = AMBER
   ctx.font = `500 20px ${MONO}`
   ctx.fillText('YOUR BLOODS, READ', PAD + 84 + ctx.measureText('').width + 232, y + 42)

@@ -1,4 +1,4 @@
-// End-to-end QA walk of Apollo as a brand-new user. Every step screenshots,
+// End-to-end QA walk of Magno as a brand-new user. Every step screenshots,
 // dumps the interactive elements on screen, and records console/page errors
 // and failed same-origin requests. Steps never abort the run; failures are
 // listed at the end so the whole app gets covered in one pass.
@@ -15,8 +15,8 @@ fs.rmSync(OUT, { recursive: true, force: true })
 fs.mkdirSync(OUT, { recursive: true })
 
 const email = `qa-${Date.now()}@example.com`
-const password = 'Review-Test-Apollo-2026!'
-const newPassword = 'Review-Test-Apollo-2026!!'
+const password = 'Review-Test-Magno-2026!'
+const newPassword = 'Review-Test-Magno-2026!!'
 const log = []
 const failures = []
 const consoleErrors = []
@@ -100,7 +100,7 @@ await step('recovery-codes', async () => {
 })
 await step('onboarding', async () => {
   for (let i = 0; i < 5; i++) {
-    const next = page.getByRole('button', { name: /^(Next|Continue|Done|Finish|Let's go|Got it|Start|Open Apollo)/i }).first()
+    const next = page.getByRole('button', { name: /^(Next|Continue|Done|Finish|Let's go|Got it|Start|Open Magno)/i }).first()
     if (!(await next.count()) || !(await next.isVisible().catch(() => false))) break
     await next.click()
     await page.waitForTimeout(600)

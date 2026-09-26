@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="public/logo-256.png" alt="Apollo Health" width="160" />
+  <img src="public/logo-256.png" alt="Magno" width="160" />
 </p>
 
-<h1 align="center">Apollo Health</h1>
+<h1 align="center">Magno</h1>
 
 <p align="center">
   Personal health record for protocols, injections, vitals, and lab biomarkers.<br />
@@ -28,7 +28,7 @@
 - Password hashing uses Argon2id (PBKDF2 fallback for legacy accounts).
 - The lock screen is a convenience gate, not encryption — local IndexedDB data is stored in plaintext in the browser.
 
-Apollo Health is a personal record and trend tool. It is not medical advice and does not diagnose, prescribe, or recommend dose changes.
+Magno is a personal record and trend tool. It is not medical advice and does not diagnose, prescribe, or recommend dose changes.
 
 ## Tech stack
 

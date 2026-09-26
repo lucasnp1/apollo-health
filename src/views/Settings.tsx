@@ -155,7 +155,7 @@ function FeedbackSettings() {
   }
 
   return (
-    <PanelCard subtitle="Help us make Apollo better" title="Send feedback">
+    <PanelCard subtitle="Help us make Magno better" title="Send feedback">
       <div className="flex flex-col gap-3">
         <textarea
           value={msg}
@@ -173,7 +173,7 @@ function FeedbackSettings() {
 }
 
 // ── Archive ────────────────────────────────────────────────────────────────
-// Removing anything in Apollo archives it (never a permanent delete). This card
+// Removing anything in Magno archives it (never a permanent delete). This card
 // counts what's archived and opens the full Archive view to restore from.
 function ArchiveCard({ onOpen }: { onOpen: () => void }) {
   const count = useLiveQuery(async () => {
@@ -205,7 +205,7 @@ function ArchiveCard({ onOpen }: { onOpen: () => void }) {
 function AccountSettings({ auth }: { auth: AuthBundle }) {
   const user = auth.state.status === 'authed' ? auth.state.user : null
   const { isPro, openUpgrade } = usePlan()
-  const planLabel = isPro ? (user?.plan_kind ? `Apollo Pro · ${user.plan_kind}` : 'Apollo Pro') : 'Free plan'
+  const planLabel = isPro ? (user?.plan_kind ? `Magno Pro · ${user.plan_kind}` : 'Magno Pro') : 'Free plan'
   const [pwOpen, setPwOpen] = useState(false)
   const [codesOpen, setCodesOpen] = useState(false)
   const [delOpen, setDelOpen] = useState(false)
@@ -222,7 +222,7 @@ function AccountSettings({ auth }: { auth: AuthBundle }) {
     >
       <div className="flex flex-col gap-3">
         {isPro ? (
-          <p className="text-sm text-muted-foreground">You're on Apollo Pro. Thanks for the support.</p>
+          <p className="text-sm text-muted-foreground">You're on Magno Pro. Thanks for the support.</p>
         ) : (
           <Button size="sm" className="self-start" onClick={() => openUpgrade()}>
             <Sparkles className="size-3.5" /> Upgrade to Pro
@@ -719,7 +719,7 @@ function PrintReport({
     <div className="print-report">
       <div className="print-header">
         <div>
-          <h1>Apollo Health Clinical Summary</h1>
+          <h1>Magno Clinical Summary</h1>
           <p>Generated {format(new Date(), 'MMMM d, yyyy')}</p>
         </div>
         <p style={{ fontSize: 11, color: '#666', maxWidth: 300, textAlign: 'right' }}>
@@ -828,7 +828,7 @@ function PrintReport({
       )}
 
       <p className="print-footer">
-        Exported from Apollo Health · {format(new Date(), 'MMMM d, yyyy')} · Data is stored locally on your device.
+        Exported from Magno · {format(new Date(), 'MMMM d, yyyy')} · Data is stored locally on your device.
       </p>
     </div>
   )

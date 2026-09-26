@@ -28,7 +28,7 @@ p{position:relative;margin:22px 0 0;font-size:28px;line-height:1.35;color:#c9cdd
 .chips{position:absolute;left:72px;bottom:56px;display:flex;gap:12px}
 .chip{font:500 20px M,monospace;padding:12px 18px;border-radius:12px;background:#1d2027;border:1px solid rgba(255,255,255,.1);color:#eef1f6}
 </style></head><body><div class="wrap"><div class="grid"></div><div class="glow"></div>
-<div class="brand"><img src="data:image/png;base64,${logo}"><b>Apollo <span>Health</span></b></div>
+<div class="brand"><img src="data:image/png;base64,${logo}"><b>Magno</b></div>
 <div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${sub}</p>
 <div class="chips">${chips.map((c) => `<span class="chip">${c}</span>`).join('')}</div>
 </div></body></html>`

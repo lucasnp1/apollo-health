@@ -118,7 +118,7 @@ export function ReadPage() {
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
           <a href="/" className="flex items-center gap-2.5">
             <img src="/logo-128.png" alt="" width="28" height="28" className="size-7 rounded-[8px]" />
-            <span className="text-[15px] font-semibold tracking-[-0.01em]">Apollo <span className="text-muted-foreground">Health</span></span>
+            <span className="text-[15px] font-semibold tracking-[-0.01em]">Magno</span>
           </a>
           <a href={appHref} className="text-sm text-muted-foreground transition-colors hover:text-foreground">Open the app</a>
         </div>
@@ -129,7 +129,7 @@ export function ReadPage() {
           <p className="eyebrow">Free · no account</p>
           <h1 className="font-display text-[34px] font-semibold leading-[1.05] tracking-[-0.02em] sm:text-[42px]">Read my bloods.</h1>
           <p className="feed-note mt-3 max-w-[560px] text-muted-foreground">
-            Drop a lab PDF or a photo of the printout. Apollo reads every marker on this device and writes up what the numbers mean together, the way an experienced TRT user would: TRT-aware ranges, probable causes, and what people usually do about it.
+            Drop a lab PDF or a photo of the printout. Magno reads every marker on this device and writes up what the numbers mean together, the way an experienced TRT user would: TRT-aware ranges, probable causes, and what people usually do about it.
           </p>
           <p className="feed-facts mt-3 inline-flex items-center gap-1.5 rounded-md bg-muted/60 px-2.5 py-1.5 text-muted-foreground">
             <Lock className="size-3.5" /> Nothing leaves your browser. The file is read here and forgotten when you close the tab.
@@ -164,7 +164,7 @@ export function ReadPage() {
                   ? `Couldn't read any text in "${state.name}". Try a clearer scan or photo.`
                   : state.usedOcr
                     ? `Read "${state.name}" with OCR but couldn't find any lab markers. Try a sharper photo with the whole table in frame.`
-                    : `No recognized lab markers in "${state.name}". Apollo looks for the marker name, value and unit on each line.`}
+                    : `No recognized lab markers in "${state.name}". Magno looks for the marker name, value and unit on each line.`}
               </p>
             )}
           </section>
@@ -190,7 +190,7 @@ export function ReadPage() {
             />
             <LabAnalysisCard findings={state.findings} />
 
-            <PanelCard title="What Apollo read" subtitle={`${state.rows.length} marker${state.rows.length === 1 ? '' : 's'} from ${state.name}`}>
+            <PanelCard title="What Magno read" subtitle={`${state.rows.length} marker${state.rows.length === 1 ? '' : 's'} from ${state.name}`}>
               {state.usedOcr && (
                 <div className="mb-3 flex items-start gap-2 rounded-md border-l-2 border-l-amber-500 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:text-amber-300">
                   <ScanText className="mt-0.5 size-3.5 shrink-0" />
@@ -235,7 +235,7 @@ export function ReadPage() {
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild size="lg">
-                  <a href={signupHref}>Save it in Apollo <ArrowRight className="size-4" /></a>
+                  <a href={signupHref}>Save it in Magno <ArrowRight className="size-4" /></a>
                 </Button>
                 <Button variant="outline" size="lg" onClick={() => setState({ kind: 'idle' })}>
                   <RotateCcw className="size-4" /> Read another file
@@ -247,7 +247,7 @@ export function ReadPage() {
 
         <footer className="feed-facts mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/70 pt-4 text-muted-foreground">
           <span>Not medical advice. Check anything you act on with your doctor.</span>
-          <a href="/" className="hover:text-foreground">About Apollo</a>
+          <a href="/" className="hover:text-foreground">About Magno</a>
           <a href="/privacy" className="hover:text-foreground">Privacy</a>
           <a href="/terms" className="hover:text-foreground">Terms</a>
         </footer>

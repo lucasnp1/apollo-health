@@ -33,7 +33,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     // 1 — welcome
     <div key="welcome" className="flex flex-col items-center text-center">
       <BrandMark size={56} />
-      <h2 className="mt-4 font-display text-2xl font-semibold tracking-[-0.02em]">Welcome to Apollo</h2>
+      <h2 className="mt-4 font-display text-2xl font-semibold tracking-[-0.02em]">Welcome to Magno</h2>
       <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">
         Your private tracker for injections, bloods, weight and blood pressure. Everything you log is backed up to your account.
       </p>
@@ -51,7 +51,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       <div className="mt-5 w-full">
         {standalone ? (
           <p className="flex items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/8 px-4 py-3 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-            <Check className="size-4" /> You've already installed Apollo. Nice.
+            <Check className="size-4" /> You've already installed Magno. Nice.
           </p>
         ) : platform === 'ios' ? (
           <ol className="flex flex-col gap-2.5 rounded-xl border border-border bg-muted/40 p-4 text-left text-sm">
@@ -88,7 +88,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           </ol>
         ) : (
           <p className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-            Install Apollo from the install icon in your browser's address bar.
+            Install Magno from the install icon in your browser's address bar.
           </p>
         )}
       </div>
