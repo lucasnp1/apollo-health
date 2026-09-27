@@ -15,7 +15,10 @@ const browser = await chromium.launch({ channel: 'chrome', headless: true })
 const ctx = await browser.newContext(DESKTOP
   ? { viewport: { width: 1280, height: 900 }, deviceScaleFactor: 1, colorScheme: 'dark', reducedMotion: 'reduce' }
   : {
-      viewport: { width: 390, height: 844 },
+      // PLAY=1 captures at 540x960 so the 2x output is exactly 1080x1920 (9:16).
+      // The default 390x844 renders 780x1688, a 2.16:1 ratio, and Google Play
+      // rejects phone screenshots wider than 2:1.
+      viewport: process.env.PLAY === '1' ? { width: 540, height: 960 } : { width: 390, height: 844 },
       deviceScaleFactor: 2,
       colorScheme: 'dark',
       isMobile: true,
