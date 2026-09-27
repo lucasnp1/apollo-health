@@ -4,4 +4,4 @@ Disallow: /app/
 Disallow: /api/
 Disallow: /local-seed/
 
-Sitemap: https://magnohq.pages.dev/sitemap.xml
+Sitemap: https://magno.fit/sitemap.xml

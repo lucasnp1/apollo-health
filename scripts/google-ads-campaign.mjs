@@ -19,7 +19,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const LANDING = 'https://magnohq.pages.dev/read'
+const LANDING = 'https://magno.fit/read'
 const DAILY_BUDGET = '1.60'        // about £50 over 31 days
 const MAX_CPC = '0.60'
 const CAMPAIGN = 'Magno UK - Marker Intent'

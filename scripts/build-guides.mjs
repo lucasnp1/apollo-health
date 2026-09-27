@@ -9,7 +9,7 @@ const root = path.resolve(new URL('..', import.meta.url).pathname)
 const { allMarkerMeta, PANEL_ORDER } = await import('../src/lib/markers.ts')
 const { MARKER_COPY, PANEL_INTRO } = await import('../src/lib/labCopy.ts')
 
-const SITE = process.env.SITE_ORIGIN ?? 'https://magnohq.pages.dev'
+const SITE = process.env.SITE_ORIGIN ?? 'https://magno.fit'
 const BRAND = 'Magno'
 const PUBLISHED = '2026-09-13'
 const today = new Date().toISOString().slice(0, 10)

@@ -12,7 +12,7 @@ import type { PagesFunction } from './_lib/types'
 // Canonical Pages project host for this app. /local-seed/* assets are only
 // served here; on every other host (preview deploys, custom domains in
 // flight) they 404 to keep accidentally-bundled seed data from leaking.
-const PROTECTED_HOST = 'magnohq.pages.dev'
+const PROTECTED_HOST = 'magno.fit'
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -42,10 +42,27 @@ const SECURITY_HEADERS: Record<string, string> = {
   ].join('; '),
 }
 
-export const onRequest: PagesFunction = async ({ request, next }) => {
+// The project's own *.pages.dev hostname. It keeps serving (Pages always does)
+// but must not compete with the custom domain for indexing, so it redirects.
+// Preview deploys (<hash>.magnohq.pages.dev) are deliberately NOT redirected —
+// they are how a build gets checked before it goes live.
+const LEGACY_HOST = 'magnohq.pages.dev'
+
+export const onRequest: PagesFunction = async ({ request, next, env }) => {
   const url = new URL(request.url)
 
-  // 1) Seed protection: only serve /local-seed/* on the canonical pages.dev host.
+  // 0) One canonical host, but ONLY once the custom domain actually resolves.
+  //    Gated on the CANONICAL_HOST secret because turning this on before
+  //    magno.fit is attached to the project would 301 the live site into a
+  //    domain that does not answer, i.e. take it down. Set the secret after
+  //    the domain is verified, not before.
+  const canonical = (env as { CANONICAL_HOST?: string }).CANONICAL_HOST
+  if (canonical && url.hostname === LEGACY_HOST) {
+    url.hostname = canonical
+    return Response.redirect(url.toString(), 301)
+  }
+
+  // 1) Seed protection: only serve /local-seed/* on the canonical host.
   if (url.pathname.startsWith('/local-seed/') && url.hostname !== PROTECTED_HOST) {
     return new Response('Not found', {
       status: 404,

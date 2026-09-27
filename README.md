@@ -6,7 +6,7 @@
 
 <p align="center">
   Personal health record for protocols, injections, vitals, and lab biomarkers.<br />
-  Local-first, end-to-end at <a href="https://magnohq.pages.dev">magnohq.pages.dev</a> (landing page) and <a href="https://magnohq.pages.dev/app/">/app/</a> (the app).
+  Local-first, end-to-end at <a href="https://magno.fit">magno.fit</a> (landing page) and <a href="https://magno.fit/app/">/app/</a> (the app).
 </p>
 
 ---
