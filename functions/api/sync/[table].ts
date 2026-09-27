@@ -24,9 +24,34 @@ export const onRequestGet: PagesFunction<Env, 'table'> = wrap<Env, 'table'>(asyn
     .bind(auth.user.id, since, limit)
     .all<Record<string, unknown>>()
 
-  const results = (rows.results || []).map((row) => rowToClient(spec, row))
+  let results = (rows.results || []).map((row) => rowToClient(spec, row))
+
+  // The cursor is a timestamp and the next page asks for `updated_at > cursor`,
+  // so a group of rows sharing one timestamp must never straddle a page
+  // boundary: everything after the cut would be skipped forever. Timestamps are
+  // not unique in practice - any bulk write stamps many rows at once (a data
+  // repair on 26 Sept 2026 gave 567 injections the same millisecond, and the
+  // rows past the 500-row page were silently never delivered).
+  if (results.length === limit) {
+    const lastStamp = Number(results[results.length - 1].updatedAt)
+    if (Number(results[0].updatedAt) !== lastStamp) {
+      // Drop the trailing tie group; the next page starts cleanly at it.
+      results = results.filter((r) => Number(r.updatedAt) !== lastStamp)
+    } else {
+      // The whole page is one timestamp, so paging cannot advance past it.
+      // Return the entire group, even though that exceeds `limit`.
+      const whole = await env.DB
+        .prepare(`SELECT * FROM ${spec.table} WHERE user_id = ? AND updated_at = ?`)
+        .bind(auth.user.id, lastStamp)
+        .all<Record<string, unknown>>()
+      results = (whole.results || []).map((row) => rowToClient(spec, row))
+    }
+    const cursor = Number(results[results.length - 1].updatedAt)
+    return jsonOk({ rows: results, cursor, hasMore: true })
+  }
+
   const cursor = results.length > 0 ? results[results.length - 1].updatedAt : since
-  return jsonOk({ rows: results, cursor, hasMore: results.length === limit })
+  return jsonOk({ rows: results, cursor, hasMore: false })
 })
 
 export const onRequestPost: PagesFunction<Env, 'table'> = wrap<Env, 'table'>(async ({ env, request, params }) => {
