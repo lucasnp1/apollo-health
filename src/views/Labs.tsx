@@ -508,6 +508,17 @@ export function Labs({
               <ShareReadButton
                 stats={{ markers: allSummaries.length, inRange: inRangeCount, outOfRange: outOfRangeSummaries.length, lastTest: lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : undefined }}
                 findings={findings}
+                // Newest entry per marker, which is what a reader would post.
+                markers={allSummaries.slice(0, 12).flatMap((m) => {
+                  const e = m.entries[0]
+                  if (!e) return []
+                  const st = rangeStatus(e.value, m.low, m.high)
+                  return [{
+                    label: m.label,
+                    value: `${e.rawValue}${m.unit ? ` ${m.unit}` : ''}`.trim(),
+                    status: st === 'good' ? 'good' as const : st === 'warn' ? 'bad' as const : 'none' as const,
+                  }]
+                })}
                 subtitle={latestExam ? [latestExam.name, latestExam.labName].filter(Boolean).join(' · ') : undefined}
               />
             ) : undefined}

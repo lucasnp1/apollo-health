@@ -224,3 +224,21 @@ const urls = [
 fs.writeFileSync(path.join(root, 'public/sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${u.loc}</loc><lastmod>${today}</lastmod><priority>${u.priority}</priority></url>`).join('\n')}\n</urlset>\n`)
 
 console.log(`guides: ${pages.length} marker pages, ${longform.length} long-form, index + sitemap (${urls.length} urls)`)
+
+// The client mirrors this slug list in src/lib/guides.ts so /read can link to a
+// guide without pulling 90KB of prose into the bundle. Fail loudly if they
+// drift, because a silent mismatch means dead links on the one page that
+// converts.
+{
+  const mirror = fs.readFileSync(path.resolve(root, 'src/lib/guides.ts'), 'utf8')
+  const inMirror = new Set([...mirror.matchAll(/'([a-z0-9-]+)',/g)].map((m) => m[1]))
+  const expected = Object.keys(MARKER_COPY).map((k) => k.replace(/_/g, '-'))
+  const missing = expected.filter((s) => !inMirror.has(s))
+  const extra = [...inMirror].filter((s) => !expected.includes(s))
+  if (missing.length || extra.length) {
+    console.error(`src/lib/guides.ts is out of sync with MARKER_COPY.`)
+    if (missing.length) console.error('  missing:', missing.join(', '))
+    if (extra.length) console.error('  stale:  ', extra.join(', '))
+    process.exit(1)
+  }
+}

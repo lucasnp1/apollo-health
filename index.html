@@ -41,7 +41,8 @@
             <a href="#how" class="transition-colors hover:text-zinc-900">How it works</a>
             <a href="#track" class="transition-colors hover:text-zinc-900">What you track</a>
             <a href="#bloods" class="transition-colors hover:text-zinc-900">Bloods</a>
-            <a href="#pricing" class="transition-colors hover:text-zinc-900">Pricing</a>
+            <a href="#compare" class="transition-colors hover:text-zinc-900">Compare</a>
+              <a href="#pricing" class="transition-colors hover:text-zinc-900">Pricing</a>
             <a href="#faq" class="transition-colors hover:text-zinc-900">FAQ</a>
             <a href="/guides/" class="transition-colors hover:text-zinc-900">Guides</a>
           </nav>
@@ -405,6 +406,56 @@
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+
+        <!-- ── Compare ──────────────────────────────────────────────────── -->
+        <section id="compare" class="relative mx-auto max-w-[1200px] px-6 py-14 md:py-[4.75rem]">
+          <div class="text-center">
+            <div class="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-apollo-ink">Compare <span class="h-1 w-1 rounded-full bg-apollo"></span></div>
+            <h2 class="mx-auto mt-3 max-w-[820px] text-[40px] font-semibold leading-[1.02] tracking-[-0.025em] text-zinc-900 md:text-[56px]">Where your lab file goes.</h2>
+            <p class="mx-auto mt-4 max-w-[640px] text-[15px] leading-relaxed text-zinc-500 md:text-[17px]">There are good trackers out there, and some do things Magno does not. This is the one difference worth knowing before you hand anyone a blood test.</p>
+          </div>
+
+          <div class="mx-auto mt-10 max-w-[900px] overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+            <div class="grid grid-cols-[1.4fr_1fr_1fr] gap-px bg-zinc-200 text-[13px] md:text-[14px]">
+              <div class="bg-zinc-50 px-4 py-3 font-semibold text-zinc-900 md:px-5">&nbsp;</div>
+              <div class="bg-zinc-50 px-4 py-3 text-center font-semibold text-zinc-900 md:px-5">Magno</div>
+              <div class="bg-zinc-50 px-4 py-3 text-center font-semibold text-zinc-500 md:px-5">Typical tracker</div>
+
+              <div class="bg-white px-4 py-3.5 text-zinc-700 md:px-5">Where your lab PDF is read</div>
+              <div class="bg-white px-4 py-3.5 text-center font-medium text-zinc-900 md:px-5">On your phone</div>
+              <div class="bg-white px-4 py-3.5 text-center text-zinc-500 md:px-5">Uploaded to a server</div>
+
+              <div class="bg-white px-4 py-3.5 text-zinc-700 md:px-5">Read your bloods without an account</div>
+              <div class="bg-white px-4 py-3.5 text-center font-medium text-zinc-900 md:px-5">Free, no sign-up</div>
+              <div class="bg-white px-4 py-3.5 text-center text-zinc-500 md:px-5">Account first</div>
+
+              <div class="bg-white px-4 py-3.5 text-zinc-700 md:px-5">Works on iPhone and Android</div>
+              <div class="bg-white px-4 py-3.5 text-center font-medium text-zinc-900 md:px-5">Both, from the web</div>
+              <div class="bg-white px-4 py-3.5 text-center text-zinc-500 md:px-5">Usually iPhone only</div>
+
+              <div class="bg-white px-4 py-3.5 text-zinc-700 md:px-5">Trackers and analytics SDKs</div>
+              <div class="bg-white px-4 py-3.5 text-center font-medium text-zinc-900 md:px-5">None</div>
+              <div class="bg-white px-4 py-3.5 text-center text-zinc-500 md:px-5">Varies</div>
+
+              <div class="bg-white px-4 py-3.5 text-zinc-700 md:px-5">Price</div>
+              <div class="bg-white px-4 py-3.5 text-center font-medium text-zinc-900 md:px-5">&pound;4.99/mo, first month free</div>
+              <div class="bg-white px-4 py-3.5 text-center text-zinc-500 md:px-5">&pound;5 to &pound;8/mo</div>
+            </div>
+          </div>
+
+          <div class="mx-auto mt-8 max-w-[760px] rounded-2xl border border-zinc-200 bg-zinc-50/70 px-6 py-6">
+            <p class="text-[15px] leading-relaxed text-zinc-700">
+              Read that first row again. Most tools that read a blood test send the file to a server to do it, and at least one app advertises <span class="font-medium text-zinc-900">&ldquo;100% on-device&rdquo;</span> on the same page it says your values are extracted by a third-party AI service.
+            </p>
+            <p class="mt-3 text-[15px] leading-relaxed text-zinc-700">
+              Magno parses the file in your browser. The PDF reader and the OCR engine are served from this site and run on your device, so your results are never uploaded, never queued on someone&rsquo;s server, and never handed to a third party to read. You can check it yourself: open <a href="/read" class="font-medium text-apollo-ink underline underline-offset-2">the free reader</a> with your browser&rsquo;s network tab open, drop a report in, and watch. Your file produces no upload. The only thing you will see us send is a counter carrying an event name &mdash; &ldquo;a read finished&rdquo;, nothing else. No id, no cookie, none of your numbers.
+            </p>
+            <p class="mt-4 text-[13px] leading-relaxed text-zinc-500">
+              Where others are ahead: the native iPhone apps integrate with Apple Health and sit in the App Store, which Magno does not yet. If that matters more to you than where your file goes, one of them is the better pick, and that is a fair trade to make with your eyes open.
+            </p>
           </div>
         </section>
 

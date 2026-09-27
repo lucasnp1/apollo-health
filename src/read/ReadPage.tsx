@@ -9,6 +9,7 @@ import type { LabExam } from '../lib/db'
 import type { EnrichedResult } from '../lib/insights'
 import type { Confidence, ExtractedMarker, ReadProgress } from '../lib/pdf'
 import { canonicalize } from '../lib/markers'
+import { guideUrl } from '../lib/guides'
 import { buildFindings, type Finding } from '../lib/labFindings'
 import { labStats, rangeStatus, type LabStats } from '../lib/labStats'
 import { captureRef, withRef } from '../lib/ref'
@@ -87,6 +88,7 @@ export function ReadPage() {
       id: i + 1,
       examId: 1,
       marker: canonicalize(m.marker)?.label ?? m.marker.trim(),
+      markerKey: canonicalize(m.marker)?.key,
       value: m.value,
       rawValue: m.rawValue ?? String(m.value),
       unit: m.unit,
@@ -256,7 +258,21 @@ export function ReadPage() {
               stats={state.stats}
               findings={state.findings}
               subtitle={[state.exam.name, state.exam.labName, new Date(state.exam.collectedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })].filter(Boolean).join(' · ')}
-              action={<ShareReadButton stats={state.stats} findings={state.findings} subtitle={state.exam.name} />}
+              action={
+                <ShareReadButton
+                  stats={state.stats}
+                  findings={state.findings}
+                  subtitle={state.exam.name}
+                  markers={state.results.map((r) => {
+                    const st = rangeStatus(r.value, r.low, r.high)
+                    return {
+                      label: r.marker,
+                      value: `${r.rawValue}${r.unit ? ` ${r.unit}` : ''}`,
+                      status: st === 'good' ? 'good' as const : st === 'warn' ? 'bad' as const : 'none' as const,
+                    }
+                  })}
+                />
+              }
             />
             <LabAnalysisCard findings={state.findings} />
 
@@ -268,7 +284,15 @@ export function ReadPage() {
                 </div>
               )}
               <FeedList>
-                {state.results.map((r, i) => {
+                {[...state.results]
+                  .map((r, i) => ({ r, conf: state.rows[i]?.confidence ?? 'high' as Confidence }))
+                  // Flagged markers first. Someone who just got a read wants the
+                  // out-of-range ones explained, not an alphabetical list.
+                  .sort((a, b) => {
+                    const rank = (x: typeof a) => (rangeStatus(x.r.value, x.r.low, x.r.high) === 'warn' ? 0 : 1)
+                    return rank(a) - rank(b)
+                  })
+                  .map(({ r, conf }) => {
                   const status = rangeStatus(r.value, r.low, r.high)
                   const above = status === 'warn' && r.high !== undefined && r.value !== undefined && r.value > r.high
                   const chip: FeedStatus = status === 'good'
@@ -276,7 +300,7 @@ export function ReadPage() {
                     : status === 'warn'
                       ? { label: above ? 'High' : 'Low', tone: 'bad', icon: TriangleAlert }
                       : { label: 'No range', tone: 'neutral', icon: CircleDashed }
-                  const conf = state.rows[i]?.confidence ?? 'high'
+                  const href = guideUrl((r as { markerKey?: string }).markerKey)
                   return (
                     <FeedRow
                       key={r.id}
@@ -286,7 +310,16 @@ export function ReadPage() {
                       sub={status === 'warn' ? `${above ? 'above' : 'below'} ${rangeText(r.low, r.high)}` : rangeText(r.low, r.high)}
                       status={chip}
                       facts={[{ text: conf === 'high' ? 'read cleanly' : conf === 'medium' ? 'worth a glance' : 'check this one', tone: conf === 'high' ? 'good' : conf === 'medium' ? 'warn' : 'bad' }]}
-                    />
+                    >
+                      {href && (
+                        <a
+                          href={href}
+                          className="feed-facts inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+                        >
+                          What {r.marker} means <ArrowRight className="size-3" />
+                        </a>
+                      )}
+                    </FeedRow>
                   )
                 })}
               </FeedList>

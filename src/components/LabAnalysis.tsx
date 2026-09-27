@@ -41,7 +41,13 @@ export type { LabStats }
 
 // "Share this read": a branded PNG of the summary, through the share sheet on
 // phones and a download elsewhere. Lazy-loads the canvas code on first tap.
-export function ShareReadButton({ stats, findings, subtitle }: { stats: LabStats; findings: Finding[]; subtitle?: string }) {
+export function ShareReadButton({ stats, findings, subtitle, markers }: {
+  stats: LabStats
+  findings: Finding[]
+  subtitle?: string
+  /** Real marker rows for the card. Omit and the card shows counts only. */
+  markers?: Array<{ label: string; value: string; status: 'good' | 'warn' | 'bad' | 'none' }>
+}) {
   const [state, setState] = useState<'idle' | 'busy' | 'shared' | 'downloaded' | 'failed'>('idle')
   const share = async () => {
     if (state === 'busy') return
@@ -53,6 +59,7 @@ export function ShareReadButton({ stats, findings, subtitle }: { stats: LabStats
         paragraphs: summarize(findings),
         stats,
         findings: findings.map((f) => ({ label: f.label, headline: f.headline, status: f.status })),
+        markers,
         subtitle,
       })
       const how = await shareOrDownload(blob, 'magno-bloods.png', 'My bloods, read by Magno')

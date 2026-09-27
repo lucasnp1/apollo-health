@@ -8,6 +8,8 @@ export type ShareCardInput = {
   paragraphs: string[]
   stats: LabStats
   findings: Array<{ label: string; headline: string; status: 'good' | 'warn' | 'bad' | 'none' }>
+  /** Actual marker rows. People post their numbers, not a summary of them. */
+  markers?: Array<{ label: string; value: string; status: 'good' | 'warn' | 'bad' | 'none' }>
   /** Shown under the title, e.g. "Advanced TRT panel · Medichecks · Sep 1, 2026". */
   subtitle?: string
   /** Site to name in the footer, without protocol. */
@@ -159,8 +161,38 @@ export async function drawShareCard(input: ShareCardInput): Promise<Blob> {
   })
   y += th + 36
 
-  // Up to four panel verdicts, while there is room above the footer.
   const footerTop = H - PAD - 40
+
+  // Real marker rows, flagged ones first. This is the part that makes the card
+  // worth posting instead of a phone screenshot: people share their NUMBERS.
+  const markers = (input.markers ?? [])
+    .slice()
+    .sort((a, b) => (a.status === 'bad' || a.status === 'warn' ? 0 : 1) - (b.status === 'bad' || b.status === 'warn' ? 0 : 1))
+    .slice(0, 6)
+  if (markers.length) {
+    const rowH = 54
+    for (const m of markers) {
+      if (y + rowH > footerTop - 60) break
+      ctx.fillStyle = CARD
+      roundRect(ctx, PAD, y, INNER, rowH - 8, 12)
+      ctx.fill()
+      ctx.fillStyle = STATUS[m.status]
+      ctx.beginPath()
+      ctx.arc(PAD + 24, y + (rowH - 8) / 2, 7, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = INK
+      ctx.font = `500 27px ${SANS}`
+      ctx.fillText(m.label, PAD + 46, y + 31)
+      ctx.font = `600 27px ${MONO}`
+      ctx.textAlign = 'right'
+      ctx.fillText(m.value, W - PAD - 24, y + 31)
+      ctx.textAlign = 'left'
+      y += rowH
+    }
+    y += 12
+  }
+
+  // Panel verdicts fill whatever room is left above the footer.
   for (const f of input.findings.slice(0, 4)) {
     if (y + 80 > footerTop) break
     ctx.fillStyle = STATUS[f.status]
