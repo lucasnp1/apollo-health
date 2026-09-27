@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./scripts/weekly-digest.sh)",
+      "Bash(./scripts/weekly-digest.sh:*)",
+      "Bash(node scripts/community-digest.mjs)",
+      "Bash(node scripts/community-digest.mjs:*)"
+    ]
+  }
+}
