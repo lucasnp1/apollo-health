@@ -58,7 +58,7 @@ export default defineConfig({
         // the network.
         navigateFallback: '/app/index.html',
         navigateFallbackAllowlist: [/^\/app(\/|$)/],
-        navigateFallbackDenylist: [/^\/local-seed\//, /^\/api\//, /^\/privacy/, /^\/terms/, /^\/read/, /^\/guides/, /^\/sitemap/, /^\/robots/],
+        navigateFallbackDenylist: [/^\/local-seed\//, /^\/api\//, /^\/privacy/, /^\/terms/, /^\/read/, /^\/guides/, /^\/sitemap/, /^\/robots/, /^\/\.well-known/],
       },
       manifest: {
         name: 'Magno',

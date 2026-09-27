@@ -4,7 +4,7 @@
  * and, for scans, tesseract), never uploaded, and forgotten on reload.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRight, CircleCheck, CircleDashed, Droplet, FileUp, Lock, RotateCcw, ScanText, TriangleAlert } from 'lucide-react'
+import { ArrowRight, CircleCheck, CircleDashed, ClipboardPaste, Droplet, FileUp, Lock, RotateCcw, ScanText, TriangleAlert } from 'lucide-react'
 import type { LabExam } from '../lib/db'
 import type { EnrichedResult } from '../lib/insights'
 import type { Confidence, ExtractedMarker, ReadProgress } from '../lib/pdf'
@@ -59,9 +59,47 @@ function rangeText(low?: number, high?: number): string {
 export function ReadPage() {
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [dragging, setDragging] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const [pasted, setPasted] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { captureRef() }, [])
+
+  // The parse from here on is identical whether the text came out of a PDF, a
+  // photo via OCR, or was pasted straight in, so it lives in one place.
+  const analyseText = useCallback(async (text: string, name: string, usedOcr: boolean) => {
+    const { extractMarkersFromText, extractCollectionDate } = await import('../lib/pdf')
+    const rows = text ? extractMarkersFromText(text) : []
+    const kept = rows.filter((m) => Number.isFinite(m.value) && m.marker.trim().length > 0)
+    if (kept.length === 0) {
+      track('read-empty')
+      setState({ kind: 'empty', name, usedOcr, hadText: Boolean(text) })
+      return
+    }
+    const exam: LabExam = {
+      id: 1,
+      name: name.replace(/\.(pdf|jpe?g|png|webp|heic|gif|bmp|tiff?)$/i, ''),
+      collectedAt: extractCollectionDate(text) ?? new Date().toISOString(),
+      labName: usedOcr ? 'Photo import' : 'PDF import',
+    }
+    // Same mapping the app uses when every review row is accepted.
+    const results: EnrichedResult[] = kept.map((m, i) => ({
+      id: i + 1,
+      examId: 1,
+      marker: canonicalize(m.marker)?.label ?? m.marker.trim(),
+      value: m.value,
+      rawValue: m.rawValue ?? String(m.value),
+      unit: m.unit,
+      low: m.low,
+      high: m.high,
+      exam,
+    }))
+    const findings = buildFindings(results, [exam])
+    const counts = labStats(results, [exam])
+    const stats: LabStats = { ...counts, lastTest: new Date(exam.collectedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }
+    track('read-completed')
+    setState({ kind: 'done', name, usedOcr, rows: kept, results, exam, findings, stats })
+  }, [])
 
   const read = useCallback(async (file: File) => {
     if (file.size > MAX_BYTES) {
@@ -71,44 +109,30 @@ export function ReadPage() {
     track('read-started')
     setState({ kind: 'reading', name: file.name })
     try {
-      const { readLabFile, extractMarkersFromText, extractCollectionDate } = await import('../lib/pdf')
+      const { readLabFile } = await import('../lib/pdf')
       const { text, usedOcr } = await readLabFile(file, (progress) => setState({ kind: 'reading', name: file.name, progress }))
-      const rows = text ? extractMarkersFromText(text) : []
-      const kept = rows.filter((m) => Number.isFinite(m.value) && m.marker.trim().length > 0)
-      if (kept.length === 0) {
-        track('read-empty')
-        setState({ kind: 'empty', name: file.name, usedOcr, hadText: Boolean(text) })
-        return
-      }
-      const exam: LabExam = {
-        id: 1,
-        name: file.name.replace(/\.(pdf|jpe?g|png|webp|heic|gif|bmp|tiff?)$/i, ''),
-        collectedAt: extractCollectionDate(text) ?? new Date().toISOString(),
-        labName: usedOcr ? 'Photo import' : 'PDF import',
-      }
-      // Same mapping the app uses when every review row is accepted.
-      const results: EnrichedResult[] = kept.map((m, i) => ({
-        id: i + 1,
-        examId: 1,
-        marker: canonicalize(m.marker)?.label ?? m.marker.trim(),
-        value: m.value,
-        rawValue: m.rawValue ?? String(m.value),
-        unit: m.unit,
-        low: m.low,
-        high: m.high,
-        exam,
-      }))
-      const findings = buildFindings(results, [exam])
-      const counts = labStats(results, [exam])
-      const stats: LabStats = { ...counts, lastTest: new Date(exam.collectedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }
-      track('read-completed')
-      setState({ kind: 'done', name: file.name, usedOcr, rows: kept, results, exam, findings, stats })
+      await analyseText(text, file.name, usedOcr)
     } catch (err) {
       console.error('read failed', err)
       track('read-failed')
       setState({ kind: 'error', name: file.name })
     }
-  }, [])
+  }, [analyseText])
+
+  // Plenty of people never have a PDF: results arrive in an email, a clinic
+  // portal, or a text message. Pasting skips the parse entirely.
+  const readPasted = useCallback(async (text: string) => {
+    if (!text.trim()) return
+    track('read-started')
+    setState({ kind: 'reading', name: 'Pasted results' })
+    try {
+      await analyseText(text, 'Pasted results', false)
+    } catch (err) {
+      console.error('paste read failed', err)
+      track('read-failed')
+      setState({ kind: 'error', name: 'Pasted results' })
+    }
+  }, [analyseText])
 
   const onFiles = (files: FileList | null) => {
     const f = files?.[0]
@@ -172,6 +196,46 @@ export function ReadPage() {
                     ? `Read "${state.name}" with OCR but couldn't find any lab markers. Try a sharper photo with the whole table in frame.`
                     : `No recognized lab markers in "${state.name}". Magno looks for the marker name, value and unit on each line.`}
               </p>
+            )}
+          </section>
+        )}
+
+        {(state.kind === 'idle' || state.kind === 'error' || state.kind === 'empty') && (
+          <section className="rounded-xl border border-border bg-card/60 p-5">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-3 text-left"
+              onClick={() => setPasteOpen((o) => !o)}
+              aria-expanded={pasteOpen}
+            >
+              <span>
+                <span className="feed-title block">No PDF? Paste your results instead.</span>
+                <span className="feed-meta block text-muted-foreground">
+                  From an email, a clinic portal or a text. One marker per line, with the value and unit.
+                </span>
+              </span>
+              <ClipboardPaste className="size-4 shrink-0 text-muted-foreground" />
+            </button>
+            {pasteOpen && (
+              <div className="mt-4 flex flex-col gap-3">
+                <textarea
+                  value={pasted}
+                  onChange={(e) => setPasted(e.target.value)}
+                  rows={8}
+                  spellCheck={false}
+                  placeholder={'Haemoglobin 152 g/L (130 - 170)\nHaematocrit 0.47 L/L (0.40 - 0.50)\nTestosterone 24.1 nmol/L (8.6 - 29.0)\nHbA1c 34 mmol/mol (20 - 41)'}
+                  className="w-full rounded-md border border-input bg-transparent p-3 font-mono text-xs leading-relaxed shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  aria-label="Paste your lab results"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={() => void readPasted(pasted)} disabled={!pasted.trim()}>
+                    Read these results <ArrowRight className="size-4" />
+                  </Button>
+                  <span className="feed-facts text-muted-foreground">
+                    Read on this device, same as a file. Nothing is sent anywhere.
+                  </span>
+                </div>
+              </div>
             )}
           </section>
         )}
