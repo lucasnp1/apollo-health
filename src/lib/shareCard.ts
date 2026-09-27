@@ -187,7 +187,10 @@ export async function drawShareCard(input: ShareCardInput): Promise<Blob> {
   ctx.fillStyle = FAINT
   ctx.font = `500 22px ${MONO}`
   const site = input.site ?? window.location.host
-  ctx.fillText(`Not medical advice  ·  Read yours at ${site}/read`, PAD, footerTop + 40)
+  // ?ref=card so a signup traced back to a shared image shows up in
+  // users.signup_source. Without it every share this product has ever produced
+  // was invisible in the numbers.
+  ctx.fillText(`Not medical advice  ·  Read yours at ${site}/read?ref=card`, PAD, footerTop + 40)
 
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('Could not render the card'))), 'image/png')

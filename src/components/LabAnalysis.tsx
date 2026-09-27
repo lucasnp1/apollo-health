@@ -54,7 +54,7 @@ export function ShareReadButton({ stats, findings, subtitle }: { stats: LabStats
         findings: findings.map((f) => ({ label: f.label, headline: f.headline, status: f.status })),
         subtitle,
       })
-      const how = await shareOrDownload(blob, 'apollo-bloods.png', 'My bloods, read by Magno')
+      const how = await shareOrDownload(blob, 'magno-bloods.png', 'My bloods, read by Magno')
       setState(how)
     } catch (err) {
       // An abandoned share sheet rejects; that is not a failure worth flagging.
