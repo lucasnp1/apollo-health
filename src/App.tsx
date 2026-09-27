@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
 import type { ExtractedMarker, ReadProgress } from './lib/pdf'
+import { takePendingRead, type PendingRead } from './lib/pendingRead'
 import { ToastProvider, useToast } from './lib/toast'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
@@ -167,6 +168,29 @@ function Shell({
   const [pdfProgress, setPdfProgress] = useState<ReadProgress | null>(null)
   const [pdfReviewFileId, setPdfReviewFileId] = useState<number | null>(null)
   const { showToast } = useToast()
+
+  // Someone who used the public /read tool and then signed up arrives with
+  // their parsed panel already in hand. Import it instead of asking for the
+  // same file a second time. Runs once, after auth, and clears itself.
+  useEffect(() => {
+    const pending = takePendingRead()
+    if (!pending) return
+    void (async () => {
+      try {
+        const examId = await db.exams.add({
+          name: pending.exam.name,
+          collectedAt: pending.exam.collectedAt,
+          labName: pending.exam.labName,
+        })
+        await db.results.bulkAdd(pending.results.map((r: PendingRead['results'][number]) => ({ ...r, examId })))
+        showToast({
+          message: `Saved your read: ${pending.results.length} marker${pending.results.length === 1 ? '' : 's'} from ${pending.exam.name}.`,
+        })
+      } catch {
+        showToast({ message: 'Could not save that read. Upload the file again from Lab results.' })
+      }
+    })()
+  }, [showToast])
 
   // Returning from Stripe checkout: refresh the plan (webhook may lag a beat)
   // and strip the query flag from the URL.

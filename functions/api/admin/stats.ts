@@ -53,7 +53,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
       signupsBySource: (perSource.results ?? []) as Array<{ source: string; n: number }>,
       plans: (plans.results ?? []) as Array<{ plan: string; kind: string; n: number }>,
       feedbackCount: one(feedback),
-      pageHits30Days: (hits.results ?? []) as Array<{ path: string; n: number }>,
+      // page_hits carries both page views and funnel events (path "event:<name>").
+      // Split them so the read funnel can be read at a glance instead of being
+      // buried among page paths.
+      pageHits30Days: ((hits.results ?? []) as Array<{ path: string; n: number }>)
+        .filter((h) => !h.path.startsWith('event:')),
+      readFunnel30Days: ((hits.results ?? []) as Array<{ path: string; n: number }>)
+        .filter((h) => h.path.startsWith('event:'))
+        .map((h) => ({ event: h.path.slice('event:'.length), n: h.n })),
     })
   } catch (e) {
     return jsonError(e instanceof Error ? e.message : 'Stats query failed', 500)

@@ -47,6 +47,7 @@ export function ShareReadButton({ stats, findings, subtitle }: { stats: LabStats
     if (state === 'busy') return
     setState('busy')
     try {
+      void import('../lib/track').then((m) => m.track('read-share')).catch(() => undefined)
       const { drawShareCard, shareOrDownload } = await import('../lib/shareCard')
       const blob = await drawShareCard({
         paragraphs: summarize(findings),

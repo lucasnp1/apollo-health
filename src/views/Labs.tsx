@@ -500,7 +500,11 @@ export function Labs({
             stats={{ markers: allSummaries.length, inRange: inRangeCount, outOfRange: outOfRangeSummaries.length, lastTest: lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : undefined }}
             findings={isPro ? findings : null}
             subtitle={latestExam ? [latestExam.name, latestExam.labName, format(parseISO(latestExam.collectedAt), 'MMM d, yyyy')].filter(Boolean).join(' · ') : undefined}
-            action={isPro && findings.length > 0 ? (
+            /* Not gated on Pro. The share card is the only loop that brings
+               anyone new in, and gating marketing behind the thing you are
+               marketing means it runs for nobody until someone already paid.
+               Free users share the counts; the written analysis stays Pro. */
+            action={findings.length > 0 ? (
               <ShareReadButton
                 stats={{ markers: allSummaries.length, inRange: inRangeCount, outOfRange: outOfRangeSummaries.length, lastTest: lastTestDate ? format(parseISO(lastTestDate), 'MMM d') : undefined }}
                 findings={findings}

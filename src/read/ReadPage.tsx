@@ -12,6 +12,8 @@ import { canonicalize } from '../lib/markers'
 import { buildFindings, type Finding } from '../lib/labFindings'
 import { labStats, rangeStatus, type LabStats } from '../lib/labStats'
 import { captureRef, withRef } from '../lib/ref'
+import { stashPendingRead } from '../lib/pendingRead'
+import { track } from '../lib/track'
 import { LabAnalysisCard, LabSummaryCard, ShareReadButton } from '../components/LabAnalysis'
 import { FeedList, FeedRow, type FeedStatus } from '../components/FeedList'
 import { PanelCard } from '../components/dashboard/PanelCard'
@@ -66,6 +68,7 @@ export function ReadPage() {
       setState({ kind: 'error', name: file.name, reason: 'That file is over 25 MB. Export a smaller PDF or take a photo of the page.' })
       return
     }
+    track('read-started')
     setState({ kind: 'reading', name: file.name })
     try {
       const { readLabFile, extractMarkersFromText, extractCollectionDate } = await import('../lib/pdf')
@@ -73,6 +76,7 @@ export function ReadPage() {
       const rows = text ? extractMarkersFromText(text) : []
       const kept = rows.filter((m) => Number.isFinite(m.value) && m.marker.trim().length > 0)
       if (kept.length === 0) {
+        track('read-empty')
         setState({ kind: 'empty', name: file.name, usedOcr, hadText: Boolean(text) })
         return
       }
@@ -97,9 +101,11 @@ export function ReadPage() {
       const findings = buildFindings(results, [exam])
       const counts = labStats(results, [exam])
       const stats: LabStats = { ...counts, lastTest: new Date(exam.collectedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }
+      track('read-completed')
       setState({ kind: 'done', name: file.name, usedOcr, rows: kept, results, exam, findings, stats })
     } catch (err) {
       console.error('read failed', err)
+      track('read-failed')
       setState({ kind: 'error', name: file.name })
     }
   }, [])
@@ -235,7 +241,23 @@ export function ReadPage() {
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild size="lg">
-                  <a href={signupHref}>Save it in Magno <ArrowRight className="size-4" /></a>
+                  <a
+                    href={signupHref}
+                    onClick={() => {
+                      track('read-save')
+                      // Hand the parsed read over so sign-up does not ask for
+                      // the same file twice. Best effort: if storage is blocked
+                      // the link still works and they re-upload.
+                      stashPendingRead({
+                        exam: { name: state.exam.name, collectedAt: state.exam.collectedAt, labName: state.exam.labName },
+                        results: state.results.map((r) => ({
+                          marker: r.marker, value: r.value, rawValue: r.rawValue,
+                          unit: r.unit, low: r.low, high: r.high,
+                        })),
+                      })
+                    }}
+                  >
+                    Save it in Magno <ArrowRight className="size-4" /></a>
                 </Button>
                 <Button variant="outline" size="lg" onClick={() => setState({ kind: 'idle' })}>
                   <RotateCcw className="size-4" /> Read another file
