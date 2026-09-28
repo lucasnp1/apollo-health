@@ -11,13 +11,15 @@ import { cn } from '@/lib/utils'
  * an animation library, which meant shipping that library on every page.
  */
 export function Segmented<T extends string>({
-  value, options, onChange, size = 'md', className,
+  value, options, onChange, size = 'md', className, ariaLabel,
 }: {
   value: T
   options: { value: T; label: ReactNode }[]
   onChange: (v: T) => void
   size?: 'sm' | 'md'
   className?: string
+  /** Names the group for screen readers when no visible label is tied to it. */
+  ariaLabel?: string
 }) {
   const track = useRef<HTMLDivElement>(null)
   // `slide` is false for the first placement so the pill appears where it
@@ -45,7 +47,7 @@ export function Segmented<T extends string>({
   }, [index, options.length])
 
   return (
-    <div ref={track} className={cn('relative inline-flex rounded-[var(--radius-md)] bg-muted p-1', className)}>
+    <div ref={track} role={ariaLabel ? 'group' : undefined} aria-label={ariaLabel} className={cn('relative inline-flex rounded-[var(--radius-md)] bg-muted p-1', className)}>
       {box && (
         <span
           aria-hidden

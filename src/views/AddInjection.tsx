@@ -1,16 +1,25 @@
-// Full-page injection logger. One route per syringe (IM oils vs SubQ peptides),
-// a primary compound container plus optional extras in the SAME syringe, a
-// route-scoped quick site list (rested vs recently-used), and per-compound
-// values that persist for next time. Peptides are reconstituted: powder mg +
-// bac water mL give the concentration, and dosing shows units on the syringe.
+// Full-page injection logger. The route (IM or SubQ) picks the site list and
+// what gets prefilled; it no longer decides the vial. A vial is liquid (an oil
+// or ready-made solution, strength in mg/mL) or powder you mix (powder + bac
+// water), on either route, so a 100 mg/mL tren oil drawn subq with a 30 unit
+// insulin syringe logs as easily as a reconstituted peptide.
+// A primary compound plus optional extras share ONE syringe. The Syringe
+// section shows how full it is, where to stop for each compound, and when a
+// different barrel would fit or read better. Everything (vial, syringe, dose,
+// mg-or-marks) is remembered per compound for next time.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { ChevronDown, ChevronUp, Plus, TriangleAlert, X } from 'lucide-react'
-import { db, type Compound, type InjectionLog, type Symptom, type Unit } from '../lib/db'
+import { db, type Compound, type InjectionLog, type Symptom, type Unit, type VialKind } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
-import { compoundGroups, findCompoundByName } from '../lib/compounds'
-import { parseConcentrationMgPerMl } from '../lib/vials'
-import { convertAmount, derive, type EntryMode } from '../lib/dose'
+import { compoundGroups, findCompoundByName, groupByCompoundId } from '../lib/compounds'
+import { findPKCompound } from '../lib/pk'
+import { vialOf } from '../lib/vials'
+import {
+  SYRINGES, convertAmount, convertDraw, converts, derive, drawMarks, drawUnit, formatDraw, num,
+  rememberedSyringe, roundForMode, syringeAdvice, syringeOf, unitLabel,
+  type Derived, type EntryMode, type Syringe,
+} from '../lib/dose'
 import { NEGATIVE, POSITIVE, ratingOf, withRating } from '../lib/symptoms'
 import { SymptomScale } from '../components/SymptomScale'
 import { IM_QUICK_SITES, SUBQ_QUICK_SITES, quickSiteFromUsed, siteGroup, type QuickSite } from '../lib/sites'
@@ -24,48 +33,98 @@ import { Segmented } from '@/components/ui/segmented'
 import { cn } from '@/lib/utils'
 
 type Route = 'IM' | 'SubQ'
+type DoseUnit = 'mg' | 'mcg' | 'iu'
 const NEW = '__new__'
 const COLORS = ['#f4c95c', '#2566c4', '#2f8b54', '#c43c2f', '#7c5cff', '#d98324', '#3aa5a0']
 
-// Moving between the "mg" and "units" tabs converts the value instead of
-// reinterpreting the same digits in the new unit. Returns the patch to apply.
-function switchEntryMode(line: Line, mode: EntryMode, unit: Unit, conc?: number): Partial<Line> {
-  if (mode === line.entryMode) return {}
-  const amount = convertAmount(line.amount, line.entryMode, mode, unit, conc)
-  return amount === undefined ? { entryMode: mode } : { entryMode: mode, amount }
-}
+const SELECT_CLASS = 'h-10 w-full appearance-none rounded-md border border-input bg-transparent bg-[length:1em_1em] bg-[right_0.75rem_center] bg-no-repeat pr-8 pl-3 text-sm font-medium shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'
+const SELECT_STYLE: CSSProperties = { backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m6 9 6 6 6-6'/%3e%3c/svg%3e\")" }
+const SUFFIX = 'pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground'
+
+// Short, stable display of a typed or derived number: 2.5, 300, 6.67.
+const fmt = (x: number) => String(Number(x.toFixed(x < 10 ? 2 : 1)))
+const numStr = (n?: number) => (n !== undefined ? String(n) : '')
+// mL beside insulin units: 3 decimals is what 0.1 unit resolves to, so 1.5
+// units reads 0.015 mL, not a contradicting 0.02.
+const fmtMl = (ml: number) => (ml < 0.1 ? String(Number(ml.toFixed(3))) : ml.toFixed(2))
 
 type Line = {
   key: string
   compoundId: number | typeof NEW | ''
   newName: string
-  conc: string          // IM: direct mg/mL
-  vialMg: string        // SubQ peptide: powder strength
-  water: string         // SubQ peptide: bac water added (mL)
+  unit: Unit            // new compounds only; an existing one keeps its own
+  kind: VialKind
+  kindTouched: boolean  // Liquid/Powder was picked by hand, so stop guessing
+  setupOpen: boolean    // vial editor shown, else a one-line summary
+  conc: string          // liquid: strength per mL
+  vialMg: string        // powder: amount in the vial
+  water: string         // powder: bac water added (mL)
   entryMode: EntryMode
   amount: string
 }
 
 let counter = 0
-function blankLine(): Line {
-  counter += 1
-  return { key: `l${counter}`, compoundId: '', newName: '', conc: '', vialMg: '', water: '', entryMode: 'dose', amount: '' }
+const nextKey = () => `l${(counter += 1)}`
+
+function blankLine(route: Route): Line {
+  return {
+    key: nextKey(), compoundId: '', newName: '', unit: 'mg',
+    // Only a first guess: typing a name like "Tren A" flips it to liquid.
+    kind: route === 'SubQ' ? 'powder' : 'liquid', kindTouched: false, setupOpen: true,
+    conc: '', vialMg: '', water: '', entryMode: 'dose', amount: '',
+  }
 }
 
-function lineFromCompound(c: Compound): Line {
-  counter += 1
-  const conc = c.concentrationMgPerMl ?? parseConcentrationMgPerMl(c.concentration)
-  const dose = c.lastDose ?? c.defaultDose
-  return {
-    key: `l${counter}`,
-    compoundId: c.id ?? '',
-    newName: '',
-    conc: conc !== undefined ? String(conc) : '',
-    vialMg: c.vialMg !== undefined ? String(c.vialMg) : '',
-    water: c.reconstituteMl !== undefined ? String(c.reconstituteMl) : '',
-    entryMode: 'dose',
-    amount: dose ? String(dose) : '',
+// A line prefilled from everything the compound remembers. `s` is the syringe
+// the page will use, so a remembered draw comes back in that syringe's marks.
+// `shotDose` is the compound's last dose on the current route, which beats
+// lastDose: a SubQ microdose must not become the next IM shot's dose.
+function lineFromCompound(c: Compound, s: Syringe, shotDose?: number): Line {
+  const v = vialOf(c)
+  const unit = c.unit ?? 'mg'
+  const dose = shotDose ?? c.lastDose ?? c.defaultDose
+  const hasDose = dose !== undefined && dose > 0
+  const conc = v.kind === 'powder' ? (v.vialMg && v.water ? v.vialMg / v.water : undefined) : v.conc
+  let entryMode: EntryMode = 'dose'
+  let amount = hasDose ? String(dose) : ''
+  if (c.entryMode === 'draw' && hasDose && conc !== undefined) {
+    const drawn = convertAmount(String(dose), 'dose', 'draw', unit, conc, s.perMl)
+    if (drawn !== undefined) { entryMode = 'draw'; amount = drawn }
   }
+  return {
+    key: nextKey(), compoundId: c.id ?? '', newName: '', unit,
+    kind: v.kind, kindTouched: false,
+    // Rows saved before vial kinds existed open once, so the numbers inferred
+    // from them get a look; so does anything missing a strength.
+    setupOpen: v.legacy || conc === undefined,
+    conc: numStr(v.conc), vialMg: numStr(v.vialMg), water: numStr(v.water),
+    entryMode, amount,
+  }
+}
+
+// Moving between the dose and draw tabs converts the value instead of
+// reinterpreting the same digits in the new unit. Returns the patch to apply.
+function switchEntryMode(line: Line, mode: EntryMode, unit: Unit, conc: number | undefined, perMl: number): Partial<Line> {
+  if (mode === line.entryMode) return {}
+  // Nothing to convert through (no strength): clear it rather than let 40
+  // units quietly become 40 mg.
+  const amount = convertAmount(line.amount, line.entryMode, mode, unit, conc, perMl)
+  return { entryMode: mode, amount: amount ?? '' }
+}
+
+type Resolved = {
+  line: Line
+  existing?: Compound
+  /** A typed new name that is already in the list: logs to that compound. */
+  match?: Compound
+  unit: Unit
+  conc?: number
+  vialMg: number
+  water: number
+  d: Derived
+  name: string
+  isNew: boolean
+  valid: boolean
 }
 
 export function AddInjection({
@@ -79,15 +138,32 @@ export function AddInjection({
 }) {
   // One row per compound name, picking the row actually in use rather than the
   // lowest id, so the remembered dose and vial numbers come from the right one.
-  const compounds = useMemo(
-    () => compoundGroups(rawCompounds, injections).map((g) => g.canonical),
-    [rawCompounds, injections],
+  const groups = useMemo(() => compoundGroups(rawCompounds, injections), [rawCompounds, injections])
+  const compounds = useMemo(() => groups.map((g) => g.canonical), [groups])
+
+  // Last dose per compound per route, from the shots themselves (newest
+  // first). This is the per-route dose memory, and it also covers compounds
+  // saved before lastDose synced.
+  const shotDoses = useMemo(() => {
+    const byId = groupByCompoundId(groups)
+    const m = new Map<string, number>()
+    for (const inj of injections) {
+      const c = byId.get(inj.compoundId)?.canonical
+      if (!c || inj.dose == null || !(inj.dose > 0) || inj.unit !== (c.unit ?? 'mg')) continue
+      const k = `${c.id}|${inj.route === 'SubQ' ? 'SubQ' : 'IM'}`
+      if (!m.has(k)) m.set(k, inj.dose)
+    }
+    return m
+  }, [groups, injections])
+  const prefill = useCallback(
+    (c: Compound, s: Syringe, r: Route) => lineFromCompound(c, s, shotDoses.get(`${c.id}|${r}`)),
+    [shotDoses],
   )
   const vials = useLiveQuery(() => db.vials.toArray(), [], [])
 
   // The last syringe you logged on a route = every compound sharing the most
   // recent takenAt for that route. Reopening prefills the WHOLE stack (with each
-  // compound's saved concentration/dose), not just the primary compound.
+  // compound's saved vial/dose), not just the primary compound.
   const syringeForRoute = useCallback((r: Route): Compound[] => {
     let batchAt: string | undefined
     for (const inj of injections) {
@@ -111,16 +187,20 @@ export function AddInjection({
     return first ? [first] : []
   }, [injections, compounds])
 
-  // Always land on the IM tab — even if SubQ was the last route used. SubQ data
+  // Always land on the IM tab, even if SubQ was the last route used. SubQ data
   // is still kept and recalled the moment you switch over. Prefill the last IM
   // syringe (falls back to a blank line when there's no IM history).
-  const initial = useMemo(
-    () => ({ route: 'IM' as Route, stack: syringeForRoute('IM') }),
-    [syringeForRoute],
-  )
+  const initial = useMemo(() => {
+    const stack = syringeForRoute('IM')
+    const syringe = rememberedSyringe(stack[0], 'IM')
+    return { route: 'IM' as Route, stack, syringe, lines: stack.map((c) => prefill(c, syringe, 'IM')) }
+  }, [syringeForRoute, prefill])
 
   const [route, setRoute] = useState<Route>(() => initial.route)
-  const [lines, setLines] = useState<Line[]>(() => (initial.stack.length ? initial.stack.map(lineFromCompound) : [blankLine()]))
+  const [syringeKey, setSyringeKey] = useState(() => initial.syringe.key)
+  // Once you pick a syringe yourself, choosing compounds stops changing it.
+  const [syringeTouched, setSyringeTouched] = useState(false)
+  const [lines, setLines] = useState<Line[]>(() => (initial.lines.length ? initial.lines : [blankLine('IM')]))
   const [site, setSite] = useState('')
   const [notes, setNotes] = useState('')
   const [feel, setFeel] = useState<Partial<Symptom>>({})
@@ -129,16 +209,18 @@ export function AddInjection({
   const kbInset = useKeyboardInset()
 
   // Data loads async (liveQuery starts empty). Hydrate the form from the last
-  // syringe once — the first time real data arrives — never clobbering edits.
+  // syringe once, the first time real data arrives, never clobbering edits.
   const hydrated = useRef(initial.stack.length > 0)
   useEffect(() => {
     if (hydrated.current || initial.stack.length === 0) return
     setRoute(initial.route)
-    setLines(initial.stack.map(lineFromCompound))
+    setSyringeKey(initial.syringe.key)
+    setLines(initial.lines)
     hydrated.current = true
   }, [initial])
 
-  // Compounds shown for the current route — SubQ hides IM oils and vice versa.
+  const syringe = syringeOf(syringeKey, route)
+
   // Sort by route rather than filter by it. Hiding a compound saved on the
   // other route is what pushed people into "＋ New…" and minted duplicates;
   // the ones for this route still come first.
@@ -151,46 +233,106 @@ export function AddInjection({
   )
 
   // Switching route resets the syringe (can't mix) + the site list, prefilling
-  // the last stack you used on that route.
+  // the last stack you used on that route with the syringe it went in.
   function changeRoute(r: Route) {
     if (r === route) return
-    setRoute(r)
     const stack = syringeForRoute(r)
-    setLines(stack.length ? stack.map(lineFromCompound) : [blankLine()])
+    const s = rememberedSyringe(stack[0], r)
+    setRoute(r)
+    setSyringeKey(s.key)
+    setSyringeTouched(false)
+    setLines(stack.length ? stack.map((c) => prefill(c, s, r)) : [blankLine(r)])
     setSite('')
   }
 
   function update(key: string, patch: Partial<Line>) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)))
   }
-  function pickCompound(key: string, value: string) {
-    if (value === NEW) { update(key, { compoundId: NEW, newName: '', conc: '', vialMg: '', water: '', amount: '' }); return }
-    const c = compounds.find((x) => x.id === Number(value))
-    if (c) { const s = lineFromCompound(c); update(key, { compoundId: c.id!, conc: s.conc, vialMg: s.vialMg, water: s.water, amount: s.amount, entryMode: 'dose' }) }
+
+  // Every syringe change goes through here. A line typed as a draw is
+  // re-expressed in the new marks so the volume stays the same: 20 units
+  // becomes 0.2 mL, never 20 mL.
+  function applySyringe(next: Syringe, touched: boolean) {
+    if (touched) setSyringeTouched(true)
+    if (next.key === syringe.key) return
+    const from = syringe.perMl
+    setSyringeKey(next.key)
+    setLines((prev) => prev.map((l) => (
+      l.entryMode === 'draw' ? { ...l, amount: convertDraw(l.amount, from, next.perMl) ?? l.amount } : l
+    )))
   }
-  function addLine() { setLines((prev) => [...prev, blankLine()]) }
+
+  function pickCompound(key: string, value: string) {
+    if (value === NEW) { update(key, { ...blankLine(route), key, compoundId: NEW }); return }
+    const c = compounds.find((x) => x.id === Number(value))
+    if (!c) return
+    // The first compound brings the syringe it was last drawn in, unless you
+    // already chose one. Extras in the same syringe never change it.
+    const s = lines[0]?.key === key && !syringeTouched ? rememberedSyringe(c, route) : syringe
+    const fresh = prefill(c, s, route)
+    setLines((prev) => prev.map((l) => {
+      if (l.key === key) return { ...fresh, key }
+      if (s.key !== syringe.key && l.entryMode === 'draw') return { ...l, amount: convertDraw(l.amount, syringe.perMl, s.perMl) ?? l.amount }
+      return l
+    }))
+    if (s.key !== syringe.key) setSyringeKey(s.key)
+  }
+
+  // A known oil (test, tren, mast...) is guessed as liquid while you type,
+  // before you reach the vial inputs, until you pick Liquid or Powder yourself.
+  function nameChange(key: string, newName: string) {
+    const line = lines.find((l) => l.key === key)
+    if (!line || line.kindTouched) { update(key, { newName }); return }
+    const name = newName.trim()
+    const kind: VialKind = name.length >= 3 && findPKCompound(name) ? 'liquid' : route === 'SubQ' ? 'powder' : 'liquid'
+    update(key, { newName, kind })
+  }
+
+  // Typing a name you already have turns the line into that compound, with
+  // everything it remembers. A dose already typed in the same unit carries
+  // over; in another unit it can't, so it is cleared rather than reread. If
+  // you left the name for this line's dose field, that field starts empty so
+  // what you type is not appended to the remembered dose.
+  function nameBlur(key: string, into?: string) {
+    const line = lines.find((l) => l.key === key)
+    const name = line?.newName.trim()
+    if (!line || !name) return
+    const match = findCompoundByName(compounds, name)
+    if (!match) return
+    const typed = line.entryMode === 'dose' && line.unit === (match.unit ?? 'mg') ? line.amount : ''
+    pickCompound(key, String(match.id))
+    if (typed || into === `amt-${key}`) update(key, { amount: typed, entryMode: 'dose' })
+  }
+
+  function addLine() { setLines((prev) => [...prev, blankLine(route)]) }
   function removeLine(key: string) { setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.key !== key) : prev)) }
 
-  const isPeptide = route === 'SubQ'
-
-  const resolved = lines.map((line) => {
-    const existing = typeof line.compoundId === 'number' ? compounds.find((c) => c.id === line.compoundId) : undefined
-    const unit = (existing?.unit ?? 'mg') as Unit
-    // Peptide concentration comes from the reconstitution maths; oils direct.
-    const vialMg = parseFloat(line.vialMg)
-    const water = parseFloat(line.water)
-    const conc = isPeptide
-      ? (vialMg > 0 && water > 0 ? vialMg / water : undefined)
-      : parseConcentrationMgPerMl(line.conc)
-    const d = derive(line.entryMode, parseFloat(line.amount), unit, conc)
-    const name = existing?.name ?? line.newName.trim()
+  const resolved: Resolved[] = lines.map((line) => {
+    const picked = typeof line.compoundId === 'number' ? compounds.find((c) => c.id === line.compoundId) : undefined
     const isNew = line.compoundId === NEW
-    const valid = Boolean((existing || (isNew && name)) && d.doseInUnit && d.doseInUnit > 0)
-    return { line, existing, unit, conc, vialMg, water, d, name, isNew, valid }
+    const name = picked?.name ?? line.newName.trim()
+    // A typed name you already have logs to that compound, never a duplicate.
+    const match = isNew && name ? findCompoundByName(compounds, name) : undefined
+    const existing = picked ?? match
+    const unit = existing ? existing.unit ?? 'mg' : line.unit
+    const vialMg = num(line.vialMg)
+    const water = num(line.water)
+    const strength = num(line.conc)
+    const conc = line.kind === 'powder'
+      ? (vialMg > 0 && water > 0 ? vialMg / water : undefined)
+      : (strength > 0 ? strength : undefined)
+    const d = derive(line.entryMode, num(line.amount), unit, conc, syringe.perMl)
+    const valid = Boolean((picked || (isNew && name)) && d.doseInUnit && d.doseInUnit > 0)
+    return { line, existing, match, unit, conc, vialMg, water, d, name, isNew, valid }
   })
 
   const validLines = resolved.filter((r) => r.valid)
   const canSave = validLines.length > 0 && !busy
+
+  // What fills the syringe: every line with an amount. The fill is only known
+  // when each of those has a volume, i.e. a strength to convert through.
+  const filled = resolved.filter((r) => (r.existing || r.isNew) && num(r.line.amount) > 0)
+  const fillKnown = filled.length > 0 && filled.every((r) => r.d.ml !== undefined)
 
   async function save() {
     if (!canSave) return
@@ -198,48 +340,52 @@ export function AddInjection({
     try {
       const takenAt = new Date().toISOString()
       for (const r of validLines) {
-        const recon = isPeptide && r.vialMg > 0 && r.water > 0 ? { vialMg: r.vialMg, reconstituteMl: r.water } : {}
+        const dose = Number(roundForMode(r.d.doseInUnit!, 'dose', r.unit))
+        // Everything this compound prefills next time. Only defined values:
+        // Dexie deletes a key when the value is undefined, which used to wipe
+        // a saved concentration whenever the vial pair was left blank.
+        // Switching to liquid keeps the powder numbers; vialKind decides.
+        const memory = {
+          // A typed name that matched an existing compound only overrides its
+          // vial when you actually set one up on this line.
+          ...((!r.match || r.line.kindTouched || r.conc !== undefined) && { vialKind: r.line.kind }),
+          syringe: syringe.key,
+          entryMode: r.line.entryMode,
+          defaultRoute: route,
+          lastDose: dose,
+          ...(r.conc !== undefined && { concentrationMgPerMl: r.conc }),
+          // Each powder number on its own: a vial size typed (or read from old
+          // entries) without the water yet must still be remembered.
+          ...(r.line.kind === 'powder' && r.vialMg > 0 && { vialMg: r.vialMg }),
+          ...(r.line.kind === 'powder' && r.water > 0 && { reconstituteMl: r.water }),
+        }
         let compoundId: number
-        // Typing a name that already exists reuses that row. Without this,
-        // "＋ New compound…" mints a duplicate every time the picker fails to
-        // offer an existing one, which is how five Retatrutides happen.
-        const already = r.existing ?? (r.isNew ? findCompoundByName(rawCompounds, r.name) : undefined)
-        if (already) {
-          compoundId = already.id!
-          await db.compounds.update(compoundId, {
-            // Only write values we actually have: Dexie deletes a key when the
-            // value is undefined, which used to wipe a saved concentration
-            // whenever the vial/water pair was left blank.
-            ...(r.conc !== undefined && { concentrationMgPerMl: r.conc }),
-            defaultRoute: route,
-            lastDose: Number(r.d.doseInUnit!.toFixed(r.unit === 'mcg' ? 1 : 3)),
-            ...recon,
-          })
+        if (r.existing) {
+          compoundId = r.existing.id!
+          await db.compounds.update(compoundId, memory)
         } else {
           compoundId = (await db.compounds.add({
             name: r.name,
-            category: isPeptide ? 'Peptide' : 'Other',
-            defaultDose: Number(r.d.doseInUnit!.toFixed(3)),
-            unit: 'mg',
-            concentration: r.conc ? `${r.conc} mg/ml` : undefined,
-            concentrationMgPerMl: r.conc,
-            defaultRoute: route,
-            lastDose: Number(r.d.doseInUnit!.toFixed(3)),
+            category: r.line.kind === 'powder' ? 'Peptide' : 'Other',
+            defaultDose: dose,
+            unit: r.unit,
             schedule: 'As needed',
             color: COLORS[(compounds.length + validLines.indexOf(r)) % COLORS.length],
-            ...recon,
+            ...memory,
           })) as number
         }
         const activeVial = vials ? pickActiveVial(vials, compoundId) : undefined
         await logInjection({
           compoundId,
           takenAt,
-          dose: Number(r.d.doseInUnit!.toFixed(r.unit === 'mcg' ? 1 : 3)),
+          dose,
           unit: r.unit,
           route,
           site: site || undefined,
           notes: notes || undefined,
           vialId: activeVial?.id,
+          // The volume actually drawn, so a wrong strength can be fixed later.
+          ...(r.d.ml !== undefined && { vialAmount: `${r.d.ml.toFixed(3)} mL` }),
         })
       }
       // Symptom check-in rides along with the injection (same moment), but only
@@ -265,9 +411,6 @@ export function AddInjection({
           className="w-full"
           options={[{ value: 'IM', label: 'Intramuscular' }, { value: 'SubQ', label: 'Subcutaneous' }]}
         />
-        <p className="px-0.5 text-xs text-muted-foreground">
-          {isPeptide ? 'Subcutaneous for peptides. Reconstituted vials, drawn in units.' : 'Everything in this syringe is intramuscular.'}
-        </p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -279,15 +422,15 @@ export function AddInjection({
             <CompoundLine
               key={r.line.key}
               index={i}
-              line={r.line}
-              existing={r.existing}
-              conc={r.conc}
-              derived={r.d}
+              r={r}
               compounds={routeCompounds}
-              peptide={isPeptide}
+              route={route}
+              syringe={syringe}
               removable={resolved.length > 1}
               onPick={(v) => pickCompound(r.line.key, v)}
               onChange={(patch) => update(r.line.key, patch)}
+              onNameChange={(v) => nameChange(r.line.key, v)}
+              onNameBlur={(into) => nameBlur(r.line.key, into)}
               onRemove={() => removeLine(r.line.key)}
             />
           ))}
@@ -298,11 +441,16 @@ export function AddInjection({
       </section>
 
       <section className="flex flex-col gap-3">
+        <h2 className="px-0.5 eyebrow">Syringe</h2>
+        <SyringePanel syringe={syringe} filled={filled} fillKnown={fillKnown} onChange={(s) => applySyringe(s, true)} />
+      </section>
+
+      <section className="flex flex-col gap-3">
         <h2 className="px-0.5 eyebrow">Site</h2>
         <SitePicker route={route} value={site} injections={injections} onChange={setSite} />
       </section>
 
-      {/* How do you feel? — optional symptom check-in that rides with the shot */}
+      {/* How do you feel? Optional symptom check-in that rides with the shot */}
       <section className="flex flex-col gap-3">
         <button
           type="button"
@@ -350,26 +498,37 @@ export function AddInjection({
 }
 
 function CompoundLine({
-  index, line, existing, conc, derived, compounds, peptide, removable, onPick, onChange, onRemove,
+  index, r, compounds, route, syringe, removable, onPick, onChange, onNameChange, onNameBlur, onRemove,
 }: {
   index: number
-  line: Line
-  existing?: Compound
-  conc?: number
-  derived: ReturnType<typeof derive>
+  r: Resolved
   compounds: Compound[]
-  peptide: boolean
+  route: Route
+  syringe: Syringe
   removable: boolean
   onPick: (v: string) => void
   onChange: (patch: Partial<Line>) => void
+  onNameChange: (name: string) => void
+  onNameBlur: (into?: string) => void
   onRemove: () => void
 }) {
-  const unit = (existing?.unit ?? 'mg') as Unit
-  // Units mode needs a concentration to convert through. Without one `derive`
-  // returns nothing, which used to leave Save dead with no explanation.
-  const canUnits = (unit === 'mg' || unit === 'mcg') && conc !== undefined
-  const overdraw = derived.ml !== undefined && derived.ml > 1
+  const { line, existing, match, unit, conc, d } = r
   const isNew = line.compoundId === NEW
+  const u = unitLabel(unit)
+  const iu = unit === 'iu'
+  const insulin = syringe.perMl === 100
+  const drawWord = insulin ? 'units' : 'mL'
+  const perMl = iu ? 'IU/mL' : 'mg/mL'
+  const v = !isNew && existing ? vialOf(existing) : undefined
+  const legacy = !!v?.legacy && (v.conc !== undefined || v.vialMg !== undefined || v.water !== undefined)
+  // Opening the editor from its summary moves focus into it; opening on load does not.
+  const [focusVial, setFocusVial] = useState(false)
+  // The draw tab needs a strength to convert through. Once you're on it, the
+  // toggle stays so you can always get back.
+  const canDraw = converts(unit) && (conc !== undefined || line.entryMode === 'draw')
+  const collapsed = !line.setupOpen && conc !== undefined
+  const draw = d.ml !== undefined ? formatDraw(d.ml, syringe) : undefined
+  const showReadout = num(line.amount) > 0 && d.ml !== undefined && (line.entryMode === 'dose' || d.doseInUnit !== undefined)
 
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5">
@@ -378,12 +537,12 @@ function CompoundLine({
           aria-label="Compound"
           value={line.compoundId === '' ? '' : String(line.compoundId)}
           onChange={(e) => onPick(e.target.value)}
-          className="h-10 w-full appearance-none rounded-md border border-input bg-transparent bg-[length:1em_1em] bg-[right_0.75rem_center] bg-no-repeat pr-8 pl-3 text-sm font-medium shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          style={{ backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m6 9 6 6 6-6'/%3e%3c/svg%3e\")" }}
+          className={SELECT_CLASS}
+          style={SELECT_STYLE}
         >
           <option value="" disabled>{index === 0 ? 'Choose compound…' : 'Add compound…'}</option>
           {compounds.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-          <option value={NEW}>＋ New {peptide ? 'peptide' : 'compound'}…</option>
+          <option value={NEW}>＋ New compound…</option>
         </select>
         {removable && (
           <Button variant="ghost" size="icon" className="size-9 shrink-0 text-muted-foreground hover:text-destructive" aria-label="Remove compound" onClick={onRemove}>
@@ -395,86 +554,235 @@ function CompoundLine({
       {isNew && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={`name-${line.key}`}>Name</Label>
-          <Input id={`name-${line.key}`} autoFocus placeholder={peptide ? 'e.g. Retatrutide' : 'e.g. Testosterone E'} value={line.newName} onChange={(e) => onChange({ newName: e.target.value })} />
+          <Input
+            id={`name-${line.key}`}
+            autoFocus
+            placeholder={route === 'SubQ' ? 'e.g. BPC-157' : 'e.g. Testosterone E'}
+            value={line.newName}
+            onChange={(e) => onNameChange(e.target.value)}
+            onBlur={(e) => onNameBlur((e.relatedTarget as HTMLElement | null)?.id)}
+          />
         </div>
       )}
 
-      {(existing || isNew) && (
-        <>
-          {peptide ? (
-            /* Reconstitution: powder + water → mg/mL */
-            <div className="flex flex-col gap-2">
-              <Label>Vial</Label>
+      {isNew && (match ? (
+        <p className="px-0.5 text-xs text-muted-foreground">
+          Already in your list. This logs to {match.name} in {unitLabel(match.unit)}.
+        </p>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <Label>Measured in</Label>
+          <Segmented<DoseUnit>
+            ariaLabel="Measured in"
+            value={line.unit as DoseUnit}
+            // Relabels only. Nothing typed is converted.
+            onChange={(v) => onChange({ unit: v })}
+            options={[{ value: 'mg', label: 'mg' }, { value: 'mcg', label: 'mcg' }, { value: 'iu', label: 'IU' }]}
+          />
+        </div>
+      ))}
+
+      {(existing || isNew) && converts(unit) && (collapsed ? (
+        <button
+          type="button"
+          onClick={() => { setFocusVial(true); onChange({ setupOpen: true }) }}
+          className="flex w-full items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted"
+        >
+          <span className="min-w-0 break-words tabular-nums">
+            <span className="text-muted-foreground">Vial · </span>
+            {line.kind === 'liquid'
+              ? `Liquid · ${fmt(conc!)} ${perMl}`
+              : `Powder · ${fmt(r.vialMg)} ${iu ? 'IU' : 'mg'} + ${fmt(r.water)} mL · ${fmt(conc!)} ${perMl}`}
+          </span>
+          <span className="shrink-0 text-xs text-muted-foreground">Edit</span>
+        </button>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <Label>Vial</Label>
+            <Segmented<VialKind>
+              ariaLabel="Vial type"
+              value={line.kind}
+              onChange={(k) => onChange({ kind: k, kindTouched: true })}
+              options={[{ value: 'liquid', label: 'Liquid' }, { value: 'powder', label: 'Powder' }]}
+            />
+          </div>
+          {line.kind === 'liquid' ? (
+            <>
+              <div className="relative">
+                <Input
+                  aria-label="Strength"
+                  autoFocus={focusVial}
+                  inputMode="decimal"
+                  className="pr-16"
+                  placeholder={route === 'SubQ' ? 'e.g. 100' : 'e.g. 300'}
+                  value={line.conc}
+                  onChange={(e) => onChange({ conc: e.target.value })}
+                />
+                <span className={SUFFIX}>{perMl}</span>
+              </div>
+              <p className="px-0.5 text-xs text-muted-foreground">The strength printed on the vial.</p>
+            </>
+          ) : (
+            <>
               <div className="grid grid-cols-2 gap-3">
                 <div className="relative">
-                  <Input inputMode="decimal" className="pr-9" placeholder="10" value={line.vialMg} onChange={(e) => onChange({ vialMg: e.target.value })} aria-label="Vial strength mg" />
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">mg</span>
+                  <Input autoFocus={focusVial} inputMode="decimal" className="pr-10" placeholder={iu ? '5000' : '10'} value={line.vialMg} onChange={(e) => onChange({ vialMg: e.target.value })} aria-label={iu ? 'Powder in the vial, IU' : 'Powder in the vial, mg'} />
+                  <span className={SUFFIX}>{iu ? 'IU' : 'mg'}</span>
                 </div>
                 <div className="relative">
-                  <Input inputMode="decimal" className="pr-9" placeholder="2" value={line.water} onChange={(e) => onChange({ water: e.target.value })} aria-label="Bac water mL" />
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">mL</span>
+                  <Input inputMode="decimal" className="pr-10" placeholder="2" value={line.water} onChange={(e) => onChange({ water: e.target.value })} aria-label="Bac water added, mL" />
+                  <span className={SUFFIX}>mL</span>
                 </div>
               </div>
               <p className="px-0.5 text-xs text-muted-foreground">
-                Powder in the vial + bac water you add{conc !== undefined ? ` = ${conc.toFixed(conc < 10 ? 1 : 0)} mg/mL` : ''}.
+                Powder in the vial + bac water you add{conc !== undefined ? ` = ${fmt(conc)} ${perMl}` : ''}.
               </p>
+            </>
+          )}
+          {legacy && <p className="px-0.5 text-xs text-muted-foreground">Check this once. It was filled in from your older entries.</p>}
+        </div>
+      ))}
+
+      {(existing || isNew) && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor={`amt-${line.key}`}>{line.entryMode === 'draw' ? 'Draw on syringe' : `Dose (${u})`}</Label>
+            {canDraw && (
+              <Segmented<EntryMode>
+                ariaLabel="Enter as"
+                value={line.entryMode}
+                // Switching the tab re-expresses what you already typed, so
+                // 20 mg becomes the marks to draw to and back again.
+                onChange={(m) => onChange(switchEntryMode(line, m, unit, conc, syringe.perMl))}
+                options={[{ value: 'dose', label: u }, { value: 'draw', label: drawWord }]}
+              />
+            )}
+          </div>
+          <div className="relative">
+            <Input
+              id={`amt-${line.key}`}
+              inputMode="decimal"
+              className="pr-16 text-base"
+              placeholder={line.entryMode === 'draw' ? (insulin ? 'e.g. 20' : 'e.g. 0.5') : ''}
+              value={line.amount}
+              onChange={(e) => onChange({ amount: e.target.value })}
+            />
+            <span className={cn(SUFFIX, 'text-sm')}>{line.entryMode === 'draw' ? drawWord : u}</span>
+          </div>
+          {line.entryMode === 'draw' && conc === undefined && (
+            <p className="px-0.5 text-xs text-muted-foreground">Add the vial strength to work out the dose.</p>
+          )}
+          {showReadout && (
+            <div className="flex flex-col gap-1 rounded-lg border-l border-l-primary bg-muted/40 px-3 py-2.5 text-sm">
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 tabular-nums">
+                {line.entryMode === 'draw' ? (
+                  <>
+                    <span className="text-base font-semibold">{fmt(d.doseInUnit!)} <small className="text-xs font-normal text-muted-foreground">{u}</small></span>
+                    {insulin && <span>{fmtMl(d.ml!)} <small className="text-xs font-normal text-muted-foreground">mL</small></span>}
+                  </>
+                ) : (
+                  <>
+                    {insulin && <span>{fmtMl(d.ml!)} <small className="text-xs font-normal text-muted-foreground">mL</small></span>}
+                    <span className="text-base font-semibold">{draw} <small className="text-xs font-normal text-muted-foreground">{drawUnit(draw!, syringe)}</small></span>
+                  </>
+                )}
+              </div>
+              {iu && insulin && <p className="text-xs text-muted-foreground">IU is the dose. Units are the marks on the syringe.</p>}
             </div>
-          ) : (
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Syringe: which barrel, how full, where to stop ──────────────────────────
+function SyringePanel({
+  syringe, filled, fillKnown, onChange,
+}: { syringe: Syringe; filled: Resolved[]; fillKnown: boolean; onChange: (s: Syringe) => void }) {
+  const insulin = syringe.perMl === 100
+  const mls = fillKnown ? filled.map((r) => r.d.ml!) : []
+  const totalMl = mls.reduce((a, b) => a + b, 0)
+  const advice = fillKnown ? syringeAdvice(totalMl, Math.min(...mls), syringe) : undefined
+  const over = advice?.kind === 'over'
+  const total = formatDraw(totalMl, syringe)
+  const totalLabel = `${total} ${drawUnit(total, syringe)}`
+  const cap = insulin ? `${syringe.capacityMl * 100} units` : `${syringe.capacityMl} mL`
+  const marks = drawMarks(mls, syringe)
+  // The advice button disappears once used; hand focus to the choice it made.
+  const selectRef = useRef<HTMLSelectElement>(null)
+
+  return (
+    <div className="flex flex-col gap-2">
+      <select
+        ref={selectRef}
+        aria-label="Syringe"
+        value={syringe.key}
+        onChange={(e) => onChange(SYRINGES.find((s) => s.key === e.target.value) ?? syringe)}
+        className={SELECT_CLASS}
+        style={SELECT_STYLE}
+      >
+        <optgroup label="Insulin (marked in units)">
+          {SYRINGES.filter((s) => s.perMl === 100).map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+        </optgroup>
+        <optgroup label="Regular (marked in mL)">
+          {SYRINGES.filter((s) => s.perMl === 1).map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+        </optgroup>
+      </select>
+      <p className="px-0.5 text-xs text-muted-foreground">
+        {insulin ? 'Insulin syringes are marked in units. 100 units is 1 mL on every size.' : 'Regular syringes are marked in mL.'}
+      </p>
+
+      {fillKnown ? (
+        <div className="mt-1 flex flex-col gap-3 rounded-lg bg-muted/40 px-3 py-3">
+          <div className="flex items-center gap-3">
+            <div role="img" aria-label={`${totalLabel} of ${cap}`} className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn('h-full rounded-full transition-[width] duration-200', over ? 'bg-destructive' : 'bg-primary')}
+                style={{ width: `${Math.min(100, (totalMl / syringe.capacityMl) * 100)}%` }}
+              />
+            </div>
+            <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{total} of {cap}</span>
+          </div>
+
+          {filled.length > 1 && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`conc-${line.key}`}>Concentration <span className="font-normal text-muted-foreground">mg/mL</span></Label>
-              <Input id={`conc-${line.key}`} inputMode="decimal" placeholder="e.g. 300" value={line.conc} onChange={(e) => onChange({ conc: e.target.value })} />
+              <p className="eyebrow">Draw to</p>
+              {filled.map((r, i) => (
+                <div key={r.line.key} className="flex items-center gap-2.5">
+                  <span className="size-2.5 shrink-0 rounded-full bg-muted-foreground/40" style={r.existing?.color ? { background: r.existing.color } : undefined} />
+                  <span className="min-w-0 flex-1 truncate text-sm">{r.name}</span>
+                  <span className="shrink-0 text-base font-semibold tabular-nums">
+                    {marks[i]} <small className="text-xs font-normal text-muted-foreground">{drawUnit(marks[i], syringe)}</small>
+                  </span>
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">Draw in this order, stopping at each mark.</p>
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor={`amt-${line.key}`}>{line.entryMode === 'units' ? 'Draw on syringe' : `Dose (${unit})`}</Label>
-              {canUnits && (
-                <Segmented
-                  value={line.entryMode}
-                  // Switching the tab re-expresses what you already typed in the
-                  // other unit, so 20 mg becomes the units to draw and back again.
-                  onChange={(m) => onChange(switchEntryMode(line, m, unit, conc))}
-                  options={[{ value: 'dose', label: unit }, { value: 'units', label: 'units' }]}
-                />
+          {advice && (
+            <div className="flex flex-col gap-2">
+              <p className={cn('flex items-start gap-1.5 text-xs', over ? 'font-medium text-destructive' : 'text-muted-foreground')}>
+                {over && <TriangleAlert className="mt-px size-3.5 shrink-0" />}
+                {over
+                  ? advice.use
+                    ? `${totalLabel} won't fit. This syringe holds ${cap}.`
+                    : `${totalLabel} won't fit in any syringe here. Split it into two shots.`
+                  : 'Small draw for this syringe, easy to misread.'}
+              </p>
+              {advice.use && (
+                <Button variant="outline" size="sm" className="self-start" onClick={() => { onChange(advice.use!); selectRef.current?.focus() }}>
+                  Use {advice.use.short}
+                </Button>
               )}
             </div>
-            <div className="relative">
-              <Input
-                id={`amt-${line.key}`}
-                inputMode="decimal"
-                className="pr-14 text-base"
-                placeholder={peptide && line.entryMode === 'units' ? 'e.g. 20' : ''}
-                value={line.amount}
-                onChange={(e) => onChange({ amount: e.target.value })}
-              />
-              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
-                {line.entryMode === 'units' ? 'units' : unit}
-              </span>
-            </div>
-            {line.amount && (derived.mg !== undefined || derived.ml !== undefined) && (
-              <div className={cn('flex flex-col gap-1 rounded-lg border-l bg-muted/40 px-3 py-2.5 text-sm', overdraw ? 'border-l-destructive' : 'border-l-primary')}>
-                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 tabular-nums">
-                  {line.entryMode === 'units' && derived.mg !== undefined && (
-                    <span className="text-base font-semibold">{derived.mg.toFixed(derived.mg < 10 ? 2 : 0)} <small className="text-xs font-normal text-muted-foreground">mg</small></span>
-                  )}
-                  {derived.ml !== undefined && (
-                    <span className={cn(line.entryMode === 'dose' && 'text-base font-semibold')}>{derived.ml.toFixed(2)} <small className="text-xs font-normal text-muted-foreground">mL</small></span>
-                  )}
-                  {line.entryMode === 'dose' && derived.units !== undefined && (
-                    <span className="text-base font-semibold">{derived.units.toFixed(0)} <small className="text-xs font-normal text-muted-foreground">units</small></span>
-                  )}
-                </div>
-                {overdraw && (
-                  <p className="flex items-center gap-1.5 text-xs font-medium text-destructive">
-                    <TriangleAlert className="size-3.5 shrink-0" /> Over 1 mL. Split it or use a bigger barrel.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </>
-      )}
+          )}
+        </div>
+      ) : filled.length > 0 ? (
+        <p className="px-0.5 text-xs text-muted-foreground">Add the vial strength for every compound to check the fill.</p>
+      ) : null}
     </div>
   )
 }

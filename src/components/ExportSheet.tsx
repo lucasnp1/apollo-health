@@ -14,6 +14,7 @@ import { Download, FileText, Share2 } from 'lucide-react'
 import type { BodyMetric, Compound, InjectionLog, LabExam, Symptom, VitalLog } from '../lib/db'
 import type { EnrichedResult } from '../lib/insights'
 import { ALL_SYMPTOMS, ratingOf } from '../lib/symptoms'
+import { unitLabel } from '../lib/dose'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
@@ -48,7 +49,7 @@ function injectionsSection(injections: InjectionLog[], compounds: Compound[], co
       return [
         format(parseISO(i.takenAt), 'dd/MM/yyyy HH:mm'),
         c?.name ?? '',
-        i.rawDose ?? (i.dose != null ? `${i.dose} ${i.unit}` : ''),
+        i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : ''),
         i.route ?? 'IM',
         i.site ?? '',
         i.notes ?? '',

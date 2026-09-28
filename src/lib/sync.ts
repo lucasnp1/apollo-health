@@ -25,7 +25,7 @@ export type TableSyncResult = {
 
 export type SyncSummary = TableSyncResult
 
-const CURSOR_KEY = (slug: string) => `sync.cursor.${slug}`
+const CURSOR_KEY = (spec: TableSpec) => `sync.cursor.${spec.slug}${spec.rev ? `.r${spec.rev}` : ''}`
 const BACKFILL_KEY = 'sync.initialBackfillDone'
 
 export async function syncAll(direction: Direction = 'both'): Promise<SyncSummary[]> {
@@ -79,7 +79,7 @@ async function syncTable(spec: TableSpec, direction: Direction): Promise<TableSy
 // After:  1 bulk read + pre-fetched FK cache + 1 bulkPut/bulkDelete = fast.
 
 async function pullTable(spec: TableSpec): Promise<number> {
-  const cursorRow = await db.meta.get(CURSOR_KEY(spec.slug))
+  const cursorRow = await db.meta.get(CURSOR_KEY(spec))
   let since = Number(cursorRow?.value || 0)
   let pulled = 0
 
@@ -92,7 +92,7 @@ async function pullTable(spec: TableSpec): Promise<number> {
     pulled += await applyServerRowsBatch(spec, res.rows)
 
     since = Math.max(since, Number(res.cursor) || since)
-    await db.meta.put({ key: CURSOR_KEY(spec.slug), value: String(since) })
+    await db.meta.put({ key: CURSOR_KEY(spec), value: String(since) })
     if (!res.hasMore) break
   }
   return pulled

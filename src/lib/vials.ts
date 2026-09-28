@@ -1,12 +1,45 @@
-import type { Unit } from './db'
+import type { Compound, Unit, VialKind } from './db'
 
-// Best-effort parse of a free-text concentration string into mg/mL.
-// Handles "250 mg/ml", "250mg/mL", "200 mg per ml", and bare "250" (assumed mg/mL).
-export function parseConcentrationMgPerMl(text?: string): number | undefined {
-  if (!text) return undefined
-  const m = text.match(/(\d+(?:\.\d+)?)\s*(?:mg)?\s*(?:\/|per)?\s*m?l?/i)
-  const n = m ? parseFloat(m[1]) : NaN
+const toNum = (s: string) => {
+  const n = parseFloat(s.replace(',', '.'))
   return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+// Legacy free-text `concentration` held two different things: a strength
+// ("300/ml", "250 mg/ml", bare "60.0") for oils, and the VIAL size ("10mg")
+// for peptides. Each parser only accepts its own shape, so "10mg" is never
+// read as 10 mg/mL again.
+export function concFromText(t?: string): number | undefined {
+  const m = t?.match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:(?:mg|iu)?\s*(?:\/|per)\s*ml)?\s*$/i)
+  return m ? toNum(m[1]) : undefined
+}
+
+export function vialFromText(t?: string): number | undefined {
+  const m = t?.match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:mg|iu)?\s*$/i)
+  return m ? toNum(m[1]) : undefined
+}
+
+export type VialInfo = { kind: VialKind; conc?: number; vialMg?: number; water?: number; legacy: boolean }
+
+/**
+ * How a compound's vial is set up. Rows saved by the current logger carry an
+ * explicit `vialKind`; older rows (legacy) are inferred once from what they
+ * hold, never from the route: a testosterone once logged SubQ is still an oil.
+ */
+export function vialOf(c: Partial<Compound>): VialInfo {
+  const legacy = c.vialKind !== 'liquid' && c.vialKind !== 'powder'
+  const kind: VialKind = !legacy
+    ? c.vialKind!
+    : ((c.vialMg ?? 0) > 0 && (c.reconstituteMl ?? 0) > 0) || c.category === 'Peptide' || c.unit === 'iu'
+      ? 'powder'
+      : 'liquid'
+  return {
+    kind,
+    legacy,
+    vialMg: c.vialMg ?? (legacy && kind === 'powder' ? vialFromText(c.concentration) : undefined),
+    water: c.reconstituteMl,
+    conc: c.concentrationMgPerMl ?? (legacy ? concFromText(c.concentration) : undefined),
+  }
 }
 
 // Convert a dose in the user's unit to mL consumed from a vial with known mg/mL.
@@ -19,4 +52,3 @@ export function mlFromDose(dose: number, unit: Unit, concentrationMgPerMl?: numb
   if (unit === 'mcg') return dose / 1000 / concentrationMgPerMl
   return undefined
 }
-

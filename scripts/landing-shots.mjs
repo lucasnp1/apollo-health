@@ -47,9 +47,9 @@ const seeded = await page.evaluate(async () => {
   const sync = () => ({ serverId: crypto.randomUUID(), updatedAt: now, dirty: 1 })
 
   const compounds = [
-    { name: 'Testosterone Enanthate', category: 'TRT', defaultDose: 150, unit: 'mg', concentration: '250 mg/mL', schedule: 'Every 3.5 days', color: '#E9A23B', ester: 'Enanthate', halfLifeDays: 4.5, peakHours: 48, concentrationMgPerMl: 250, defaultRoute: 'IM', lastDose: 150 },
-    { name: 'HCG', category: 'Ancillary', defaultDose: 500, unit: 'iu', schedule: 'Twice a week', color: '#3B82F6', defaultRoute: 'SubQ', lastDose: 500, vialMg: 5000, reconstituteMl: 2 },
-    { name: 'BPC-157', category: 'Peptide', defaultDose: 250, unit: 'mcg', schedule: 'Daily', color: '#A78BFA', defaultRoute: 'SubQ', lastDose: 250, vialMg: 5, reconstituteMl: 2 },
+    { name: 'Testosterone Enanthate', category: 'TRT', defaultDose: 150, unit: 'mg', concentration: '250 mg/mL', schedule: 'Every 3.5 days', color: '#E9A23B', ester: 'Enanthate', halfLifeDays: 4.5, peakHours: 48, concentrationMgPerMl: 250, defaultRoute: 'IM', lastDose: 150, vialKind: 'liquid', syringe: 'ml1', entryMode: 'dose' },
+    { name: 'HCG', category: 'Ancillary', defaultDose: 500, unit: 'iu', schedule: 'Twice a week', color: '#3B82F6', defaultRoute: 'SubQ', lastDose: 500, vialMg: 5000, reconstituteMl: 2, vialKind: 'powder', syringe: 'u100', entryMode: 'dose' },
+    { name: 'BPC-157', category: 'Peptide', defaultDose: 250, unit: 'mcg', schedule: 'Daily', color: '#A78BFA', defaultRoute: 'SubQ', lastDose: 250, vialMg: 5, reconstituteMl: 2, vialKind: 'powder', syringe: 'u100', entryMode: 'dose' },
   ]
 
   const req = indexedDB.open('apollo-health-local')

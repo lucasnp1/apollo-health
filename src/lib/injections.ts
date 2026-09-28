@@ -46,11 +46,16 @@ export async function logInjection(
     }
     if (entry.vialId && entry.dose !== undefined) {
       const vial = await db.vials.get(entry.vialId)
-      const ml = vial ? mlFromDose(entry.dose, entry.unit, vial.concentrationMgPerMl) : undefined
+      // The volume the logger measured wins; the vial's own strength is only
+      // a fallback for callers that don't know it.
+      const given = entry.vialAmount ? parseFloat(entry.vialAmount) : NaN
+      const ml = vial
+        ? (given > 0 ? given : mlFromDose(entry.dose, entry.unit, vial.concentrationMgPerMl))
+        : undefined
       if (vial && ml !== undefined) {
         const remaining = Math.max(0, vial.remainingMl - ml)
         await db.vials.update(vial.id!, { remainingMl: remaining })
-        nextEntry = { ...nextEntry, vialAmount: `${ml.toFixed(3)} mL` }
+        if (!entry.vialAmount) nextEntry = { ...nextEntry, vialAmount: `${ml.toFixed(3)} mL` }
       }
     }
     return db.injections.add(nextEntry)

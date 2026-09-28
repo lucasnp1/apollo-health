@@ -8,6 +8,7 @@ import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, ty
 import { ALL_SYMPTOMS, chipTone, ratingOf } from '../lib/symptoms'
 import { archiveRow, restoreRow, setExamArchived, setFileArchived } from '../lib/archive'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
+import { unitLabel } from '../lib/dose'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { FeedList, FeedRow, type FeedStatus } from '../components/FeedList'
@@ -266,7 +267,7 @@ const INJ_COLS: Col<InjRow>[] = [
       <span className="size-2 shrink-0 rounded-full" style={{ background: r.color }} />{r.name}
     </span>
   ) },
-  { key: 'amount', label: 'Amount', num: true, render: (r) => r.inj.rawDose ?? (r.inj.dose != null ? `${r.inj.dose} ${r.inj.unit}` : '—') },
+  { key: 'amount', label: 'Amount', num: true, render: (r) => r.inj.rawDose ?? (r.inj.dose != null ? `${r.inj.dose} ${unitLabel(r.inj.unit)}` : '—') },
   { key: 'route', label: 'Route', render: (r) => r.inj.route },
   { key: 'site', label: 'Site', render: (r) => r.inj.site ?? '—' },
   { key: 'weight', label: 'Body wt', num: true, defaultHidden: true, render: (r) => (r.inj.weightKg != null ? `${r.inj.weightKg} kg` : '—') },
@@ -462,7 +463,7 @@ export function Timeline({
     return [
       ...injections.map((i): TimelineEvent => {
         const name = compoundMap.get(i.compoundId)?.name ?? 'Injection'
-        const dose = i.rawDose ?? (i.dose != null ? `${i.dose} ${i.unit}` : undefined)
+        const dose = i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : undefined)
         return {
           id: `i-${i.id}`,
           date: parseISO(i.takenAt),

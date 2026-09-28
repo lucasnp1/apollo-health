@@ -15,6 +15,7 @@ import { passwordOk } from '../lib/password'
 import { LegalLink } from '../components/LegalLink'
 import { RecoveryCodesList } from '../components/RecoveryCodes'
 import { usePlan } from '../lib/plan'
+import { unitLabel } from '../lib/dose'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -816,7 +817,7 @@ function PrintReport({
                 <tr key={inj.id}>
                   <td>{format(parseISO(inj.takenAt), 'MMM d, yyyy HH:mm')}</td>
                   <td>{compoundMap.get(inj.compoundId)?.name ?? '—'}</td>
-                  <td>{inj.dose} {compoundMap.get(inj.compoundId)?.unit ?? ''}</td>
+                  <td>{inj.dose} {unitLabel(inj.unit ?? compoundMap.get(inj.compoundId)?.unit)}</td>
                   <td>{(inj as { route?: string }).route ?? 'IM'}</td>
                   <td>{inj.site ?? '—'}</td>
                   <td>{inj.notes ?? ''}</td>

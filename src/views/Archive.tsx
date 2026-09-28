@@ -3,6 +3,7 @@ import { format, parseISO } from 'date-fns'
 import { Archive as ArchiveIcon, RotateCcw } from 'lucide-react'
 import { db } from '../lib/db'
 import { restoreRow, setFileArchived } from '../lib/archive'
+import { unitLabel } from '../lib/dose'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -33,7 +34,7 @@ export function Archive() {
 
   const groups: Array<{ key: string; title: string; items: Item[] }> = [
     { key: 'files', title: 'Files', items: (files ?? []).map((f) => ({ id: f.id!, label: f.name, at: f.addedAt, restore: () => setFileArchived(f.id!, false) })) },
-    { key: 'inj', title: 'Injections', items: (injections ?? []).map((i) => ({ id: i.id!, label: `${compMap.get(i.compoundId)?.name ?? 'Injection'} · ${i.rawDose ?? (i.dose != null ? `${i.dose} ${i.unit}` : '')}`, at: i.takenAt, restore: () => restoreRow('injections', i.id!) })) },
+    { key: 'inj', title: 'Injections', items: (injections ?? []).map((i) => ({ id: i.id!, label: `${compMap.get(i.compoundId)?.name ?? 'Injection'} · ${i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : '')}`, at: i.takenAt, restore: () => restoreRow('injections', i.id!) })) },
     { key: 'weight', title: 'Weight', items: (bodyMetrics ?? []).filter((b) => b.weightKg != null).map((b) => ({ id: b.id!, label: `${b.weightKg} kg`, at: b.measuredAt, restore: () => restoreRow('bodyMetrics', b.id!) })) },
     { key: 'bp', title: 'Blood pressure', items: (vitals ?? []).map((v) => ({ id: v.id!, label: `${v.systolic}/${v.diastolic}`, at: v.measuredAt, restore: () => restoreRow('vitals', v.id!) })) },
     { key: 'sym', title: 'Symptoms', items: (symptoms ?? []).map((s) => ({ id: s.id!, label: 'Check-in', at: s.recordedAt, restore: () => restoreRow('symptoms', s.id!) })) },

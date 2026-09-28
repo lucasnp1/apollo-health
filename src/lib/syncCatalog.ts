@@ -19,6 +19,10 @@ export type TableSpec = {
   // FK columns that point to another local Dexie row by numeric id. Sync engine
   // resolves to/from server UUIDs.
   foreignKeys?: ForeignKey[]
+  // Bump when adding columns. It keys a fresh pull cursor, so every device
+  // re-pulls the table once and picks up values for rows it already pulled
+  // while its bundle did not know the new columns yet.
+  rev?: number
 }
 
 // Parent-first order. Children depend on earlier entries.
@@ -29,6 +33,7 @@ export const TABLES: TableSpec[] = [
   {
     slug: 'compounds',
     dexie: 'compounds',
+    rev: 12,
     columns: {
       name: 'text',
       category: 'text',
@@ -48,6 +53,10 @@ export const TABLES: TableSpec[] = [
       lastDose: 'real',
       vialMg: 'real',
       reconstituteMl: 'real',
+      // Migration 0012: vial kind and syringe are per compound, not per route.
+      vialKind: 'text',
+      syringe: 'text',
+      entryMode: 'text',
     },
   },
   {

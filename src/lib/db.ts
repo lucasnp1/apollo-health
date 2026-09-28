@@ -1,6 +1,8 @@
 import Dexie, { type Table } from 'dexie'
 
 export type Unit = 'mg' | 'mcg' | 'iu' | 'ml' | 'tablet' | 'capsule'
+export type VialKind = 'liquid' | 'powder'
+export type SyringeKey = 'u30' | 'u50' | 'u100' | 'ml1' | 'ml2' | 'ml3'
 export type TestosteroneEster = 'Enanthate' | 'Cypionate' | 'Propionate' | 'Undecanoate' | 'Custom'
 
 export type Compound = {
@@ -18,13 +20,21 @@ export type Compound = {
   archived?: boolean
   // Per-compound values remembered for the next injection (protocols removed —
   // the compound itself carries its defaults now). Non-indexed → no migration.
+  // concentrationMgPerMl and vialMg are in the vial's unit: mg, or IU when
+  // unit === 'iu'. The names are historical.
   concentrationMgPerMl?: number
   defaultRoute?: 'IM' | 'SubQ'
   lastDose?: number
-  // Peptides (SubQ) are reconstituted: powder strength + bac water added give
+  // Powder vials are reconstituted: powder strength + bac water added give
   // the concentration. Stored so the vial maths pre-fills next time.
   vialMg?: number
   reconstituteMl?: number
+  // Liquid (oil or ready-made solution) or powder you mix, on ANY route.
+  // Undefined = saved before this existed; vialOf() infers it.
+  vialKind?: VialKind
+  // Syringe of the last shot, and whether the dose or the draw was typed.
+  syringe?: SyringeKey
+  entryMode?: 'dose' | 'draw'
 } & SyncFields
 
 export type SyncFields = {

@@ -14,6 +14,7 @@ import { format, startOfWeek } from 'date-fns'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import type { Compound, InjectionLog } from '../lib/db'
 import { findPKCompound, PK_COMPOUNDS } from '../lib/pk'
+import { unitLabel } from '../lib/dose'
 import { PanelCard, PanelEmpty } from './dashboard/PanelCard'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { Segmented } from '@/components/ui/segmented'
@@ -290,7 +291,7 @@ export function ActiveLevelsCard({
                 <span className="size-2.5 shrink-0 rounded-full" style={{ background: w.color }} />
                 <span className="min-w-0 flex-1 truncate font-medium">{w.name}</span>
                 <span className="shrink-0 font-mono text-sm font-semibold tabular-nums">
-                  {Math.round(w.total * 100) / 100} {w.unit}
+                  {Math.round(w.total * 100) / 100} {unitLabel(w.unit)}
                 </span>
               </li>
             ))}
