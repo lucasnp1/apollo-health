@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { ChevronDown, ChevronUp, Plus, TriangleAlert, X } from 'lucide-react'
 import { db, type Compound, type InjectionLog, type Symptom, type Unit, type VialKind } from '../lib/db'
 import { logInjection, pickActiveVial } from '../lib/injections'
-import { compoundGroups, findCompoundByName, groupByCompoundId } from '../lib/compounds'
+import { compoundGroups, findCompoundByName, groupByCompoundId, randomDistinctColor } from '../lib/compounds'
 import { findPKCompound } from '../lib/pk'
 import { vialOf } from '../lib/vials'
 import {
@@ -35,7 +35,6 @@ import { cn } from '@/lib/utils'
 type Route = 'IM' | 'SubQ'
 type DoseUnit = 'mg' | 'mcg' | 'iu'
 const NEW = '__new__'
-const COLORS = ['#f4c95c', '#2566c4', '#2f8b54', '#c43c2f', '#7c5cff', '#d98324', '#3aa5a0']
 
 const SELECT_CLASS = 'h-10 w-full appearance-none rounded-md border border-input bg-transparent bg-[length:1em_1em] bg-[right_0.75rem_center] bg-no-repeat pr-8 pl-3 text-sm font-medium shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'
 const SELECT_STYLE: CSSProperties = { backgroundImage: "url(\"data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='m6 9 6 6 6-6'/%3e%3c/svg%3e\")" }
@@ -339,6 +338,8 @@ export function AddInjection({
     setBusy(true)
     try {
       const takenAt = new Date().toISOString()
+      // Colours already on screen, so each new compound gets one of its own.
+      const used = compounds.map((c) => c.color).filter(Boolean)
       for (const r of validLines) {
         const dose = Number(roundForMode(r.d.doseInUnit!, 'dose', r.unit))
         // Everything this compound prefills next time. Only defined values:
@@ -364,13 +365,15 @@ export function AddInjection({
           compoundId = r.existing.id!
           await db.compounds.update(compoundId, memory)
         } else {
+          const color = randomDistinctColor(used)
+          used.push(color)
           compoundId = (await db.compounds.add({
             name: r.name,
             category: r.line.kind === 'powder' ? 'Peptide' : 'Other',
             defaultDose: dose,
             unit: r.unit,
             schedule: 'As needed',
-            color: COLORS[(compounds.length + validLines.indexOf(r)) % COLORS.length],
+            color,
             ...memory,
           })) as number
         }

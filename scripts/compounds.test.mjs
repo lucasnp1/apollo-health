@@ -1,6 +1,6 @@
 // Compound grouping self-check. Run: node scripts/compounds.test.mjs
 import assert from 'node:assert/strict'
-import { compoundGroups, groupByCompoundId, findCompoundByName, compoundKey } from '../src/lib/compounds.ts'
+import { compoundGroups, groupByCompoundId, findCompoundByName, compoundKey, colorFixes, colorsClash, randomDistinctColor } from '../src/lib/compounds.ts'
 
 let n = 0
 const check = (name, fn) => { fn(); n++; console.log('  ok', name) }
@@ -63,6 +63,61 @@ check('rows with no id are grouped but contribute no filterable id', () => {
   const g = compoundGroups([C(undefined, 'Unsaved'), C(4, 'Unsaved')], [])
   assert.equal(g.length, 1)
   assert.deepEqual(g[0].ids, [4])
+})
+
+// --- colours ----------------------------------------------------------------
+// Production on 28 Sept 2026: name, colour, shots.
+const PROD = [
+  ['Testosterone E', '#0f8f84', 41], ['Retatrutide', '#2563eb', 69], ['BPC157', '#f59e0b', 34],
+  ['GHKCU', '#8b5cf6', 41], ['TB500', '#dc2626', 14], ['MOTSC', '#14b8a6', 13], ['SS31', '#64748b', 12],
+  ['Methylene Blue', '#7c3aed', 32], ['Primobolan', '#2f8b54', 18], ['Trenbolone Acetate', '#2f8b54', 1],
+]
+const prodRows = PROD.map(([name, color], i) => C(i + 1, name, { color }))
+const prodShots = PROD.flatMap(([, , shots], i) => Array.from({ length: shots }, () => I(i + 1)))
+
+check('clashing colours are fixed, the most-used compound keeps its own', () => {
+  const fixes = colorFixes(prodRows, prodShots)
+  const byId = new Map(fixes.flatMap((f) => f.ids.map((id) => [id, f.color])))
+  // Test E (41 shots) keeps teal; Primobolan and Tren were green next to it.
+  assert.equal(byId.has(1), false)
+  assert.ok(byId.has(9) && byId.has(10), 'Primobolan and Tren recoloured')
+  // GHK-Cu (41) keeps violet; Methylene Blue (32) was a second violet.
+  assert.equal(byId.has(4), false)
+  assert.ok(byId.has(8))
+  // Only the clashes move (Methylene Blue, MOTS-c teal next to Test E, Primo,
+  // Tren); everything else keeps its colour.
+  assert.deepEqual([...byId.keys()].sort((x, y) => x - y), [6, 8, 9, 10])
+  // After the fixes every pair is distinct.
+  const final = prodRows.map((r) => byId.get(r.id) ?? r.color)
+  for (let a = 0; a < final.length; a++) for (let b = a + 1; b < final.length; b++) {
+    assert.ok(!colorsClash(final[a], final[b]), `${PROD[a][0]} ${final[a]} vs ${PROD[b][0]} ${final[b]}`)
+  }
+  // Running it again finds nothing: no write loop.
+  assert.deepEqual(colorFixes(prodRows.map((r) => ({ ...r, color: byId.get(r.id) ?? r.color })), prodShots), [])
+})
+
+check('fixes are the same on every device (no randomness)', () => {
+  assert.deepEqual(colorFixes(prodRows, prodShots), colorFixes([...prodRows].reverse(), prodShots))
+})
+
+check('a new compound gets a colour nobody else has', () => {
+  const used = PROD.map(([, c]) => c)
+  for (let k = 0; k < 20; k++) {
+    const c = randomDistinctColor(used)
+    assert.ok(used.every((u) => !colorsClash(c, u)), c)
+  }
+})
+
+check('dark teal and bright green are one family; greys only clash with greys', () => {
+  assert.equal(colorsClash('#0f8f84', '#14b8a6'), true)   // Test E vs MOTS-c
+  assert.equal(colorsClash('#0f8f84', '#2f8b54'), true)   // teal vs green: "all green"
+  assert.equal(colorsClash('#64748b', '#2563eb'), false)  // slate grey vs blue
+  assert.equal(colorsClash('#dc2626', '#2563eb'), false)
+})
+
+check('missing or odd colours get one', () => {
+  const rows = [C(1, 'A', { color: undefined }), C(2, 'B', { color: 'var(--primary)' })]
+  assert.equal(colorFixes(rows, []).length, 2)
 })
 
 console.log(`\n${n} checks passed`)

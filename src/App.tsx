@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Lock,
   Moon,
@@ -17,6 +17,7 @@ import { takePendingRead, type PendingRead } from './lib/pendingRead'
 import { ToastProvider, useToast } from './lib/toast'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
+import { colorFixes } from './lib/compounds'
 import { useTheme } from './lib/useTheme'
 import { InstallPrompt } from './components/InstallPrompt'
 import { Onboarding, ONBOARDED_KEY } from './components/Onboarding'
@@ -315,6 +316,25 @@ function Shell({
     },
     [], [],
   )
+  // Give every compound a colour of its own on the charts. Runs after a full
+  // sync (so a fresh device has the injections that decide which compound
+  // keeps its colour) and only when the compound list actually changed.
+  const colorsChecked = useRef('')
+  useEffect(() => {
+    if (!sync.lastRunAt || !compounds.length) return
+    const sig = compounds.map((c) => `${c.id}:${c.color}`).join()
+    if (sig === colorsChecked.current) return
+    colorsChecked.current = sig
+    void (async () => {
+      const [all, shots] = await Promise.all([
+        db.compounds.filter((c) => !c.archived && !c.deletedAtSync).toArray(),
+        db.injections.filter((i) => !i.deletedAtSync && !i.archivedAt).toArray(),
+      ])
+      for (const f of colorFixes(all, shots)) {
+        for (const id of f.ids) await db.compounds.update(id, { color: f.color })
+      }
+    })()
+  }, [sync.lastRunAt, compounds])
   // Vitals: cap at 200 — charts only show last 50, stats use last 14
   const vitals = useLiveQuery(
     () => db.vitals.orderBy('measuredAt').reverse().filter((v) => !v.archivedAt).limit(200).toArray(),
