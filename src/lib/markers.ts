@@ -93,7 +93,7 @@ const CATALOG: Entry[] = [
 
   // ── Metabolic ──────────────────────────────────────────────────────────────
   m('glucose', 'Fasting Glucose', 'Metabolic', 'mg/dL', ['glucose', 'fasting glucose', 'glicose', 'glicemia', 'blood glucose'], { low: 70, high: 99 }),
-  m('hba1c', 'HbA1c', 'Metabolic', '%', ['hba1c', 'hemoglobin a1c', 'haemoglobin a1c', 'glycated', 'a1c', 'hemoglobina glicada'], { high: 5.4 }),
+  m('hba1c', 'HbA1c', 'Metabolic', '%', ['hba1c', 'hemoglobin a1c', 'haemoglobin a1c', 'glycated', 'a1c', 'hemoglobina glicada', 'glycated haemoglobin', 'glycated hemoglobin', 'glycosylated', 'haemoglobin, glycated', 'hemoglobin, glycated'], { high: 5.4 }),
   m('insulin', 'Insulin', 'Metabolic', 'µIU/mL', ['insulin', 'fasting insulin', 'insulina'], { high: 8 }),
   m('homa_ir', 'HOMA-IR', 'Metabolic', '', ['homa-ir', 'homa ir', 'homa']),
   m('uric_acid', 'Uric Acid', 'Metabolic', 'mg/dL', ['uric acid', 'urate', 'ácido úrico', 'acido urico']),

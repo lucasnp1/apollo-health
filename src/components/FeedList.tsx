@@ -44,7 +44,7 @@ export function FeedList({ children, className }: { children: ReactNode; classNa
 export function FeedChip({ status, className }: { status: FeedStatus; className?: string }) {
   const Icon = status.icon
   return (
-    <span className={cn('feed-chip inline-flex items-center gap-1 rounded-md px-1.5 py-1', FEED_TONE[status.tone], className)}>
+    <span className={cn('feed-chip inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-1', FEED_TONE[status.tone], className)}>
       {Icon && <Icon className="size-3 shrink-0" />}
       <span className="truncate">{status.label}</span>
     </span>

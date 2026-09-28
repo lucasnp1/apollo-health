@@ -4,6 +4,7 @@ import { CalendarClock, FlaskConical, FolderOpen, HeartPulse, Scale, Settings, S
 import { format } from 'date-fns'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '../lib/db'
 import { ALL_SYMPTOMS, chipTone, ratingOf } from '../lib/symptoms'
+import { felt } from '../lib/wellbeingSummary'
 import { Reveal } from '../components/motion'
 import { cn } from '@/lib/utils'
 import type { View } from '../app/views'
@@ -144,9 +145,9 @@ export function Overview({
       for (const def of ALL_SYMPTOMS) {
         const v = ratingOf(s, def)
         if (typeof v !== 'number') continue
-        const t = chipTone(v, def.direction)
-        if (t === 'good') goodCount += 1
-        else if (t === 'bad' || t === 'warn') watchCount += 1
+        // "Watch" is exactly what the Wellbeing summary counts as felt.
+        if (felt(s, def)) watchCount += 1
+        else if (chipTone(v, def.direction) === 'good') goodCount += 1
       }
     }
     return { checkIns: recent.length, goodCount, watchCount }
@@ -241,7 +242,7 @@ export function Overview({
       {/* Wellbeing — the trend, plus a standalone check-in so how you feel can
           be logged on its own and not only alongside an injection. */}
       <Suspense fallback={null}>
-        <WellbeingCard symptoms={symptoms} />
+        <WellbeingCard symptoms={symptoms} vitals={vitals} injections={injections} compounds={compounds} />
       </Suspense>
 
       {/* Navigation launcher — replaces the sidebar */}
