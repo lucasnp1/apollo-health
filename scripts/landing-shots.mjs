@@ -102,10 +102,22 @@ const seeded = await page.evaluate(async () => {
     await add('bodyMetrics', { measuredAt: at(day, 7, 2), source: 'manual', weightKg: kg, notes: day === 0 ? 'Morning, after the bathroom.' : undefined, ...sync() })
   }
 
-  // Weekly symptom check-ins.
-  const symptomNotes = { 1: 'Sleep dipped two nights in a row. Worth reading against the estradiol result.' }
-  for (let w = 0; w < 6; w++) {
-    await add('symptoms', { recordedAt: at(w * 7 + 1, 22, 15), mood: 4, energy: w === 1 ? 3 : 4, sleep: w === 1 ? 2 : 4, libido: 5, waterRetention: 2, acne: 2, nippleSensitivity: 1, jointPain: w > 3 ? 3 : 2, headache: 1, notes: symptomNotes[w], ...sync() })
+  // Check-ins every few days for 6 weeks, written so the Wellbeing summary
+  // tells one story with the bloods: headaches this week (5 in 30 days) next
+  // to a hematocrit over range, and two low-energy days earlier on. Headaches
+  // are 4 and energy 2 so they count on the old 1-5 scale and the new 0-5 one
+  // alike; everything else is 0 or good so no other line competes. No side
+  // effect whose cause line names a steroid, since this ends up on the landing.
+  const symptomDays = [1, 3, 5, 8, 11, 14, 17, 20, 23, 26, 29, 33, 37, 41]
+  const headacheDays = new Set([1, 3, 5, 14, 23])
+  const lowEnergyDays = new Set([8, 20])
+  const symptomNotes = { 1: 'Third headache this week. Took BP after, 131/84.' }
+  for (const day of symptomDays) {
+    await add('symptoms', {
+      recordedAt: at(day, 22, 15), mood: 4, energy: lowEnergyDays.has(day) ? 2 : 4, sleep: 4, libido: 5,
+      waterRetention: 0, acne: 0, nippleSensitivity: 0, jointPain: 0, headache: headacheDays.has(day) ? 4 : 0,
+      notes: symptomNotes[day], ...sync(),
+    })
   }
 
   // Three blood panels: baseline, mid-protocol, latest.
@@ -193,6 +205,12 @@ const scrollToCard = async (locator, fallback) => {
 // 2. Active levels (home, scrolled to the chart)
 await scrollToCard(page.locator('h3, h2, p', { hasText: /^Active levels$/ }).first(), 620)
 await shot('levels')
+
+// 2b. Wellbeing (home, the card with its summary; the headache line opened)
+await scrollToCard(page.locator('p', { hasText: /check-ins logged$/ }).first(), 1500)
+const headache = page.locator('button[aria-expanded]', { hasText: /^Headache/ }).first()
+if (await headache.count()) { await headache.click(); await page.waitForTimeout(400) }
+await shot('wellbeing')
 
 // 3. Log a shot
 await home()
