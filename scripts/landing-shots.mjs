@@ -206,8 +206,8 @@ const scrollToCard = async (locator, fallback) => {
 await scrollToCard(page.locator('h3, h2, p', { hasText: /^Active levels$/ }).first(), 620)
 await shot('levels')
 
-// 2b. Wellbeing (home, the card with its summary; the headache line opened)
-await scrollToCard(page.locator('p', { hasText: /check-ins logged$/ }).first(), 1500)
+// 2b. Wellbeing (home, the "What keeps coming up" card; the headache line opened)
+await scrollToCard(page.locator('h3', { hasText: /^What keeps coming up$/ }).first(), 700)
 const headache = page.locator('button[aria-expanded]', { hasText: /^Headache/ }).first()
 if (await headache.count()) { await headache.click(); await page.waitForTimeout(400) }
 await shot('wellbeing')

@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react'
 import { CalendarClock, FlaskConical, FolderOpen, HeartPulse, Scale, Settings, Syringe } from 'lucide-react'
 import { format } from 'date-fns'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '../lib/db'
-import { ALL_SYMPTOMS, chipTone, ratingOf } from '../lib/symptoms'
+import { ALL_SYMPTOMS, chipTone, customDefs, ratingOf } from '../lib/symptoms'
 import { felt } from '../lib/wellbeingSummary'
 import { Reveal } from '../components/motion'
 import { cn } from '@/lib/utils'
@@ -15,6 +15,7 @@ const BpTrendCard = lazy(() => import('../components/BpTrendCard').then((m) => (
 // app-shell critical path (see project_apollo_perf).
 const WeightTrendCard = lazy(() => import('../components/WeightTrendCard').then((m) => ({ default: m.WeightTrendCard })))
 const WellbeingCard = lazy(() => import('../components/WellbeingCard').then((m) => ({ default: m.WellbeingCard })))
+const WellbeingSummaryCard = lazy(() => import('../components/WellbeingSummaryCard').then((m) => ({ default: m.WellbeingSummaryCard })))
 
 const DAY = 86_400_000
 
@@ -139,10 +140,12 @@ export function Overview({
   const sym = useMemo(() => {
     const cutoff = Date.now() - 7 * DAY
     const recent = symptoms.filter((s) => new Date(s.recordedAt).getTime() >= cutoff)
+    // Custom symptoms count too, as they do in the summary card right below.
+    const defs = [...ALL_SYMPTOMS, ...customDefs(recent)]
     let goodCount = 0
     let watchCount = 0
     for (const s of recent) {
-      for (const def of ALL_SYMPTOMS) {
+      for (const def of defs) {
         const v = ratingOf(s, def)
         if (typeof v !== 'number') continue
         // "Watch" is exactly what the Wellbeing summary counts as felt.
@@ -205,7 +208,7 @@ export function Overview({
           {sym.checkIns === 0 ? (
             <>
               <p className="mt-1.5 text-xl font-semibold text-muted-foreground sm:text-2xl">—</p>
-              <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">No check-ins</p>
+              <p className="mt-0.5 truncate text-xs leading-tight text-muted-foreground">None in 7d</p>
             </>
           ) : (
             <>
@@ -219,6 +222,12 @@ export function Overview({
           )}
         </MiniStat>
       </div>
+
+      {/* What keeps coming up: the one interpreting layer, so it comes right
+          after the at-a-glance tiles and before the detail charts. */}
+      <Suspense fallback={null}>
+        <WellbeingSummaryCard symptoms={symptoms} vitals={vitals} injections={injections} compounds={compounds} />
+      </Suspense>
 
       {/* Drug levels through time */}
       {injections.length > 0 && (
@@ -242,7 +251,7 @@ export function Overview({
       {/* Wellbeing — the trend, plus a standalone check-in so how you feel can
           be logged on its own and not only alongside an injection. */}
       <Suspense fallback={null}>
-        <WellbeingCard symptoms={symptoms} vitals={vitals} injections={injections} compounds={compounds} />
+        <WellbeingCard symptoms={symptoms} />
       </Suspense>
 
       {/* Navigation launcher — replaces the sidebar */}
