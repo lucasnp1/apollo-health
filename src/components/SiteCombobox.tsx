@@ -1,34 +1,30 @@
-// Injection site selector. Uses a native <select> (works reliably on iOS Safari)
-// with an optional "Custom…" free-text input for sites not in the standard list.
+// "Other site" selector: every site for the route, grouped by body region in
+// the same top-to-bottom order as the quick list, then the user's own custom
+// sites, then free text. Native <select> (works reliably on iOS Safari).
 
 import { useState } from 'react'
-import { IM_SITES, SUBQ_SITES } from '../lib/sites'
+import { REGIONS, type Route } from '../lib/sites'
 
 const CUSTOM_VALUE = '__custom__'
+const FIELD = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50'
 
 export function SiteCombobox({
   value,
   onChange,
-  recentSites,
   route,
+  customs = [],
 }: {
   value: string
   onChange: (site: string) => void
-  recentSites?: string[]
-  /** Only offer this route's sites. Omit to offer both. */
-  route?: 'IM' | 'SubQ'
+  route: Route
+  /** Sites the user typed before, offered again by name. */
+  customs?: string[]
 }) {
-  const groups = route === 'SubQ' ? [] : IM_SITES
-  const subqGroups = route === 'IM' ? [] : SUBQ_SITES
-  const allSites = [
-    ...IM_SITES.flatMap((g) => g.sites),
-    ...SUBQ_SITES.flatMap((g) => g.sites),
-  ]
-  const recents = (recentSites ?? []).filter((s) => s)
+  const regions = REGIONS[route]
+  const known = new Set([...regions.flatMap((r) => r.sites.map((s) => s.site)), ...customs])
 
-  // If the current value is not in the standard list, treat it as custom
-  const isCustom = value !== '' && !allSites.includes(value)
-  const [showCustom, setShowCustom] = useState(isCustom)
+  // Anything not on the list is free text being typed.
+  const [showCustom, setShowCustom] = useState(value !== '' && !known.has(value))
   const selectValue = showCustom ? CUSTOM_VALUE : value
 
   function handleSelect(e: React.ChangeEvent<HTMLSelectElement>) {
@@ -43,47 +39,33 @@ export function SiteCombobox({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <select
-        value={selectValue}
-        onChange={handleSelect}
-        className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-      >
-        <option value="">Select site</option>
-        {recents.length > 0 && (
-          <optgroup label="Recent">
-            {recents.map((s) => (
-              <option key={`r-${s}`} value={s}>{s}</option>
+      <select aria-label="Other site" value={selectValue} onChange={handleSelect} className={FIELD}>
+        <option value="">Choose a site</option>
+        {regions.map((r) => (
+          <optgroup key={r.label} label={r.label}>
+            {r.sites.map((s) => (
+              <option key={s.site} value={s.site}>
+                {s.muscle}{s.side ? `, ${s.side === 'L' ? 'left' : 'right'}` : ''}
+              </option>
             ))}
           </optgroup>
+        ))}
+        {customs.length > 0 && (
+          <optgroup label="Your custom sites">
+            {customs.map((c) => <option key={c} value={c}>{c}</option>)}
+          </optgroup>
         )}
-        {groups.length > 0 && (
-        <optgroup label="IM sites">
-          {groups.flatMap((g) =>
-            g.sites.map((s) => (
-              <option key={s} value={s}>{s} · {g.label}</option>
-            ))
-          )}
-        </optgroup>
-        )}
-        {subqGroups.length > 0 && (
-        <optgroup label="SubQ sites">
-          {subqGroups.flatMap((g) =>
-            g.sites.map((s) => (
-              <option key={s} value={s}>{s} · {g.label}</option>
-            ))
-          )}
-        </optgroup>
-        )}
-        <option value={CUSTOM_VALUE}>Custom…</option>
+        <option value={CUSTOM_VALUE}>Type a custom site…</option>
       </select>
       {showCustom && (
         <input
           type="text"
-          placeholder="Type custom site name"
+          aria-label="Custom site name"
+          placeholder="e.g. Calf L"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           autoFocus
-          className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          className={FIELD}
         />
       )}
     </div>

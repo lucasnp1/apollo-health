@@ -25,6 +25,15 @@ export const SYRINGES: Syringe[] = [
   { key: 'ml3', label: 'Regular, 3 mL', short: '3 mL', capacityMl: 3, perMl: 1 },
 ]
 
+// Needles, optional on each shot. Insulin syringes come with the needle fixed
+// on, so they only offer those; regular syringes take any luer needle.
+// Stored as the label, like a site.
+export const NEEDLES: Record<'insulin' | 'regular', string[]> = {
+  insulin: ['31G 6 mm', '31G 8 mm', '30G 8 mm', '29G 12.7 mm'],
+  regular: ['30G ½ in (13 mm)', '27G ½ in (13 mm)', '25G ⅝ in (16 mm)', '25G 1 in (25 mm)', '23G 1 in (25 mm)', '23G 1¼ in (32 mm)', '22G 1½ in (38 mm)', '21G 1½ in (38 mm)'],
+}
+export const needlesFor = (s: Syringe) => NEEDLES[s.perMl === 100 ? 'insulin' : 'regular']
+
 export type EntryMode = 'dose' | 'draw'
 
 export type Derived = { base?: number; ml?: number; draw?: number; doseInUnit?: number }

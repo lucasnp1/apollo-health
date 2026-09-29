@@ -16,13 +16,13 @@ import { compoundGroups, findCompoundByName, groupByCompoundId, randomDistinctCo
 import { findPKCompound } from '../lib/pk'
 import { vialOf } from '../lib/vials'
 import {
-  SYRINGES, convertAmount, convertDraw, converts, derive, drawMarks, drawUnit, formatDraw, num,
+  SYRINGES, convertAmount, convertDraw, converts, derive, drawMarks, drawUnit, formatDraw, needlesFor, num,
   rememberedSyringe, roundForMode, syringeAdvice, syringeOf, unitLabel,
   type Derived, type EntryMode, type Syringe,
 } from '../lib/dose'
 import { NEGATIVE, POSITIVE, ratingOf, withRating } from '../lib/symptoms'
 import { SymptomScale } from '../components/SymptomScale'
-import { IM_QUICK_SITES, SUBQ_QUICK_SITES, quickSiteFromUsed, siteGroup, type QuickSite } from '../lib/sites'
+import { canonicalSite, customSite, groupOf, isCustomSite, quickSites, siteLabel, type CatalogSite, type Route } from '../lib/sites'
 import { useKeyboardInset } from '../lib/useKeyboardInset'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { SiteCombobox } from '../components/SiteCombobox'
@@ -32,7 +32,6 @@ import { Label } from '@/components/ui/label'
 import { Segmented } from '@/components/ui/segmented'
 import { cn } from '@/lib/utils'
 
-type Route = 'IM' | 'SubQ'
 type DoseUnit = 'mg' | 'mcg' | 'iu'
 const NEW = '__new__'
 
@@ -186,19 +185,27 @@ export function AddInjection({
     return first ? [first] : []
   }, [injections, compounds])
 
+  // The needle of your last shot on this route, if it fits this syringe type
+  // (insulin syringes have theirs fixed on). Optional, so often empty.
+  const needleFor = useCallback((r: Route, s: Syringe): string => {
+    const fits = needlesFor(s)
+    return injections.find((i) => (i.route === 'SubQ' ? 'SubQ' : 'IM') === r && i.needle && fits.includes(i.needle))?.needle ?? ''
+  }, [injections])
+
   // Always land on the IM tab, even if SubQ was the last route used. SubQ data
   // is still kept and recalled the moment you switch over. Prefill the last IM
   // syringe (falls back to a blank line when there's no IM history).
   const initial = useMemo(() => {
     const stack = syringeForRoute('IM')
     const syringe = rememberedSyringe(stack[0], 'IM')
-    return { route: 'IM' as Route, stack, syringe, lines: stack.map((c) => prefill(c, syringe, 'IM')) }
-  }, [syringeForRoute, prefill])
+    return { route: 'IM' as Route, stack, syringe, needle: needleFor('IM', syringe), lines: stack.map((c) => prefill(c, syringe, 'IM')) }
+  }, [syringeForRoute, prefill, needleFor])
 
   const [route, setRoute] = useState<Route>(() => initial.route)
   const [syringeKey, setSyringeKey] = useState(() => initial.syringe.key)
   // Once you pick a syringe yourself, choosing compounds stops changing it.
   const [syringeTouched, setSyringeTouched] = useState(false)
+  const [needle, setNeedle] = useState(() => initial.needle)
   const [lines, setLines] = useState<Line[]>(() => (initial.lines.length ? initial.lines : [blankLine('IM')]))
   const [site, setSite] = useState('')
   const [notes, setNotes] = useState('')
@@ -214,6 +221,7 @@ export function AddInjection({
     if (hydrated.current || initial.stack.length === 0) return
     setRoute(initial.route)
     setSyringeKey(initial.syringe.key)
+    setNeedle(initial.needle)
     setLines(initial.lines)
     hydrated.current = true
   }, [initial])
@@ -240,6 +248,7 @@ export function AddInjection({
     setRoute(r)
     setSyringeKey(s.key)
     setSyringeTouched(false)
+    setNeedle(needleFor(r, s))
     setLines(stack.length ? stack.map((c) => prefill(c, s, r)) : [blankLine(r)])
     setSite('')
   }
@@ -256,6 +265,7 @@ export function AddInjection({
     if (next.key === syringe.key) return
     const from = syringe.perMl
     setSyringeKey(next.key)
+    if (next.perMl !== from) setNeedle(needleFor(route, next))
     setLines((prev) => prev.map((l) => (
       l.entryMode === 'draw' ? { ...l, amount: convertDraw(l.amount, from, next.perMl) ?? l.amount } : l
     )))
@@ -274,7 +284,10 @@ export function AddInjection({
       if (s.key !== syringe.key && l.entryMode === 'draw') return { ...l, amount: convertDraw(l.amount, syringe.perMl, s.perMl) ?? l.amount }
       return l
     }))
-    if (s.key !== syringe.key) setSyringeKey(s.key)
+    if (s.key !== syringe.key) {
+      setSyringeKey(s.key)
+      if (s.perMl !== syringe.perMl) setNeedle(needleFor(route, s))
+    }
   }
 
   // A known oil (test, tren, mast...) is guessed as liquid while you type,
@@ -384,9 +397,11 @@ export function AddInjection({
           dose,
           unit: r.unit,
           route,
-          site: site || undefined,
+          // One spelling per spot, whatever was typed: "lat r" is saved as "Lats R".
+          site: site.trim() ? canonicalSite(site) : undefined,
           notes: notes || undefined,
           vialId: activeVial?.id,
+          ...(needle && { needle }),
           // The volume actually drawn, so a wrong strength can be fixed later.
           ...(r.d.ml !== undefined && { vialAmount: `${r.d.ml.toFixed(3)} mL` }),
         })
@@ -445,7 +460,7 @@ export function AddInjection({
 
       <section className="flex flex-col gap-3">
         <h2 className="px-0.5 eyebrow">Syringe</h2>
-        <SyringePanel syringe={syringe} filled={filled} fillKnown={fillKnown} onChange={(s) => applySyringe(s, true)} />
+        <SyringePanel syringe={syringe} filled={filled} fillKnown={fillKnown} onChange={(s) => applySyringe(s, true)} needle={needle} onNeedle={setNeedle} />
       </section>
 
       <section className="flex flex-col gap-3">
@@ -702,8 +717,15 @@ function CompoundLine({
 
 // ── Syringe: which barrel, how full, where to stop ──────────────────────────
 function SyringePanel({
-  syringe, filled, fillKnown, onChange,
-}: { syringe: Syringe; filled: Resolved[]; fillKnown: boolean; onChange: (s: Syringe) => void }) {
+  syringe, filled, fillKnown, onChange, needle, onNeedle,
+}: {
+  syringe: Syringe
+  filled: Resolved[]
+  fillKnown: boolean
+  onChange: (s: Syringe) => void
+  needle: string
+  onNeedle: (n: string) => void
+}) {
   const insulin = syringe.perMl === 100
   const mls = fillKnown ? filled.map((r) => r.d.ml!) : []
   const totalMl = mls.reduce((a, b) => a + b, 0)
@@ -786,6 +808,22 @@ function SyringePanel({
       ) : filled.length > 0 ? (
         <p className="px-0.5 text-xs text-muted-foreground">Add the vial strength for every compound to check the fill.</p>
       ) : null}
+
+      {/* Optional, one row: which needle, for anyone tracking PIP or depth. */}
+      <div className="mt-1 flex items-center gap-3">
+        <label htmlFor="needle" className="shrink-0 px-0.5 text-xs text-muted-foreground">Needle</label>
+        <select
+          id="needle"
+          value={needle}
+          onChange={(e) => onNeedle(e.target.value)}
+          className={cn(SELECT_CLASS, 'h-9 font-normal', !needle && 'text-muted-foreground')}
+          style={SELECT_STYLE}
+        >
+          <option value="">Not noted</option>
+          {needlesFor(syringe).map((n) => <option key={n} value={n}>{n}</option>)}
+          {needle && !needlesFor(syringe).includes(needle) && <option value={needle}>{needle}</option>}
+        </select>
+      </div>
     </div>
   )
 }
@@ -800,13 +838,10 @@ function dayLabel(d: number): string {
   return `${Math.round(d)}d ago`
 }
 
-// Friendly muscle name for an adjacency group — used in the "nearby used" warning.
-
 // rested → this spot is free. near → an ADJACENT spot on the same muscle was
 // used (soft warning, not blocked). caution / avoid → you actually used THIS
 // spot (a while ago / recently).
 type SiteStatus = 'rested' | 'near' | 'caution' | 'avoid'
-const RANK: Record<SiteStatus, number> = { rested: 0, near: 1, caution: 2, avoid: 3 }
 
 const DOT_CLASS: Record<'rested' | 'caution' | 'avoid', string> = {
   rested: 'bg-emerald-500',
@@ -822,83 +857,83 @@ const LABEL_CLASS: Record<SiteStatus, string> = {
   avoid: 'text-destructive',
 }
 
+const routeOf = (inj: InjectionLog): Route => (inj.route === 'SubQ' ? 'SubQ' : 'IM')
+
 function SitePicker({
   route, value, injections, onChange,
 }: { route: Route; value: string; injections: InjectionLog[]; onChange: (s: string) => void }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const now = Date.now()
 
-  // The curated list for this route, plus every site actually used on it. The
-  // injection rows are the persistence: log a custom spot once and it stays on
-  // the list for good, with no extra table to keep in sync.
-  const quick: QuickSite[] = useMemo(() => {
-    const base = route === 'SubQ' ? SUBQ_QUICK_SITES : IM_QUICK_SITES
-    const seen = new Set(base.map((q) => q.site.trim().toLowerCase()))
-    const extra: QuickSite[] = []
+  // The route's rotation sites in body order, then any site the user typed
+  // and used on this route (marked custom). Other catalog sites used once,
+  // or old spellings, do not pile up here: every logged name is read through
+  // canonicalSite, so "Rear deltoid R" and "Lat L" land on their catalog row.
+  const { quick, customs } = useMemo(() => {
+    const base = quickSites(route)
+    // Keys are lower-cased: typed text keeps its own spelling, so "calf L"
+    // and "Calf L" must still be one row.
+    const seen = new Set(base.map((q) => q.site.toLowerCase()))
+    const typed: CatalogSite[] = []
     for (const inj of injections) {
-      const site = inj.site?.trim()
-      if (!site) continue
-      if ((inj.route === 'SubQ' ? 'SubQ' : 'IM') !== route) continue
+      if (!inj.site || routeOf(inj) !== route) continue
+      const site = canonicalSite(inj.site)
       const k = site.toLowerCase()
-      if (seen.has(k)) continue
+      if (seen.has(k) || !isCustomSite(site)) continue
       seen.add(k)
-      extra.push(quickSiteFromUsed(site))
+      typed.push(customSite(site))
     }
-    return [...base, ...extra]
+    typed.sort((a, b) => a.site.localeCompare(b.site))
+    return { quick: [...base, ...typed], customs: typed.map((t) => t.site) }
   }, [route, injections])
 
   // Days since each exact site, plus the most-recent USED site per adjacency
-  // group. The group is only used to warn neighbours — it never marks an
+  // group. The group is only used to warn neighbours; it never marks an
   // untouched spot as "used".
   const { daysBySite, groupRecent } = useMemo(() => {
     const bySite = new Map<string, number>()
     const gRecent = new Map<string, { days: number; site: string }>()
     for (const inj of injections) {
-      if (!inj.site) continue
-      if ((inj.route === 'SubQ' ? 'SubQ' : 'IM') !== route) continue
+      if (!inj.site || routeOf(inj) !== route) continue
+      const site = canonicalSite(inj.site)
       const d = (now - new Date(inj.takenAt).getTime()) / DAY
-      const cur = bySite.get(inj.site)
-      if (cur === undefined || d < cur) bySite.set(inj.site, d)
-      const g = siteGroup(inj.site)
-      if (g) { const prev = gRecent.get(g); if (!prev || d < prev.days) gRecent.set(g, { days: d, site: inj.site }) }
+      const cur = bySite.get(site.toLowerCase())
+      if (cur === undefined || d < cur) bySite.set(site.toLowerCase(), d)
+      const g = groupOf(site)
+      if (g) { const prev = gRecent.get(g); if (!prev || d < prev.days) gRecent.set(g, { days: d, site }) }
     }
     return { daysBySite: bySite, groupRecent: gRecent }
   }, [injections, route, now])
 
-  // Classify + order: rested first, then nearby-warnings, then this-spot-used,
-  // most-recently-used at the very bottom.
-  const rows = useMemo(() => {
-    const out = quick.map((q) => {
-      const exact = daysBySite.get(q.site) ?? Infinity
-      const gr = groupRecent.get(q.group)
-      let status: SiteStatus
-      let label: string
-      // Each status says a different thing, so the four are told apart by words
-      // and not only by the colour of a dot.
-      if (exact < 4) { status = 'avoid'; label = `This exact spot, ${dayLabel(exact)}` }
-      else if (exact < 10) { status = 'caution'; label = `This exact spot, ${dayLabel(exact)}` }
-      else if (gr && gr.days < 7 && gr.site !== q.site) {
-        status = 'near'
-        // Name the neighbour rather than the region: "Front Deltoid L" is
-        // actionable, "deltoid used nearby" is not.
-        label = `Not this spot, but ${gr.site} ${dayLabel(gr.days)}`
-      } else {
-        status = 'rested'
-        label = Number.isFinite(exact) ? `Rested, last used ${dayLabel(exact)}` : 'Rested, never used'
-      }
-      const sortDays = status === 'near' ? (gr?.days ?? Infinity) : exact
-      return { q, status, label, sortDays }
-    })
-    out.sort((a, b) => (RANK[a.status] - RANK[b.status]) || (b.sortDays - a.sortDays))
-    return out
-  }, [quick, daysBySite, groupRecent])
+  // Body order stays put. Rest is carried by the dot colour and the words, so
+  // the list never reshuffles under your thumb after a shot.
+  const rows = useMemo(() => quick.map((q) => {
+    const exact = daysBySite.get(q.site.toLowerCase()) ?? Infinity
+    const gr = groupRecent.get(q.group)
+    let status: SiteStatus
+    let label: string
+    // Each status says a different thing, so the four are told apart by words
+    // and not only by the colour of a dot.
+    if (exact < 4) { status = 'avoid'; label = `This exact spot, ${dayLabel(exact)}` }
+    else if (exact < 10) { status = 'caution'; label = `This exact spot, ${dayLabel(exact)}` }
+    else if (gr && gr.days < 7 && gr.site.toLowerCase() !== q.site.toLowerCase()) {
+      status = 'near'
+      // Name the neighbour rather than the region: "Front delt, left" is
+      // actionable, "deltoid used nearby" is not.
+      label = `Not this spot, but ${siteLabel(gr.site)} ${dayLabel(gr.days)}`
+    } else {
+      status = 'rested'
+      label = Number.isFinite(exact) ? `Rested, last used ${dayLabel(exact)}` : 'Rested, never used'
+    }
+    return { q, status, label }
+  }), [quick, daysBySite, groupRecent])
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="px-0.5 text-xs text-muted-foreground">Most rested first. Green = free. Amber = you used that exact spot. Red = you used it in the last few days. ⚠ = a neighbouring spot was used, this one is still free.</p>
+      <p className="px-0.5 text-xs text-muted-foreground">Top to bottom, head to legs. Green = rested. Amber = you used that exact spot. Red = in the last few days. ⚠ = a neighbouring spot was used, this one is still free.</p>
       <div className="flex flex-col gap-1.5">
         {rows.map(({ q, status, label }) => {
-          const selected = value === q.site
+          const selected = canonicalSite(value) === q.site
           return (
             <button
               key={q.site}
@@ -916,8 +951,10 @@ function SitePicker({
                 <span className={cn('size-2.5 shrink-0 rounded-full', DOT_CLASS[status])} />
               )}
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-foreground">
-                  {q.muscle}<span className="ml-1.5 text-xs font-normal text-muted-foreground">{q.side === 'L' ? 'Left' : 'Right'}</span>
+                <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-foreground">
+                  <span className="truncate">{q.muscle}</span>
+                  {!q.custom && q.side && <span className="shrink-0 text-xs font-normal text-muted-foreground">{q.side === 'L' ? 'Left' : 'Right'}</span>}
+                  {q.custom && <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Custom</span>}
                 </span>
                 <span className={cn('block text-xs', selected ? 'text-foreground' : LABEL_CLASS[status])}>{label}</span>
               </span>
@@ -926,12 +963,12 @@ function SitePicker({
         })}
       </div>
 
-      {value && !quick.some((q) => q.site === value) && (
-        <p className="px-0.5 text-xs text-muted-foreground">Selected: <span className="font-medium text-foreground">{value}</span></p>
+      {value && !quick.some((q) => q.site === canonicalSite(value)) && (
+        <p className="px-0.5 text-xs text-muted-foreground">Selected: <span className="font-medium text-foreground">{siteLabel(value)}</span></p>
       )}
 
       {moreOpen ? (
-        <SiteCombobox value={value} onChange={onChange} route={route} />
+        <SiteCombobox value={value} onChange={onChange} route={route} customs={customs} />
       ) : (
         <button type="button" onClick={() => setMoreOpen(true)} className="self-start px-0.5 text-xs text-muted-foreground underline-offset-2 hover:underline">
           Other site / custom…

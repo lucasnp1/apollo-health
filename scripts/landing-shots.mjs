@@ -64,7 +64,7 @@ const seeded = await page.evaluate(async () => {
   for (const c of compounds) cid[c.name] = await add('compounds', { ...c, ...sync() })
 
   // Injections: Test E every 3.5 days for 8 weeks, sites rotated; HCG Mon/Thu; BPC-157 daily for 12 days.
-  const imSites = ['Ventrogluteal L', 'Ventrogluteal R', 'Vastus Lateralis L', 'Vastus Lateralis R', 'Deltoid L', 'Deltoid R']
+  const imSites = ['Ventrogluteal L', 'Ventrogluteal R', 'Vastus Lateralis L', 'Vastus Lateralis R', 'Front Deltoid L', 'Front Deltoid R']
   const notes = {
     0: 'Week 8. Ventrogluteal L was rested 9 days, so it went there.',
     7: 'Slight PIP last time on the quad, moved back to glute.',

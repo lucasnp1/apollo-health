@@ -472,7 +472,7 @@ export function Timeline({
           sub: facts(i.site, i.route).join(' · ') || undefined,
           status: LOGGED,
           note: i.notes || undefined,
-          facts: facts(dose, i.site, i.route, i.weightKg ? `${i.weightKg} kg` : undefined),
+          facts: facts(dose, i.site, i.route, i.needle, i.weightKg ? `${i.weightKg} kg` : undefined),
           type: 'injection',
           compoundId: i.compoundId,
         }

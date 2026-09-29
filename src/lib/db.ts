@@ -64,6 +64,8 @@ export type InjectionLog = {
   weightKg?: number
   protocolDoseId?: number
   vialId?: number
+  /** Optional, e.g. "25G 1 in (25 mm)" (see NEEDLES in dose.ts). */
+  needle?: string
 } & SyncFields
 
 export type VitalLog = {

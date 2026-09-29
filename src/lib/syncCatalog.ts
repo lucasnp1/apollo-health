@@ -109,6 +109,7 @@ export const TABLES: TableSpec[] = [
   {
     slug: 'injections',
     dexie: 'injections',
+    rev: 13,
     columns: {
       takenAt: 'text',
       dose: 'real',
@@ -123,6 +124,7 @@ export const TABLES: TableSpec[] = [
       vialId: 'text',
       protocolDoseId: 'text',
       archivedAt: 'int',
+      needle: 'text',
     },
     foreignKeys: [
       { field: 'compoundId', targetTable: 'compounds' },

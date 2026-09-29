@@ -70,6 +70,7 @@ export const TABLES: Record<string, TableSpec> = {
       weightKg: { col: 'weight_kg', type: 'real' },
       protocolDoseId: { col: 'protocol_dose_id', type: 'text' },
       vialId: { col: 'vial_id', type: 'text' },
+      needle: { col: 'needle', type: 'text' },
       ...ARCH,
       ...CT,
     },
