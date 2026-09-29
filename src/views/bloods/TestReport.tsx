@@ -2,23 +2,25 @@
 // the draw, every section of markers, then the actions on the test.
 
 import { useState, type ReactNode } from 'react'
-import { Archive, Check, ChevronDown, ChevronRight, FileText, Share2, Syringe, TriangleAlert } from 'lucide-react'
+import { Archive, Check, ChevronDown, ChevronRight, FileText, Merge, Pencil, Share2, Syringe, TriangleAlert } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { db, type LabExam } from '../../lib/db'
 import { SECTION_ABBR, SECTION_ORDER, type LabSection } from '../../lib/markers'
-import type { LabTest, TestMarker } from '../../lib/labTests'
+import { planMerge, type LabTest, type TestMarker } from '../../lib/labTests'
 import { dayOf, fmtDay } from '../../lib/dates'
 import type { DoseTiming } from '../../lib/protocolAtDraw'
 import { setExamArchived } from '../../lib/archive'
+import { mergeTests } from '../../lib/bloodTestsDb'
 import { ensureBlobAvailable } from '../../lib/fileSync'
 import { useUndoableDelete } from '../../lib/useUndoableDelete'
 import { useToast } from '../../lib/toast'
 import { unitLabel } from '../../lib/dose'
 import { FeedChip, FeedList, FeedRow, type FeedFact, type FeedStatus } from '../../components/FeedList'
 import { PanelCard } from '../../components/dashboard/PanelCard'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { markerRowProps, phaseLabel, plural, printedValue, verdictLine } from './feed'
+import { fixOf, markerRowProps, mergeCandidates, phaseLabel, plural, printedValue, testRowProps, verdictLine } from './feed'
 import { markerHash } from './route'
 
 // ── Header ────────────────────────────────────────────────────────────────
@@ -54,12 +56,25 @@ function countsLine(t: LabTest, isPro: boolean): string {
   return parts.join(' · ')
 }
 
-function Facts({ facts }: { facts: FeedFact[] }) {
+function Facts({ facts, onFix }: { facts: FeedFact[]; onFix?: (warning: string) => void }) {
   if (!facts.length) return null
   return (
-    <p className="feed-facts mt-2 flex flex-wrap gap-x-3 gap-y-1">
+    <p className="feed-facts mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
       {facts.map((f, i) => {
         const x = typeof f === 'string' ? { text: f } : f
+        if (x.tone === 'warn' && onFix) {
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onFix(x.text)}
+              className="-my-2 inline-flex min-h-10 items-center gap-0.5 rounded text-left text-amber-700 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:text-amber-400"
+            >
+              {x.text} · {fixOf(x.text) === 'merge' ? 'Merge' : 'Edit'}
+              <ChevronRight className="size-3.5" aria-hidden="true" />
+            </button>
+          )
+        }
         return <span key={i} className={x.tone === 'warn' ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'}>{x.text}</span>
       })}
     </p>
@@ -70,7 +85,7 @@ function Facts({ facts }: { facts: FeedFact[] }) {
  * The test's header. `latest` is the tappable summary card on the Latest tab;
  * `detail` heads the test report.
  */
-export function TestHeader({ test: t, variant, isPro, onClick }: { test: LabTest; variant: 'latest' | 'detail'; isPro: boolean; onClick?: () => void }) {
+export function TestHeader({ test: t, variant, isPro, onClick, onFix }: { test: LabTest; variant: 'latest' | 'detail'; isPro: boolean; onClick?: () => void; onFix?: (warning: string) => void }) {
   const warn: FeedFact[] = t.needsCheck.map((text) => ({ text, tone: 'warn' as const }))
   if (variant === 'latest') {
     return (
@@ -102,7 +117,7 @@ export function TestHeader({ test: t, variant, isPro, onClick }: { test: LabTest
       <h2 className="mt-1.5 font-display text-xl font-semibold leading-tight">{t.title}</h2>
       <p className="feed-meta mt-1 text-muted-foreground">{countsLine(t, isPro)}</p>
       {timingLine(t) && <p className="feed-meta mt-0.5 text-muted-foreground">{timingLine(t)}</p>}
-      <Facts facts={[...(src && !t.needsCheck.length ? [src] : []), ...warn]} />
+      <Facts facts={[...(src && !t.needsCheck.length ? [src] : []), ...warn]} onFix={onFix} />
     </PanelCard>
   )
 }
@@ -277,9 +292,76 @@ async function openOriginal(exam: LabExam): Promise<string | undefined> {
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
+// ── Merge ─────────────────────────────────────────────────────────────────
+
+/** Pick the other report, confirm, merge (with undo). The test with more markers keeps its name and date. */
+export function MergeDialog({ test, tests, go, onClose }: { test: LabTest; tests: LabTest[]; go: (hash: string, replace?: boolean) => void; onClose: () => void }) {
+  const undo = useUndoableDelete()
+  const near = mergeCandidates(test, tests)
+  const [pick, setPick] = useState<LabTest | undefined>(near.length === 1 ? near[0] : undefined)
+  const [busy, setBusy] = useState(false)
+  // Ties keep the older record.
+  const [src, dst] = !pick ? [] : pick.counts.total > test.counts.total || (pick.counts.total === test.counts.total && pick.id < test.id) ? [test, pick] : [pick, test]
+  // Markers both reports hold with different values: dst keeps its own.
+  const rowsOf = (t: LabTest) => t.markers.map((m) => ({ id: m.resultId, marker: m.printedName, unit: m.unit, value: m.value, rawValue: m.rawValue, high: m.high }))
+  const differing = src && dst ? planMerge(rowsOf(src), rowsOf(dst)).differing : 0
+
+  async function merge() {
+    if (!src || !dst || busy) return
+    setBusy(true)
+    let restore: (() => Promise<void>) | undefined
+    await undo({
+      label: `Merged into ${dst.title}`,
+      remove: async () => { restore = await mergeTests(src.id, dst.id) },
+      restore: async () => restore?.(),
+      errorMessage: 'Could not merge these tests. Please try again.',
+    })
+    onClose()
+    if (restore) go(`#test/${dst.id}`, true)
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose() }}>
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-md">
+        <DialogHeader className="pr-8 text-left">
+          <DialogTitle>Merge with another report</DialogTitle>
+          <DialogDescription>
+            {near.length === 0 ? 'No other test is within 14 days of this one.' : !pick ? 'Pick the report from the same blood draw.' : 'Two reports of one blood draw become one test.'}
+          </DialogDescription>
+        </DialogHeader>
+        {!pick ? (
+          <FeedList>
+            {near.map((o) => <FeedRow key={o.id} {...testRowProps(o, false)} onClick={() => setPick(o)} />)}
+          </FeedList>
+        ) : src && dst && (
+          <p className="feed-note">
+            The {plural(src.counts.total, 'marker')} from {src.title} ({fmtDay(src.date)}) move into {dst.title} ({fmtDay(dst.date)}).
+            {dayOf(src.date) !== dayOf(dst.date) && ` The merged test keeps the ${fmtDay(dst.date)} date.`}
+            {differing > 0
+              ? ` ${plural(differing, 'marker')} it already has keep${differing === 1 ? 's its value' : ' their values'}. The other report's readings go to the archive, and so does the emptied report. You can undo this.`
+              : ' Values already in it are archived, and the emptied report goes to the archive. You can undo this.'}
+          </p>
+        )}
+        <DialogFooter className="gap-2">
+          {pick && near.length > 1 && <Button variant="outline" className="h-10" onClick={() => setPick(undefined)} disabled={busy}>Back</Button>}
+          <Button variant={pick ? 'outline' : 'default'} className="h-10" onClick={onClose} disabled={busy}>Cancel</Button>
+          {pick && <Button className="h-10" onClick={() => void merge()} disabled={busy}><Merge className="size-4" /> {busy ? 'Merging…' : 'Merge'}</Button>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────
 
-export function TestReport({ test: t, isPro, go }: { test: LabTest; isPro: boolean; go: (hash: string, replace?: boolean) => void }) {
+export function TestReport({ test: t, tests, isPro, go, onEdit, onMerge }: {
+  test: LabTest
+  tests: LabTest[]
+  isPro: boolean
+  go: (hash: string, replace?: boolean) => void
+  onEdit: (id: number) => void
+  onMerge: (id: number) => void
+}) {
   const undo = useUndoableDelete()
   const { showToast } = useToast()
   const sections = SECTION_ORDER
@@ -288,7 +370,7 @@ export function TestReport({ test: t, isPro, go }: { test: LabTest; isPro: boole
 
   return (
     <div className="flex flex-col gap-4">
-      <TestHeader test={t} variant="detail" isPro={isPro} />
+      <TestHeader test={t} variant="detail" isPro={isPro} onFix={(w) => (fixOf(w) === 'merge' ? onMerge(t.id) : onEdit(t.id))} />
       <AtTheDraw test={t} />
       {sections.map((s) => (
         <SectionCard key={s.section} memoKey={`${t.id}:${s.section}`} section={s.section} markers={s.markers} isPro={isPro} onOpen={(m) => go(markerHash(m.key, t.id))} />
@@ -304,6 +386,8 @@ export function TestReport({ test: t, isPro, go }: { test: LabTest; isPro: boole
             View original report
           </ActionButton>
         )}
+        <ActionButton icon={Pencil} onClick={() => onEdit(t.id)}>Edit</ActionButton>
+        {mergeCandidates(t, tests).length > 0 && <ActionButton icon={Merge} onClick={() => onMerge(t.id)}>Merge with another report</ActionButton>}
         <ShareTestButton test={t} isPro={isPro} />
         <ActionButton
           icon={Archive}

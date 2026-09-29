@@ -9,6 +9,9 @@ import type { LabExam } from '../lib/db'
 import type { EnrichedResult } from '../lib/insights'
 import type { Confidence, ExtractedMarker, ReadProgress } from '../lib/pdf'
 import { canonicalize } from '../lib/markers'
+import { extractCollectionDate, fmtDay } from '../lib/dates'
+import { detectProvider } from '../lib/labTests'
+import { format, parseISO } from 'date-fns'
 import { guideUrl } from '../lib/guides'
 import { buildFindings, type Finding } from '../lib/labFindings'
 import { labStats, rangeStatus, type LabStats } from '../lib/labStats'
@@ -69,7 +72,7 @@ export function ReadPage() {
   // The parse from here on is identical whether the text came out of a PDF, a
   // photo via OCR, or was pasted straight in, so it lives in one place.
   const analyseText = useCallback(async (text: string, name: string, usedOcr: boolean) => {
-    const { extractMarkersFromText, extractCollectionDate } = await import('../lib/pdf')
+    const { extractMarkersFromText } = await import('../lib/pdf')
     const rows = text ? extractMarkersFromText(text) : []
     const kept = rows.filter((m) => Number.isFinite(m.value) && m.marker.trim().length > 0)
     if (kept.length === 0) {
@@ -77,11 +80,15 @@ export function ReadPage() {
       setState({ kind: 'empty', name, usedOcr, hadText: Boolean(text) })
       return
     }
+    const drawn = extractCollectionDate(text)
     const exam: LabExam = {
       id: 1,
       name: name.replace(/\.(pdf|jpe?g|png|webp|heic|gif|bmp|tiff?)$/i, ''),
-      collectedAt: extractCollectionDate(text) ?? new Date().toISOString(),
+      // No silent today date: without one the page says "Draw date not found".
+      collectedAt: drawn?.date ?? '',
       labName: usedOcr ? 'Photo import' : 'PDF import',
+      company: detectProvider(text, name),
+      meta: drawn ? { dateSource: drawn.source } : undefined,
     }
     // Same mapping the app uses when every review row is accepted.
     const results: EnrichedResult[] = kept.map((m, i) => ({
@@ -98,7 +105,7 @@ export function ReadPage() {
     }))
     const findings = buildFindings(results, [exam])
     const counts = labStats(results, [exam])
-    const stats: LabStats = { ...counts, lastTest: new Date(exam.collectedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) }
+    const stats: LabStats = { ...counts, lastTest: exam.collectedAt ? format(parseISO(exam.collectedAt), 'MMM d') : undefined }
     track('read-completed')
     setState({ kind: 'done', name, usedOcr, rows: kept, results, exam, findings, stats })
   }, [])
@@ -257,7 +264,7 @@ export function ReadPage() {
             <LabSummaryCard
               stats={state.stats}
               findings={state.findings}
-              subtitle={[state.exam.name, state.exam.labName, new Date(state.exam.collectedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })].filter(Boolean).join(' · ')}
+              subtitle={[state.exam.name, state.exam.labName, state.exam.collectedAt ? fmtDay(state.exam.collectedAt) : 'Draw date not found'].filter(Boolean).join(' · ')}
               action={
                 <ShareReadButton
                   stats={state.stats}
@@ -346,10 +353,11 @@ export function ReadPage() {
                       // the same file twice. Best effort: if storage is blocked
                       // the link still works and they re-upload.
                       stashPendingRead({
-                        exam: { name: state.exam.name, collectedAt: state.exam.collectedAt, labName: state.exam.labName },
-                        results: state.results.map((r) => ({
-                          marker: r.marker, value: r.value, rawValue: r.rawValue,
-                          unit: r.unit, low: r.low, high: r.high,
+                        exam: { name: state.exam.name, collectedAt: state.exam.collectedAt || undefined, labName: state.exam.labName, company: state.exam.company, meta: state.exam.meta },
+                        // The lab's printed names, as the app keeps them.
+                        results: state.results.map((r, i) => ({
+                          marker: state.rows[i]?.marker.trim() || r.marker, value: r.value, rawValue: r.rawValue,
+                          unit: r.unit, low: r.low, high: r.high, status: state.rows[i]?.flag,
                         })),
                       })
                     }}

@@ -27,6 +27,8 @@ export type UndoableDeleteRequest = {
   restore: () => Promise<unknown>
   // Override the undo window (default: matches the toast's auto-dismiss).
   durationMs?: number
+  // The error toast when `remove` fails. Defaults to the archive message.
+  errorMessage?: string
 }
 
 export function useUndoableDelete() {
@@ -39,7 +41,7 @@ export function useUndoableDelete() {
         console.error('Delete failed', err)
         showToast({
           tone: 'error',
-          message: 'Could not archive. Please try again.',
+          message: req.errorMessage ?? 'Could not archive. Please try again.',
         })
         return
       }

@@ -12,6 +12,7 @@ import { api } from './api'
 import { db } from './db'
 import { pushUnuploadedBlobs } from './fileSync'
 import { TABLES, type ForeignKey, type TableSpec } from './syncCatalog'
+import { mergeServerRow } from './syncMerge'
 
 type Direction = 'pull' | 'push' | 'both'
 
@@ -130,41 +131,9 @@ async function applyServerRowsBatch(
       continue
     }
 
-    // Last-write-wins for real: a local edit that has not pushed yet (dirty)
-    // and is at least as new as the server copy stays put. Without this, the
-    // echo of our own earlier push could pull back over the newer local row
-    // (a PDF stayed "Needs review" after import for exactly this reason).
-    if (existing && existing.dirty === 1 && Number(existing.updatedAt ?? 0) >= (Number(row.updatedAt) || 0)) continue
-
-    const localRow = translateFkSync(spec, row, fkCache)
-
-    // A data column the server has no value for must not erase the one we hold
-    // locally. translateFkSync maps a NULL column to undefined, and spreading
-    // that over the existing row deletes the key (Dexie treats undefined as
-    // delete). This bites whenever a column is newer than the rows in it:
-    // migration 0010 added the per-compound dosing fields, and every row
-    // already on the server has NULL for them, so an unguarded merge would wipe
-    // exactly the values the user asked us to remember. Runs before the sync
-    // fields below, which DO need their explicit undefined to clear a tombstone.
-    // Cost: a field cleared on one device no longer clears on another. Losing a
-    // saved value is the worse failure, so it stays this way.
-    if (existing) {
-      for (const k of Object.keys(localRow)) {
-        if (localRow[k] === undefined && existing[k] !== undefined) delete localRow[k]
-      }
-    }
-
-    localRow.serverId = serverId
-    localRow.updatedAt = Number(row.updatedAt) || Date.now()
-    localRow.dirty = 0
-    localRow.deletedAtSync = undefined
-
-    if (existing?.id !== undefined) {
-      toPut.push({ ...existing, ...localRow })
-    } else {
-      delete localRow.id
-      toPut.push(localRow)
-    }
+    const merged = mergeServerRow(spec, row, existing, fkCache)
+    if (!merged) continue
+    toPut.push(merged)
     count++
   }
 
@@ -206,40 +175,6 @@ async function buildFkCache(
     result.set(fk.field, idMap)
   }
   return result
-}
-
-/** Synchronous FK translation using the pre-built cache. */
-function translateFkSync(
-  spec: TableSpec,
-  row: Record<string, unknown>,
-  fkCache: Map<string, Map<string, number>>,
-): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const [client, type] of Object.entries(spec.columns)) {
-    const v = row[client]
-    if (v === null || v === undefined) {
-      out[client] = undefined
-    } else if (type === 'bool') {
-      out[client] = Boolean(v)
-    } else if (type === 'json' && typeof v === 'string') {
-      try { out[client] = JSON.parse(v) } catch { out[client] = v }
-    } else {
-      out[client] = v
-    }
-  }
-  if (spec.foreignKeys) {
-    for (const fk of spec.foreignKeys) {
-      const serverFk = row[fk.field]
-      if (typeof serverFk === 'string' && serverFk.length > 0) {
-        out[fk.field] = fkCache.get(fk.field)?.get(serverFk) ?? undefined
-      } else if (typeof serverFk === 'number') {
-        out[fk.field] = serverFk
-      } else {
-        out[fk.field] = undefined
-      }
-    }
-  }
-  return out
 }
 
 // --- push -----------------------------------------------------------------

@@ -8,7 +8,7 @@
 
 import { MARKER_VARIANTS, fixOcrDigits, isKnownUnit, isPlausible, normalizeUnit } from './labCatalog'
 import { parseLabLines, type Confidence } from './labParse'
-import { parseLabDate } from './dates'
+import { canonicalize } from './markers'
 
 export type { Confidence }
 
@@ -144,8 +144,12 @@ export function extractMarkersFromText(text: string): ExtractedMarker[] {
   for (const row of parseLabLines(lines)) {
     // OCR digits can be misread, so never call an OCR row "high".
     const confidence: Confidence = ocr && row.confidence === 'high' ? 'medium' : row.confidence
+    // The lab's printed name, when the catalog folds it onto the same marker.
+    const printed = row.printed.trim()
+    const key = canonicalize(printed)?.key
+    const same = key !== undefined && key === canonicalize(row.canonical)?.key
     found.set(row.canonical, {
-      marker: row.canonical,
+      marker: same ? printed : row.canonical,
       value: row.value,
       unit: row.unit,
       low: row.low,
@@ -257,32 +261,4 @@ function scoreCandidate(canonical: string, value: number, unit: string, start: n
   if (!isPlausible(canonical, value)) score -= 5
   if (value === 0) score -= 3
   return score
-}
-
-// ── Collection date extraction ────────────────────────────────────────────
-
-const DATE_LABELS = [
-  /\b(?:collection|specimen|sample)\s*(?:date|collected|taken|received)\b/i,
-  /\bdate\s+(?:of\s+)?(?:collect(?:ed|ion)|sample|draw)\b/i,
-  /\bcollected\s*(?:on|at)?\b/i,
-  /\bspecimen\s+received\b/i,
-  /\bsample\s+(?:date|received|taken)\b/i,
-  /\b(?:drawn|draw date)\b/i,
-  /\b(?:data\s+d[ae]\s+coleta|coleta|colhido\s+em)\b/i,
-  /\b(?:reported|report)\s*(?:date)?\b/i,
-]
-
-export function extractCollectionDate(text: string): string | undefined {
-  const found: string[] = []
-  for (const label of DATE_LABELS) {
-    const re = new RegExp(label.source + '.{0,60}', label.flags + 'g')
-    for (const m of text.matchAll(re)) {
-      const iso = parseLabDate(m[0])
-      if (iso) found.push(iso)
-    }
-  }
-  if (found.length === 0) return undefined
-  // Earliest date wins: collection comes before reporting.
-  found.sort()
-  return found[0]
 }

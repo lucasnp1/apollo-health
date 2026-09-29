@@ -27,8 +27,10 @@ export const SECTION_ABBR: Partial<Record<LabSection, 'FBC' | 'LFT' | 'U&E' | 'T
   'Full blood count': 'FBC', Liver: 'LFT', Kidney: 'U&E', Thyroid: 'TFT',
 }
 
-// ponytail: `panel`, PANEL_ORDER and `optimal` stay until the old Labs page
-// that reads them is deleted.
+// `panel`, PANEL_ORDER and `optimal` are read only by the public SEO guides
+// (scripts/build-guides.mjs, grouped with labCopy's PANEL_INTRO). The app
+// groups by `section` and judges on labRules. ponytail: drop them when the
+// guides move to sections.
 
 export type LabPanel =
   | 'Sex Hormones'

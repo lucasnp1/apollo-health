@@ -23,6 +23,10 @@ export type TableSpec = {
   // re-pulls the table once and picks up values for rows it already pulled
   // while its bundle did not know the new columns yet.
   rev?: number
+  // Columns that were device-local before their migration: a server NULL
+  // there means "never sent", so the pull keeps the local value. Every other
+  // column takes the server's NULL, so restores and cleared fields sync.
+  keepLocalOnNull?: string[]
 }
 
 // Parent-first order. Children depend on earlier entries.
@@ -34,6 +38,8 @@ export const TABLES: TableSpec[] = [
     slug: 'compounds',
     dexie: 'compounds',
     rev: 12,
+    // Migrations 0010 and 0012 moved these from the device to the server.
+    keepLocalOnNull: ['concentrationMgPerMl', 'defaultRoute', 'lastDose', 'vialMg', 'reconstituteMl', 'vialKind', 'syringe', 'entryMode'],
     columns: {
       name: 'text',
       category: 'text',
@@ -213,8 +219,8 @@ export const TABLES: TableSpec[] = [
       headache: 'int',
       notes: 'text',
       archivedAt: 'int',
-          extras: 'json',
-},
+      extras: 'json',
+    },
   },
   {
     slug: 'markerTargets',

@@ -75,3 +75,43 @@ export function addDays(iso: string, n: number): string {
   const [y, m, d] = dayOf(iso).split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
 }
+
+// ── The draw date inside a report ─────────────────────────────────────────
+
+const COLLECTION_LABELS = [
+  /\b(?:collection|specimen|sample)\s*(?:date|collected|taken|received)\b/i,
+  /\bdate\s+(?:of\s+)?(?:collect(?:ed|ion)|sample|draw)\b/i,
+  /\bcollected\s*(?:on|at)?\b/i,
+  /\bspecimen\s+received\b/i,
+  /\bsample\s+(?:date|received|taken)\b/i,
+  /\b(?:drawn|draw date)\b/i,
+  /\b(?:data\s+d[ae]\s+coleta|coleta|colhido\s+em)\b/i,
+]
+const REPORT_LABELS = [/\b(?:reported|report)\s*(?:date)?\b/i]
+
+/**
+ * The draw date printed in a report: the earliest date next to a collection
+ * label ('report'), else the earliest next to a report label ('report-date',
+ * usually a day or two after the draw). Birth dates, future dates and dates
+ * over 15 years old are never taken.
+ */
+export function extractCollectionDate(text: string, now: Date = new Date()): { date: string; source: 'report' | 'report-date' } | undefined {
+  const today = dayOf(now.toISOString())
+  const oldest = `${Number(today.slice(0, 4)) - 15}${today.slice(4)}`
+  const earliest = (labels: RegExp[]) => {
+    const found: string[] = []
+    for (const label of labels) {
+      for (const m of text.matchAll(new RegExp(label.source + '.{0,60}', label.flags + 'g'))) {
+        // "Collected 23/06/2026 DOB 01/02/1980": keep what comes before the birth date.
+        const cut = m[0].search(/birth|\bd\.?o\.?b\b/i)
+        const iso = parseLabDate(cut >= 0 ? m[0].slice(0, cut) : m[0])
+        if (iso && iso <= today && iso >= oldest) found.push(iso)
+      }
+    }
+    return found.sort()[0]
+  }
+  const drawn = earliest(COLLECTION_LABELS)
+  if (drawn) return { date: drawn, source: 'report' }
+  const reported = earliest(REPORT_LABELS)
+  return reported ? { date: reported, source: 'report-date' } : undefined
+}

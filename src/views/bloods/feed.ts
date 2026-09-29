@@ -182,3 +182,12 @@ export function verdictLine(t: LabTest, isPro: boolean): string {
   const tail = !expected ? '' : out === 1 ? ', expected on your protocol' : `, ${expected} of them expected on your protocol`
   return `${out} of ${plural(c.total, 'marker')} ${out === 1 ? 'is' : 'are'} outside the lab range${tail}.`
 }
+
+/** The fix for a needs-check warning: a date to confirm opens Edit, a same-day pair opens Merge. */
+export const fixOf = (warning: string): 'edit' | 'merge' => (warning.startsWith('Same day as') ? 'merge' : 'edit')
+
+/** Tests close enough to be the same draw: within 14 days, nearest first. */
+export function mergeCandidates(t: LabTest, tests: LabTest[]): LabTest[] {
+  const gap = (o: LabTest) => Math.abs(daysBetween(o.date, t.date))
+  return tests.filter((o) => o.id !== t.id && gap(o) <= 14).sort((a, b) => gap(a) - gap(b))
+}

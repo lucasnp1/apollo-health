@@ -10,8 +10,9 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, seedIfEmpty } from './lib/db'
-import type { ExtractedMarker, ReadProgress } from './lib/pdf'
-import { takePendingRead, type PendingRead } from './lib/pendingRead'
+import type { ReadProgress } from './lib/pdf'
+import { peekPendingRead, type PendingRead } from './lib/pendingRead'
+import type { EditorOpen } from './components/TestEditor'
 import { ToastProvider, useToast } from './lib/toast'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
@@ -24,10 +25,9 @@ import { UpgradeDialog } from './components/UpgradeDialog'
 import { PlanProvider, usePlan } from './lib/plan'
 // Modals / add-pages are lazy — only loaded when first opened
 const ExportPage       = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportPage })))
-const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
+const TestEditor       = lazy(() => import('./components/TestEditor').then(m => ({ default: m.TestEditor })))
 const ResetPassword    = lazy(() => import('./views/ResetPassword').then(m => ({ default: m.ResetPassword })))
 const AddResultsSheet  = lazy(() => import('./components/AddResultsSheet').then(m => ({ default: m.AddResultsSheet })))
-const ManualResultDialog = lazy(() => import('./components/ManualResultDialog').then(m => ({ default: m.ManualResultDialog })))
 const RecoveryCodesScreen = lazy(() => import('./components/RecoveryCodes').then(m => ({ default: m.RecoveryCodesScreen })))
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
@@ -144,6 +144,14 @@ function App() {
 
 type AuthBundle = ReturnType<typeof useAuth>
 
+// The pending /read, taken from storage once per page load: StrictMode runs
+// state initializers twice, and taking it clears it.
+let pendingAtLoad: PendingRead | undefined | null = null
+function pendingReadOnce(): PendingRead | undefined {
+  if (pendingAtLoad === null) pendingAtLoad = peekPendingRead()
+  return pendingAtLoad
+}
+
 function Shell({
   activeView,
   setActiveView,
@@ -162,10 +170,22 @@ function Shell({
   // pressure (matters most on iOS). Best-effort, prompts on no supported browser.
   useEffect(() => { void navigator.storage?.persist?.() }, [])
 
-  // Bloods: the Add results sheet, the typed-in result dialog, and the one
-  // hidden file input every import goes through.
+  // Bloods: the Add results sheet, the test editor (import, typing in, a
+  // /read result, editing), and the one hidden file input every import goes through.
   const [addSheetOpen, setAddSheetOpen] = useState(false)
-  const [manualOpen, setManualOpen] = useState(false)
+  // A /read result carried through sign-up opens the editor once per load, so
+  // the user confirms its draw date and lab. Nothing is saved until they do;
+  // until then (or 24 hours) it stays in storage and Bloods offers it again.
+  const [editor, setEditor] = useState<EditorOpen | null>(() => {
+    const pending = pendingReadOnce()
+    return pending ? { mode: 'read', pending } : null
+  })
+  const [waitingRead, setWaitingRead] = useState(peekPendingRead)
+  const closeEditor = () => {
+    pendingAtLoad = undefined
+    setEditor(null)
+    setWaitingRead(peekPendingRead())
+  }
   const labFileInput = useRef<HTMLInputElement>(null)
   const startLabImport = () => {
     setAddSheetOpen(false)
@@ -174,8 +194,12 @@ function Shell({
   }
   const startManual = () => {
     setAddSheetOpen(false)
-    setManualOpen(true)
+    setEditor({ mode: 'manual' })
   }
+  const openTest = useCallback((id: number) => {
+    setActiveView('labs')
+    window.location.hash = `#test/${id}`
+  }, [setActiveView])
   // Bloods keeps its screen in the URL hash; leaving the view drops it.
   useEffect(() => {
     if (activeView !== 'labs' && window.location.hash) {
@@ -196,31 +220,7 @@ function Shell({
   // in ToastProvider so any view can fire one without prop drilling).
   const [pdfParsingName, setPdfParsingName] = useState<string | null>(null)
   const [pdfProgress, setPdfProgress] = useState<ReadProgress | null>(null)
-  const [pdfReviewFileId, setPdfReviewFileId] = useState<number | null>(null)
   const { showToast } = useToast()
-
-  // Someone who used the public /read tool and then signed up arrives with
-  // their parsed panel already in hand. Import it instead of asking for the
-  // same file a second time. Runs once, after auth, and clears itself.
-  useEffect(() => {
-    const pending = takePendingRead()
-    if (!pending) return
-    void (async () => {
-      try {
-        const examId = await db.exams.add({
-          name: pending.exam.name,
-          collectedAt: pending.exam.collectedAt,
-          labName: pending.exam.labName,
-        })
-        await db.results.bulkAdd(pending.results.map((r: PendingRead['results'][number]) => ({ ...r, examId })))
-        showToast({
-          message: `Saved your read: ${pending.results.length} marker${pending.results.length === 1 ? '' : 's'} from ${pending.exam.name}.`,
-        })
-      } catch {
-        showToast({ message: 'Could not save that read. Upload the file again from Bloods.' })
-      }
-    })()
-  }, [showToast])
 
   // Returning from Stripe checkout: refresh the plan (webhook may lag a beat)
   // and strip the query flag from the URL.
@@ -260,7 +260,7 @@ function Shell({
       })
       setActiveView('labs')
       if (markers.length > 0) {
-        setPdfReviewFileId(id as number)
+        setEditor({ mode: 'file', fileId: id as number })
       } else if (extractedText) {
         showToast({
           tone: 'warn',
@@ -284,38 +284,6 @@ function Shell({
       setPdfParsingName(null)
       setPdfProgress(null)
     }
-  }
-
-  const pdfReviewFile = useLiveQuery(
-    async () => (pdfReviewFileId == null ? null : (await db.files.get(pdfReviewFileId)) ?? null),
-    [pdfReviewFileId],
-    null,
-  )
-
-  async function commitPdfImport(items: ExtractedMarker[], collectedAt: string) {
-    if (!pdfReviewFile?.id || items.length === 0) return
-    const examId = await db.exams.add({
-      name: pdfReviewFile.name.replace(/\.(pdf|jpe?g|png|webp|heic|gif|bmp|tiff?)$/i, ''),
-      collectedAt,
-      labName: pdfReviewFile.type.startsWith('image/') ? 'Photo import' : 'PDF import',
-      sourceFileId: pdfReviewFile.id,
-    })
-    await db.results.bulkAdd(items.map((item) => ({
-      examId,
-      marker: item.marker,
-      value: item.value,
-      rawValue: item.rawValue ?? String(item.value),
-      unit: item.unit,
-      // Persist the reference range from the PDF so the Labs view can
-      // show HIGH/LOW status. Without these the row falls through to
-      // "no range known" and stops contributing OK / out-of-range counts.
-      low: item.low,
-      high: item.high,
-    })))
-    await db.files.update(pdfReviewFile.id, { status: 'Reviewed' })
-    showToast({
-      message: `Imported ${items.length} marker${items.length === 1 ? '' : 's'} from ${pdfReviewFile.name}.`,
-    })
   }
 
   const compounds = useLiveQuery(
@@ -362,19 +330,6 @@ function Shell({
     () => db.exams.orderBy('collectedAt').reverse().filter((e) => !e.deletedAtSync && !e.archivedAt).toArray(),
     [], [],
   )
-  // Duplicate detection: if an exam with the same source filename already
-  // exists, warn the user in the review sheet so they can decide whether
-  // to import. Depends on `exams` so it's declared after that live query.
-  const pdfDuplicateWarning = useMemo(() => {
-    if (!pdfReviewFile) return undefined
-    const base = pdfReviewFile.name.replace(/\.pdf$/i, '').toLowerCase()
-    const match = exams.find(
-      (e) => e.name.toLowerCase() === base && e.sourceFileId !== pdfReviewFile.id,
-    )
-    return match
-      ? `You already imported a PDF named "${pdfReviewFile.name}" on ${new Date(match.collectedAt).toLocaleDateString()}. Importing again will create a duplicate panel.`
-      : undefined
-  }, [pdfReviewFile, exams])
   const results = useLiveQuery(
     () => db.results.filter((r) => !r.deletedAtSync && !r.archivedAt).toArray(),
     [], [],
@@ -461,16 +416,16 @@ function Shell({
           {activeView === 'add-weight' && <AddWeight onBack={() => setActiveView('overview')} />}
           {activeView === 'add-bp' && <AddBP onBack={() => setActiveView('overview')} />}
           {activeView === 'labs' && (
-            <Labs onImport={startLabImport} onManual={startManual} onReviewFile={(id) => setPdfReviewFileId(id)} />
+            <Labs onImport={startLabImport} onManual={startManual} onReviewFile={(fileId) => setEditor({ mode: 'file', fileId })} onEdit={(examId) => setEditor({ mode: 'edit', examId })} onReviewRead={waitingRead ? () => setEditor({ mode: 'read', pending: waitingRead }) : undefined} />
           )}
           {activeView === 'timeline' && (
             <Timeline
               compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} bodyMetrics={bodyMetrics}
-              onOpenTest={(id) => { setActiveView('labs'); window.location.hash = `#test/${id}` }}
+              onOpenTest={openTest}
             />
           )}
           {activeView === 'files' && (
-            <Files files={files ?? []} onReviewFile={(id) => setPdfReviewFileId(id)} />
+            <Files files={files ?? []} onReviewFile={(fileId) => setEditor({ mode: 'file', fileId })} />
           )}
           {activeView === 'export' && (
             <ExportPage
@@ -504,15 +459,7 @@ function Shell({
 
       <Suspense fallback={null}>
         {addSheetOpen && <AddResultsSheet open isPro={isPro} onImport={startLabImport} onManual={startManual} onClose={() => setAddSheetOpen(false)} />}
-        {manualOpen && <ManualResultDialog open onClose={() => setManualOpen(false)} />}
-        {pdfReviewFile && (
-          <PdfReviewSheet
-            file={pdfReviewFile}
-            duplicateWarning={pdfDuplicateWarning}
-            onImport={commitPdfImport}
-            onClose={() => setPdfReviewFileId(null)}
-          />
-        )}
+        {editor && <TestEditor open={editor} onClose={closeEditor} onOpenTest={openTest} />}
       </Suspense>
 
       {pdfParsingName && (

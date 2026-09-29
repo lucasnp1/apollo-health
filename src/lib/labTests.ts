@@ -7,6 +7,7 @@ import type { Compound, ExamMeta, HealthFile, InjectionLog, LabExam, LabResult, 
 import { canonicalize, metaForKey, type LabSection } from './markers.ts'
 import { CORE_KEYS, changeOf, expectedOnProtocol, labFlag, readMarker, retestBy, type LabFlag, type Read } from './labRules.ts'
 import { homaIr, toUnit } from './labUnits.ts'
+import { parseLabNumber } from './labCatalog.ts'
 import { beforeProtocol, onProtocol, protocolAtDraw, type DoseTiming } from './protocolAtDraw.ts'
 import { CALENDAR_DAY, dateFromFileName, dayOf, daysBetween, fmtDay } from './dates.ts'
 
@@ -89,8 +90,9 @@ const LEGACY_DEFAULT = /^(blood|lab) panel$/i
 /** The name a person gave the test, or "{Provider} blood test". Never a file name. */
 export function testTitle(exam: Pick<LabExam, 'name'> & Partial<LabExam>, file?: HealthFile): string {
   const name = exam.name?.trim() ?? ''
-  // Before meta existed, every PDF or photo import (including /read) was named after its file.
-  const legacyImport = !exam.meta && /^(PDF|Photo) import$/.test(exam.labName ?? '')
+  // Before dateSource existed, every PDF or photo import (including /read) was named after its file.
+  // Keyed on dateSource, not meta: a merge can give a legacy test a meta without one.
+  const legacyImport = !exam.meta?.dateSource && /^(PDF|Photo) import$/.test(exam.labName ?? '')
   const fromFile = legacyImport || (!!file && (name === file.name || name === stripExt(file.name)))
   if (name && !looksLikeFileName(name) && !fromFile && !LEGACY_DEFAULT.test(name)) return name
   return defaultTestName(exam.company || detectProvider(`${name} ${file?.extractedText ?? ''}`, file?.name))
@@ -171,7 +173,7 @@ function timingBucket(t: LabTest | undefined): 'low' | 'high' | undefined {
 function needsCheckOf(exam: LabExam, file: HealthFile | undefined, sameDay: LabTest | undefined, title: (t: LabTest) => string): string[] {
   const out: string[] = []
   const src = exam.meta?.dateSource
-  const importStamp = !exam.meta && !CALENDAR_DAY.test(exam.collectedAt)
+  const importStamp = !exam.meta?.dateSource && !CALENDAR_DAY.test(exam.collectedAt)
   // Only legacy tests: every dateSource names where its date came from.
   const nameDates = src ? [] : [exam.name, file?.name].map((n) => (n ? dateFromFileName(n) : undefined))
   const nameOff = nameDates.some((d) => d && Math.abs(daysBetween(d, exam.collectedAt)) > 1)
@@ -425,10 +427,82 @@ export function findSameDraw(
       const v = toUnit(m.key, row.value, row.unit, m.unit)
       if (v !== undefined && Math.abs(v - m.value!) <= Math.abs(m.value!) * 0.01) matched++
     }
-    if (overlap > 0 && matched / overlap >= 0.8 && (!dup || matched > dup.matched)) dup = { id: t.id, matched, overlap }
+    // ponytail: 3 matching values is a heuristic floor (capped by the test's size, so a small
+    // real test still counts); one shared value is a coincidence, not a duplicate report.
+    if (matched >= Math.min(3, t.markers.length) && matched / overlap >= 0.8 && (!dup || matched > dup.matched)) dup = { id: t.id, matched, overlap }
     const sameProvider = !!draft.provider && draft.provider === t.provider
     if ((gap <= 1 || sameProvider) && (!same || gap < same.gap)) same = { id: t.id, gap, matched, overlap }
   }
   if (dup) return { duplicateOf: dup.id, sameDrawAs: same?.id, matched: dup.matched, overlap: dup.overlap }
   return { sameDrawAs: same?.id, matched: same?.matched ?? 0, overlap: same?.overlap ?? 0 }
+}
+
+// ── Editing and merging (pure halves of bloodTestsDb) ──────────────────────
+
+/** A typed or printed value: "<0.5" reads 0.5 with its operator kept apart. */
+export function parseEntry(raw: string): { value?: number; op?: '<' | '>' } {
+  const m = raw.trim().match(/^([<>≤≥])=?\s*(.*)$/)
+  const value = parseLabNumber(m ? m[2] : raw)
+  return { value, op: m ? (m[1] === '<' || m[1] === '≤' ? '<' : '>') : undefined }
+}
+
+/** The two range fields as typed: "<5" in either is an upper limit, ">60" a lower one. */
+export function parseRange(lowRaw: string, highRaw: string): { low?: number; high?: number } {
+  const lo = parseEntry(lowRaw), hi = parseEntry(highRaw)
+  // A bare number counts for its own field; an operator can move it to the other one.
+  const side = (e: typeof lo, want: '<' | '>', bare: boolean) => (e.value !== undefined && (e.op ? e.op === want : bare) ? e.value : undefined)
+  return { low: side(lo, '>', true) ?? side(hi, '>', false), high: side(hi, '<', true) ?? side(lo, '<', false) }
+}
+
+type KeyedRow = { id?: number; marker: string; unit?: string; value?: number; rawValue?: string; high?: number }
+
+/** Draft rows already in a test (by key) are skipped when adding to it. */
+export function splitNewRows<T extends KeyedRow>(rows: T[], existing: KeyedRow[]): { add: T[]; skipped: number } {
+  const have = new Set(existing.map((r) => canonicalKey(r.marker, r.unit, r).key))
+  const add = rows.filter((r) => !have.has(canonicalKey(r.marker, r.unit, r).key))
+  return { add, skipped: rows.length - add.length }
+}
+
+/**
+ * Moving src's results into dst. dst keeps its name, date and values, so a moved
+ * row whose key dst already has is archived, unless it holds the only value for
+ * that key. `differing` counts the markers where the two reports disagree.
+ */
+export function planMerge(src: KeyedRow[], dst: KeyedRow[]): { archive: number[]; differing: number } {
+  const keyOf = (r: KeyedRow) => canonicalKey(r.marker, r.unit, r).key
+  const same = (a: KeyedRow, b: KeyedRow, key: string) => {
+    if (a.value === undefined || b.value === undefined) return false
+    const v = toUnit(key, a.value, a.unit, b.unit)
+    return v !== undefined && Math.abs(v - b.value) <= Math.abs(b.value) * 0.01
+  }
+  const byKey = new Map<string, KeyedRow[]>()
+  for (const d of dst) byKey.set(keyOf(d), [...(byKey.get(keyOf(d)) ?? []), d])
+  const archive: number[] = []
+  const differs = new Set<string>()
+  for (const r of src) {
+    const key = keyOf(r)
+    const have = byKey.get(key)
+    if (r.id === undefined || !have) continue
+    if (r.value !== undefined && have.every((d) => d.value === undefined)) continue
+    archive.push(r.id)
+    if (r.value !== undefined && !have.some((d) => same(r, d, key))) differs.add(key)
+  }
+  return { archive, differing: differs.size }
+}
+
+const FILLABLE = ['company', 'notes', 'sourceFileId', 'examType', 'location'] as const
+
+/** dst's empty fields (and empty meta fields), filled from src. Nothing dst has is overwritten. */
+export function fillEmpty(dst: LabExam, src: Partial<LabExam>): Partial<LabExam> {
+  const out: Partial<LabExam> = {}
+  for (const k of FILLABLE) {
+    if ((dst[k] === undefined || dst[k] === '') && src[k] !== undefined && src[k] !== '') (out as Record<string, unknown>)[k] = src[k]
+  }
+  const dm = dst.meta ?? {}, sm = src.meta ?? {}
+  const meta: ExamMeta = { ...dm }
+  if (dm.drawTime === undefined && sm.drawTime) meta.drawTime = sm.drawTime
+  if ((dm.fasted === undefined || dm.fasted === null) && typeof sm.fasted === 'boolean') meta.fasted = sm.fasted
+  if (!dm.conditions?.length && sm.conditions?.length) meta.conditions = sm.conditions
+  if (JSON.stringify(meta) !== JSON.stringify(dm)) out.meta = meta
+  return out
 }

@@ -1,12 +1,12 @@
 // Bloods model self-check. Run: node scripts/labs.test.mjs
 import assert from 'node:assert/strict'
-import { dateFromFileName, dayOf, fmtDay, parseLabDate } from '../src/lib/dates.ts'
+import { dateFromFileName, dayOf, extractCollectionDate, fmtDay, parseLabDate } from '../src/lib/dates.ts'
 import { homaIr, toUnit } from '../src/lib/labUnits.ts'
 import { canonicalize } from '../src/lib/markers.ts'
 import { changeOf, fmtRange, labFlag, readMarker } from '../src/lib/labRules.ts'
 import { protocolAtDraw } from '../src/lib/protocolAtDraw.ts'
 import { markerHash, parseBloodsHash } from '../src/views/bloods/route.ts'
-import { buildTests, canonicalKey, changesFor, derivedFor, detectProvider, findSameDraw, markerSeries, notInTest, testTitle } from '../src/lib/labTests.ts'
+import { buildTests, canonicalKey, changesFor, derivedFor, detectProvider, fillEmpty, findSameDraw, markerSeries, notInTest, parseEntry, parseRange, planMerge, splitNewRows, testTitle } from '../src/lib/labTests.ts'
 
 let n = 0
 const check = (name, fn) => { fn(); n++; console.log('  ok', name) }
@@ -354,6 +354,15 @@ check('same draw and duplicates', () => {
   const same = findSameDraw({ date: '2026-06-19', rows: [{ marker: 'Vitamin D', unit: 'nmol/L', value: 80 }] }, tests)
   assert.equal(same.duplicateOf, undefined)
   assert.ok([9, 10].includes(same.sameDrawAs))
+  // One shared value is not a duplicate report, just the same draw.
+  const [small] = buildTests({
+    exams: [{ id: 1, name: 'x', collectedAt: '2026-06-10T12:00:00Z' }],
+    results: [R(1, 1, 'Sodium', 140, 'mmol/L', 133, 146), R(2, 1, 'Potassium', 4.2, 'mmol/L', 3.5, 5.3), R(3, 1, 'Urea', 5.1, 'mmol/L', 2.5, 7.8)],
+    files: [], targets: [], compounds: [], injections: [],
+  })
+  const one = findSameDraw({ date: '2026-06-11', rows: [{ marker: 'Sodium', unit: 'mmol/L', value: 140 }] }, [small])
+  assert.equal(one.duplicateOf, undefined)
+  assert.equal(one.sameDrawAs, 1)
 })
 
 check('an impossible stored date never crashes the page', () => {
@@ -449,6 +458,61 @@ check('expected on protocol survives a personal target', () => {
   assert.equal(m.expected, true)
   assert.equal(latest.markers.find((x) => x.key === 'total_testosterone').expected, true)
   assert.equal(latest.markers.find((x) => x.key === 'estradiol').expected, false)
+})
+
+// ── Step 5: import, editing and merging ─────────────────────────────────────
+
+check('the draw date skips birth dates, future dates and old dates, and prefers collection labels', () => {
+  const now = new Date('2026-09-29T12:00:00Z')
+  assert.deepEqual(extractCollectionDate('Reported: 30/06/2026\nSample collected: 28/06/2026', now), { date: '2026-06-28', source: 'report' })
+  assert.deepEqual(extractCollectionDate('Report date 30 Jun 2026', now), { date: '2026-06-30', source: 'report-date' })
+  assert.deepEqual(extractCollectionDate('Collected 23/06/2026 DOB 01/02/1980', now), { date: '2026-06-23', source: 'report' })
+  assert.equal(extractCollectionDate('Collected DOB: 01/02/1990', now), undefined)
+  assert.equal(extractCollectionDate('Sample date 01/01/2027', now), undefined)
+  assert.equal(extractCollectionDate('Collection date 01/01/2009', now), undefined)
+  assert.equal(extractCollectionDate('Date of birth 12/03/2020 Reported 30/06/2026', now).date, '2026-06-30')
+})
+
+check('typed values and ranges', () => {
+  assert.deepEqual(parseEntry('<0.5'), { value: 0.5, op: '<' })
+  assert.deepEqual(parseEntry('51,2'), { value: 51.2, op: undefined })
+  assert.equal(parseEntry('abc').value, undefined)
+  assert.deepEqual(parseRange('40', '50'), { low: 40, high: 50 })
+  assert.deepEqual(parseRange('<5', ''), { low: undefined, high: 5 })
+  assert.deepEqual(parseRange('', '<5'), { low: undefined, high: 5 })
+  assert.deepEqual(parseRange('', '50'), { low: undefined, high: 50 })
+  assert.deepEqual(parseRange('>60', ''), { low: 60, high: undefined })
+})
+
+check('adding to a same-draw test skips markers it already has', () => {
+  const rows = [{ marker: 'Haematocrit', unit: '%', value: 51 }, { marker: 'Vitamin D', unit: 'nmol/L', value: 80 }]
+  const { add, skipped } = splitNewRows(rows, [{ marker: 'Hematocrit', unit: 'L/L', value: 0.5 }])
+  assert.equal(skipped, 1)
+  assert.deepEqual(add.map((r) => r.marker), ['Vitamin D'])
+})
+
+check('a merge archives every moved row whose marker the destination already has', () => {
+  const src = [R(1, 1, 'HDL Cholesterol', 1.1, 'mmol/L'), R(2, 1, 'Haematocrit', 0.5, 'L/L'), R(3, 1, 'ALT', 30, 'U/L'), R(7, 1, 'GGT', 25, 'U/L')]
+  const dst = [R(4, 2, 'HDL', 1.1, 'mmol/L'), R(5, 2, 'Hematocrit', 50, '%'), R(6, 2, 'ALT', 44, 'U/L'), { id: 8, examId: 2, marker: 'GGT', rawValue: '', unit: 'U/L' }]
+  // dst keeps its ALT; src's GGT is the only value, so it stays.
+  assert.deepEqual(planMerge(src, dst), { archive: [1, 2, 3], differing: 1 })
+})
+
+check('a merge into a legacy test keeps "Draw date not confirmed" and never brings back a file-name title', () => {
+  const legacy = { id: 1, name: 'Alex Morgan bloods', labName: 'PDF import', collectedAt: '2025-11-15T18:43:12.345Z' }
+  const filled = { ...legacy, ...fillEmpty(legacy, { meta: { dateSource: 'user', fasted: true } }) }
+  const [t] = buildTests({ exams: [filled], results: [], files: [], targets: [], compounds: [], injections: [] })
+  assert.deepEqual(t.needsCheck, ['Draw date not confirmed'])
+  assert.equal(t.title, 'Blood test')
+})
+
+check('a merge fills only the empty fields of the destination', () => {
+  const fill = fillEmpty(
+    { id: 2, name: 'Well Man', collectedAt: 'x', company: 'Medichecks', meta: { dateSource: 'report', fasted: null } },
+    { id: 1, name: 'Blood test', collectedAt: 'x', company: 'Thriva', notes: 'hard week', sourceFileId: 7, meta: { dateSource: 'user', drawTime: '08:40', fasted: true } },
+  )
+  assert.deepEqual(fill, { notes: 'hard week', sourceFileId: 7, meta: { dateSource: 'report', drawTime: '08:40', fasted: true } })
+  assert.deepEqual(fillEmpty({ id: 2, name: 'x', collectedAt: 'x', company: 'A' }, { company: 'B' }), {})
 })
 
 console.log(`\n${n} checks passed`)

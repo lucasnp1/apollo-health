@@ -15,8 +15,10 @@ const MAX_AGE_MS = 24 * 60 * 60 * 1000
 
 export type PendingRead = {
   savedAt: number
-  exam: Pick<LabExam, 'name' | 'collectedAt' | 'labName'>
-  results: Array<Pick<LabResult, 'marker' | 'value' | 'rawValue' | 'unit' | 'low' | 'high'>>
+  // No collectedAt when the report printed no draw date: the editor asks for it.
+  exam: Pick<LabExam, 'name' | 'labName' | 'company' | 'meta'> & { collectedAt?: string }
+  // status: the lab's printed H or L. Reads stashed before it was carried have none.
+  results: Array<Pick<LabResult, 'marker' | 'value' | 'rawValue' | 'unit' | 'low' | 'high' | 'status'>>
 }
 
 export function stashPendingRead(read: Omit<PendingRead, 'savedAt'>): boolean {
@@ -30,23 +32,21 @@ export function stashPendingRead(read: Omit<PendingRead, 'savedAt'>): boolean {
   }
 }
 
-export function takePendingRead(): PendingRead | undefined {
+/** The pending read, left in storage until it is saved (clearPendingRead) or expires. */
+export function peekPendingRead(): PendingRead | undefined {
   let raw: string | null
   try { raw = localStorage.getItem(KEY) } catch { return undefined }
   if (!raw) return undefined
-  // Read once. Even a malformed entry is cleared, so a bad parse cannot wedge
-  // every future sign-in on the same broken payload.
-  try { localStorage.removeItem(KEY) } catch { /* ignore */ }
   try {
     const parsed = JSON.parse(raw) as PendingRead
-    if (!parsed?.results?.length || !parsed.exam) return undefined
-    if (!Number.isFinite(parsed.savedAt) || Date.now() - parsed.savedAt > MAX_AGE_MS) return undefined
-    return parsed
-  } catch {
-    return undefined
-  }
+    if (parsed?.results?.length && parsed.exam && Number.isFinite(parsed.savedAt) && Date.now() - parsed.savedAt <= MAX_AGE_MS) return parsed
+  } catch { /* malformed: cleared below */ }
+  // A malformed or expired entry is cleared, so a bad parse cannot wedge every
+  // future sign-in on the same broken payload.
+  clearPendingRead()
+  return undefined
 }
 
-export function hasPendingRead(): boolean {
-  try { return localStorage.getItem(KEY) !== null } catch { return false }
+export function clearPendingRead() {
+  try { localStorage.removeItem(KEY) } catch { /* ignore */ }
 }

@@ -2,7 +2,7 @@
 // newest first) and Markers (one row per marker, grouped by section).
 
 import { useMemo, useState } from 'react'
-import { CalendarClock, Lock, TriangleAlert } from 'lucide-react'
+import { CalendarClock, Lock, Merge, Pencil, TriangleAlert } from 'lucide-react'
 import { SECTION_ABBR, SECTION_ORDER } from '../../lib/markers'
 import { changesFor, notInTest, type LabTest, type TestMarker } from '../../lib/labTests'
 import { CORE_KEYS } from '../../lib/labRules'
@@ -13,7 +13,7 @@ import { PanelCard } from '../../components/dashboard/PanelCard'
 import { Segmented } from '@/components/ui/segmented'
 import { Button } from '@/components/ui/button'
 import { TestHeader } from './TestReport'
-import { flagChip, markerChip, markerRowProps, plural, printedValue, rangeSub, SECTION_ICON, testRowProps, valueTitle } from './feed'
+import { fixOf, flagChip, markerChip, markerRowProps, plural, printedValue, rangeSub, SECTION_ICON, testRowProps, valueTitle } from './feed'
 import { markerHash, type HomeTab } from './route'
 type Go = (hash: string, replace?: boolean) => void
 
@@ -151,7 +151,9 @@ function Latest({ tests, isPro, go }: { tests: LabTest[]; isPro: boolean; go: Go
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
-function Tests({ tests, isPro, go }: { tests: LabTest[]; isPro: boolean; go: Go }) {
+type Fix = { onEdit: (id: number) => void; onMerge: (id: number) => void }
+
+function Tests({ tests, isPro, go, onEdit, onMerge }: { tests: LabTest[]; isPro: boolean; go: Go } & Fix) {
   const [onlyCheck, setOnlyCheck] = useState(false)
   const needCheck = tests.filter((t) => t.needsCheck.length > 0)
   const list = onlyCheck ? needCheck : tests
@@ -171,7 +173,18 @@ function Tests({ tests, isPro, go }: { tests: LabTest[]; isPro: boolean; go: Go 
       )}
       <FeedList>
         {list.map((t) => (
-          <FeedRow key={t.id} {...testRowProps(t, isPro, tests)} onClick={() => go(`#test/${t.id}`)} />
+          <FeedRow key={t.id} {...testRowProps(t, isPro, tests)} onClick={() => go(`#test/${t.id}`)}>
+            {/* Checking: each warning ends in one tap on its fix. */}
+            {onlyCheck && (
+              <span className="flex flex-wrap gap-2 pb-1 pl-14">
+                {[...new Set(t.needsCheck.map(fixOf))].map((fix) => (
+                  <Button key={fix} variant="outline" className="h-10" onClick={() => (fix === 'merge' ? onMerge(t.id) : onEdit(t.id))}>
+                    {fix === 'merge' ? <><Merge className="size-4" /> Merge</> : <><Pencil className="size-4" /> Check the date</>}
+                  </Button>
+                ))}
+              </span>
+            )}
+          </FeedRow>
         ))}
       </FeedList>
     </PanelCard>
@@ -220,7 +233,7 @@ function Markers({ tests, isPro, go }: { tests: LabTest[]; isPro: boolean; go: G
 
 // ── Home ──────────────────────────────────────────────────────────────────
 
-export function BloodsHome({ tests, isPro, tab, onTab, go }: { tests: LabTest[]; isPro: boolean; tab: HomeTab; onTab: (t: HomeTab) => void; go: Go }) {
+export function BloodsHome({ tests, isPro, tab, onTab, go, onEdit, onMerge }: { tests: LabTest[]; isPro: boolean; tab: HomeTab; onTab: (t: HomeTab) => void; go: Go } & Fix) {
   return (
     <div className="flex flex-col gap-4">
       <Segmented
@@ -235,7 +248,7 @@ export function BloodsHome({ tests, isPro, tab, onTab, go }: { tests: LabTest[];
         ]}
       />
       {tab === 'latest' && <Latest tests={tests} isPro={isPro} go={go} />}
-      {tab === 'tests' && <Tests tests={tests} isPro={isPro} go={go} />}
+      {tab === 'tests' && <Tests tests={tests} isPro={isPro} go={go} onEdit={onEdit} onMerge={onMerge} />}
       {tab === 'markers' && <Markers tests={tests} isPro={isPro} go={go} />}
     </div>
   )

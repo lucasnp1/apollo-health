@@ -4,7 +4,7 @@
 //   #test/<id>                          one test's report
 //   #marker/<key>[/<examId>]            one marker over time
 
-import { useEffect, useRef, useSyncExternalStore, type Ref } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type Ref } from 'react'
 import { ChevronLeft, Droplet, FileText, Keyboard, Upload } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -14,7 +14,7 @@ import { FeedList, FeedRow } from '../components/FeedList'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { BloodsHome } from './bloods/BloodsHome'
-import { TestReport } from './bloods/TestReport'
+import { MergeDialog, TestReport } from './bloods/TestReport'
 import { MarkerScreen } from './bloods/MarkerScreen'
 import { valueTitle } from './bloods/feed'
 import { parseBloodsHash, type Route } from './bloods/route'
@@ -87,11 +87,19 @@ function Empty({ isPro, onImport, onManual }: { isPro: boolean; onImport: () => 
   )
 }
 
-export function Labs({ onImport, onManual, onReviewFile }: { onImport: () => void; onManual: () => void; onReviewFile: (id: number) => void }) {
+export function Labs({ onImport, onManual, onReviewFile, onEdit, onReviewRead }: {
+  onImport: () => void
+  onManual: () => void
+  onReviewFile: (id: number) => void
+  onEdit: (examId: number) => void
+  /** Set while a /read result carried through sign-up is waiting to be saved. */
+  onReviewRead?: () => void
+}) {
   const { isPro } = usePlan()
   // undefined while Dexie loads, so the empty state never flashes over real tests.
   const tests = useBloodTests()
   const [route, go] = useBloodsRoute()
+  const [mergeId, setMergeId] = useState<number>()
   // A parsed report that was never imported (the review sheet was closed).
   const pending = useLiveQuery(() => db.files.filter((f) => f.status === 'Needs review' && !!f.extractedText && !f.archivedAt && !f.deletedAtSync).first(), [])
 
@@ -106,13 +114,17 @@ export function Labs({ onImport, onManual, onReviewFile }: { onImport: () => voi
     }
   }, [screen, route.kind, loading])
 
-  const pendingRow = pending?.id !== undefined && (
+  const pendingRow = (pending?.id !== undefined || onReviewRead) && (
     <FeedList>
-      <FeedRow icon={FileText} title="A report is ready to review" sub="Check the values before they are saved" onClick={() => onReviewFile(pending.id!)} />
+      {onReviewRead && <FeedRow icon={FileText} title="Your read is waiting" sub="Check the draw date and lab, then save it" onClick={onReviewRead} />}
+      {pending?.id !== undefined && <FeedRow icon={FileText} title="A report is ready to review" sub="Check the values before they are saved" onClick={() => onReviewFile(pending.id!)} />}
     </FeedList>
   )
 
   if (tests === undefined) return <div className="min-h-[40dvh]" />
+
+  const mergeTest = mergeId !== undefined ? tests.find((t) => t.id === mergeId) : undefined
+  const merge = mergeTest && <MergeDialog test={mergeTest} tests={tests} go={go} onClose={() => setMergeId(undefined)} />
 
   if (route.kind === 'home') {
     return (
@@ -120,7 +132,8 @@ export function Labs({ onImport, onManual, onReviewFile }: { onImport: () => voi
         {pendingRow}
         {tests.length === 0
           ? <Empty isPro={isPro} onImport={onImport} onManual={onManual} />
-          : <BloodsHome tests={tests} isPro={isPro} tab={route.tab} onTab={(t) => go(t === 'latest' ? '#latest' : `#${t}`, true)} go={go} />}
+          : <BloodsHome tests={tests} isPro={isPro} tab={route.tab} onTab={(t) => go(t === 'latest' ? '#latest' : `#${t}`, true)} go={go} onEdit={onEdit} onMerge={setMergeId} />}
+        {merge}
       </div>
     )
   }
@@ -130,9 +143,10 @@ export function Labs({ onImport, onManual, onReviewFile }: { onImport: () => voi
     <div className="flex flex-col gap-3">
       <BackBar ref={backRef} />
       {route.kind === 'test' && (test
-        ? <TestReport key={test.id} test={test} isPro={isPro} go={go} />
+        ? <TestReport key={test.id} test={test} tests={tests} isPro={isPro} go={go} onEdit={onEdit} onMerge={setMergeId} />
         : <PanelCard><p className="feed-note text-muted-foreground">This test is not on file. It may have been archived.</p></PanelCard>)}
-      {route.kind === 'marker' && <MarkerScreen key={route.key} markerKey={route.key} focusExamId={route.examId} tests={tests} isPro={isPro} go={go} />}
+      {route.kind === 'marker' && <MarkerScreen key={route.key} markerKey={route.key} focusExamId={route.examId} tests={tests} isPro={isPro} go={go} onEdit={onEdit} />}
+      {merge}
     </div>
   )
 }

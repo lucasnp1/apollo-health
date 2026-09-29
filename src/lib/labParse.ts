@@ -11,6 +11,8 @@ export type Confidence = 'high' | 'medium' | 'low'
 
 export type ParsedRow = {
   canonical: string
+  /** The name as the report prints it ("Haematocrit", "HDL CHOLESTEROL"). */
+  printed: string
   value: number
   rawValue: string
   unit: string
@@ -83,7 +85,7 @@ function parseFlag(s: string): { flag?: 'H' | 'L'; consumed: number } {
 
 // Parse the text that follows a marker name. Returns undefined when it does
 // not look like a result row.
-function parseTail(tail: string): { row: Omit<ParsedRow, 'canonical' | 'line' | 'confidence'>; consumed: number; unitKnown: boolean; hasRange: boolean } | undefined {
+function parseTail(tail: string): { row: Omit<ParsedRow, 'canonical' | 'printed' | 'line' | 'confidence'>; consumed: number; unitKnown: boolean; hasRange: boolean } | undefined {
   let s = tail
   let pos = 0
   const take = (n: number) => { s = s.slice(n); pos += n }
@@ -183,7 +185,7 @@ function parseLabLine(line: string, lineNo: number): ParsedRow[] {
       : parsed.unitKnown || parsed.hasRange || parsed.row.flag ? 'medium' : 'low'
     if (!isPlausible(best.a.canonical, parsed.row.value)) confidence = 'low'
 
-    rows.push({ canonical: best.a.canonical, line: lineNo, confidence, ...parsed.row })
+    rows.push({ canonical: best.a.canonical, printed: sub.slice(best.idx, best.idx + best.len), line: lineNo, confidence, ...parsed.row })
     cursor = nameEnd + parsed.consumed
   }
   return rows

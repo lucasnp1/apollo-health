@@ -5,15 +5,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, XAxis, YAxis } from 'recharts'
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns'
-import { Archive, Lock } from 'lucide-react'
+import { Lock, Pencil } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type MarkerTarget } from '../../lib/db'
 import { markerSeries, type LabTest, type TestMarker } from '../../lib/labTests'
 import { fmtRange } from '../../lib/labRules'
 import { toUnit } from '../../lib/labUnits'
 import { dayOf, fmtDay } from '../../lib/dates'
-import { archiveRow, restoreRow } from '../../lib/archive'
-import { useUndoableDelete } from '../../lib/useUndoableDelete'
 import type { MarkerCopy } from '../../lib/labCopy'
 import { FeedChip, FeedList, FeedRow, type FeedFact } from '../../components/FeedList'
 import { RangeBar } from '../../components/RangeBar'
@@ -138,12 +136,13 @@ function niceStep(raw: number): number {
   return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p
 }
 
-export function MarkerScreen({ markerKey, focusExamId, tests, isPro, go }: {
+export function MarkerScreen({ markerKey, focusExamId, tests, isPro, go, onEdit }: {
   markerKey: string
   focusExamId?: number
   tests: LabTest[]
   isPro: boolean
   go: (hash: string, replace?: boolean) => void
+  onEdit: (examId: number) => void
 }) {
   // Every test that has this marker, newest first.
   const rows = useMemo(() => tests.flatMap((t) => {
@@ -152,7 +151,6 @@ export function MarkerScreen({ markerKey, focusExamId, tests, isPro, go }: {
   }), [tests, markerKey])
   const series = useMemo(() => markerSeries(tests, markerKey), [tests, markerKey])
   const target = useLiveQuery(() => db.markerTargets.where('marker').equals(markerKey).first(), [markerKey])
-  const undo = useUndoableDelete()
 
   if (rows.length === 0) {
     return <PanelCard><p className="feed-note text-muted-foreground">No results for this marker yet.</p></PanelCard>
@@ -288,14 +286,10 @@ export function MarkerScreen({ markerKey, focusExamId, tests, isPro, go }: {
                 selected={t.id === focusExamId}
                 onClick={() => go(`#test/${t.id}`)}
               >
-                {/* The one way to drop a single misread value. TestEditor's edit mode replaces this once it ships. */}
+                {/* A misread value is fixed (or removed) in that test's editor. */}
                 {t.id === focusExamId && (
-                  <Button
-                    variant="ghost"
-                    className="mt-1 h-10 text-muted-foreground"
-                    onClick={() => void undo({ label: 'Result archived', remove: () => archiveRow('results', m.resultId), restore: () => restoreRow('results', m.resultId) })}
-                  >
-                    <Archive className="size-4" /> Remove this result
+                  <Button variant="ghost" className="mt-1 h-10 text-muted-foreground" onClick={() => onEdit(t.id)}>
+                    <Pencil className="size-4" /> Edit this test
                   </Button>
                 )}
               </FeedRow>
