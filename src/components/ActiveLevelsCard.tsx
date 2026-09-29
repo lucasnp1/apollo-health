@@ -96,8 +96,9 @@ export function ActiveLevelsCard({
     const eligible = [...groups.values()].map((g, i) => {
       const pk = findPKCompound(g.name, g.ester && g.ester !== 'Custom' ? g.ester : inferEster(g.name))
       if (!pk) return null
-      return { key: `s${i}`, name: g.name, color: g.color, lambda: Math.LN2 / pk.halfLifeDays, activePct: pk.activeDosePct, doses: g.doses }
-    }).filter(Boolean) as Array<{ key: string; name: string; color: string; lambda: number; activePct: number; doses: Array<{ ms: number; dose: number }> }>
+      const firstMs = Math.min(...g.doses.map((d) => d.ms))
+      return { key: `s${i}`, name: g.name, color: g.color, lambda: Math.LN2 / pk.halfLifeDays, activePct: pk.activeDosePct, doses: g.doses, firstMs }
+    }).filter(Boolean) as Array<{ key: string; name: string; color: string; lambda: number; activePct: number; doses: Array<{ ms: number; dose: number }>; firstMs: number }>
 
     if (eligible.length === 0) {
       return { data: [] as SeriesPoint[], legend: [] as Legend[] }
@@ -110,6 +111,10 @@ export function ActiveLevelsCard({
       const ptMs = anchorMs + d * MS_PER_DAY
       const pt: SeriesPoint = { dayNum: d, date: format(new Date(ptMs), 'MMM d') }
       for (const c of eligible) {
+        // Before the first shot there is no series at all. A 0 here still drew
+        // the compound's line along the top of the stack from the start of the
+        // window, so a drug started this week looked like it began in August.
+        if (ptMs < c.firstMs - MS_PER_DAY) continue
         let level = 0
         for (const inj of c.doses) {
           if (inj.ms > ptMs) continue

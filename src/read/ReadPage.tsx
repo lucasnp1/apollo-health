@@ -149,7 +149,7 @@ export function ReadPage() {
       <header className="sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
           <a href="/" className="flex items-center gap-2.5">
-            <img src="/logo-128.png" alt="" width="28" height="28" className="size-7 rounded-[8px]" />
+            <img src="/logo-badge.svg" alt="" width="28" height="28" className="size-7 rounded-[8px]" />
             <span className="text-[15px] font-semibold tracking-[-0.01em]">Magno</span>
           </a>
           <a href={appHref} className="text-sm text-muted-foreground transition-colors hover:text-foreground">Open the app</a>

@@ -6,7 +6,7 @@
 // stood out, one quiet line.
 
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowUpRight, HeartPulse } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Compound, type InjectionLog, type Symptom, type VitalLog } from '../lib/db'
 import { canonicalize } from '../lib/markers'
@@ -14,8 +14,8 @@ import { ALL_SYMPTOMS, customDefs } from '../lib/symptoms'
 import { times, wellbeingSummary, type Insight, type LabPoint } from '../lib/wellbeingSummary'
 import { CAUSES } from '../lib/wellbeingCauses'
 import { ChartCard } from './dashboard/ChartCard'
+import { FeedList, FeedRow } from './FeedList'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 // Marker keys the cause map can cite; only these are read from the labs.
 const CITED = new Set(Object.values(CAUSES).flatMap((r) => r.markers))
@@ -102,9 +102,9 @@ export function WellbeingSummaryCard({
   const list = all ? insights : insights.slice(0, STEP)
   return (
     <ChartCard title="What keeps coming up" subtitle={`Last 30 days · ${counted}`}>
-      <ul className="-mt-1 flex flex-col gap-2">
+      <FeedList className="-mt-2">
         {list.map((ins) => <InsightRow key={ins.keys.join()} insight={ins} />)}
-      </ul>
+      </FeedList>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <p className="text-xs text-muted-foreground">Patterns from your check-ins, not a diagnosis.</p>
         {insights.length > STEP && (
@@ -117,48 +117,33 @@ export function WellbeingSummaryCard({
   )
 }
 
+// Built on FeedRow, the row every list in the app uses (Timeline, check-ins,
+// labs): same icon circle, title, sub line, status chip and note, and the
+// same tap-to-expand. Only the content is specific to a pattern.
 function InsightRow({ insight }: { insight: Insight }) {
   const { title, week, month, tone, mild, causes } = insight
   const [open, setOpen] = useState(false)
-  const when = `${week > 0 ? `${times(week)} this week and ${times(month)} this month` : `${times(month)} this month, not this week`}${mild ? ', all mild' : ''}.`
   // Every cause line names its own symptom, so grouped lines read on their own.
-  // Collapsed shows the first; the rest, the user's numbers and the guides open on tap.
   const lines = [...new Set(causes.map((c) => c.line))]
   const evidence = causes.flatMap((c) => c.evidence)
   const guides = [...new Set(causes.map((c) => c.guide).filter((g): g is string => !!g))]
   const more = lines.length > 1 || evidence.length > 0 || guides.length > 0
-  const head = (
-    <>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm">
-          <span className="font-medium text-foreground">{title}</span>{' '}
-          <span className="text-muted-foreground">{when}</span>
-        </span>
-        {lines[0] && <span className={cn('mt-1 block text-sm text-foreground/85', !open && 'line-clamp-2')}>{lines[0]}</span>}
-      </span>
-      {more && (open
-        ? <ChevronUp className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        : <ChevronDown className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />)}
-    </>
-  )
-  const headCls = 'flex w-full items-start gap-2 rounded-lg px-3 py-2.5 text-left'
+  const counts = `${week > 0 ? `${times(week)} this week · ` : 'Not this week · '}${times(month)} this month${mild ? ' · all mild' : ''}`
   return (
-    <li className={cn('rounded-lg border-l-2 bg-muted/40', tone === 'bad' ? 'border-l-destructive' : 'border-l-amber-500')}>
-      {more ? (
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          className={cn(headCls, 'focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50')}
-        >
-          {head}
-        </button>
-      ) : (
-        <div className={headCls}>{head}</div>
-      )}
+    <FeedRow
+      icon={HeartPulse}
+      iconTone={tone}
+      title={title}
+      sub={counts}
+      status={{ label: 'Pattern', tone }}
+      note={lines[0]}
+      clampNote={!open}
+      onClick={more ? () => setOpen((o) => !o) : undefined}
+      expanded={more ? open : undefined}
+    >
       {open && (
-        <div className="flex flex-col gap-1 px-3 pb-3">
-          {lines.slice(1).map((l) => <p key={l} className="text-sm text-foreground/85">{l}</p>)}
+        <div className="flex flex-col gap-1 pb-3 pl-14 pr-2">
+          {lines.slice(1).map((l) => <p key={l} className="feed-note text-foreground/85">{l}</p>)}
           {evidence.map((e) => <p key={e} className="text-xs text-muted-foreground">{e}</p>)}
           {guides.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
@@ -171,7 +156,7 @@ function InsightRow({ insight }: { insight: Insight }) {
           )}
         </div>
       )}
-    </li>
+    </FeedRow>
   )
 }
 

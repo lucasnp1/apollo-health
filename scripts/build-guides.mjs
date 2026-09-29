@@ -91,7 +91,7 @@ function shell({ title, description, canonical, jsonld, body, ogImage = '/og.png
 </head>
 <body>
 <header class="site">
-  <a class="brand" href="/"><img src="/logo-128.png" alt="" width="28" height="28" />Magno <span>Health</span></a>
+  <a class="brand" href="/"><img src="/logo-badge.svg" alt="" width="28" height="28" />Magno <span>Health</span></a>
   <nav><a href="/guides/">Guides</a><a href="/read">Read my bloods</a><a href="/app/?ref=guides">Open the app</a></nav>
 </header>
 <main>

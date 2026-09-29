@@ -869,7 +869,7 @@ function SitePicker({
   // and used on this route (marked custom). Other catalog sites used once,
   // or old spellings, do not pile up here: every logged name is read through
   // canonicalSite, so "Rear deltoid R" and "Lat L" land on their catalog row.
-  const { quick, customs } = useMemo(() => {
+  const { quick } = useMemo(() => {
     const base = quickSites(route)
     // Keys are lower-cased: typed text keeps its own spelling, so "calf L"
     // and "Calf L" must still be one row.
@@ -884,7 +884,7 @@ function SitePicker({
       typed.push(customSite(site))
     }
     typed.sort((a, b) => a.site.localeCompare(b.site))
-    return { quick: [...base, ...typed], customs: typed.map((t) => t.site) }
+    return { quick: [...base, ...typed] }
   }, [route, injections])
 
   // Days since each exact site, plus the most-recent USED site per adjacency
@@ -968,7 +968,7 @@ function SitePicker({
       )}
 
       {moreOpen ? (
-        <SiteCombobox value={value} onChange={onChange} route={route} customs={customs} />
+        <SiteCombobox value={value} onChange={onChange} route={route} onList={quick.map((q) => q.site)} />
       ) : (
         <button type="button" onClick={() => setMoreOpen(true)} className="self-start px-0.5 text-xs text-muted-foreground underline-offset-2 hover:underline">
           Other site / custom…

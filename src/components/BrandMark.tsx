@@ -16,7 +16,7 @@ export function BrandMark({ size = 28, bordered = false }: BrandMarkProps) {
       style={{ width: size, height: size }}
       aria-hidden="true"
     >
-      <img src="/logo-128.png" alt="" width={size} height={size} draggable={false} />
+      <img src="/logo-badge.svg" alt="" width={size} height={size} draggable={false} />
     </span>
   )
 }
