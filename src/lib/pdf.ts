@@ -8,6 +8,7 @@
 
 import { MARKER_VARIANTS, fixOcrDigits, isKnownUnit, isPlausible, normalizeUnit } from './labCatalog'
 import { parseLabLines, type Confidence } from './labParse'
+import { parseLabDate } from './dates'
 
 export type { Confidence }
 
@@ -270,35 +271,6 @@ const DATE_LABELS = [
   /\b(?:data\s+d[ae]\s+coleta|coleta|colhido\s+em)\b/i,
   /\b(?:reported|report)\s*(?:date)?\b/i,
 ]
-
-function parseLabDate(raw: string): string | undefined {
-  const s = raw.trim()
-  let m = s.match(/(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})/)
-  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
-  // d/m/yyyy is the default (UK, EU, Brazil). Only a first number above 12
-  // could disambiguate, and it also means day-first.
-  m = s.match(/(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})/)
-  if (m) {
-    const a = parseInt(m[1], 10)
-    const b = parseInt(m[2], 10)
-    // m/d/yyyy only when the second number cannot be a month.
-    const [day, month] = b > 12 && a <= 12 ? [b, a] : [a, b]
-    if (month < 1 || month > 12 || day < 1 || day > 31) return undefined
-    return `${m[3]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-  }
-  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
-  m = s.match(/(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(20\d{2})/)
-  if (m) {
-    const mi = months.indexOf(m[2].slice(0, 3).toLowerCase())
-    if (mi >= 0) return `${m[3]}-${String(mi + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`
-  }
-  m = s.match(/([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(20\d{2})/)
-  if (m) {
-    const mi = months.indexOf(m[1].slice(0, 3).toLowerCase())
-    if (mi >= 0) return `${m[3]}-${String(mi + 1).padStart(2, '0')}-${m[2].padStart(2, '0')}`
-  }
-  return undefined
-}
 
 export function extractCollectionDate(text: string): string | undefined {
   const found: string[] = []

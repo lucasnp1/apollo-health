@@ -39,7 +39,7 @@ export function Files({
             </TableBody>
           </Table>
         ) : (
-          <PanelEmpty icon={FileText} title="No files yet" detail="Upload a lab PDF from Lab results. Every import shows up here." />
+          <PanelEmpty icon={FileText} title="No files yet" detail="Import a lab PDF from Bloods. Every import shows up here." />
         )}
       </PanelCard>
     </DashGrid>

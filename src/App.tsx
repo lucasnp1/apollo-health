@@ -3,9 +3,7 @@ import {
   Lock,
   Moon,
   Plus,
-  Share2,
   Sun,
-  Upload,
 } from 'lucide-react'
 import { BrandMark } from './components/BrandMark'
 import { Button } from '@/components/ui/button'
@@ -18,6 +16,7 @@ import { ToastProvider, useToast } from './lib/toast'
 import { useAuth } from './lib/useAuth'
 import { useSync } from './lib/useSync'
 import { colorFixes } from './lib/compounds'
+import { dedupeInjections } from './lib/injections'
 import { useTheme } from './lib/useTheme'
 import { InstallPrompt } from './components/InstallPrompt'
 import { Onboarding, ONBOARDED_KEY } from './components/Onboarding'
@@ -27,6 +26,8 @@ import { PlanProvider, usePlan } from './lib/plan'
 const ExportPage       = lazy(() => import('./components/ExportSheet').then(m => ({ default: m.ExportPage })))
 const PdfReviewSheet   = lazy(() => import('./components/PdfReviewSheet').then(m => ({ default: m.PdfReviewSheet })))
 const ResetPassword    = lazy(() => import('./views/ResetPassword').then(m => ({ default: m.ResetPassword })))
+const AddResultsSheet  = lazy(() => import('./components/AddResultsSheet').then(m => ({ default: m.AddResultsSheet })))
+const ManualResultDialog = lazy(() => import('./components/ManualResultDialog').then(m => ({ default: m.ManualResultDialog })))
 const RecoveryCodesScreen = lazy(() => import('./components/RecoveryCodes').then(m => ({ default: m.RecoveryCodesScreen })))
 import { SignIn } from './views/SignIn'
 import type { View } from './app/views'
@@ -161,7 +162,35 @@ function Shell({
   // pressure (matters most on iOS). Best-effort, prompts on no supported browser.
   useEffect(() => { void navigator.storage?.persist?.() }, [])
 
-  const [labAddOpen, setLabAddOpen] = useState(false)
+  // Bloods: the Add results sheet, the typed-in result dialog, and the one
+  // hidden file input every import goes through.
+  const [addSheetOpen, setAddSheetOpen] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
+  const labFileInput = useRef<HTMLInputElement>(null)
+  const startLabImport = () => {
+    setAddSheetOpen(false)
+    if (isPro) labFileInput.current?.click()
+    else openUpgrade('Lab PDF import')
+  }
+  const startManual = () => {
+    setAddSheetOpen(false)
+    setManualOpen(true)
+  }
+  // Bloods keeps its screen in the URL hash; leaving the view drops it.
+  useEffect(() => {
+    if (activeView !== 'labs' && window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [activeView])
+  // Back onto a Bloods entry (left in history by pushed Bloods screens) returns
+  // to Bloods on that screen. Never clear the hash here: Timeline's deep link
+  // sets it before React commits 'labs', and clearing would wipe it.
+  useEffect(() => {
+    if (activeView === 'labs') return
+    const onPop = () => { if (window.location.hash) setActiveView('labs') }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [activeView, setActiveView])
   // PDF upload pipeline state — parsing overlay + review sheet. Transient
   // messages now route through the shared toast context (snackbar UI lives
   // in ToastProvider so any view can fire one without prop drilling).
@@ -188,7 +217,7 @@ function Shell({
           message: `Saved your read: ${pending.results.length} marker${pending.results.length === 1 ? '' : 's'} from ${pending.exam.name}.`,
         })
       } catch {
-        showToast({ message: 'Could not save that read. Upload the file again from Lab results.' })
+        showToast({ message: 'Could not save that read. Upload the file again from Bloods.' })
       }
     })()
   }, [showToast])
@@ -236,13 +265,13 @@ function Shell({
         showToast({
           tone: 'warn',
           message: usedOcr
-            ? `Read "${file.name}" with OCR but couldn't find any lab markers. Try a sharper photo, or add the results under Add result.`
-            : `Stored "${file.name}" but no recognized lab markers were found. You can add results manually under Add result.`,
+            ? `Read "${file.name}" with OCR but couldn't find any lab markers. Try a sharper photo, or type the results in under Add results.`
+            : `Stored "${file.name}" but no recognized lab markers were found. You can type the results in under Add results.`,
         })
       } else {
         showToast({
           tone: 'warn',
-          message: `Couldn't read any text in "${file.name}". Try a clearer scan or photo, or add the results under Add result.`,
+          message: `Couldn't read any text in "${file.name}". Try a clearer scan or photo, or type the results in under Add results.`,
         })
       }
     } catch (err) {
@@ -301,18 +330,7 @@ function Shell({
         .filter(i => !i.deletedAtSync && !i.archivedAt)
         .limit(500)
         .toArray()
-      // Deduplicate sync phantoms: same compound + dose + minute bucket
-      const seen = new Set<string>()
-      return all
-        .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
-        .filter((i) => {
-          const bucket = Math.floor(Date.parse(i.takenAt) / 60_000)
-          const key = `${i.compoundId}|${i.dose ?? ''}|${bucket}`
-          if (seen.has(key)) return false
-          seen.add(key)
-          return true
-        })
-        .sort((a, b) => b.takenAt.localeCompare(a.takenAt))
+      return dedupeInjections(all)
     },
     [], [],
   )
@@ -414,30 +432,11 @@ function Shell({
               )
             )}
             {activeView === 'labs' && (
-              <Button variant="ghost" size="icon" onClick={() => (isPro ? setActiveView('export') : openUpgrade('Doctor export'))} aria-label="Export for doctor" title="Export / share">
-                <Share2 className="size-4" />
+              <Button onClick={() => setAddSheetOpen(true)} aria-label="Add results" className="size-10 p-0 sm:h-9 sm:w-auto sm:px-3">
+                <Plus className="size-4" /> <span className="hidden sm:inline">Add results</span>
               </Button>
             )}
-
-            {activeView === 'labs' && (
-              <>
-                {isPro ? (
-                  <Button asChild variant="outline" size="sm">
-                    <label className="cursor-pointer" title="Upload a lab PDF or photo">
-                      <input type="file" accept="application/pdf,image/*" hidden onChange={handleLabPdfUpload} />
-                      <Upload className="size-4" /> <span className="hidden sm:inline">Upload</span>
-                    </label>
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => openUpgrade('Lab PDF import')} title="Upload PDF (Pro)">
-                    <Upload className="size-4" /> <span className="hidden sm:inline">Upload</span>
-                  </Button>
-                )}
-                <Button size="sm" onClick={() => setLabAddOpen(true)} title="Add result">
-                  <Plus className="size-4" /> <span className="hidden sm:inline">Add result</span>
-                </Button>
-              </>
-            )}
+            <input ref={labFileInput} type="file" accept="application/pdf,image/*" hidden onChange={handleLabPdfUpload} />
 
             {/* Always-available theme toggle */}
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle theme">
@@ -462,10 +461,13 @@ function Shell({
           {activeView === 'add-weight' && <AddWeight onBack={() => setActiveView('overview')} />}
           {activeView === 'add-bp' && <AddBP onBack={() => setActiveView('overview')} />}
           {activeView === 'labs' && (
-            <Labs compounds={compounds} injections={injections} vitals={vitals} exams={exams} results={enrichedResults} files={files} addOpen={labAddOpen} onAddClose={() => setLabAddOpen(false)} onReviewFile={(id) => setPdfReviewFileId(id)} />
+            <Labs onImport={startLabImport} onManual={startManual} onReviewFile={(id) => setPdfReviewFileId(id)} />
           )}
           {activeView === 'timeline' && (
-            <Timeline compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} bodyMetrics={bodyMetrics} />
+            <Timeline
+              compounds={compounds} injections={injections} vitals={vitals} exams={exams} files={files} bodyMetrics={bodyMetrics}
+              onOpenTest={(id) => { setActiveView('labs'); window.location.hash = `#test/${id}` }}
+            />
           )}
           {activeView === 'files' && (
             <Files files={files ?? []} onReviewFile={(id) => setPdfReviewFileId(id)} />
@@ -501,6 +503,8 @@ function Shell({
       <InstallPrompt />
 
       <Suspense fallback={null}>
+        {addSheetOpen && <AddResultsSheet open isPro={isPro} onImport={startLabImport} onManual={startManual} onClose={() => setAddSheetOpen(false)} />}
+        {manualOpen && <ManualResultDialog open onClose={() => setManualOpen(false)} />}
         {pdfReviewFile && (
           <PdfReviewSheet
             file={pdfReviewFile}
@@ -540,7 +544,7 @@ function titleFor(view: View) {
     'add-injection': 'Add injection',
     'add-weight': 'Add weight',
     'add-bp': 'Add blood pressure',
-    labs: 'Lab results',
+    labs: 'Bloods',
     timeline: 'Timeline',
     files: 'Files',
     export: 'Export',

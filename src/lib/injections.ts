@@ -2,6 +2,22 @@ import { db, type InjectionLog, type Vial } from './db'
 import { mlFromDose } from './vials'
 import { generateDoseInstants } from './schedule'
 
+// Sync phantoms: the same shot pulled twice under two ids. Same compound, dose
+// and minute is one shot; the oldest row wins. Returns newest first.
+export function dedupeInjections(list: InjectionLog[]): InjectionLog[] {
+  const seen = new Set<string>()
+  return [...list]
+    .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
+    .filter((i) => {
+      const bucket = Math.floor(Date.parse(i.takenAt) / 60_000)
+      const key = `${i.compoundId}|${i.dose ?? ''}|${bucket}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .sort((a, b) => b.takenAt.localeCompare(a.takenAt))
+}
+
 // Pick the best vial to draw from for a given compound:
 // most-recently-opened, non-archived, with remaining > 0 — falls back to any non-archived.
 export function pickActiveVial(vials: Vial[], compoundId: number): Vial | undefined {

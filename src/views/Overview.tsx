@@ -26,7 +26,7 @@ const CARDS: LaunchItem[] = [
   { view: 'add-injection', label: 'Injection', sub: 'Log a shot', icon: Syringe, chip: 'bg-primary text-primary-foreground', primary: true },
   { view: 'add-weight', label: 'Weight', sub: 'Log body weight', icon: Scale, chip: 'bg-blue-500/12 text-blue-600 dark:text-blue-400' },
   { view: 'add-bp', label: 'Blood pressure', sub: 'Log a reading', icon: HeartPulse, chip: 'bg-rose-500/12 text-rose-600 dark:text-rose-400' },
-  { view: 'labs', label: 'Lab results', sub: 'Upload or add', icon: FlaskConical, chip: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' },
+  { view: 'labs', label: 'Bloods', sub: 'Tests and trends', icon: FlaskConical, chip: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' },
 ]
 
 // Bottom launcher — navigation to full pages (replaces the old sidebar).

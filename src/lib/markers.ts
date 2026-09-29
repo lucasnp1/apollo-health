@@ -1,6 +1,34 @@
 // Canonical marker catalog: folds every lab's naming onto one stable key so
-// history lines, panels and composites line up across imports.
+// history lines, sections and calculated values line up across imports.
 // Aliases are lowercase and matched as whole words inside the incoming name.
+
+// How Bloods groups markers in a test report, in clinical order.
+export type LabSection =
+  | 'Hormones'
+  | 'Prostate'
+  | 'Full blood count'
+  | 'Lipids'
+  | 'Liver'
+  | 'Kidney'
+  | 'Blood sugar'
+  | 'Thyroid'
+  | 'Iron & vitamins'
+  | 'Inflammation'
+  | 'Other hormones'
+  | 'Other'
+
+export const SECTION_ORDER: LabSection[] = [
+  'Hormones', 'Prostate', 'Full blood count', 'Lipids', 'Liver', 'Kidney',
+  'Blood sugar', 'Thyroid', 'Iron & vitamins', 'Inflammation', 'Other hormones', 'Other',
+]
+
+/** The clinical abbreviation a doctor reads, where one exists. */
+export const SECTION_ABBR: Partial<Record<LabSection, 'FBC' | 'LFT' | 'U&E' | 'TFT'>> = {
+  'Full blood count': 'FBC', Liver: 'LFT', Kidney: 'U&E', Thyroid: 'TFT',
+}
+
+// ponytail: `panel`, PANEL_ORDER and `optimal` stay until the old Labs page
+// that reads them is deleted.
 
 export type LabPanel =
   | 'Sex Hormones'
@@ -18,6 +46,7 @@ export type MarkerMeta = {
   key: string
   label: string
   panel: LabPanel
+  section: LabSection
   unit?: string
   // Curated "optimal" range for men on TRT, when meaningful. Not medical advice.
   optimal?: { low?: number; high?: number; note?: string }
@@ -25,8 +54,20 @@ export type MarkerMeta = {
 
 type Entry = MarkerMeta & { aliases: string[] }
 
+const PANEL_SECTION: Record<LabPanel, LabSection> = {
+  'Sex Hormones': 'Hormones', Lipids: 'Lipids', 'Blood Count': 'Full blood count', Metabolic: 'Other',
+  'Kidney & Electrolytes': 'Kidney', Liver: 'Liver', Thyroid: 'Thyroid', 'Vitamins & Minerals': 'Iron & vitamins',
+  Inflammation: 'Inflammation', Other: 'Other',
+}
+const SECTION_MOVES: Record<string, LabSection> = {
+  psa: 'Prostate', free_psa: 'Prostate',
+  cortisol: 'Other hormones', igf1: 'Other hormones', dhea_s: 'Other hormones',
+  ferritin: 'Iron & vitamins',
+  glucose: 'Blood sugar', hba1c: 'Blood sugar', insulin: 'Blood sugar', homa_ir: 'Blood sugar',
+}
+
 function m(key: string, label: string, panel: LabPanel, unit: string | undefined, aliases: string[], optimal?: MarkerMeta['optimal']): Entry {
-  return { key, label, panel, unit, aliases, optimal }
+  return { key, label, panel, section: SECTION_MOVES[key] ?? PANEL_SECTION[panel], unit, aliases, optimal }
 }
 
 const CATALOG: Entry[] = [
@@ -67,7 +108,7 @@ const CATALOG: Entry[] = [
   m('platelets', 'Platelets', 'Blood Count', 'K/uL', ['platelet', 'platelets', 'platelet count', 'plt', 'plaquetas']),
   m('mcv', 'MCV', 'Blood Count', 'fL', ['mcv', 'mean cell volume', 'mean corpuscular volume', 'vcm']),
   m('mch', 'MCH', 'Blood Count', 'pg', ['mch', 'mean cell haemoglobin', 'mean cell hemoglobin', 'mean corpuscular haemoglobin', 'mean corpuscular hemoglobin', 'hcm']),
-  m('mchc', 'MCHC', 'Blood Count', 'g/dL', ['mchc', 'mean cell haemoglobin concentration', 'mean cell hemoglobin concentration', 'chcm']),
+  m('mchc', 'MCHC', 'Blood Count', 'g/dL', ['mchc', 'mean cell haemoglobin concentration', 'mean cell hemoglobin concentration', 'mean corpuscular haemoglobin concentration', 'mean corpuscular hemoglobin concentration', 'chcm']),
   m('rdw', 'RDW', 'Blood Count', '%', ['rdw', 'red cell distribution width', 'rdw-cv', 'rdw-sd']),
   m('mpv', 'MPV', 'Blood Count', 'fL', ['mpv', 'mean platelet volume', 'vpm']),
   m('neutrophils', 'Neutrophils', 'Blood Count', 'K/uL', ['neutrophil', 'neutrophils', 'neutrophil count', 'neutrófilos', 'neutrofilos']),
@@ -85,7 +126,7 @@ const CATALOG: Entry[] = [
   m('triglycerides', 'Triglycerides', 'Lipids', 'mg/dL', ['triglycerides', 'triglyceride', 'triglicerideos', 'triglicérides', 'triglicerides', 'trig', 'tg'], { high: 100 }),
   m('total_cholesterol', 'Total Cholesterol', 'Lipids', 'mg/dL', ['total cholesterol', 'cholesterol total', 'cholesterol, total', 'colesterol total', 'cholesterol'], { high: 200 }),
   m('non_hdl', 'Non-HDL Cholesterol', 'Lipids', 'mmol/L', ['non-hdl cholesterol', 'non hdl cholesterol', 'non hdl', 'non-hdl', 'nonhdl', 'non-hdl-c'], { high: 3.37 }),
-  m('tc_hdl_ratio', 'TC/HDL Ratio', 'Lipids', '', ['total cholesterol / hdl ratio', 'total cholesterol/hdl ratio', 'tc/hdl ratio', 'tc hdl ratio', 'tc/hdl', 'tc:hdl', 'cholesterol/hdl ratio', 'cholesterol/hdl', 'chol/hdl ratio', 'chol:hdl'], { high: 4 }),
+  m('tc_hdl_ratio', 'TC/HDL Ratio', 'Lipids', '', ['total cholesterol:hdl ratio', 'total cholesterol : hdl ratio', 'cholesterol:hdl ratio', 'total cholesterol : hdl', 'cholesterol : hdl ratio', 'cholesterol hdl ratio', 'total cholesterol / hdl ratio', 'total cholesterol/hdl ratio', 'tc/hdl ratio', 'tc hdl ratio', 'tc/hdl', 'tc:hdl', 'cholesterol/hdl ratio', 'cholesterol/hdl', 'chol/hdl ratio', 'chol:hdl'], { high: 4 }),
   m('apob', 'ApoB', 'Lipids', 'mg/dL', ['apob', 'apo b', 'apo-b', 'apolipoprotein b']),
   m('apoa1', 'ApoA1', 'Lipids', 'mg/dL', ['apoa1', 'apo a1', 'apo-a1', 'apolipoprotein a1', 'apolipoprotein a-1', 'apolipoprotein a-i']),
   m('lpa', 'Lp(a)', 'Lipids', 'nmol/L', ['lp(a)', 'lipoprotein(a)', 'lipoprotein (a)', 'lipoprotein a']),
@@ -97,7 +138,7 @@ const CATALOG: Entry[] = [
   m('insulin', 'Insulin', 'Metabolic', 'µIU/mL', ['insulin', 'fasting insulin', 'insulina'], { high: 8 }),
   m('homa_ir', 'HOMA-IR', 'Metabolic', '', ['homa-ir', 'homa ir', 'homa']),
   m('uric_acid', 'Uric Acid', 'Metabolic', 'mg/dL', ['uric acid', 'urate', 'ácido úrico', 'acido urico']),
-  m('creatine_kinase', 'Creatine Kinase', 'Metabolic', 'U/L', ['creatine kinase', 'ck', 'cpk', 'creatine phosphokinase'], { high: 200 }),
+  m('creatine_kinase', 'Creatine kinase (muscle)', 'Metabolic', 'U/L', ['creatine kinase', 'ck', 'cpk', 'creatine phosphokinase'], { high: 200 }),
   m('ldh', 'LDH', 'Metabolic', 'U/L', ['ldh', 'lactate dehydrogenase']),
   m('lipase', 'Lipase', 'Metabolic', 'U/L', ['lipase']),
   m('amylase', 'Amylase', 'Metabolic', 'U/L', ['amylase', 'amilase']),
@@ -124,7 +165,7 @@ const CATALOG: Entry[] = [
   m('albumin', 'Albumin', 'Liver', 'g/dL', ['albumin', 'albumina']),
   m('globulin', 'Globulin', 'Liver', 'g/dL', ['globulin', 'globulins', 'globulina']),
   m('total_protein', 'Total Protein', 'Liver', 'g/dL', ['total protein', 'protein total', 'proteínas totais', 'proteinas totais']),
-  m('ag_ratio', 'Albumin/Globulin Ratio', 'Liver', '', ['albumin/globulin ratio', 'a/g ratio']),
+  m('ag_ratio', 'Albumin/Globulin Ratio', 'Liver', '', ['albumin/globulin ratio', 'albumin : globulin ratio', 'albumin:globulin ratio', 'a/g ratio']),
 
   // ── Thyroid ────────────────────────────────────────────────────────────────
   m('tsh', 'TSH', 'Thyroid', 'mIU/L', ['tsh', 'thyroid stimulating', 'thyroid-stimulating', 'thyrotropin'], { low: 0.5, high: 2.5 }),
@@ -148,7 +189,10 @@ const CATALOG: Entry[] = [
   m('zinc', 'Zinc', 'Vitamins & Minerals', 'µg/dL', ['zinc', 'zinco']),
 
   // ── Inflammation ───────────────────────────────────────────────────────────
-  m('crp', 'hs-CRP', 'Inflammation', 'mg/L', ['crp', 'hscrp', 'hs-crp', 'hs crp', 'c-reactive', 'c reactive', 'high sensitivity crp', 'pcr'], { high: 1 }),
+  // Two assays: plain CRP is read on the lab range; hs-CRP is the low-range
+  // cardiac one. Keys are separate so the two never share a history line.
+  m('crp', 'CRP', 'Inflammation', 'mg/L', ['crp', 'c-reactive', 'c reactive', 'c-reactive protein', 'pcr']),
+  m('hs_crp', 'hs-CRP', 'Inflammation', 'mg/L', ['hs-crp', 'hscrp', 'hs crp', 'high sensitivity crp', 'high-sensitivity crp', 'high sensitivity c-reactive protein', 'hs c-reactive protein'], { high: 1 }),
   m('homocysteine', 'Homocysteine', 'Inflammation', 'µmol/L', ['homocysteine', 'homocisteína', 'homocisteina']),
   m('esr', 'ESR', 'Inflammation', 'mm/h', ['esr', 'erythrocyte sedimentation rate', 'sed rate', 'vhs']),
   m('fibrinogen', 'Fibrinogen', 'Inflammation', 'mg/dL', ['fibrinogen', 'fibrinogênio', 'fibrinogenio']),
@@ -190,13 +234,38 @@ function strip(entry: Entry): MarkerMeta {
   return meta
 }
 
-export function canonicalize(raw: string): MarkerMeta | undefined {
-  const needle = raw.toLowerCase().trim()
-  if (!needle) return undefined
+// A ratio or a percentage must never fold onto the plain marker inside its
+// name: "Total Cholesterol:HDL Ratio" is not total cholesterol, and
+// "HDL % of total cholesterol" is not HDL.
+const RATIO_KEYS = new Set(['tc_hdl_ratio', 'ag_ratio', 'fai'])
+const PERCENT_KEYS = new Set(['hematocrit', 'hba1c', 'transferrin_sat', 'rdw', 'reticulocytes'])
+// Units printed inside a name ("HbA1c mmol/mol", "Platelets 10^9/L", "eGFR
+// mL/min/1.73m²") are not a ratio.
+const UNIT_IN_NAME = /(?:m|µ|u|n|p|mc|k)?(?:mol|g|iu|u|eq)\/(?:m?mol|d?l|ml)|x?\s*10\^\d+\/l|ml\/min(?:\/1\.73\s*m[²2]?)?|mm\/hr?|\bl\/l\b/g
+
+function aliasMatch(needle: string, only?: Set<string>): MarkerMeta | undefined {
   for (const { alias, entry } of ensureAliasIndex()) {
+    if (only && !only.has(entry.key)) continue
     if (needle === alias || matchesAsWord(needle, alias)) return strip(entry)
   }
   return undefined
+}
+
+export function canonicalize(raw: string): MarkerMeta | undefined {
+  const needle = raw.toLowerCase().trim()
+  if (!needle) return undefined
+  const exact = CATALOG.find((e) => e.label.toLowerCase() === needle || e.aliases.includes(needle))
+  if (exact) return strip(exact)
+  const bare = needle.replace(UNIT_IN_NAME, ' ')
+  // "ALT/SGPT", "Hematocrit/PCV", "Urea/BUN": a slash between two names for
+  // the SAME marker is a synonym. Only different markers either side
+  // ("Cholesterol/HDL") make a ratio.
+  if (/[/:]/.test(bare) && !/\bratio\b/.test(bare)) {
+    const sides = bare.split(/[/:]/).map((p) => p.trim()).filter(Boolean).map((p) => aliasMatch(p))
+    if (sides.length > 1 && sides[0] && sides.every((m) => m?.key === sides[0]!.key)) return sides[0]
+  }
+  const only = /\bratio\b|:|\/|%\s*of|\bper\b/.test(bare) ? RATIO_KEYS : bare.includes('%') ? PERCENT_KEYS : undefined
+  return aliasMatch(needle, only)
 }
 
 export function metaForKey(key: string): MarkerMeta | undefined {

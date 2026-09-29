@@ -1,6 +1,6 @@
 /**
  * LabAnalysis UI: the written summary card and the panel-by-panel analysis
- * list on the Lab results page. The reading itself lives in lib/labFindings.
+ * list on the public /read page. The reading itself lives in lib/labFindings.
  */
 
 import { useState, type ReactNode } from 'react'

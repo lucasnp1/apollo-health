@@ -158,9 +158,11 @@ export const TABLES: TableSpec[] = [
       labName: 'text',
       notes: 'text',
       sourceFileId: 'text',
+      meta: 'json',
       archivedAt: 'int',
     },
     foreignKeys: [{ field: 'sourceFileId', targetTable: 'files' }],
+    rev: 14,
   },
   {
     slug: 'results',

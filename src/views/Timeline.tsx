@@ -11,7 +11,12 @@ import { useUndoableDelete } from '../lib/useUndoableDelete'
 import { unitLabel } from '../lib/dose'
 import { PanelCard } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
-import { FeedList, FeedRow, type FeedStatus } from '../components/FeedList'
+import { FeedList, FeedRow, type FeedFact, type FeedStatus, type FeedTone } from '../components/FeedList'
+import { useBloodTests } from '../lib/useBloodTests'
+import { usePlan } from '../lib/plan'
+import type { LabTest } from '../lib/labTests'
+import { fmtDay } from '../lib/dates'
+import { testRowProps } from './bloods/feed'
 import { cn } from '@/lib/utils'
 
 type EventType = 'injection' | 'weight' | 'bp' | 'lab' | 'file' | 'symptom'
@@ -30,7 +35,10 @@ type TimelineEvent = {
   sub?: string
   status: Status
   note?: string
-  facts: string[]
+  facts: FeedFact[]
+  iconTone?: FeedTone
+  /** Blood tests open their report. */
+  testId?: number
   type: EventType
   compoundId?: number
   /** Lab panels carry a collection date, not a time of day. */
@@ -314,13 +322,15 @@ const SYM_COLS: Col<Symptom>[] = [
   { key: 'notes', label: 'Notes', render: (r) => r.notes || '—' },
 ]
 
-const LAB_COLS: Col<LabExam>[] = [
-  { key: 'date', label: 'Date', render: (r) => (r.collectedAt ? format(parseISO(r.collectedAt), 'MMM d, yyyy') : '—') },
-  { key: 'name', label: 'Panel', render: (r) => <span className="font-medium">{r.name}</span> },
-  { key: 'lab', label: 'Lab', render: (r) => r.labName ?? '—' },
-  { key: 'type', label: 'Type', defaultHidden: true, render: (r) => r.examType ?? '—' },
-  { key: 'notes', label: 'Notes', defaultHidden: true, render: (r) => r.notes || '—' },
+// Built from the Bloods tests, so title and provider match Bloods exactly.
+const LAB_COLS: Col<LabTest>[] = [
+  { key: 'date', label: 'Date', render: (r) => fmtDay(r.date) || '—' },
+  { key: 'name', label: 'Test', render: (r) => <span className="font-medium">{r.title}</span> },
+  { key: 'lab', label: 'Lab', render: (r) => r.provider ?? '—' },
+  { key: 'type', label: 'Type', defaultHidden: true, render: (r) => r.exam.examType ?? '—' },
+  { key: 'notes', label: 'Notes', defaultHidden: true, render: (r) => r.exam.notes || '—' },
 ]
+const NO_TESTS: LabTest[] = []
 
 type FileRow = { id?: number; name: string; addedAt: string; status: string; type?: string; size?: number }
 const FILE_COLS: Col<FileRow>[] = [
@@ -331,13 +341,17 @@ const FILE_COLS: Col<FileRow>[] = [
 
 // ── The "All" feed: one structured row per entry, newest first ───────────────
 
-function TimelineFeed({ events }: { events: TimelineEvent[] }) {
+function TimelineFeed({ events, onOpenTest }: { events: TimelineEvent[]; onOpenTest?: (id: number) => void }) {
   if (events.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">Nothing logged yet.</p>
   const now = new Date()
   return (
     <FeedList>
       {events.map((e) => (
-        <FeedRow key={e.id} icon={e.icon} title={e.title} when={e.dateOnly ? dayLabel(e.date, now) : whenLabel(e.date, now)} sub={e.sub} status={e.status} note={e.note} clampNote facts={e.facts} />
+        <FeedRow
+          key={e.id} icon={e.icon} iconTone={e.iconTone} title={e.title} when={e.dateOnly ? dayLabel(e.date, now) : whenLabel(e.date, now)}
+          sub={e.sub} status={e.status} note={e.note} clampNote facts={e.facts}
+          onClick={e.testId !== undefined && onOpenTest ? () => onOpenTest(e.testId!) : undefined}
+        />
       ))}
     </FeedList>
   )
@@ -362,7 +376,7 @@ function symptomSummary(s: Symptom): { rated: number; first: string[]; watch: st
 }
 
 export function Timeline({
-  compounds, injections, vitals, exams, files, bodyMetrics,
+  compounds, injections, vitals, exams, files, bodyMetrics, onOpenTest,
 }: {
   compounds: Compound[]
   injections: InjectionLog[]
@@ -370,24 +384,11 @@ export function Timeline({
   exams: LabExam[]
   files: Array<{ id?: number; addedAt: string; name: string; status: string }>
   bodyMetrics: BodyMetric[]
+  onOpenTest?: (id: number) => void
 }) {
+  const { isPro } = usePlan()
+  const tests = useBloodTests() ?? NO_TESTS
   const symptoms = useLiveQuery(() => db.symptoms.filter((s) => !s.archivedAt).toArray(), [], [])
-  // Lab results, so each panel row can say how many markers it holds and how
-  // many sit outside the lab's range.
-  const results = useLiveQuery(() => db.results.filter((r) => !r.archivedAt).toArray(), [], [])
-  const examStats = useMemo(() => {
-    const m = new Map<number, { n: number; ranged: number; flagged: number }>()
-    for (const r of results) {
-      const s = m.get(r.examId) ?? { n: 0, ranged: 0, flagged: 0 }
-      s.n += 1
-      if (r.value !== undefined && (r.low !== undefined || r.high !== undefined)) {
-        s.ranged += 1
-        if ((r.low !== undefined && r.value < r.low) || (r.high !== undefined && r.value > r.high)) s.flagged += 1
-      }
-      m.set(r.examId, s)
-    }
-    return m
-  }, [results])
 
   // Archiving an entry (never a delete) with an Undo toast. Restore is symmetric.
   const undo = useUndoableDelete()
@@ -452,10 +453,6 @@ export function Timeline({
     () => [...symptoms].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt)),
     [symptoms],
   )
-  const labRows = useMemo<LabExam[]>(
-    () => [...exams].sort((a, b) => (b.collectedAt ?? '').localeCompare(a.collectedAt ?? '')),
-    [exams],
-  )
 
   // ── "All" overview events + tab counts ──
   const events = useMemo<TimelineEvent[]>(() => {
@@ -505,21 +502,19 @@ export function Timeline({
           type: 'bp',
         }
       }),
-      ...exams.map((e): TimelineEvent => {
-        const s = examStats.get(e.id!) ?? { n: 0, ranged: 0, flagged: 0 }
-        const markers = `${s.n} marker${s.n === 1 ? '' : 's'}`
-        const status: Status = s.flagged > 0
-          ? { label: `${s.flagged} flagged`, tone: 'bad', icon: TriangleAlert }
-          : s.ranged > 0 ? { label: 'In range', tone: 'good', icon: CircleCheck } : LOGGED
+      ...tests.map((t): TimelineEvent => {
+        const row = testRowProps(t, isPro, tests)
         return {
-          id: `e-${e.id}`,
-          date: parseISO(e.collectedAt),
-          icon: FlaskConical,
-          title: e.name,
-          sub: facts(e.labName ?? 'Lab panel', s.n > 0 ? markers : undefined).join(' · '),
-          status,
-          note: e.notes || undefined,
-          facts: facts(s.n > 0 ? markers : undefined, s.flagged > 0 ? `${s.flagged} out of range` : s.ranged > 0 ? 'all in range' : undefined, e.examType),
+          id: `e-${t.id}`,
+          date: parseISO(t.date),
+          icon: row.icon,
+          iconTone: row.iconTone,
+          title: row.title,
+          sub: row.sub,
+          status: row.status ?? LOGGED,
+          note: t.exam.notes || undefined,
+          facts: row.facts,
+          testId: t.id,
           type: 'lab',
           dateOnly: true,
         }
@@ -554,7 +549,7 @@ export function Timeline({
     ]
       .filter((e) => e.date.getTime() <= now)
       .sort((a, b) => b.date.getTime() - a.date.getTime())
-  }, [injections, vitals, exams, examStats, fileRows, symptoms, compoundMap, weightRows, now])
+  }, [injections, vitals, tests, isPro, fileRows, symptoms, compoundMap, weightRows, now])
 
   const counts = useMemo<Record<EventType, number>>(() => ({
     injection: injections.length,
@@ -644,12 +639,12 @@ export function Timeline({
         </div>
       )}
 
-      {activeType === null && <TimelineFeed events={events} />}
+      {activeType === null && <TimelineFeed events={events} onOpenTest={onOpenTest} />}
       {activeType === 'injection' && <DataGrid columns={INJ_COLS} rows={injRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-injection" empty="No injections logged." onArchive={(r) => archiveOne('injections', r.inj.id)} />}
       {activeType === 'weight' && <DataGrid columns={WEIGHT_COLS} rows={weightRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-weight" empty="No weight entries yet." onArchive={(r) => archiveOne('bodyMetrics', r.id)} />}
       {activeType === 'bp' && <DataGrid columns={BP_COLS} rows={bpRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-bp" empty="No blood pressure readings yet." onArchive={(r) => archiveOne('vitals', r.v.id)} />}
       {activeType === 'symptom' && <DataGrid columns={SYM_COLS} rows={symRows} rowKey={(r) => r.id ?? r.recordedAt} storageKey="apollo-tl-cols-symptom" empty="No symptom check-ins yet." onArchive={(r) => archiveOne('symptoms', r.id)} />}
-      {activeType === 'lab' && <DataGrid columns={LAB_COLS} rows={labRows} rowKey={(r) => r.id ?? r.name} storageKey="apollo-tl-cols-lab" empty="No lab panels yet." onArchive={(r) => archiveExamEntry(r.id)} />}
+      {activeType === 'lab' && <DataGrid columns={LAB_COLS} rows={tests} rowKey={(r) => r.id} storageKey="apollo-tl-cols-lab" empty="No blood tests yet." onArchive={(r) => archiveExamEntry(r.id)} />}
       {activeType === 'file' && <DataGrid columns={FILE_COLS} rows={fileRows} rowKey={(r) => r.id ?? r.name} storageKey="apollo-tl-cols-file" empty="No files yet." onArchive={(r) => archiveFileEntry(r.id)} />}
     </PanelCard>
   )

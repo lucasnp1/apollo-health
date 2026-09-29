@@ -50,7 +50,8 @@ const GUIDE_SLUGS = new Set([
 /** Link to a marker's guide, or undefined when no page exists for it. */
 export function guideUrl(markerKey: string | undefined, ref = 'read'): string | undefined {
   if (!markerKey) return undefined
-  const slug = markerKey.replace(/_/g, '-')
+  // hs-CRP shares the CRP guide.
+  const slug = (markerKey === 'hs_crp' ? 'crp' : markerKey).replace(/_/g, '-')
   return GUIDE_SLUGS.has(slug) ? `/guides/${slug}?ref=${ref}` : undefined
 }
 

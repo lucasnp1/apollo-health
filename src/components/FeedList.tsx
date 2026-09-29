@@ -82,6 +82,7 @@ export function FeedRow({
   children,
   onClick,
   selected = false,
+  pressed,
   expanded,
   className,
 }: {
@@ -101,14 +102,17 @@ export function FeedRow({
   /** Extra content under the row, outside the tap target. */
   children?: ReactNode
   onClick?: () => void
-  /** Row is the current selection (lab marker lists). */
+  /** Row is the current one in its list: a highlight plus aria-current, not a toggle. */
   selected?: boolean
-  /** Row toggles a detail block (analysis). Overrides the selected chevron. */
+  /** Row is an on/off toggle (a filter): the same highlight, announced as pressed. */
+  pressed?: boolean
+  /** Row toggles a detail block (analysis): a down chevron while open. */
   expanded?: boolean
   className?: string
 }) {
   const interactive = typeof onClick === 'function'
-  const open = expanded !== undefined ? expanded : selected
+  // Only rows that open a detail block point down; selected rows still navigate.
+  const open = expanded === true
   const body = (
     <>
       <span className={cn('grid size-9 shrink-0 place-items-center rounded-full ring-1 ring-border/70', ICON_TONE[iconTone])}>
@@ -151,7 +155,7 @@ export function FeedRow({
   const cls = cn(
     'flex w-full items-start gap-3 rounded-xl px-2 py-3 text-left transition-colors',
     interactive && 'hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-    selected && 'bg-accent/50 hover:bg-accent/50',
+    (selected || pressed) && 'bg-accent/50 hover:bg-accent/50',
     className,
   )
   return (
@@ -160,7 +164,8 @@ export function FeedRow({
         <button
           type="button"
           onClick={onClick}
-          aria-pressed={expanded === undefined ? selected : undefined}
+          aria-pressed={pressed}
+          aria-current={selected || undefined}
           aria-expanded={expanded}
           className={cls}
         >

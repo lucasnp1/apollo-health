@@ -121,10 +121,13 @@ const seeded = await page.evaluate(async () => {
   }
 
   // Three blood panels: baseline, mid-protocol, latest.
+  // Draw dates as the importer now stores them (noon UTC, read from the
+  // report), with the lab in company, so no demo test asks to be checked.
+  const drawDay = (daysAgo) => `${at(daysAgo, 12, 0).slice(0, 10)}T12:00:00.000Z`
   const exams = [
-    { key: 'e3', name: 'Advanced TRT panel', collectedAt: at(2, 9, 0), labName: 'Medichecks', examType: 'Venous draw' },
-    { key: 'e2', name: 'TRT follow-up', collectedAt: at(86, 9, 0), labName: 'Medichecks', examType: 'Venous draw' },
-    { key: 'e1', name: 'Baseline bloods', collectedAt: at(182, 9, 0), labName: 'Medichecks', examType: 'Venous draw' },
+    { key: 'e3', name: 'Advanced blood test', collectedAt: drawDay(2), company: 'Medichecks', meta: { dateSource: 'report', fasted: true }, examType: 'Venous draw' },
+    { key: 'e2', name: 'Follow-up blood test', collectedAt: drawDay(86), company: 'Medichecks', meta: { dateSource: 'report' }, examType: 'Venous draw' },
+    { key: 'e1', name: 'Baseline blood test', collectedAt: drawDay(182), company: 'Medichecks', meta: { dateSource: 'report' }, examType: 'Venous draw' },
   ]
   const eid = {}
   for (const e of exams) { const { key, ...row } = e; eid[key] = await add('exams', { ...row, ...sync() }) }
@@ -224,21 +227,17 @@ await page.getByRole('button', { name: /^Timeline/ }).first().click()
 await page.waitForTimeout(900)
 await shot('timeline')
 
-// 5 + 6. Labs: smart analysis at the top, then the marker list further down
+// 5 + 6. Bloods: the Latest summary, then one marker over time
 await home()
-await page.getByRole('button', { name: /^Lab results/ }).first().click()
+await page.getByRole('button', { name: /^Bloods/ }).first().click()
 await page.waitForTimeout(1500)
-await scrollToCard(page.locator('h3, h2, p', { hasText: /^Analysis$/ }).first(), 900)
-await shot('analysis')
-if (DESKTOP) {
-  // Open the first analysis row so the causes and practices block is in the review set.
-  const first = page.locator('button[aria-expanded]').first()
-  if (await first.count()) { await first.click(); await page.waitForTimeout(500); await shot('analysis-open') }
-  await page.evaluate(() => window.scrollTo(0, 0))
-  await shot('labs-top')
-}
-await scrollToCard(page.locator('h3', { hasText: /Sex Hormones/ }).first(), 1400)
+await page.evaluate(() => window.scrollTo(0, 0))
 await shot('bloods')
+await page.evaluate(() => { location.hash = '#marker/hematocrit' })
+await page.waitForTimeout(1200)
+await page.evaluate(() => window.scrollTo(0, 0))
+await shot('analysis')
+if (DESKTOP) { await page.evaluate(() => { location.hash = '#tests' }); await page.waitForTimeout(900); await shot('labs-top') }
 
 // 7. Doctor export (header button on the labs page)
 const exportBtn = page.getByRole('button', { name: /Export for doctor/ }).first()

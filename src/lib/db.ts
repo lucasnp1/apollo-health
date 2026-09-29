@@ -91,7 +91,17 @@ export type LabExam = {
   labName?: string
   sourceFileId?: number
   notes?: string
+  meta?: ExamMeta
 } & SyncFields
+
+// Draw details that have no column of their own. One JSON column so new
+// fields need no migration. dateSource says where collectedAt came from.
+export type ExamMeta = {
+  dateSource?: 'report' | 'report-date' | 'filename' | 'user' | 'import-time'
+  drawTime?: string
+  fasted?: boolean | null
+  conditions?: string[]
+}
 
 export type LabResult = {
   id?: number

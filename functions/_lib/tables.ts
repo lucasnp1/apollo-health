@@ -103,6 +103,7 @@ export const TABLES: Record<string, TableSpec> = {
       labName: { col: 'lab_name', type: 'text' },
       sourceFileId: { col: 'source_file_id', type: 'text' },
       notes: { col: 'notes', type: 'text' },
+      meta: { col: 'meta', type: 'json' },
       ...ARCH,
       ...CT,
     },
