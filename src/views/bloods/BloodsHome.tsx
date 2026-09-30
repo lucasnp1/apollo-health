@@ -2,11 +2,11 @@
 // newest first) and Markers (one row per marker, grouped by section).
 
 import { useMemo, useState } from 'react'
-import { CalendarClock, Lock, Merge, Pencil, TriangleAlert } from 'lucide-react'
+import { ArrowLeftRight, CalendarClock, Lock, Merge, Pencil, Stethoscope, TriangleAlert } from 'lucide-react'
 import { SECTION_ABBR, SECTION_ORDER } from '../../lib/markers'
-import { changesFor, notInTest, type LabTest, type TestMarker } from '../../lib/labTests'
+import { changesFor, notInTest, prevText, previousTest, type LabTest, type TestMarker } from '../../lib/labTests'
 import { CORE_KEYS } from '../../lib/labRules'
-import { dayOf, fmtDay } from '../../lib/dates'
+import { fmtDay } from '../../lib/dates'
 import { usePlan } from '../../lib/plan'
 import { FeedList, FeedRow, type FeedStatus } from '../../components/FeedList'
 import { PanelCard } from '../../components/dashboard/PanelCard'
@@ -14,7 +14,7 @@ import { Segmented } from '@/components/ui/segmented'
 import { Button } from '@/components/ui/button'
 import { TestHeader } from './TestReport'
 import { fixOf, flagChip, markerChip, markerRowProps, plural, printedValue, rangeSub, SECTION_ICON, testRowProps, valueTitle } from './feed'
-import { markerHash, type HomeTab } from './route'
+import { compareHash, markerHash, type HomeTab } from './route'
 type Go = (hash: string, replace?: boolean) => void
 
 const flagged = (m: TestMarker) => m.labFlag === 'high' || m.labFlag === 'low'
@@ -53,8 +53,7 @@ function Latest({ tests, isPro, go }: { tests: LabTest[]; isPro: boolean; go: Go
   const { openUpgrade } = usePlan()
   const t = tests[0]
   // The same strictly-earlier-day rule the changes use (R4), so the baseline named is the one compared.
-  const day = dayOf(t.date)
-  const previous = day ? tests.find((o) => { const d = dayOf(o.date); return d !== '' && d < day }) : undefined
+  const previous = previousTest(tests, t)
 
   const attention = isPro ? attentionOf(t) : [...t.markers.filter(flagged)].sort((a, b) => outBy(b) - outBy(a))
   const shown = attention.slice(0, 3)
@@ -112,7 +111,7 @@ function Latest({ tests, isPro, go }: { tests: LabTest[]; isPro: boolean; go: Go
                     icon={SECTION_ICON[m.section]}
                     iconTone={c.better === false ? 'bad' : 'neutral'}
                     title={valueTitle(m.label, printedValue(m), m.unit, m.labFlag, m.expected)}
-                    sub={`${c.dir === 'up' ? 'Up' : 'Down'} ${amount} since ${fmtDay(m.prev!.date)} (${Number(m.prev!.value.toPrecision(4))})`}
+                    sub={`${c.dir === 'up' ? 'Up' : 'Down'} ${amount} since ${fmtDay(m.prev!.date)} (${prevText(m.prev!)})`}
                     status={c.better === true ? { label: 'Better', tone: 'good' } : c.better === false ? { label: 'Worse', tone: 'bad' } : markerChip(m, true)}
                     onClick={() => go(markerHash(m.key, t.id))}
                   />
@@ -142,9 +141,37 @@ function Latest({ tests, isPro, go }: { tests: LabTest[]; isPro: boolean; go: Go
         </PanelCard>
       )}
 
+      <ProButtons
+        isPro={isPro}
+        compare={tests.length > 1 ? () => go(compareHash(t.id, previous?.id)) : undefined}
+        compareLabel="Compare with previous test"
+        report={() => go(`#report/${t.id}`)}
+      />
+
       <p className="feed-facts px-1 text-muted-foreground">
         Not medical advice. Flags come from your lab; check anything you act on with your doctor.
       </p>
+    </div>
+  )
+}
+
+/**
+ * Compare and the doctor report, as outline buttons. Free sees a lock, and a
+ * tap says which Pro feature it is.
+ */
+export function ProButtons({ isPro, compare, compareLabel, report }: { isPro: boolean; compare?: () => void; compareLabel: string; report: () => void }) {
+  const { openUpgrade } = usePlan()
+  const gate = (feature: string, fn: () => void) => () => (isPro ? fn() : openUpgrade(feature))
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {compare && (
+        <Button variant="outline" className="h-10 justify-start" onClick={gate('Comparing two tests', compare)}>
+          {isPro ? <ArrowLeftRight className="size-4" /> : <Lock className="size-4" />} {compareLabel}
+        </Button>
+      )}
+      <Button variant="outline" className="h-10 justify-start" onClick={gate('The doctor report', report)}>
+        {isPro ? <Stethoscope className="size-4" /> : <Lock className="size-4" />} For your doctor
+      </Button>
     </div>
   )
 }
@@ -157,8 +184,16 @@ function Tests({ tests, isPro, go, onEdit, onMerge }: { tests: LabTest[]; isPro:
   const [onlyCheck, setOnlyCheck] = useState(false)
   const needCheck = tests.filter((t) => t.needsCheck.length > 0)
   const list = onlyCheck ? needCheck : tests
+  const { openUpgrade } = usePlan()
   return (
-    <PanelCard>
+    <PanelCard
+      action={tests.length > 1 && (
+        <Button variant="outline" className="h-10" onClick={() => (isPro ? go(compareHash(tests[0].id)) : openUpgrade('Comparing two tests'))}>
+          {isPro ? <ArrowLeftRight className="size-4" /> : <Lock className="size-4" />} Compare two
+        </Button>
+      )}
+      title={plural(tests.length, 'test')}
+    >
       {needCheck.length > 0 && (
         <FeedList className="mb-2">
           <FeedRow

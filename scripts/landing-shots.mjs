@@ -239,15 +239,18 @@ await page.evaluate(() => window.scrollTo(0, 0))
 await shot('analysis')
 if (DESKTOP) { await page.evaluate(() => { location.hash = '#tests' }); await page.waitForTimeout(900); await shot('labs-top') }
 
-// 7. Doctor export (header button on the labs page)
-const exportBtn = page.getByRole('button', { name: /Export for doctor/ }).first()
-if (await exportBtn.count()) {
+// 7. Doctor report for the latest test (Bloods → For your doctor)
+await home()
+await page.getByRole('button', { name: /^Bloods/ }).first().click()
+await page.waitForTimeout(1200)
+const doctor = page.getByRole('button', { name: /For your doctor/ }).first()
+if (await doctor.count()) {
+  await doctor.click()
+  await page.waitForTimeout(1200)
   await page.evaluate(() => window.scrollTo(0, 0))
-  await exportBtn.click()
-  await page.waitForTimeout(900)
   await shot('export')
 } else {
-  console.log('export button not found')
+  console.log('doctor report button not found')
 }
 
 await browser.close()

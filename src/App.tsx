@@ -330,10 +330,6 @@ function Shell({
     () => db.exams.orderBy('collectedAt').reverse().filter((e) => !e.deletedAtSync && !e.archivedAt).toArray(),
     [], [],
   )
-  const results = useLiveQuery(
-    () => db.results.filter((r) => !r.deletedAtSync && !r.archivedAt).toArray(),
-    [], [],
-  )
   // Kept for Settings export; protocol scheduling UI was removed.
   const protocols = useLiveQuery(
     () => db.protocols.toArray(),
@@ -342,12 +338,6 @@ function Shell({
   const bodyMetrics = useLiveQuery(() => db.bodyMetrics.orderBy('measuredAt').reverse().filter((b) => !b.archivedAt).limit(200).toArray(), [], [])
   const symptoms = useLiveQuery(() => db.symptoms.orderBy('recordedAt').reverse().filter((s) => !s.archivedAt).limit(200).toArray(), [], [])
   const files = useLiveQuery(() => db.files.orderBy('addedAt').reverse().filter((f) => !f.deletedAtSync && !f.archivedAt).toArray(), [], [])
-
-  const examMap = useMemo(() => new Map(exams.map((e) => [e.id, e])), [exams])
-  const enrichedResults = useMemo(
-    () => results.map((r) => ({ ...r, exam: examMap.get(r.examId) })),
-    [results, examMap],
-  )
 
   return (
     <div className="min-h-dvh bg-background">
@@ -427,17 +417,7 @@ function Shell({
           {activeView === 'files' && (
             <Files files={files ?? []} onReviewFile={(fileId) => setEditor({ mode: 'file', fileId })} />
           )}
-          {activeView === 'export' && (
-            <ExportPage
-              compounds={compounds ?? []}
-              injections={injections ?? []}
-              vitals={vitals ?? []}
-              exams={exams ?? []}
-              results={enrichedResults ?? []}
-              bodyMetrics={bodyMetrics ?? []}
-              symptoms={symptoms ?? []}
-            />
-          )}
+          {activeView === 'export' && <ExportPage />}
           {activeView === 'archive' && <Archive />}
           {activeView === 'settings' && (
             <Settings

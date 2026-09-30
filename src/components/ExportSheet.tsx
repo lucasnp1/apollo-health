@@ -8,11 +8,15 @@
  * weight, symptoms.
  */
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { format, parseISO, subMonths } from 'date-fns'
 import { Download, FileText, Share2 } from 'lucide-react'
-import type { BodyMetric, Compound, InjectionLog, LabExam, Symptom, VitalLog } from '../lib/db'
-import type { EnrichedResult } from '../lib/insights'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type LabResult, type Symptom, type VitalLog } from '../lib/db'
+import { dedupeInjections } from '../lib/injections'
+import { fmtRange, labFlag } from '../lib/labRules'
+import { canonicalKey, tcUnitExams, testTitle } from '../lib/labTests'
+import { dayOf } from '../lib/dates'
 import { ALL_SYMPTOMS, ratingOf } from '../lib/symptoms'
 import { unitLabel } from '../lib/dose'
 import { Button } from '@/components/ui/button'
@@ -43,7 +47,6 @@ function injectionsSection(injections: InjectionLog[], compounds: Compound[], co
     .filter((i) => compoundIds.includes(i.compoundId))
     .filter((i) => !cutoff || parseISO(i.takenAt) >= cutoff)
     .sort((a, b) => b.takenAt.localeCompare(a.takenAt))
-    .slice(0, 1000)
     .map((i) => {
       const c = compMap.get(i.compoundId)
       return [
@@ -58,36 +61,46 @@ function injectionsSection(injections: InjectionLog[], compounds: Compound[], co
   return { title: 'Injections', headers: ['Date & time', 'Compound', 'Dose', 'Route', 'Site', 'Notes'], rows }
 }
 
-function labsSection(exams: LabExam[], results: EnrichedResult[], cutoff: Date | null): Section {
+function labsSection(exams: LabExam[], results: LabResult[], cutoff: Date | null): Section {
   const examById = new Map(exams.map((e) => [e.id, e]))
-  const rows = results
+  const tcUnit = tcUnitExams(results)
+  // One row per key per test, as buildTests: duplicate imports stacked a marker up to four times. The row with a value wins, then the oldest.
+  const keep = new Map<string, LabResult>()
+  for (const r of [...results].sort((a, b) => (a.id ?? 0) - (b.id ?? 0))) {
+    const k = `${r.examId}|${canonicalKey(r.marker, r.unit, r, tcUnit.has(r.examId)).key}`
+    const had = keep.get(k)
+    if (!had || (had.value === undefined && r.value !== undefined)) keep.set(k, r)
+  }
+  // Lab dates are calendar days: compare and print the day, never a local-time instant.
+  const since = cutoff ? format(cutoff, 'yyyy-MM-dd') : ''
+  const dayOfExam = (id: number) => dayOf(examById.get(id)?.collectedAt ?? '')
+  const rows = [...keep.values()]
     .filter((r) => {
       const e = examById.get(r.examId)
-      return e && (!cutoff || parseISO(e.collectedAt) >= cutoff)
+      return e && (!cutoff || dayOf(e.collectedAt) >= since)
     })
-    .sort((a, b) => (examById.get(b.examId)?.collectedAt ?? '').localeCompare(examById.get(a.examId)?.collectedAt ?? ''))
+    .sort((a, b) => dayOfExam(b.examId).localeCompare(dayOfExam(a.examId)))
     .map((r) => {
       const e = examById.get(r.examId)!
-      const flag = r.value != null && r.low != null && r.value < r.low ? 'LOW'
-        : r.value != null && r.high != null && r.value > r.high ? 'HIGH'
-        : (r.low != null || r.high != null) ? 'OK' : ''
+      // OK only when a value was actually compared with a printed range.
+      const f = labFlag(r.value, r.low, r.high, r.status)
+      const flag = f === 'high' ? 'HIGH' : f === 'low' ? 'LOW' : f === 'in' ? 'OK' : ''
       return [
-        format(parseISO(e.collectedAt), 'dd/MM/yyyy'),
-        e.name,
+        dayOf(e.collectedAt) ? format(parseISO(dayOf(e.collectedAt)), 'dd/MM/yyyy') : '',
+        testTitle(e),
         r.marker,
         `${r.rawValue}${r.unit ? ' ' + r.unit : ''}`,
-        r.low != null || r.high != null ? `${r.low ?? ''}-${r.high ?? ''}` : '',
+        r.low != null || r.high != null ? fmtRange(r.low, r.high) : '',
         flag,
       ]
     })
-  return { title: 'Lab results', headers: ['Date', 'Panel', 'Marker', 'Result', 'Reference', 'Flag'], rows }
+  return { title: 'Lab results', headers: ['Date', 'Test', 'Marker', 'Result', 'Reference', 'Flag'], rows }
 }
 
 function bpSection(vitals: VitalLog[], cutoff: Date | null): Section {
   const rows = vitals
     .filter((v) => !cutoff || parseISO(v.measuredAt) >= cutoff)
     .sort((a, b) => b.measuredAt.localeCompare(a.measuredAt))
-    .slice(0, 1000)
     .map((v) => [
       format(parseISO(v.measuredAt), 'dd/MM/yyyy HH:mm'),
       String(v.systolic),
@@ -103,7 +116,6 @@ function weightSection(bodyMetrics: BodyMetric[], cutoff: Date | null): Section 
     .filter((b) => b.weightKg !== undefined)
     .filter((b) => !cutoff || parseISO(b.measuredAt) >= cutoff)
     .sort((a, b) => b.measuredAt.localeCompare(a.measuredAt))
-    .slice(0, 1000)
     .map((b) => [format(parseISO(b.measuredAt), 'dd/MM/yyyy HH:mm'), String(b.weightKg), b.notes ?? ''])
   return { title: 'Weight', headers: ['Date & time', 'Weight (kg)', 'Notes'], rows }
 }
@@ -112,7 +124,6 @@ function symptomsSection(symptoms: Symptom[], cutoff: Date | null): Section {
   const rows = symptoms
     .filter((s) => !cutoff || parseISO(s.recordedAt) >= cutoff)
     .sort((a, b) => b.recordedAt.localeCompare(a.recordedAt))
-    .slice(0, 1000)
     .map((s) => [
       format(parseISO(s.recordedAt), 'dd/MM/yyyy'),
       ...ALL_SYMPTOMS.map((def) => { const v = ratingOf(s, def); return v === undefined ? '' : String(v) }),
@@ -163,7 +174,7 @@ function buildHtml(title: string, subtitle: string, sections: Section[]): string
     td { padding: 6px 10px; border: 1px solid #ddd; }
     tr:nth-child(even) td { background: #fafafa; }
     .flag-high { color: #dc2626; font-weight: 700; }
-    .flag-low  { color: #2563eb; font-weight: 700; }
+    .flag-low  { color: #dc2626; font-weight: 700; }
     footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ddd; color: #888; font-size: 11px; }
   </style>
 </head>
@@ -194,42 +205,33 @@ function buildCsv(title: string, sections: Section[]): string {
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-export function ExportPage({
-  compounds, injections, vitals, exams, results, bodyMetrics, symptoms,
-}: {
-  compounds: Compound[]
-  injections: InjectionLog[]
-  vitals: VitalLog[]
-  exams: LabExam[]
-  results: EnrichedResult[]
-  bodyMetrics: BodyMetric[]
-  symptoms: Symptom[]
-}) {
+const live = (r: { archivedAt?: number; deletedAtSync?: number }) => !r.archivedAt && !r.deletedAtSync
+
+export function ExportPage() {
+  // Straight from Dexie: no caps, and archived compounds keep their doses.
+  const data = useLiveQuery(async () => {
+    const [compounds, injections, vitals, exams, results, bodyMetrics, symptoms] = await Promise.all([
+      db.compounds.filter((c) => !c.deletedAtSync).toArray(),
+      db.injections.filter(live).toArray(),
+      db.vitals.filter(live).toArray(),
+      db.exams.filter(live).toArray(),
+      db.results.filter(live).toArray(),
+      db.bodyMetrics.filter(live).toArray(),
+      db.symptoms.filter(live).toArray(),
+    ])
+    return { compounds, injections: dedupeInjections(injections), vitals, exams, results, bodyMetrics, symptoms }
+  }, [])
+  const compounds = data?.compounds ?? [], injections = data?.injections ?? [], vitals = data?.vitals ?? []
+  const exams = data?.exams ?? [], results = data?.results ?? [], bodyMetrics = data?.bodyMetrics ?? [], symptoms = data?.symptoms ?? []
   const [range, setRange] = useState<DateRange>('ALL')
   const [incl, setIncl] = useState({ injections: true, labs: true, bp: false, weight: false, symptoms: false })
-  const [selectedCompounds, setSelectedCompounds] = useState<number[]>([])
+  // Compounds the user switched off; every compound with a logged dose starts on.
+  const [off, setOff] = useState<number[]>([])
   const [busy, setBusy] = useState<'csv' | 'pdf' | null>(null)
 
-  const compoundsWithHistory = useMemo(() => {
-    const ids = new Set(injections.map((i) => i.compoundId))
-    const all = compounds.filter((c) => ids.has(c.id!))
-    const countById = new Map<number, number>()
-    for (const inj of injections) countById.set(inj.compoundId, (countById.get(inj.compoundId) ?? 0) + 1)
-    const seen = new Map<string, Compound>()
-    for (const c of all) {
-      const key = c.name.toLowerCase().split(/[\s-]/)[0]
-      const existing = seen.get(key)
-      if (!existing || (countById.get(c.id!) ?? 0) > (countById.get(existing.id!) ?? 0)) seen.set(key, c)
-    }
-    return [...seen.values()]
-  }, [compounds, injections])
-
-  useMemo(() => {
-    if (selectedCompounds.length === 0 && compoundsWithHistory.length > 0) {
-      setSelectedCompounds(compoundsWithHistory.map((c) => c.id!))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compoundsWithHistory.length])
+  const dosed = new Set(injections.map((i) => i.compoundId))
+  const compoundsWithHistory = compounds.filter((c) => dosed.has(c.id!))
+  const selectedCompounds = compoundsWithHistory.map((c) => c.id!).filter((id) => !off.includes(id))
 
   const anySelected = incl.injections || incl.labs || incl.bp || incl.weight || incl.symptoms
 
@@ -257,7 +259,7 @@ export function ExportPage({
     setBusy('csv')
     try {
       const csv = buildCsv(`${docTitle(titleParts)} · ${RANGE_LABELS[range]}`, sections)
-      const filename = `apollo-health-${format(new Date(), 'yyyy-MM-dd')}.csv`
+      const filename = `magno-export-${format(new Date(), 'yyyy-MM-dd')}.csv`
       const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }) // BOM for Excel
       const file = new File([blob], filename, { type: 'text/csv' })
       // Prefer the native share sheet on mobile; fall back to a download.
@@ -291,14 +293,14 @@ export function ExportPage({
   }
 
   function toggleCompound(id: number) {
-    setSelectedCompounds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+    setOff((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
 
   const canShareFiles = typeof navigator !== 'undefined' && !!navigator.canShare
 
   const rows: Array<{ key: keyof typeof incl; label: string; detail: string }> = [
     { key: 'injections', label: 'Injections', detail: 'All logged doses' },
-    { key: 'labs', label: 'Lab results', detail: `${exams.length} panel${exams.length !== 1 ? 's' : ''} on file` },
+    { key: 'labs', label: 'Lab results', detail: `${exams.length} test${exams.length !== 1 ? 's' : ''} on file` },
     { key: 'bp', label: 'Blood pressure', detail: `${vitals.length} reading${vitals.length !== 1 ? 's' : ''}` },
     { key: 'weight', label: 'Weight', detail: `${bodyMetrics.filter((b) => b.weightKg !== undefined).length} entries` },
     { key: 'symptoms', label: 'Symptoms', detail: `${symptoms.length} check-in${symptoms.length !== 1 ? 's' : ''}` },

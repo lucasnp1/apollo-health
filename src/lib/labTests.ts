@@ -4,7 +4,7 @@
 // rewritten. Pure (no React, siblings imported with .ts) so node can load it.
 
 import type { Compound, ExamMeta, HealthFile, InjectionLog, LabExam, LabResult, MarkerTarget } from './db'
-import { canonicalize, metaForKey, type LabSection } from './markers.ts'
+import { canonicalize, metaForKey, SECTION_ORDER, type LabSection } from './markers.ts'
 import { CORE_KEYS, changeOf, expectedOnProtocol, labFlag, readMarker, retestBy, type LabFlag, type Read } from './labRules.ts'
 import { homaIr, toUnit } from './labUnits.ts'
 import { parseLabNumber } from './labCatalog.ts'
@@ -32,8 +32,8 @@ export type TestMarker = {
   next?: string
   /** yyyy-mm-dd, for act and watch reads. */
   retestBy?: string
-  /** The value is converted into this marker's unit. */
-  prev?: { examId: number; date: string; value: number; unit: string; gapDays: number; sameTiming: boolean }
+  /** The value is converted into this marker's unit; `raw` is the lab's printed value, `converted` says the unit changed. */
+  prev?: { examId: number; date: string; value: number; raw: string; converted: boolean; unit: string; gapDays: number; sameTiming: boolean }
   change?: { text: string; meaningful: boolean; dir: 'up' | 'down' | 'same'; better?: boolean }
 }
 
@@ -253,7 +253,7 @@ export function buildTests(i: Input): LabTest[] {
           if (v === undefined) continue
           const a = timingBucket(t), b = timingBucket(o)
           const timed = section === 'Hormones' || TIMING_KEYS.has(key)
-          prev = { examId: o.id, date: o.date, value: v, unit, gapDays: daysBetween(o.date, t.date), sameTiming: !(timed && a && b && a !== b) }
+          prev = { examId: o.id, date: o.date, value: v, raw: p!.rawValue, converted: v !== p!.value, unit, gapDays: daysBetween(o.date, t.date), sameTiming: !(timed && a && b && a !== b) }
           break
         }
       }
@@ -276,7 +276,8 @@ export function buildTests(i: Input): LabTest[] {
       )
 
       let change: TestMarker['change']
-      if (prev && r.value !== undefined) {
+      // "<37" is a detection limit, not a value: no change from or to one.
+      if (prev && r.value !== undefined && !censored(r.rawValue) && !censored(prev.raw)) {
         const c = changeOf(key, r.value, prev.value, unit)
         // R5: a move across these gaps is shown muted, never counted.
         const guard = prev.gapDays < 14 ? ` · ${prev.gapDays} day${prev.gapDays === 1 ? '' : 's'} apart`
@@ -439,6 +440,11 @@ export function findSameDraw(
 
 // ── Editing and merging (pure halves of bloodTestsDb) ──────────────────────
 
+/** The leading < or > of a printed value ("<0.1" gives "<"), or ''. */
+export const opOf = (raw?: string) => raw?.trim().match(/^[<>≤≥]/)?.[0] ?? ''
+/** A printed value that is a detection limit, not a measured number. */
+export const censored = (raw?: string) => opOf(raw) !== ''
+
 /** A typed or printed value: "<0.5" reads 0.5 with its operator kept apart. */
 export function parseEntry(raw: string): { value?: number; op?: '<' | '>' } {
   const m = raw.trim().match(/^([<>≤≥])=?\s*(.*)$/)
@@ -505,4 +511,138 @@ export function fillEmpty(dst: LabExam, src: Partial<LabExam>): Partial<LabExam>
   if (!dm.conditions?.length && sm.conditions?.length) meta.conditions = sm.conditions
   if (JSON.stringify(meta) !== JSON.stringify(dm)) out.meta = meta
   return out
+}
+
+// ── Compare and the doctor report ──────────────────────────────────────────
+
+const num6 = (v: number) => String(Number(v.toPrecision(6)))
+
+/** The lab's printed value, without the range or notes some PDFs glue on. */
+export function printedValue(m: Pick<TestMarker, 'rawValue' | 'value'>): string {
+  const raw = m.rawValue?.replace(/\s*[[(][0-9].*$/, '').replace(/\s*;.*$/, '').trim()
+  return raw || (m.value !== undefined ? num6(m.value) : '')
+}
+
+/** The previous result as the lab printed it, or its converted number with the lab's < or > kept. */
+export function prevText(prev: NonNullable<TestMarker['prev']>): string {
+  return prev.converted ? opOf(prev.raw) + String(Number(prev.value.toPrecision(4))) : printedValue({ rawValue: prev.raw, value: prev.value })
+}
+
+/** Tests drawn on a strictly earlier day than `t` (R4), newest first. */
+export function earlierTests(tests: LabTest[], t: LabTest): LabTest[] {
+  const day = dayOf(t.date)
+  return day ? tests.filter((o) => { const d = dayOf(o.date); return d !== '' && d < day }) : []
+}
+
+/** The test R4 compares with: the newest one from a strictly earlier day. */
+export const previousTest = (tests: LabTest[], t: LabTest): LabTest | undefined => earlierTests(tests, t)[0]
+
+/** Compare's default older test: the earlier one sharing the most markers with `newer`, nearest on ties. */
+export function defaultOlder(tests: LabTest[], newer: LabTest): LabTest | undefined {
+  const keys = new Set(newer.markers.map((m) => m.key))
+  let best: LabTest | undefined
+  let most = -1
+  for (const o of earlierTests(tests, newer)) {
+    const n = o.markers.filter((m) => keys.has(m.key)).length
+    if (n > most) { best = o; most = n }
+  }
+  // The oldest test has nothing earlier: fall back to the nearest other one.
+  return best ?? tests.find((o) => o.id !== newer.id)
+}
+
+/** The androgen phase at the draw, as Compare and the report name it. */
+export const drawPhase = (t: LabTest) => t.timing.find((d) => d.androgen)?.phase
+
+export type CompareRow = {
+  key: string
+  label: string
+  section: LabSection
+  /** The newer reading's unit; both values are shown in it. */
+  unit: string
+  older: TestMarker
+  newer: TestMarker
+  /** The older value in the newer unit; undefined when missing or not convertible. */
+  olderValue?: number
+  /** The older value was converted, so its printed value shows as a second line. */
+  olderConverted: boolean
+  /** R6 on the two values; 'same' below the threshold, 'different unit' with no conversion, 'not comparable' when either is a < or > limit. */
+  change?: { text: string; meaningful: boolean; dir: 'up' | 'down' | 'same' }
+}
+
+/** Two tests side by side, by section, every value in the newer test's unit. */
+export function compareTests(newer: LabTest, older: LabTest): {
+  sections: Array<{ section: LabSection; rows: CompareRow[] }>
+  both: number
+  onlyNewer: TestMarker[]
+  onlyOlder: TestMarker[]
+  gapDays: number
+  /** Trough vs near peak (either way round): hormone and hematocrit moves may be timing. */
+  differentTiming: boolean
+} {
+  const olderBy = new Map(older.markers.map((m) => [m.key, m]))
+  const newerKeys = new Set(newer.markers.map((m) => m.key))
+  const rows: CompareRow[] = []
+  for (const n of newer.markers) {
+    const o = olderBy.get(n.key)
+    if (!o) continue
+    const ov = o.value !== undefined ? toUnit(n.key, o.value, o.unit, n.unit) : undefined
+    let change: CompareRow['change']
+    if (n.value !== undefined && o.value !== undefined) {
+      if (ov === undefined) change = { text: 'different unit', meaningful: false, dir: 'same' }
+      else if (censored(n.rawValue) || censored(o.rawValue)) change = { text: 'not comparable', meaningful: false, dir: 'same' }
+      else {
+        const c = changeOf(n.key, n.value, ov, n.unit)
+        change = c.meaningful ? c : { text: 'same', meaningful: false, dir: 'same' }
+      }
+    }
+    rows.push({ key: n.key, label: n.label, section: n.section, unit: n.unit, older: o, newer: n, olderValue: ov, olderConverted: ov !== undefined && ov !== o.value, change })
+  }
+  const a = timingBucket(newer), b = timingBucket(older)
+  return {
+    sections: SECTION_ORDER.map((section) => ({ section, rows: rows.filter((r) => r.section === section) })).filter((s) => s.rows.length > 0),
+    both: rows.length,
+    onlyNewer: newer.markers.filter((m) => !olderBy.has(m.key)),
+    onlyOlder: older.markers.filter((m) => !newerKeys.has(m.key)),
+    gapDays: Math.abs(daysBetween(older.date, newer.date)),
+    differentTiming: !!a && !!b && a !== b,
+  }
+}
+
+/** The doctor report's page 2 rows, in this order, when any column has a value. */
+export const KEY_MARKERS = [
+  'total_testosterone', 'free_testosterone', 'shbg', 'estradiol', 'lh', 'fsh', 'hematocrit', 'hemoglobin', 'psa',
+  'total_cholesterol', 'ldl', 'hdl', 'triglycerides', 'alt', 'ggt', 'creatinine', 'egfr', 'hba1c',
+]
+
+export type MatrixCell = { text: string; labFlag: LabFlag; converted: boolean }
+
+/**
+ * Key markers across tests: `cols[0]` is the report's test, then earlier ones.
+ * Each row is in the unit of its first column that has the marker; a converted
+ * cell is marked and its conversion listed once. A value with no conversion
+ * keeps its own printed unit.
+ */
+export function keyMarkerMatrix(cols: LabTest[]): {
+  rows: Array<{ key: string; label: string; unit: string; cells: Array<MatrixCell | undefined> }>
+  conversions: string[]
+} {
+  const conversions = new Set<string>()
+  const rows: ReturnType<typeof keyMarkerMatrix>['rows'] = []
+  for (const key of KEY_MARKERS) {
+    const found = cols.map((t) => t.markers.find((m) => m.key === key && (m.value !== undefined || m.rawValue?.trim())))
+    const first = found.find(Boolean)
+    if (!first) continue
+    const cells = found.map((m): MatrixCell | undefined => {
+      if (!m) return undefined
+      const v = m.value !== undefined ? toUnit(key, m.value, m.unit, first.unit) : undefined
+      if (v !== undefined && v !== m.value) {
+        conversions.add(`${first.label}: ${m.unit} to ${first.unit}`)
+        return { text: opOf(m.rawValue) + num6(Number(v.toPrecision(3))), labFlag: m.labFlag, converted: true }
+      }
+      const unitNote = m.value !== undefined && v === undefined && m.unit ? ` ${m.unit}` : ''
+      return { text: printedValue(m) + unitNote, labFlag: m.labFlag, converted: false }
+    })
+    rows.push({ key, label: first.label, unit: first.unit, cells })
+  }
+  return { rows, conversions: [...conversions] }
 }

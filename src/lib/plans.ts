@@ -20,6 +20,9 @@ export const PRO_PLANS: Array<{
 export const PRO_FEATURES = [
   'Import lab results straight from a PDF or photo',
   'Bloods analysis in plain words: causes and what people do',
-  'Doctor-ready CSV and PDF export',
+  'Change since your last test',
+  'Compare two tests side by side',
+  'A doctor-ready report of each test',
+  'PDF and CSV export of your log',
   'Injection reminders (coming soon)',
 ]

@@ -1,12 +1,14 @@
 // One blood test as its own dated report: the header, what was being taken at
 // the draw, every section of markers, then the actions on the test.
 
-import { useState, type ReactNode } from 'react'
-import { Archive, Check, ChevronDown, ChevronRight, FileText, Merge, Pencil, Share2, Syringe, TriangleAlert } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { Archive, ArrowLeftRight, Calculator, Check, ChevronDown, ChevronRight, FileText, Lock, Merge, Pencil, Share2, Stethoscope, Syringe, TriangleAlert } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { db, type LabExam } from '../../lib/db'
 import { SECTION_ABBR, SECTION_ORDER, type LabSection } from '../../lib/markers'
-import { planMerge, type LabTest, type TestMarker } from '../../lib/labTests'
+import { derivedFor, planMerge, type LabTest, type TestMarker } from '../../lib/labTests'
+import { buildFindings, type Finding } from '../../lib/labFindings'
+import { usePlan } from '../../lib/plan'
 import { dayOf, fmtDay } from '../../lib/dates'
 import type { DoseTiming } from '../../lib/protocolAtDraw'
 import { setExamArchived } from '../../lib/archive'
@@ -21,7 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { fixOf, markerRowProps, mergeCandidates, phaseLabel, plural, printedValue, testRowProps, verdictLine } from './feed'
-import { markerHash } from './route'
+import { compareHash, markerHash } from './route'
 
 // ── Header ────────────────────────────────────────────────────────────────
 
@@ -194,7 +196,7 @@ function sectionChip(ms: TestMarker[], isPro: boolean): FeedStatus | undefined {
 const openSections = new Map<string, boolean>()
 
 /** One clinical section of a test, open when anything in it needs a look. */
-export function SectionCard({ section, markers, isPro, onOpen, memoKey }: { section: LabSection; markers: TestMarker[]; isPro: boolean; onOpen: (m: TestMarker) => void; memoKey: string }) {
+export function SectionCard({ section, markers, isPro, onOpen, memoKey, findings = [] }: { section: LabSection; markers: TestMarker[]; isPro: boolean; onOpen: (m: TestMarker) => void; memoKey: string; findings?: Finding[] }) {
   const needsLook = markers.some((m) => (isPro ? m.read === 'act' || m.read === 'watch' : false) || flagged(m))
   const [open, setOpen] = useState(() => openSections.get(memoKey) ?? needsLook)
   const toggle = () => {
@@ -231,7 +233,70 @@ export function SectionCard({ section, markers, isPro, onOpen, memoKey }: { sect
           ))}
         </FeedList>
       )}
+      {open && isPro && findings.length > 0 && <SectionRead findings={findings} />}
     </PanelCard>
+  )
+}
+
+/** Toggle with a chevron, 40px tall, for the read's two disclosures. */
+function Disclosure({ open, onClick, children }: { open: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      className="-mx-2 flex min-h-10 items-center gap-1.5 rounded-md px-2 text-left text-sm font-medium text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+    >
+      {open ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
+      {children}
+    </button>
+  )
+}
+
+/**
+ * Pro: what this section's numbers mean together, from this test alone, then
+ * (collapsed) what people on a protocol usually do. Never in the doctor report.
+ */
+function SectionRead({ findings }: { findings: Finding[] }) {
+  const [open, setOpen] = useState(false)
+  const [practices, setPractices] = useState(false)
+  const all = findings.flatMap((f) => f.practices)
+  return (
+    <div className="mt-2 border-t border-border/60 pt-1">
+      <Disclosure open={open} onClick={() => setOpen(!open)}>Read more</Disclosure>
+      {open && (
+        <div className="flex flex-col gap-3 pb-1 pt-1">
+          {findings.map((f) => (
+            <div key={f.id}>
+              {findings.length > 1 && <p className="eyebrow">{f.label}</p>}
+              <p className="feed-note mt-1 font-medium text-foreground">{f.headline}</p>
+              {f.story && <p className="feed-note mt-1 text-foreground/85">{f.story}</p>}
+              {f.causes.length > 0 && (
+                <>
+                  <p className="eyebrow mt-2.5">Probable causes on a protocol</p>
+                  <ul className="feed-note mt-1 list-disc space-y-1 pl-4 text-foreground/85 marker:text-muted-foreground/60">
+                    {f.causes.map((c, i) => <li key={i}>{c}</li>)}
+                  </ul>
+                </>
+              )}
+            </div>
+          ))}
+          {all.length > 0 && (
+            <div className="rounded-lg border border-border bg-secondary/50 px-3 py-1">
+              <Disclosure open={practices} onClick={() => setPractices(!practices)}>
+                What people on a protocol usually do · not a recommendation
+              </Disclosure>
+              {practices && (
+                <ul className="feed-note mb-2 list-disc space-y-1 pl-4 text-foreground/85 marker:text-muted-foreground/60">
+                  {all.map((p, i) => <li key={i}>{p}</li>)}
+                </ul>
+              )}
+            </div>
+          )}
+          <p className="feed-facts text-muted-foreground">From this test only. A second opinion for your own reading, not medical advice.</p>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -364,6 +429,13 @@ export function TestReport({ test: t, tests, isPro, go, onEdit, onMerge }: {
 }) {
   const undo = useUndoableDelete()
   const { showToast } = useToast()
+  const { openUpgrade } = usePlan()
+  const derived = isPro ? derivedFor(t) : []
+  // The per-section read, fed this test's own results only, so every pairing is same-draw.
+  const findings = useMemo(() => (isPro ? buildFindings(t.markers.map((m) => ({
+    id: m.resultId, examId: t.id, marker: m.printedName, value: m.value, rawValue: m.rawValue, unit: m.unit, low: m.low, high: m.high,
+  })), [t.exam], t.id) : []), [t, isPro])
+  const gate = (feature: string, fn: () => void) => () => (isPro ? fn() : openUpgrade(feature))
   const sections = SECTION_ORDER
     .map((s) => ({ section: s, markers: t.markers.filter((m) => m.section === s) }))
     .filter((s) => s.markers.length > 0)
@@ -372,8 +444,23 @@ export function TestReport({ test: t, tests, isPro, go, onEdit, onMerge }: {
     <div className="flex flex-col gap-4">
       <TestHeader test={t} variant="detail" isPro={isPro} onFix={(w) => (fixOf(w) === 'merge' ? onMerge(t.id) : onEdit(t.id))} />
       <AtTheDraw test={t} />
+      {derived.length > 0 && (
+        <PanelCard>
+          <FeedList>
+            <FeedRow icon={Calculator} title="Calculated from this test" sub="Worked out from values in this same test." facts={derived.map((d) => `${d.label} ${d.value}`)} />
+          </FeedList>
+        </PanelCard>
+      )}
       {sections.map((s) => (
-        <SectionCard key={s.section} memoKey={`${t.id}:${s.section}`} section={s.section} markers={s.markers} isPro={isPro} onOpen={(m) => go(markerHash(m.key, t.id))} />
+        <SectionCard
+          key={s.section}
+          memoKey={`${t.id}:${s.section}`}
+          section={s.section}
+          markers={s.markers}
+          isPro={isPro}
+          findings={findings.filter((f) => f.section === s.section)}
+          onOpen={(m) => go(markerHash(m.key, t.id))}
+        />
       ))}
       <div className="grid gap-2 sm:grid-cols-2">
         {t.exam.sourceFileId !== undefined && (
@@ -386,6 +473,10 @@ export function TestReport({ test: t, tests, isPro, go, onEdit, onMerge }: {
             View original report
           </ActionButton>
         )}
+        {tests.length > 1 && (
+          <ActionButton icon={isPro ? ArrowLeftRight : Lock} onClick={gate('Comparing two tests', () => go(compareHash(t.id)))}>Compare with another test</ActionButton>
+        )}
+        <ActionButton icon={isPro ? Stethoscope : Lock} onClick={gate('The doctor report', () => go(`#report/${t.id}`))}>For your doctor</ActionButton>
         <ActionButton icon={Pencil} onClick={() => onEdit(t.id)}>Edit</ActionButton>
         {mergeCandidates(t, tests).length > 0 && <ActionButton icon={Merge} onClick={() => onMerge(t.id)}>Merge with another report</ActionButton>}
         <ShareTestButton test={t} isPro={isPro} />

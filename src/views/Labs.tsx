@@ -3,9 +3,11 @@
 //   '' / #latest, #tests, #markers      home tabs
 //   #test/<id>                          one test's report
 //   #marker/<key>[/<examId>]            one marker over time
+//   #compare/<newerId>/<olderId>        two tests side by side (Pro)
+//   #report/<id>                        the doctor report (Pro)
 
 import { useEffect, useRef, useState, useSyncExternalStore, type Ref } from 'react'
-import { ChevronLeft, Droplet, FileText, Keyboard, Upload } from 'lucide-react'
+import { ChevronLeft, Droplet, FileText, Keyboard, Lock, Upload } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { useBloodTests } from '../lib/useBloodTests'
@@ -16,6 +18,8 @@ import { Button } from '@/components/ui/button'
 import { BloodsHome } from './bloods/BloodsHome'
 import { MergeDialog, TestReport } from './bloods/TestReport'
 import { MarkerScreen } from './bloods/MarkerScreen'
+import { ComparePage } from './bloods/ComparePage'
+import { DoctorReport } from './bloods/DoctorReport'
 import { valueTitle } from './bloods/feed'
 import { parseBloodsHash, type Route } from './bloods/route'
 
@@ -48,7 +52,7 @@ function BackBar({ ref }: { ref?: Ref<HTMLButtonElement> }) {
       ref={ref}
       aria-label="Back to Bloods"
       variant="ghost"
-      className="-ml-2 h-10 self-start px-2 text-muted-foreground"
+      className="-ml-2 h-10 self-start px-2 text-muted-foreground print:hidden"
       // Deep links (Timeline) have nothing of ours to go back to.
       onClick={() => (window.history.state?.bloods ? window.history.back() : goBloods('#latest', true))}
     >
@@ -87,6 +91,17 @@ function Empty({ isPro, onImport, onManual }: { isPro: boolean; onImport: () => 
   )
 }
 
+function ProOnly({ feature, line }: { feature: string; line: string }) {
+  const { openUpgrade } = usePlan()
+  return (
+    <PanelCard>
+      <FeedList>
+        <FeedRow icon={Lock} title={`${feature} is part of Pro`} sub={line} onClick={() => openUpgrade(feature)} />
+      </FeedList>
+    </PanelCard>
+  )
+}
+
 export function Labs({ onImport, onManual, onReviewFile, onEdit, onReviewRead }: {
   onImport: () => void
   onManual: () => void
@@ -103,7 +118,10 @@ export function Labs({ onImport, onManual, onReviewFile, onEdit, onReviewRead }:
   // A parsed report that was never imported (the review sheet was closed).
   const pending = useLiveQuery(() => db.files.filter((f) => f.status === 'Needs review' && !!f.extractedText && !f.archivedAt && !f.deletedAtSync).first(), [])
 
-  const screen = route.kind === 'home' ? route.tab : route.kind === 'test' ? `t${route.id}` : `m${route.key}`
+  const screen = route.kind === 'home' ? route.tab
+    : route.kind === 'test' ? `t${route.id}`
+      : route.kind === 'marker' ? `m${route.key}`
+        : route.kind === 'report' ? `r${route.id}` : 'compare'
   const loading = tests === undefined
   const backRef = useRef<HTMLButtonElement>(null)
   // Pushed screens open at the top, with focus on Back so a screen reader lands on the new screen.
@@ -146,6 +164,12 @@ export function Labs({ onImport, onManual, onReviewFile, onEdit, onReviewRead }:
         ? <TestReport key={test.id} test={test} tests={tests} isPro={isPro} go={go} onEdit={onEdit} onMerge={setMergeId} />
         : <PanelCard><p className="feed-note text-muted-foreground">This test is not on file. It may have been archived.</p></PanelCard>)}
       {route.kind === 'marker' && <MarkerScreen key={route.key} markerKey={route.key} focusExamId={route.examId} tests={tests} isPro={isPro} go={go} onEdit={onEdit} />}
+      {route.kind === 'compare' && (isPro
+        ? (tests.length ? <ComparePage tests={tests} newerId={route.newerId} olderId={route.olderId} go={go} /> : null)
+        : <ProOnly feature="Comparing two tests" line="Pro puts two tests side by side, every marker in one unit, with what changed." />)}
+      {route.kind === 'report' && (isPro
+        ? <DoctorReport tests={tests} examId={route.id} go={go} />
+        : <ProOnly feature="The doctor report" line="Pro turns a test into a clean report for your doctor, as a PDF or a CSV." />)}
       {merge}
     </div>
   )

@@ -29,7 +29,7 @@ export function InstallPrompt() {
 
   return (
     <div
-      className="fixed inset-x-3 bottom-[calc(70px+env(safe-area-inset-bottom))] z-40 flex items-center gap-3 rounded-xl border bg-card p-3.5 shadow-lg md:left-auto md:right-6 md:max-w-sm"
+      className="install-prompt fixed inset-x-3 bottom-[calc(70px+env(safe-area-inset-bottom))] z-40 flex items-center gap-3 rounded-xl border bg-card p-3.5 shadow-lg md:left-auto md:right-6 md:max-w-sm"
       role="region"
       aria-label="Install Magno"
     >

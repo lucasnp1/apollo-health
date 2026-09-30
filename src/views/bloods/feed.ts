@@ -9,7 +9,7 @@ import {
 import type { FeedFact, FeedStatus, FeedTone } from '../../components/FeedList'
 import { RangeBar } from '../../components/RangeBar'
 import type { LabSection } from '../../lib/markers'
-import type { LabTest, TestMarker } from '../../lib/labTests'
+import { printedValue, type LabTest, type TestMarker } from '../../lib/labTests'
 import { fmtRange, retestLine } from '../../lib/labRules'
 import { daysBetween, fmtDay } from '../../lib/dates'
 
@@ -28,13 +28,7 @@ export const SECTION_ICON: Record<LabSection, LucideIcon> = {
   Other: FlaskConical,
 }
 
-const num = (v: number) => String(Number(v.toPrecision(6)))
-
-/** The lab's printed value, without the range or notes some PDFs glue on. */
-export function printedValue(m: Pick<TestMarker, 'rawValue' | 'value'>): string {
-  const raw = m.rawValue?.replace(/\s*[[(][0-9].*$/, '').replace(/\s*;.*$/, '').trim()
-  return raw || (m.value !== undefined ? num(m.value) : '')
-}
+export { printedValue }
 
 /** "Hematocrit 51.2 % H": label, the value in mono, then the lab's H or L. */
 export function valueTitle(label: string, value: string, unit: string, flag?: TestMarker['labFlag'], mutedTag = false): ReactNode {

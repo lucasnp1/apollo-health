@@ -36,3 +36,71 @@
   .print-table tr:nth-child(even) td { background: #fafafa; }
   .print-footer { margin-top: 24pt; font-size: 8pt; color: #888; border-top: 1px solid #ddd; padding-top: 8pt; }
 }
+
+/* ── Bloods doctor report (#report/<id>) ─────────────────────────────────
+   One light, clinical document. On screen it is a white sheet under the
+   controls; in print it is the only thing on the page. The Bloods report
+   screen sets html.bloods-report-page while it is open. */
+
+.doctor-report {
+  --dr-ink: #111;
+  --dr-muted: #555;
+  --dr-rule: #d4d4d4;
+  --dr-red: #b91c1c;
+  color-scheme: light;
+  background: #fff;
+  color: var(--dr-ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  border-radius: 12px;
+  padding: 20px 16px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+}
+.doctor-report h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+.doctor-report h2 { margin: 20px 0 6px; font-size: 14px; font-weight: 700; border-bottom: 1.5px solid var(--dr-ink); padding-bottom: 3px; }
+.doctor-report h3 { margin: 12px 0 4px; font-size: 12.5px; font-weight: 700; }
+.doctor-report p { margin: 4px 0; }
+.doctor-report .dr-head { border-bottom: 2px solid var(--dr-ink); padding-bottom: 10px; }
+.doctor-report .dr-patient { font-size: 13px; font-weight: 600; }
+.doctor-report .dr-muted { color: var(--dr-muted); font-weight: 400; }
+.doctor-report .dr-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.doctor-report table { width: 100%; border-collapse: collapse; }
+.doctor-report .dr-table { min-width: 520px; font-size: 12px; }
+.doctor-report .dr-table th { text-align: left; font-weight: 600; font-size: 12px; color: var(--dr-muted); padding: 4px 6px; border-bottom: 1px solid var(--dr-ink); vertical-align: bottom; }
+.doctor-report .dr-table td { padding: 4px 6px; border-bottom: 1px solid var(--dr-rule); vertical-align: top; }
+.doctor-report .dr-facts th { text-align: left; font-weight: 600; width: 96px; padding: 3px 8px 3px 0; vertical-align: top; }
+.doctor-report .dr-facts td { padding: 3px 0; }
+.doctor-report .dr-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.doctor-report .dr-flag { color: var(--dr-red); font-weight: 700; }
+.doctor-report .dr-section { break-inside: avoid; }
+.doctor-report .dr-footer { margin-top: 18px; padding-top: 6px; border-top: 1px solid var(--dr-rule); color: var(--dr-muted); font-size: 12px; }
+.doctor-report .dr-page + .dr-page { margin-top: 28px; padding-top: 4px; border-top: 1px dashed var(--dr-rule); }
+.doctor-report .dr-id { margin: 0 0 8px; color: var(--dr-muted); }
+
+@media print {
+  /* White margins too: Chrome paints them from the dark root's color-scheme. */
+  @page {
+    margin: 14mm 12mm;
+    background: #fff;
+    /* Best-effort running footer: Chrome 131+ fills margin boxes, WebKit ignores them.
+       --dr-id is set on <html> by the report screen; the page context inherits from the root. */
+    @bottom-left { content: var(--dr-id, ''); font: 7.5pt -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #555; }
+    @bottom-right { content: 'Page ' counter(page) ' of ' counter(pages); font: 7.5pt -apple-system, 'Helvetica Neue', Arial, sans-serif; color: #555; }
+  }
+  html.bloods-report-page, html.bloods-report-page body, html.bloods-report-page #root > div { background: #fff !important; color: #000 !important; }
+  html.bloods-report-page main > header,
+  html.bloods-report-page .install-prompt { display: none !important; }
+  html.bloods-report-page main > div { padding: 0 !important; max-width: none !important; }
+
+  .doctor-report { border-radius: 0; padding: 0; box-shadow: none; font-size: 9.5pt; }
+  .doctor-report h1 { font-size: 16pt; }
+  .doctor-report h2 { font-size: 11pt; break-after: avoid; }
+  .doctor-report h3 { font-size: 10pt; break-after: avoid; }
+  .doctor-report .dr-scroll { overflow: visible; }
+  .doctor-report .dr-table { min-width: 0; font-size: 9pt; }
+  .doctor-report .dr-table th { font-size: 8.5pt; }
+  .doctor-report tr { break-inside: avoid; }
+  .doctor-report .dr-flag { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .doctor-report .dr-page + .dr-page { break-before: page; margin-top: 0; padding-top: 0; border-top: 0; }
+}

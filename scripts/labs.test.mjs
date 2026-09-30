@@ -5,8 +5,8 @@ import { homaIr, toUnit } from '../src/lib/labUnits.ts'
 import { canonicalize } from '../src/lib/markers.ts'
 import { changeOf, fmtRange, labFlag, readMarker } from '../src/lib/labRules.ts'
 import { protocolAtDraw } from '../src/lib/protocolAtDraw.ts'
-import { markerHash, parseBloodsHash } from '../src/views/bloods/route.ts'
-import { buildTests, canonicalKey, changesFor, derivedFor, detectProvider, fillEmpty, findSameDraw, markerSeries, notInTest, parseEntry, parseRange, planMerge, splitNewRows, testTitle } from '../src/lib/labTests.ts'
+import { compareHash, markerHash, parseBloodsHash } from '../src/views/bloods/route.ts'
+import { buildTests, canonicalKey, changesFor, compareTests, defaultOlder, derivedFor, earlierTests, keyMarkerMatrix, prevText, previousTest, detectProvider, fillEmpty, findSameDraw, markerSeries, notInTest, parseEntry, parseRange, planMerge, splitNewRows, testTitle } from '../src/lib/labTests.ts'
 
 let n = 0
 const check = (name, fn) => { fn(); n++; console.log('  ok', name) }
@@ -513,6 +513,90 @@ check('a merge fills only the empty fields of the destination', () => {
   )
   assert.deepEqual(fill, { notes: 'hard week', sourceFileId: 7, meta: { dateSource: 'report', drawTime: '08:40', fasted: true } })
   assert.deepEqual(fillEmpty({ id: 2, name: 'x', collectedAt: 'x', company: 'A' }, { company: 'B' }), {})
+})
+
+// ── Step 8 and 9: compare and the doctor report ─────────────────────────────
+
+check('compare and report routes parse', () => {
+  assert.deepEqual(parseBloodsHash(compareHash(11, 9)), { kind: 'compare', newerId: 11, olderId: 9 })
+  assert.deepEqual(parseBloodsHash('#compare/11'), { kind: 'compare', newerId: 11, olderId: undefined })
+  assert.deepEqual(parseBloodsHash('#report/11'), { kind: 'report', id: 11 })
+  assert.deepEqual(parseBloodsHash('#report/x'), { kind: 'home', tab: 'latest' })
+})
+
+check('compare defaults: previous is a strictly earlier day, older shares the most markers', () => {
+  const t11 = byId(11)
+  assert.equal(previousTest(tests, t11).id, 9) // Jun 18 (9 and 10 share the day; 9 has more results)
+  assert.ok(earlierTests(tests, byId(9)).every((o) => o.date.slice(0, 10) < '2026-06-18'))
+  // 9 and 1 both share three markers with 11; the nearer one wins.
+  assert.equal(defaultOlder(tests, t11).id, 9)
+  // The oldest test has nothing earlier and falls back to another test.
+  assert.ok(defaultOlder(tests, byId(1)))
+})
+
+check('compare converts into the newer unit and applies R6', () => {
+  const c = compareTests(byId(11), byId(9))
+  const row = (k) => c.sections.flatMap((s) => s.rows).find((r) => r.key === k)
+  assert.equal(row('hematocrit').change.text, '▲ 2.2 pts')
+  assert.equal(row('hematocrit').change.meaningful, true)
+  assert.equal(row('total_testosterone').change.text, 'same') // 17% is under the 20% bar
+  assert.equal(row('estradiol').change.text, '▲ 20%')
+  assert.equal(c.gapDays, 10)
+  assert.deepEqual(c.onlyOlder.map((m) => m.key).sort(), ['insulin', 'psa'])
+  assert.equal(c.both + c.onlyNewer.length, byId(11).counts.total)
+  // % into L/L, with the printed value kept for the second line.
+  const d = compareTests(byId(11), byId(1))
+  const hct = d.sections.flatMap((s) => s.rows).find((r) => r.key === 'hematocrit')
+  assert.equal(hct.olderValue, 0.44)
+  assert.equal(hct.olderConverted, true)
+  // No conversion: no value and no change, just "different unit".
+  const e = compareTests(byId(11), byId(2))
+  const hgb = e.sections.flatMap((s) => s.rows).find((r) => r.key === 'hemoglobin')
+  assert.equal(hgb.olderValue, undefined)
+  assert.equal(hgb.change.text, 'different unit')
+  assert.equal(hgb.change.meaningful, false)
+  // Sections follow the clinical order.
+  assert.deepEqual(c.sections.map((s) => s.section), ['Hormones', 'Full blood count'])
+})
+
+check('the key-marker matrix converts into the first column unit and lists each conversion once', () => {
+  const m = keyMarkerMatrix([byId(11), byId(9), byId(1)])
+  const hct = m.rows.find((r) => r.key === 'hematocrit')
+  assert.equal(hct.unit, 'L/L')
+  assert.deepEqual(hct.cells.map((c) => c && [c.text, c.labFlag, c.converted]), [['0.512', 'high', false], ['0.49', 'in', false], ['0.44', 'in', true]])
+  assert.deepEqual(m.conversions, ['Hematocrit: % to L/L'])
+  assert.equal(m.rows[0].key, 'total_testosterone')
+  // Never a calculated ratio or a marker outside the key list.
+  assert.ok(m.rows.every((r) => !/ratio|homa|insulin|platelets/i.test(r.key)))
+  // A row only when some column has the marker; an empty cell where a test lacks it.
+  assert.ok(!m.rows.some((r) => r.key === 'egfr'))
+  const psa = m.rows.find((r) => r.key === 'psa')
+  assert.equal(psa.cells[0], undefined)
+  assert.equal(psa.cells[1].text, '1')
+})
+
+check('a < or > limit is not a value: no change from it, and the lab\'s sign is kept', () => {
+  const two = (marker, unit, olderRaw, newerRaw) => buildTests({
+    exams: [{ id: 1, name: 'A', collectedAt: '2026-01-10', meta: { dateSource: 'user' } }, { id: 2, name: 'B', collectedAt: '2026-06-10', meta: { dateSource: 'user' } }],
+    results: [[1, olderRaw], [2, newerRaw]].map(([examId, raw], i) => ({ id: i + 1, examId, marker, unit, rawValue: raw, value: parseEntry(raw).value })),
+    files: [], targets: [], compounds: [], injections: [],
+  })
+  const [vd] = two('Vitamin D', 'nmol/L', '<37', '80')
+  assert.equal(vd.markers[0].change, undefined)
+  assert.equal(vd.markers[0].prev.raw, '<37')
+  assert.equal(prevText(vd.markers[0].prev), '<37')
+  const [psa] = two('PSA', 'ug/L', '<0.1', '<0.1')
+  assert.equal(prevText(psa.markers[0].prev), '<0.1')
+  assert.equal(psa.markers[0].change, undefined)
+  const [n, o] = two('eGFR', 'mL/min/1.73m2', '62', '>90')
+  const row = compareTests(n, o).sections[0].rows[0]
+  assert.equal(row.change.meaningful, false)
+  assert.equal(row.change.text, 'not comparable')
+})
+
+check('a legacy import stamp is a draw date not confirmed', () => {
+  const [t] = buildTests({ exams: [{ id: 1, name: 'SCT001-01187340_LabReport_28-May-2026-0413', labName: 'PDF import', collectedAt: '2026-05-30T19:59:28.724Z' }], results: [], files: [], targets: [], compounds: [], injections: [] })
+  assert.ok(t.needsCheck.includes('Draw date not confirmed'))
 })
 
 console.log(`\n${n} checks passed`)

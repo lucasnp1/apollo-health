@@ -16,6 +16,7 @@ import { LegalLink } from '../components/LegalLink'
 import { RecoveryCodesList } from '../components/RecoveryCodes'
 import { usePlan } from '../lib/plan'
 import { unitLabel } from '../lib/dose'
+import { fmtDay } from '../lib/dates'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -794,7 +795,7 @@ function PrintReport({
             <tbody>
               {exams.slice(0, 10).map((e) => (
                 <tr key={e.id}>
-                  <td>{e.collectedAt ? format(parseISO(e.collectedAt), 'MMM d, yyyy') : '—'}</td>
+                  <td>{fmtDay(e.collectedAt) || '—'}</td>
                   <td>{e.name}</td>
                   <td>{e.labName ?? '—'}</td>
                 </tr>
