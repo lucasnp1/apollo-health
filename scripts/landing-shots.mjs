@@ -85,10 +85,11 @@ const seeded = await page.evaluate(async () => {
     await add('injections', { compoundId: cid['BPC-157'], takenAt: at(day, 21, 30), dose: 250, unit: 'mcg', route: 'SubQ', site: day % 2 ? 'Abdomen L' : 'Abdomen R', rawDose: '250 mcg', notes: day === 0 ? 'Day 12. Elbow feels better on the press.' : undefined, ...sync() })
   }
 
-  // Blood pressure every other day, 6 weeks, mostly at rest.
+  // Blood pressure every other day, 6 weeks, creeping up while weight falls,
+  // so Home rules weight out and points at the hematocrit instead.
   const bpNotes = { 0: 'At rest, before coffee.', 6: 'Logged right after squats, so retake tomorrow at rest.' }
   for (let day = 0; day < 42; day += 2) {
-    const drift = day / 42 * 6
+    const drift = (42 - day) / 42 * 14
     const bump = day === 6 ? 8 : 0
     const sys = Math.round(122 + drift + bump + Math.sin(day * 1.3) * 4)
     const dia = Math.round(76 + drift / 2 + bump / 2 + Math.cos(day * 0.9) * 3)
@@ -209,10 +210,10 @@ const scrollToCard = async (locator, fallback) => {
 await scrollToCard(page.locator('h3, h2, p', { hasText: /^Active levels$/ }).first(), 620)
 await shot('levels')
 
-// 2b. Wellbeing (home, the "What keeps coming up" card; the headache line opened)
-await scrollToCard(page.locator('h3', { hasText: /^What keeps coming up$/ }).first(), 700)
-const headache = page.locator('button[aria-expanded]', { hasText: /^Headache/ }).first()
-if (await headache.count()) { await headache.click(); await page.waitForTimeout(400) }
+// 2b. What needs a look (home; the blood pressure line opened)
+await scrollToCard(page.locator('h3', { hasText: /^What needs a look$/ }).first(), 700)
+const bpRow = page.locator('button[aria-expanded]', { hasText: /^Blood pressure/ }).first()
+if (await bpRow.count()) { await bpRow.click(); await page.waitForTimeout(400) }
 await shot('wellbeing')
 
 // 3. Log a shot

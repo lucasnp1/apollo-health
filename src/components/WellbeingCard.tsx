@@ -37,7 +37,7 @@ function ratingsOf(s: Symptom, defs: SymptomDef[]) {
 
 const RECENT_STEP = 3
 
-// The summary of what keeps coming up lives in WellbeingSummaryCard, higher
+// The summary of what stands out lives in HomeInsightsCard, higher
 // on Home; this card is the trend, the check-ins and the check-in form.
 export function WellbeingCard({ symptoms }: { symptoms: Symptom[] }) {
   const [range, setRange] = useState<TimeRange>('3M')

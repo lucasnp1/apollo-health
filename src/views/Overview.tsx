@@ -15,8 +15,7 @@ const BpTrendCard = lazy(() => import('../components/BpTrendCard').then((m) => (
 // app-shell critical path (see project_apollo_perf).
 const WeightTrendCard = lazy(() => import('../components/WeightTrendCard').then((m) => ({ default: m.WeightTrendCard })))
 const WellbeingCard = lazy(() => import('../components/WellbeingCard').then((m) => ({ default: m.WellbeingCard })))
-const WellbeingSummaryCard = lazy(() => import('../components/WellbeingSummaryCard').then((m) => ({ default: m.WellbeingSummaryCard })))
-const BleedNudgeCard = lazy(() => import('../components/BleedNudgeCard').then((m) => ({ default: m.BleedNudgeCard })))
+const HomeInsightsCard = lazy(() => import('../components/HomeInsightsCard').then((m) => ({ default: m.HomeInsightsCard })))
 
 const DAY = 86_400_000
 
@@ -224,15 +223,10 @@ export function Overview({
         </MiniStat>
       </div>
 
-      {/* What keeps coming up: the one interpreting layer, so it comes right
+      {/* What needs a look: the one interpreting layer, so it comes right
           after the at-a-glance tiles and before the detail charts. */}
       <Suspense fallback={null}>
-        <WellbeingSummaryCard symptoms={symptoms} vitals={vitals} injections={injections} compounds={compounds} />
-      </Suspense>
-
-      {/* Blood-letting: only when hematocrit is high or a bleed awaits its retest. */}
-      <Suspense fallback={null}>
-        <BleedNudgeCard onOpen={() => onNavigate('labs')} />
+        <HomeInsightsCard symptoms={symptoms} vitals={vitals} injections={injections} compounds={compounds} bodyMetrics={bodyMetrics} onNavigate={onNavigate} />
       </Suspense>
 
       {/* Drug levels through time */}
