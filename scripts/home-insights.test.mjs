@@ -15,7 +15,8 @@ const bp = (d, s, di) => ({ measuredAt: ago(d), systolic: s, diastolic: di })
     e2: { pgml: 44, date: '2026-10-01' },
     dose: { recent: 450, before: 300 },
   }, NOW)
-  assert.equal(i.title, 'Blood pressure up 10 points to 139/87')
+  assert.equal(i.title, 'Up 10 points to 139/87')
+  assert.equal(i.area, 'Blood pressure')
   assert.equal(i.tone, 'warn')
   assert.equal(i.sub, 'Lines up with weight, hematocrit, estradiol and dose')
   assert.deepEqual(i.signals.map((x) => `${x.label} ${x.value}`), ['Your average 139/87', 'Weight +2 kg', 'Hematocrit 56%', 'Estradiol 44 pg/mL', 'Testosterone dose +50%'])
@@ -26,7 +27,7 @@ const bp = (d, s, di) => ({ measuredAt: ago(d), systolic: s, diastolic: di })
 {
   const i = bpInsight({ vitals: [bp(1, 150, 96), bp(3, 148, 95)], weights: [{ at: ago(1), kg: 80 }, { at: ago(30), kg: 83 }] }, NOW)
   assert.equal(i.tone, 'bad')
-  assert.equal(i.title, 'Blood pressure averaging 149/96')
+  assert.equal(i.title, 'Averaging 149/96')
   assert.equal(i.sub, 'Not weight, and nothing else in your logs yet')
   assert.deepEqual([i.signals[1].value, i.signals[1].tone], ['−3 kg', 'good'])
 }

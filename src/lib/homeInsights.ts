@@ -26,6 +26,8 @@ export type HomeInsight = {
   id: string
   kind: 'bloods' | 'bp' | 'bleed' | 'symptoms' | 'stale'
   tone: Tone
+  /** What part of you it is about, shown above the title: "Blood pressure", "Blood health". */
+  area: string
   title: string
   /** One plain line: what it lines up with, or where the number came from. */
   sub: string
@@ -130,7 +132,9 @@ export function bpInsight(input: BpInput, now: number): HomeInsight | undefined 
     id: 'bp',
     kind: 'bp',
     tone: veryHigh ? 'bad' : 'warn',
-    title: base && rise >= 6 ? `Blood pressure up ${rise} points to ${sys}/${dia}` : `Blood pressure averaging ${sys}/${dia}`,
+    area: 'Blood pressure',
+    // The area line above says "Blood pressure", so the title starts with the number.
+    title: base && rise >= 6 ? `Up ${rise} points to ${sys}/${dia}` : `Averaging ${sys}/${dia}`,
     sub,
     chip: veryHigh ? 'High' : 'Watch',
     signalsTitle: 'What lines up',
@@ -162,6 +166,7 @@ export function labInsight(f: Finding, test: { id: number; date: string }, bleed
     id: `lab-${f.id}`,
     kind: 'bloods',
     tone: f.status === 'bad' ? 'bad' : 'warn',
+    area: f.label,
     title: f.headline,
     sub: `${off.slice(0, 2).map((m) => `${m.label} ${m.display}`).join(', ')} · ${day(test.date, today)} test`,
     chip: f.status === 'bad' ? 'Act' : 'Watch',
@@ -192,7 +197,7 @@ export function labInsight(f: Finding, test: { id: number; date: string }, bleed
 /** A bleed waiting on its retest, or high hematocrit with none logged (when no bloods row says it). */
 export function bleedInsight(n: BleedNudge | undefined): HomeInsight | undefined {
   if (!n) return undefined
-  return { id: 'bleed', kind: 'bleed', tone: n.tone, title: n.title, sub: n.sub, chip: n.tone === 'warn' ? 'High' : 'Retest', signals: [], logBleed: n.tone === 'warn' }
+  return { id: 'bleed', kind: 'bleed', tone: n.tone, area: 'Blood-letting', title: n.title, sub: n.sub, chip: n.tone === 'warn' ? 'High' : 'Retest', signals: [], logBleed: n.tone === 'warn' }
 }
 
 /** The newest test is too old to say much about now. */
@@ -201,7 +206,7 @@ export function staleInsight(test: { id: number; date: string }, today: string):
   if (days <= 180) return undefined
   const months = Math.round(days / 30)
   return {
-    id: 'stale', kind: 'stale', tone: 'warn', chip: 'Due',
+    id: 'stale', kind: 'stale', tone: 'warn', area: 'Bloods', chip: 'Due',
     title: `Your last blood test was ${months} months ago`,
     sub: `${fmtDay(test.date)} · on a protocol people test every 3 to 6 months`,
     signals: [], testId: test.id,
@@ -220,6 +225,7 @@ export function symptomInsight(s: WellbeingSummary): HomeInsight | undefined {
     id: 'symptoms',
     kind: 'symptoms',
     tone: severe ? 'bad' : mild ? 'neutral' : 'warn',
+    area: 'Check-ins',
     title: shown,
     sub: `${mild ? 'All mild' : 'Some strong'} · ${s.checkIns} check-in${s.checkIns === 1 ? '' : 's'} in 30 days`,
     chip: severe ? 'Strong' : mild ? 'Mild' : 'Pattern',

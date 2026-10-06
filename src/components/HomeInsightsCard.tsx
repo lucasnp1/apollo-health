@@ -4,7 +4,7 @@
 // row at the end unless they are strong. The rules live in lib/homeInsights.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Brain, CalendarClock, Droplets, FlaskConical, HeartPulse, Lock, type LucideIcon } from 'lucide-react'
+import { ChevronRight, Droplets, Lock } from 'lucide-react'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '../lib/db'
 import { useBloodTests } from '../lib/useBloodTests'
 import { usePlan } from '../lib/plan'
@@ -20,13 +20,12 @@ import { useBleeds } from '../views/bloods/bleedFeed'
 import { PhlebotomyDialog } from '../views/bloods/Bleeds'
 import type { View } from '../app/views'
 import { ChartCard } from './dashboard/ChartCard'
-import { FeedChip, FeedList, FeedRow } from './FeedList'
+import { FeedChip } from './FeedList'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogBar, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 const STEP = 4
-const KIND_ICON: Record<HomeInsight['kind'], LucideIcon> = { bloods: FlaskConical, bp: HeartPulse, bleed: Droplets, stale: CalendarClock, symptoms: Brain }
 
 export function HomeInsightsCard({ symptoms, vitals, injections, compounds, bodyMetrics, onNavigate }: {
   symptoms: Symptom[]
@@ -75,7 +74,7 @@ export function HomeInsightsCard({ symptoms, vitals, injections, compounds, body
         const flagged = latest.markers.filter((m) => m.labFlag === 'high' || m.labFlag === 'low')
         if (flagged.length) {
           out.push({
-            id: 'lab-free', kind: 'bloods', tone: 'warn', chip: 'Pro',
+            id: 'lab-free', kind: 'bloods', tone: 'warn', area: 'Bloods', chip: 'Pro',
             title: `${flagged.length} result${flagged.length === 1 ? '' : 's'} outside the lab range`,
             sub: `${flagged.slice(0, 2).map((m) => `${m.label} ${m.rawValue || m.value}${m.unit ? ` ${m.unit}` : ''}`).join(', ')} · ${fmtDay(latest.date)} test`,
             signals: [],
@@ -130,21 +129,29 @@ export function HomeInsightsCard({ symptoms, vitals, injections, compounds, body
   const list = all ? insights : insights.slice(0, STEP)
   const current = insights.find((x) => x.id === openId)
   return (
-    <ChartCard title="What needs a look" subtitle={countLine(insights)}>
-      <FeedList className="-mt-1">
+    <ChartCard title="What needs a look" subtitle={countLine(insights)} className="px-4 py-5 sm:p-6">
+      {/* No icon column: the tag carries the tone, so the title gets the full width. */}
+      <ul className="-mt-1 divide-y divide-border/70">
         {list.map((ins) => (
-          <FeedRow
-            key={ins.id}
-            className="py-3.5"
-            icon={ins.id === 'lab-free' ? Lock : ins.icon ?? KIND_ICON[ins.kind]}
-            iconTone={ins.tone === 'neutral' ? 'neutral' : ins.tone}
-            title={ins.title}
-            sub={ins.sub}
-            status={{ label: ins.chip, tone: ins.tone === 'neutral' ? 'neutral' : ins.tone }}
-            onClick={() => (ins.id === 'lab-free' ? openUpgrade('Bloods read') : setOpenId(ins.id))}
-          />
+          <li key={ins.id}>
+            <button
+              type="button"
+              onClick={() => (ins.id === 'lab-free' ? openUpgrade('Bloods read') : setOpenId(ins.id))}
+              className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="flex min-w-0 items-center gap-2">
+                  <FeedChip status={{ label: ins.chip, tone: ins.tone === 'neutral' ? 'neutral' : ins.tone, icon: ins.id === 'lab-free' ? Lock : undefined }} className="shrink-0" />
+                  <span className="truncate text-[13px] text-muted-foreground">{ins.area}</span>
+                </span>
+                <span className="mt-2 block text-base font-semibold leading-snug tracking-[-0.005em] text-pretty">{ins.title}</span>
+                <span className="mt-1 block text-sm leading-snug text-muted-foreground text-pretty">{ins.sub}</span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" aria-hidden="true" />
+            </button>
+          </li>
         ))}
-      </FeedList>
+      </ul>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <p className="text-[13px] leading-snug text-muted-foreground">Read together from your bloods, pressure, weight and check-ins. Not medical advice.</p>
         {insights.length > STEP && (
@@ -185,7 +192,10 @@ function InsightSheet({ insight: i, onClose, onOpenTest, onLogBleed }: {
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent sheet className="sm:max-w-lg">
         <DialogHeader className="gap-2">
-          <FeedChip status={{ label: i.chip, tone: i.tone === 'neutral' ? 'neutral' : i.tone }} className="self-start" />
+          <span className="flex min-w-0 items-center gap-2">
+            <FeedChip status={{ label: i.chip, tone: i.tone === 'neutral' ? 'neutral' : i.tone }} className="shrink-0" />
+            <span className="truncate text-[13px] text-muted-foreground">{i.area}</span>
+          </span>
           <DialogTitle className="text-[22px]">{i.title}</DialogTitle>
           <DialogDescription>{i.sub}</DialogDescription>
         </DialogHeader>
