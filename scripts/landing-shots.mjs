@@ -210,11 +210,12 @@ const scrollToCard = async (locator, fallback) => {
 await scrollToCard(page.locator('h3, h2, p', { hasText: /^Active levels$/ }).first(), 620)
 await shot('levels')
 
-// 2b. What needs a look (home; the blood pressure line opened)
+// 2b. What needs a look (home; the blood pressure row's detail sheet open)
 await scrollToCard(page.locator('h3', { hasText: /^What needs a look$/ }).first(), 700)
-const bpRow = page.locator('button[aria-expanded]', { hasText: /^Blood pressure/ }).first()
-if (await bpRow.count()) { await bpRow.click(); await page.waitForTimeout(400) }
+const bpRow = page.locator('button', { hasText: /^Blood pressure (up|averaging)/ }).first()
+if (await bpRow.count()) { await bpRow.click(); await page.waitForTimeout(500) }
 await shot('wellbeing')
+await page.keyboard.press('Escape')
 
 // 3. Log a shot
 await home()

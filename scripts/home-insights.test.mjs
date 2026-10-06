@@ -1,6 +1,6 @@
 // Home "What needs a look" self-check. Run: node scripts/home-insights.test.mjs
 import assert from 'node:assert/strict'
-import { bpInsight, doseChange, labInsight, rankInsights, staleInsight, symptomInsight } from '../src/lib/homeInsights.ts'
+import { bpInsight, countLine, doseChange, labInsight, rankInsights, staleInsight, symptomInsight } from '../src/lib/homeInsights.ts'
 
 const NOW = Date.parse('2026-10-06T12:00:00Z')
 const ago = (d) => new Date(NOW - d * 86_400_000).toISOString()
@@ -17,18 +17,18 @@ const bp = (d, s, di) => ({ measuredAt: ago(d), systolic: s, diastolic: di })
   }, NOW)
   assert.equal(i.title, 'Blood pressure up 10 points to 139/87')
   assert.equal(i.tone, 'warn')
-  assert.match(i.why[0], /Weight is up 2 kg/)
-  assert.ok(i.why.some((w) => /Hematocrit was 56%/.test(w)))
-  assert.ok(i.why.some((w) => /Estradiol was 44/.test(w)))
-  assert.ok(i.why.some((w) => /50% more testosterone/.test(w)))
-  assert.deepEqual(i.facts.map((f) => f.text), ['139/87 average', 'was 129/80', 'Weight +2 kg', 'HCT 56%', 'E2 44 pg/mL', 'Dose +50%'])
+  assert.equal(i.sub, 'Lines up with weight, hematocrit, estradiol and dose')
+  assert.deepEqual(i.signals.map((x) => `${x.label} ${x.value}`), ['Your average 139/87', 'Weight +2 kg', 'Hematocrit 56%', 'Estradiol 44 pg/mL', 'Testosterone dose +50%'])
+  assert.match(i.signals[0].text, /against 129\/80/)
+  assert.match(i.signals[4].text, /450 mg in the last three weeks against 300 mg/)
 }
 // High with weight down: weight is ruled out, not blamed.
 {
   const i = bpInsight({ vitals: [bp(1, 150, 96), bp(3, 148, 95)], weights: [{ at: ago(1), kg: 80 }, { at: ago(30), kg: 83 }] }, NOW)
   assert.equal(i.tone, 'bad')
   assert.equal(i.title, 'Blood pressure averaging 149/96')
-  assert.match(i.why[0], /down 3 kg.*not what pushed it up/)
+  assert.equal(i.sub, 'Not weight, and nothing else in your logs yet')
+  assert.deepEqual([i.signals[1].value, i.signals[1].tone], ['−3 kg', 'good'])
 }
 // Normal and steady: nothing to say. One reading: nothing either.
 assert.equal(bpInsight({ vitals: [bp(1, 122, 78), bp(3, 124, 79), bp(30, 121, 78), bp(40, 123, 77)], weights: [] }, NOW), undefined)
@@ -48,11 +48,14 @@ assert.equal(bpInsight({ vitals: [bp(1, 160, 100)], weights: [] }, NOW), undefin
   const test = { id: 7, date: '2026-10-01' }
   const none = labInsight(f, test, [], '2026-10-06')
   assert.equal(none.logBleed, true)
-  assert.deepEqual(none.facts, [{ text: 'HCT 56%', tone: 'bad' }])
+  assert.equal(none.sub, 'HCT 56% · Oct 1 test')
+  assert.equal(none.summary, 'Hematocrit is 56%.')
+  assert.deepEqual(none.signals.map((x) => x.tone), ['bad', 'good'])
   const bled = labInsight(f, test, [{ performedAt: '2026-10-04', kind: 'therapeutic', volumeMl: 500 }], '2026-10-06')
   assert.equal(bled.chip, 'Retest')
   assert.equal(bled.logBleed, undefined)
-  assert.match(bled.why[1], /retest around Nov 1, 2026/)
+  assert.equal(bled.sub, 'Venesection Oct 4 · retest around Nov 1')
+  assert.equal(bled.signals[2].text, 'Logged after this test. A retest around Nov 1 shows what it did.')
 }
 
 assert.equal(staleInsight({ id: 1, date: '2026-01-01' }, '2026-10-06').title, 'Your last blood test was 9 months ago')
@@ -66,8 +69,9 @@ assert.equal(staleInsight({ id: 1, date: '2026-08-01' }, '2026-10-06'), undefine
   ] })
   assert.equal(s.title, 'Headache, acne and bloating')
   assert.equal(s.tone, 'neutral')
-  assert.equal(s.sub, 'All mild · last 30 days · 5 check-ins')
-  assert.equal(s.why[0], 'Headache: twice this month, mild. Check BP.')
+  assert.equal(s.sub, 'All mild · 5 check-ins in 30 days')
+  assert.deepEqual(s.signals[0], { label: 'Headache', value: 'twice', tone: undefined, text: 'Check BP.' })
+  assert.equal(s.signals[1].value, 'once this week')
   const order = rankInsights([s, { kind: 'stale', tone: 'warn' }, { kind: 'bp', tone: 'bad' }, { kind: 'bloods', tone: 'warn' }]).map((i) => i.kind)
   assert.deepEqual(order, ['bp', 'bloods', 'stale', 'symptoms'])
   // A strong check-in sits after same-level findings but before milder ones.
@@ -75,4 +79,6 @@ assert.equal(staleInsight({ id: 1, date: '2026-08-01' }, '2026-10-06'), undefine
   assert.deepEqual(strong, ['bp', 'bloods', 'symptoms', 'bleed'])
   assert.deepEqual(rankInsights([{ kind: 'bloods', tone: 'warn' }, { kind: 'bp', tone: 'warn' }, { kind: 'bloods', tone: 'bad' }]).map((i) => `${i.kind}:${i.tone}`), ['bloods:bad', 'bp:warn', 'bloods:warn'])
 }
+assert.equal(countLine([{ kind: 'bp', tone: 'bad' }, { kind: 'bloods', tone: 'warn' }, { kind: 'symptoms', tone: 'bad' }, { kind: 'bleed', tone: 'neutral' }]), '1 to act on, 1 to watch')
+assert.equal(countLine([{ kind: 'symptoms', tone: 'neutral' }]), 'Nothing to act on')
 console.log('home insights ok')

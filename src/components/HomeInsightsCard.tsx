@@ -15,13 +15,15 @@ import { bleedNudge, hctSeries } from '../lib/phlebotomy'
 import { ALL_SYMPTOMS, customDefs } from '../lib/symptoms'
 import { wellbeingSummary } from '../lib/wellbeingSummary'
 import { CAUSES } from '../lib/wellbeingCauses'
-import { bleedInsight, bpInsight, doseChange, labInsight, rankInsights, staleInsight, symptomInsight, type HomeInsight } from '../lib/homeInsights'
+import { bleedInsight, bpInsight, countLine, doseChange, labInsight, rankInsights, staleInsight, symptomInsight, type HomeInsight, type Signal } from '../lib/homeInsights'
 import { useBleeds } from '../views/bloods/bleedFeed'
 import { PhlebotomyDialog } from '../views/bloods/Bleeds'
 import type { View } from '../app/views'
 import { ChartCard } from './dashboard/ChartCard'
-import { FeedList, FeedRow } from './FeedList'
+import { FeedChip, FeedList, FeedRow } from './FeedList'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
 const STEP = 4
 const KIND_ICON: Record<HomeInsight['kind'], LucideIcon> = { bloods: FlaskConical, bp: HeartPulse, bleed: Droplets, stale: CalendarClock, symptoms: Brain }
@@ -39,6 +41,7 @@ export function HomeInsightsCard({ symptoms, vitals, injections, compounds, body
   const bleeds = useBleeds()
   const [all, setAll] = useState(false)
   const [logging, setLogging] = useState(false)
+  const [openId, setOpenId] = useState<string>()
   // Moves on when the app comes back into view, so a PWA left open on Home does not go stale.
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -74,9 +77,8 @@ export function HomeInsightsCard({ symptoms, vitals, injections, compounds, body
           out.push({
             id: 'lab-free', kind: 'bloods', tone: 'warn', chip: 'Pro',
             title: `${flagged.length} result${flagged.length === 1 ? '' : 's'} outside the lab range`,
-            sub: `Your ${fmtDay(latest.date)} test`,
-            facts: flagged.slice(0, 3).map((m) => ({ text: `${m.label} ${m.rawValue || m.value} ${m.unit}`.trim(), tone: 'warn' as const })),
-            why: [],
+            sub: `${flagged.slice(0, 2).map((m) => `${m.label} ${m.rawValue || m.value}${m.unit ? ` ${m.unit}` : ''}`).join(', ')} · ${fmtDay(latest.date)} test`,
+            signals: [],
           })
         }
       }
@@ -126,79 +128,115 @@ export function HomeInsightsCard({ symptoms, vitals, injections, compounds, body
     window.location.assign(`#test/${id}`)
   }
   const list = all ? insights : insights.slice(0, STEP)
+  const current = insights.find((x) => x.id === openId)
   return (
-    <ChartCard title="What needs a look" subtitle="Your bloods, pressure, weight and check-ins, read together">
-      <FeedList className="-mt-2">
+    <ChartCard title="What needs a look" subtitle={countLine(insights)}>
+      <FeedList className="-mt-1">
         {list.map((ins) => (
-          <InsightRow
+          <FeedRow
             key={ins.id}
-            insight={ins}
-            onOpenTest={ins.testId !== undefined ? () => openTest(ins.testId!) : undefined}
-            onLogBleed={ins.logBleed ? () => setLogging(true) : undefined}
-            onLocked={ins.id === 'lab-free' ? () => openUpgrade('Bloods read') : undefined}
+            className="py-3.5"
+            icon={ins.id === 'lab-free' ? Lock : ins.icon ?? KIND_ICON[ins.kind]}
+            iconTone={ins.tone === 'neutral' ? 'neutral' : ins.tone}
+            title={ins.title}
+            sub={ins.sub}
+            status={{ label: ins.chip, tone: ins.tone === 'neutral' ? 'neutral' : ins.tone }}
+            onClick={() => (ins.id === 'lab-free' ? openUpgrade('Bloods read') : setOpenId(ins.id))}
           />
         ))}
       </FeedList>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <p className="text-xs text-muted-foreground">From your own numbers. Not medical advice.</p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <p className="text-[13px] leading-snug text-muted-foreground">Read together from your bloods, pressure, weight and check-ins. Not medical advice.</p>
         {insights.length > STEP && (
-          <Button variant="ghost" size="sm" className="h-8 text-muted-foreground" onClick={() => setAll((a) => !a)} aria-expanded={all}>
+          <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => setAll((a) => !a)} aria-expanded={all}>
             {all ? 'Show less' : `Show ${insights.length - STEP} more`}
           </Button>
         )}
       </div>
+      {current && (
+        <InsightSheet
+          insight={current}
+          onClose={() => setOpenId(undefined)}
+          onOpenTest={current.testId !== undefined ? () => { setOpenId(undefined); openTest(current.testId!) } : undefined}
+          onLogBleed={current.logBleed ? () => { setOpenId(undefined); setLogging(true) } : undefined}
+        />
+      )}
       {logging && <PhlebotomyDialog onClose={() => setLogging(false)} />}
     </ChartCard>
   )
 }
 
-function InsightRow({ insight: i, onOpenTest, onLogBleed, onLocked }: {
+const DOT: Record<NonNullable<Signal['tone']> | 'none', string> = {
+  bad: 'bg-destructive', warn: 'bg-amber-500', good: 'bg-emerald-500', none: 'bg-muted-foreground/40',
+}
+const VALUE: Record<NonNullable<Signal['tone']> | 'none', string> = {
+  bad: 'text-destructive', warn: 'text-amber-700 dark:text-amber-400', good: 'text-emerald-700 dark:text-emerald-400', none: 'text-foreground',
+}
+
+/** The detail of one insight: full width, one idea per block, body text at reading size. */
+function InsightSheet({ insight: i, onClose, onOpenTest, onLogBleed }: {
   insight: HomeInsight
+  onClose: () => void
   onOpenTest?: () => void
   onLogBleed?: () => void
-  onLocked?: () => void
 }) {
-  const [open, setOpen] = useState(false)
-  const more = i.why.length > 0 || !!i.practices?.length || !!onOpenTest || !!onLogBleed
+  const hasActions = !!onOpenTest || !!onLogBleed
   return (
-    <FeedRow
-      icon={onLocked ? Lock : i.icon ?? KIND_ICON[i.kind]}
-      iconTone={i.tone === 'neutral' ? 'neutral' : i.tone}
-      title={i.title}
-      sub={i.sub}
-      status={{ label: i.chip, tone: i.tone === 'neutral' ? 'neutral' : i.tone }}
-      facts={i.facts}
-      note={onLocked ? 'Pro reads what they mean together and what people usually do.' : undefined}
-      onClick={onLocked ?? (more ? () => setOpen((o) => !o) : undefined)}
-      expanded={onLocked || !more ? undefined : open}
-    >
-      {open && (
-        <div className="flex flex-col gap-2 pb-3 pl-14 pr-2">
-          {i.why.map((w) => <p key={w} className="feed-note text-foreground/85">{w}</p>)}
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <div className="overflow-y-auto overscroll-contain px-5 pb-6 pt-5 sm:px-6">
+          <DialogHeader className="gap-2 pr-8 text-left">
+            <FeedChip status={{ label: i.chip, tone: i.tone === 'neutral' ? 'neutral' : i.tone }} className="self-start" />
+            <DialogTitle className="font-display text-[22px] font-semibold leading-[1.2] tracking-[-0.01em] text-balance">{i.title}</DialogTitle>
+            <DialogDescription className="text-[15px] leading-snug text-muted-foreground">{i.sub}</DialogDescription>
+          </DialogHeader>
+
+          {i.summary && <p className="mt-5 text-[15px] leading-[1.6] text-foreground/90 text-pretty">{i.summary}</p>}
+
+          {i.signals.length > 0 && (
+            <section className="mt-6">
+              {i.signalsTitle && <h3 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">{i.signalsTitle}</h3>}
+              <ul className="mt-2 divide-y divide-border/70">
+                {i.signals.map((s) => (
+                  <li key={s.label} className="py-3.5">
+                    <div className="flex items-baseline gap-3">
+                      <span className={cn('size-2 shrink-0 translate-y-[-1px] rounded-full', DOT[s.tone ?? 'none'])} aria-hidden="true" />
+                      <span className="min-w-0 flex-1 text-[15px] font-semibold leading-snug">{s.label}</span>
+                      {s.value && <span className={cn('shrink-0 font-mono text-[15px] font-medium tabular-nums', VALUE[s.tone ?? 'none'])}>{s.value}</span>}
+                    </div>
+                    {s.text && <p className="mt-1.5 pl-5 text-[14px] leading-[1.55] text-muted-foreground text-pretty">{s.text}</p>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {!!i.causes?.length && (
-            <div>
-              <p className="eyebrow mt-1">Why it happens on a protocol</p>
-              <ul className="mt-1 flex list-disc flex-col gap-1 pl-4">
-                {i.causes.map((c) => <li key={c} className="text-sm text-muted-foreground">{c}</li>)}
+            <section className="mt-6">
+              <h3 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Why it happens on a protocol</h3>
+              <ul className="mt-3 flex list-disc flex-col gap-2.5 pl-5 marker:text-muted-foreground/60">
+                {i.causes.map((c) => <li key={c} className="text-[15px] leading-[1.55] text-foreground/90 text-pretty">{c}</li>)}
               </ul>
-            </div>
+            </section>
           )}
+
           {!!i.practices?.length && (
-            <div>
-              <p className="eyebrow mt-1 text-[var(--accent-ink)]">What people usually do · not a recommendation</p>
-              <ul className="mt-1 flex list-disc flex-col gap-1 pl-4">
-                {i.practices.map((p) => <li key={p} className="text-sm text-muted-foreground">{p}</li>)}
-              </ul>
-            </div>
-          )}
-          {(onOpenTest || onLogBleed) && (
-            <div className="mt-1 flex flex-wrap gap-2">
-              {onLogBleed && <Button size="sm" className="h-9" onClick={onLogBleed}><Droplets className="size-4" /> Log a blood-letting</Button>}
-              {onOpenTest && <Button size="sm" variant="outline" className="h-9" onClick={onOpenTest}>Open the test</Button>}
-            </div>
+            <section className="mt-6">
+              <h3 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">What people usually do</h3>
+              <p className="mt-1 text-[13px] text-muted-foreground">Common practice on a protocol, not a recommendation.</p>
+              <ol className="mt-3 flex list-decimal flex-col gap-2.5 pl-5 marker:font-mono marker:text-[13px] marker:text-[var(--accent-ink)]">
+                {i.practices.map((p) => <li key={p} className="pl-1 text-[15px] leading-[1.55] text-foreground/90 text-pretty">{p}</li>)}
+              </ol>
+            </section>
           )}
         </div>
-      )}
-    </FeedRow>
+        {hasActions && (
+          <div className="flex flex-col-reverse gap-2 border-t border-border bg-card px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-6">
+            {onOpenTest && <Button variant={onLogBleed ? 'outline' : 'default'} className="h-11" onClick={onOpenTest}>Open the test</Button>}
+            {onLogBleed && <Button className="h-11" onClick={onLogBleed}><Droplets className="size-4" /> Log a blood-letting</Button>}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
