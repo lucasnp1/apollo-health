@@ -2,6 +2,7 @@
 // React, siblings imported with .ts) so `node scripts/labs.test.mjs` loads it.
 
 import { format, parseISO } from 'date-fns'
+import { isTableText, parseLabTable } from './labTable.ts'
 
 /** A printed lab date ("23/06/2026", "2026-06-23", "28 May 2026", "May 28, 2026") as yyyy-mm-dd. */
 export function parseLabDate(raw: string): string | undefined {
@@ -96,6 +97,11 @@ const REPORT_LABELS = [/\b(?:reported|report)\s*(?:date)?\b/i]
  * over 15 years old are never taken.
  */
 export function extractCollectionDate(text: string, now: Date = new Date()): { date: string; source: 'report' | 'report-date' } | undefined {
+  // A spreadsheet has a date column; the sheet's own date is the draw date.
+  if (isTableText(text)) {
+    const date = parseLabTable(text).date
+    return date ? { date, source: 'report' } : undefined
+  }
   const today = dayOf(now.toISOString())
   const oldest = `${Number(today.slice(0, 4)) - 15}${today.slice(4)}`
   const earliest = (labels: RegExp[]) => {

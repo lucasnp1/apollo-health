@@ -82,7 +82,8 @@ export const MARKER_VARIANTS: Array<[canonical: string, ...aliases: string[]]> =
   ['Potassium', 'Potássio', 'Potassio'],
   ['Chloride', 'Cloreto', 'Cloro'],
   ['Bicarbonate', 'CO2', 'Carbon Dioxide', 'Total CO2'],
-  ['Calcium', 'Calcium (Adjusted)', 'Adjusted Calcium', 'Corrected Calcium', 'Calcium Adjusted', 'Cálcio', 'Calcio'],
+  ['Corrected Calcium', 'Calcium (Adjusted)', 'Adjusted Calcium', 'Calcium Adjusted', 'Calcium (Corrected)'],
+  ['Calcium', 'Cálcio', 'Calcio'],
   ['Magnesium', 'Magnesium (Serum)', 'Serum Magnesium', 'Magnésio', 'Magnesio'],
   ['Phosphorus', 'Phosphate', 'Fósforo', 'Fosforo'],
   ['Zinc', 'Zinc (Serum)', 'Serum Zinc', 'Zinco'],
@@ -105,7 +106,8 @@ export const MARKER_VARIANTS: Array<[canonical: string, ...aliases: string[]]> =
 
   // ── Vitamins / minerals / iron ──────────────────────────────────────
   ['Vitamin D', '25-Hydroxy Vitamin D', '25-Hydroxyvitamin D', 'Vitamin D (25-OH)', '25-OH Vitamin D', '25 OH Vitamin D', 'Vitamin D 25-Hydroxy', 'Vitamin D, 25-Hydroxy', 'Vitamin D Total', 'Vitamin D3', '25(OH)D', '25-OH-D', 'Vitamina D'],
-  ['Vitamin B12', 'Vitamin B-12', 'Active Vitamin B12', 'Vitamin B12 - Active', 'Active B12', 'B12 Active', 'Cobalamin', 'Vitamina B12', 'B12'],
+  ['Active B12', 'Active Vitamin B12', 'Vitamin B12 - Active', 'B12 Active', 'Holotranscobalamin', 'HoloTC'],
+  ['Vitamin B12', 'Vitamin B-12', 'Cobalamin', 'Vitamina B12', 'B12'],
   ['Folate', 'Folic Acid', 'Folate (Serum)', 'Serum Folate', 'Ácido Fólico', 'Acido Folico', 'Folato'],
   ['Iron', 'Iron (Serum)', 'Serum Iron', 'Ferro', 'Ferro Sérico'],
   ['Ferritin', 'Ferritina'],
@@ -206,6 +208,7 @@ const PLAUSIBLE: Record<string, Plausibility> = {
   'Ferritin':             { min: 1,    max: 5000 },
   'Vitamin D':            { min: 1,    max: 600 },
   'Vitamin B12':          { min: 10,   max: 5000 },
+  'Active B12':           { min: 1,    max: 1000 },
   'CRP':                  { min: 0.05, max: 500 },
   'hsCRP':                { min: 0.05, max: 100 },
   'Hemoglobin':           { min: 3,    max: 250 },
@@ -217,6 +220,7 @@ const PLAUSIBLE: Record<string, Plausibility> = {
   'Sodium':               { min: 100,  max: 180 },
   'Potassium':            { min: 1.5,  max: 9 },
   'Calcium':              { min: 0.5,  max: 20 },
+  'Corrected Calcium':    { min: 0.5,  max: 20 },
   'PSA':                  { min: 0,    max: 500 },
   'Creatine Kinase':      { min: 5,    max: 100000 },
 }

@@ -78,7 +78,7 @@ const CATALOG: Entry[] = [
     ['total testosterone', 'testosterone, total', 'testosterone (total)', 'testosterone total', 'testosterona total', 'serum testosterone', 'testosterone serum', 'testosterone', 'testosterona'],
     { low: 700, high: 1100, note: 'Mid-to-upper reference for men on TRT, draw-time dependent.' }),
   m('free_testosterone', 'Free Testosterone', 'Sex Hormones', 'pg/mL',
-    ['free testosterone', 'testosterone, free', 'testosterone (free)', 'testosterone free', 'calculated free testosterone', 'testosterona livre'],
+    ['free testosterone', 'testosterone, free', 'testosterone (free)', 'testosterone free', 'calculated free testosterone', 'free-testosterone', 'free-testosterone(calculated)', 'free testosterone (calculated)', 'testosterona livre'],
     { low: 15, high: 25 }),
   m('bioavailable_testosterone', 'Bioavailable Testosterone', 'Sex Hormones', 'ng/dL', ['bioavailable testosterone', 'testosterone bioavailable']),
   m('fai', 'Free Androgen Index', 'Sex Hormones', '', ['free androgen index', 'fai']),
@@ -109,9 +109,9 @@ const CATALOG: Entry[] = [
   m('wbc', 'White Blood Cells', 'Blood Count', 'K/uL', ['white blood cell', 'white blood cells', 'white cell count', 'wbc', 'leukocytes', 'leukocyte count', 'leucócitos', 'leucocitos']),
   m('platelets', 'Platelets', 'Blood Count', 'K/uL', ['platelet', 'platelets', 'platelet count', 'plt', 'plaquetas']),
   m('mcv', 'MCV', 'Blood Count', 'fL', ['mcv', 'mean cell volume', 'mean corpuscular volume', 'vcm']),
-  m('mch', 'MCH', 'Blood Count', 'pg', ['mch', 'mean cell haemoglobin', 'mean cell hemoglobin', 'mean corpuscular haemoglobin', 'mean corpuscular hemoglobin', 'hcm']),
+  m('mch', 'MCH', 'Blood Count', 'pg', ['mch', 'mean cell hb', 'mean cell haemoglobin', 'mean cell hemoglobin', 'mean corpuscular haemoglobin', 'mean corpuscular hemoglobin', 'hcm']),
   m('mchc', 'MCHC', 'Blood Count', 'g/dL', ['mchc', 'mean cell haemoglobin concentration', 'mean cell hemoglobin concentration', 'mean corpuscular haemoglobin concentration', 'mean corpuscular hemoglobin concentration', 'chcm']),
-  m('rdw', 'RDW', 'Blood Count', '%', ['rdw', 'red cell distribution width', 'rdw-cv', 'rdw-sd']),
+  m('rdw', 'RDW', 'Blood Count', '%', ['rdw', 'red cell distribution', 'red cell distribution width', 'rdw-cv', 'rdw-sd']),
   m('mpv', 'MPV', 'Blood Count', 'fL', ['mpv', 'mean platelet volume', 'vpm']),
   m('neutrophils', 'Neutrophils', 'Blood Count', 'K/uL', ['neutrophil', 'neutrophils', 'neutrophil count', 'neutrófilos', 'neutrofilos']),
   m('lymphocytes', 'Lymphocytes', 'Blood Count', 'K/uL', ['lymphocyte', 'lymphocytes', 'lymphocyte count', 'linfócitos', 'linfocitos']),
@@ -154,7 +154,9 @@ const CATALOG: Entry[] = [
   m('potassium', 'Potassium', 'Kidney & Electrolytes', 'mmol/L', ['potassium', 'potássio', 'potassio']),
   m('chloride', 'Chloride', 'Kidney & Electrolytes', 'mmol/L', ['chloride', 'cloreto', 'cloro']),
   m('bicarbonate', 'Bicarbonate', 'Kidney & Electrolytes', 'mmol/L', ['bicarbonate', 'co2', 'carbon dioxide', 'total co2']),
-  m('calcium', 'Calcium', 'Kidney & Electrolytes', 'mg/dL', ['calcium', 'adjusted calcium', 'corrected calcium', 'cálcio', 'calcio']),
+  m('calcium', 'Calcium', 'Kidney & Electrolytes', 'mg/dL', ['calcium', 'cálcio', 'calcio']),
+  // Albumin-adjusted, printed next to plain calcium on the same report.
+  m('corrected_calcium', 'Corrected Calcium', 'Kidney & Electrolytes', 'mmol/L', ['corrected calcium', 'adjusted calcium', 'albumin-adjusted calcium', 'calcium (corrected)', 'calcium (adjusted)']),
   m('phosphorus', 'Phosphorus', 'Kidney & Electrolytes', 'mg/dL', ['phosphorus', 'phosphate', 'fósforo', 'fosforo']),
 
   // ── Liver ──────────────────────────────────────────────────────────────────
@@ -181,7 +183,9 @@ const CATALOG: Entry[] = [
 
   // ── Vitamins & Minerals ────────────────────────────────────────────────────
   m('vitamin_d', 'Vitamin D (25-OH)', 'Vitamins & Minerals', 'ng/mL', ['vitamin d', '25-oh', '25 hydroxy', '25-hydroxy', '25(oh)d', 'vitamina d'], { low: 40, high: 80 }),
-  m('vitamin_b12', 'Vitamin B12', 'Vitamins & Minerals', 'pg/mL', ['vitamin b12', 'vitamin b-12', 'b12', 'active b12', 'cobalamin', 'vitamina b12']),
+  m('vitamin_b12', 'Vitamin B12', 'Vitamins & Minerals', 'pg/mL', ['vitamin b12', 'vitamin b-12', 'b12', 'cobalamin', 'vitamina b12']),
+  // Holotranscobalamin: a different test with its own pmol/L range.
+  m('active_b12', 'Active B12', 'Vitamins & Minerals', 'pmol/L', ['active b12', 'active vitamin b12', 'holotranscobalamin', 'holotc', 'holo-tc']),
   m('folate', 'Folate', 'Vitamins & Minerals', 'ng/mL', ['folate', 'folic acid', 'folato', 'ácido fólico', 'acido folico']),
   m('iron', 'Iron', 'Vitamins & Minerals', 'µg/dL', ['iron', 'serum iron', 'ferro']),
   m('tibc', 'TIBC', 'Vitamins & Minerals', 'µg/dL', ['tibc', 'total iron binding capacity', 'total iron-binding capacity']),

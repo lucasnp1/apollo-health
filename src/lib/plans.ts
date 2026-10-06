@@ -18,7 +18,7 @@ export const PRO_PLANS: Array<{
 ]
 
 export const PRO_FEATURES = [
-  'Import lab results straight from a PDF or photo',
+  'Import lab results from a PDF, photo or spreadsheet',
   'Bloods analysis in plain words: causes and what people do',
   'Change since your last test',
   'Compare two tests side by side',

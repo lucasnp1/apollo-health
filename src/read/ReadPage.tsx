@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const MAX_BYTES = 25 * 1024 * 1024
-const ACCEPT = 'application/pdf,image/*'
+const ACCEPT = 'application/pdf,image/*,.csv,.tsv,.xlsx,text/csv'
 
 type State =
   | { kind: 'idle' }
@@ -168,7 +168,7 @@ export function ReadPage() {
           <p className="eyebrow">Free · no account</p>
           <h1 className="font-display text-[34px] font-semibold leading-[1.05] tracking-[-0.02em] sm:text-[42px]">Read my bloods.</h1>
           <p className="feed-note mt-3 max-w-[560px] text-muted-foreground">
-            Drop a lab PDF or a photo of the printout. Magno reads every marker on this device and writes up what the numbers mean together: how they relate, what moves them, and what people usually do about it.
+            Drop a lab PDF, a photo of the printout, or a CSV or Excel export. Magno reads every marker on this device and writes up what the numbers mean together: how they relate, what moves them, and what people usually do about it.
           </p>
           <p className="feed-facts mt-3 inline-flex items-center gap-1.5 rounded-md bg-muted/60 px-2.5 py-1.5 text-muted-foreground">
             <Lock className="size-3.5" /> Nothing leaves your browser. The file is read here and forgotten when you close the tab.

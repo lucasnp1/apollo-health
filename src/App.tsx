@@ -381,7 +381,7 @@ function Shell({
                 <Plus className="size-4" /> <span className="hidden sm:inline">Add results</span>
               </Button>
             )}
-            <input ref={labFileInput} type="file" accept="application/pdf,image/*" hidden onChange={handleLabPdfUpload} />
+            <input ref={labFileInput} type="file" accept="application/pdf,image/*,.csv,.tsv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onChange={handleLabPdfUpload} />
 
             {/* Always-available theme toggle */}
             <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle light or dark theme" title="Toggle theme">

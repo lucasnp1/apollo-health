@@ -600,3 +600,27 @@ check('a legacy import stamp is a draw date not confirmed', () => {
 })
 
 console.log(`\n${n} checks passed`)
+
+// ── Spreadsheet import (CSV/Excel via labTable) ──
+{
+  const { parseLabTable, TABLE_SENTINEL, toCsv, parseCsv } = await import('../src/lib/labTable.ts')
+  const csv = `Test Name,Category,Date,Value,Units,Reference Range,Status
+Haematocrit,haematology,2026-10-01,0.56,L/L,0.380 - 0.500,Above normal
+eGFR,kidneyFunction,2026-10-01,66,mL/min/1.73m2,>60,Normal
+ALT,liverFunction,2026-10-01,33,U/L,<50,Normal
+"Free-Testosterone(Calculated)",hormones,2026-10-01,"6.507",nmol/L,0.2 - 0.62,Above normal
+Note,,,,,,`
+  const { markers, date } = parseLabTable(`${TABLE_SENTINEL}\n${csv}`)
+  assert.equal(date, '2026-10-01')
+  assert.equal(markers.length, 4)
+  assert.deepEqual(markers[0], { marker: 'Haematocrit', value: 0.56, unit: 'L/L', low: 0.38, high: 0.5, flag: 'H', rawValue: undefined, confidence: 'high' })
+  assert.equal(markers[1].low, 60); assert.equal(markers[1].high, undefined); assert.equal(markers[1].flag, undefined)
+  assert.equal(markers[2].high, 50)
+  assert.equal(markers[3].value, 6.507)
+  assert.deepEqual(parseCsv(toCsv([['a,b', 'c"d', '']])), [['a,b', 'c"d', '']])
+  assert.equal(extractCollectionDate(`${TABLE_SENTINEL}\n${csv}`).date, '2026-10-01')
+  // Semicolon CSV with low/high columns and an Excel serial date (46296 = 2026-10-01).
+  const semi = parseLabTable('Marker;Result;Unit;Low;High;Date\nFerritin;95;ug/L;30;400;46296')
+  assert.deepEqual([semi.markers[0].low, semi.markers[0].high, semi.date], [30, 400, '2026-10-01'])
+  console.log('labTable ok')
+}

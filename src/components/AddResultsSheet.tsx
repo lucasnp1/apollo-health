@@ -20,7 +20,7 @@ export function AddResultsSheet({ open, isPro, onImport, onManual, onClose }: {
         <FeedList>
           <FeedRow
             icon={Upload}
-            title="Import a PDF or photo"
+            title="Import a PDF, photo or spreadsheet"
             sub="Magno reads the values, units and ranges"
             status={isPro ? undefined : { label: 'Pro', tone: 'neutral' }}
             onClick={onImport}

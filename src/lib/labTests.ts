@@ -59,6 +59,7 @@ const PROVIDERS: Array<[string, RegExp]> = [
   ['Thriva', /thriva/i],
   ['Forth', /forth\s?with\s?life|forth\s?edge/i],
   ['e-Val', /\be-?val\b/i],
+  ['Lola', /lola\s?health/i],
   ['Bluecrest', /blue\s?crest/i],
   ['Randox', /randox/i],
   ['London Medical Laboratory', /london medical lab/i],
@@ -83,7 +84,7 @@ export function looksLikeFileName(s: string): boolean {
   return /\d{5,}|_|labreport|results?\s+for|^sct\d|\.(pdf|jpe?g|png)$/i.test(s)
 }
 
-const stripExt = (s: string) => s.replace(/\.(pdf|jpe?g|png|webp|heic|gif|bmp|tiff?)$/i, '')
+const stripExt = (s: string) => s.replace(/\.(csv|tsv|xlsx|pdf|jpe?g|png|webp|heic|gif|bmp|tiff?)$/i, '')
 // The old manual-entry default, not a name anyone chose; "panel" is gone from Bloods.
 const LEGACY_DEFAULT = /^(blood|lab) panel$/i
 

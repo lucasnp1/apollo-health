@@ -70,7 +70,7 @@ function Empty({ isPro, onImport, onManual }: { isPro: boolean; onImport: () => 
           Add a test and Magno keeps it as its own dated report, reads it and shows what changed next time.
         </p>
         <FeedList className="mt-3">
-          <FeedRow icon={Upload} title="Import a PDF or photo" sub="Magno reads the values, units and ranges" status={isPro ? undefined : { label: 'Pro', tone: 'neutral' }} onClick={onImport} />
+          <FeedRow icon={Upload} title="Import a PDF, photo or spreadsheet" sub="Magno reads the values, units and ranges" status={isPro ? undefined : { label: 'Pro', tone: 'neutral' }} onClick={onImport} />
           <FeedRow icon={Keyboard} title="Type results in" sub="From a printed or emailed report" onClick={onManual} />
         </FeedList>
       </PanelCard>

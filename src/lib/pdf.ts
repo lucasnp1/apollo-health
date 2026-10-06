@@ -9,6 +9,7 @@
 import { MARKER_VARIANTS, fixOcrDigits, isKnownUnit, isPlausible, normalizeUnit } from './labCatalog'
 import { parseLabLines, type Confidence } from './labParse'
 import { canonicalize } from './markers'
+import { isSheetFile, isTableText, parseLabTable, readSheetFile } from './labTable'
 
 export type { Confidence }
 
@@ -86,6 +87,12 @@ function hasUsableText(lines: string[]): boolean {
   return letters >= 40 && digits >= 3
 }
 
+type PdfPage = { getOperatorList(): Promise<{ fnArray: number[] }> }
+async function hasImages(page: PdfPage, OPS: Record<string, number>): Promise<boolean> {
+  const { fnArray } = await page.getOperatorList()
+  return fnArray.some((fn) => fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintImageXObjectRepeat)
+}
+
 // Full read: text layer per page, OCR for pages without one, or OCR for an
 // image file. Returns the line-joined text (prefixed with OCR_SENTINEL when
 // OCR was used) so the rest of the pipeline is source-agnostic.
@@ -93,6 +100,7 @@ export async function readLabFile(
   file: File,
   onProgress?: (p: ReadProgress) => void,
 ): Promise<{ text: string; usedOcr: boolean; pages: number }> {
+  if (isSheetFile(file)) return { text: await readSheetFile(file), usedOcr: false, pages: 1 }
   if (file.type.startsWith('image/')) {
     const { recognizeImage } = await import('./ocr')
     onProgress?.({ stage: 'ocr', page: 1, pages: 1, pct: 0 })
@@ -112,11 +120,14 @@ export async function readLabFile(
     const page = await document.getPage(n)
     const content = await page.getTextContent()
     const lines = itemsToLines(content.items as PdfTextItem[])
-    if (hasUsableText(lines)) {
+    // Trust the text layer when it has lab rows, or when there is no picture
+    // that could hold them. A web page printed to PDF (Lola, iOS) keeps only
+    // its header and footer as text and the results table as a screenshot.
+    if (hasUsableText(lines) && (parseLabLines(lines).length > 0 || !(await hasImages(page, pdfjs.OPS)))) {
       out.push(lines.join('\n'))
       continue
     }
-    // No text layer: render the page and read it.
+    // No useful text layer: render the page and read it.
     ocr ??= await import('./ocr')
     onProgress?.({ stage: 'ocr', page: n, pages, pct: 0 })
     const ocrLines = await ocr.recognizePdfPage(page, (pct) => onProgress?.({ stage: 'ocr', page: n, pages, pct }))
@@ -136,6 +147,7 @@ export function wasOcr(text: string | undefined): boolean {
 const RANK: Record<Confidence, number> = { high: 3, medium: 2, low: 1 }
 
 export function extractMarkersFromText(text: string): ExtractedMarker[] {
+  if (isTableText(text)) return parseLabTable(text).markers
   const ocr = wasOcr(text)
   const body = ocr ? text.slice(OCR_SENTINEL.length) : text
   const lines = body.split(/\r?\n/)

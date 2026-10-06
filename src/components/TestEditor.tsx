@@ -31,7 +31,7 @@ export type EditorOpen =
   | { mode: 'read'; pending: PendingRead }
   | { mode: 'edit'; examId: number }
 
-const LABS = ['Medichecks', 'e-Val', 'Randox', 'Thriva', 'Forth', 'Bluecrest', 'London Medical Laboratory', 'NHS']
+const LABS = ['Lola', 'Medichecks', 'e-Val', 'Randox', 'Thriva', 'Forth', 'Bluecrest', 'London Medical Laboratory', 'NHS']
 const CONDITIONS = ['Hard training', 'Alcohol', 'Unwell', 'Gave blood in last 8 weeks', 'Cycling or sex in last 48 h']
 const MARKER_LABELS = [...new Set(allMarkerMeta().map((m) => m.label))].sort()
 
@@ -64,7 +64,7 @@ type Init = { form: Form; rows: Row[]; source: Draft['source']; fromFile?: strin
 let nextKey = 1
 const str = (v?: number) => (v === undefined || Number.isNaN(v) ? '' : String(v))
 const blankRow = (): Row => ({ key: nextKey++, marker: '', value: '', unit: '', low: '', high: '' })
-const stripExt = (s: string) => s.replace(/\.(pdf|jpe?g|png|webp|heic|gif|bmp|tiff?)$/i, '')
+const stripExt = (s: string) => s.replace(/\.(csv|tsv|xlsx|pdf|jpe?g|png|webp|heic|gif|bmp|tiff?)$/i, '')
 const sectionRank = new Map(SECTION_ORDER.map((s, i) => [s, i]))
 // A stored value as printed, minus a glued-on range ("0.51 (0.40-0.50)" -> "0.51").
 const seedValue = (x: { rawValue: string; value?: number }) => {
