@@ -4,7 +4,7 @@
 import { format, parseISO } from 'date-fns'
 import { isTableText, parseLabTable } from './labTable.ts'
 
-/** A printed lab date ("23/06/2026", "2026-06-23", "28 May 2026", "May 28, 2026") as yyyy-mm-dd. */
+/** A printed lab date ("23/06/2026", "2026-06-23", "28 May 2026", "4-JUN-2026", "May 28, 2026") as yyyy-mm-dd. */
 export function parseLabDate(raw: string): string | undefined {
   const s = raw.trim()
   // "31/06/2026" and Feb 29 in a non-leap year match the patterns but are not days.
@@ -23,7 +23,8 @@ export function parseLabDate(raw: string): string | undefined {
     return ok(`${m[3]}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
   }
   const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
-  m = s.match(/(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(20\d{2})/)
+  // "28 May 2026" and "4-JUN-2026".
+  m = s.match(/(\d{1,2})[\s-]+([A-Za-z]{3,9})\.?[\s-]+(20\d{2})/)
   if (m) {
     const mi = months.indexOf(m[2].slice(0, 3).toLowerCase())
     if (mi >= 0) return ok(`${m[3]}-${String(mi + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`)
@@ -83,6 +84,8 @@ const COLLECTION_LABELS = [
   /\b(?:collection|specimen|sample)\s*(?:date|collected|taken|received)\b/i,
   /\bdate\s+(?:of\s+)?(?:collect(?:ed|ion)|sample|draw)\b/i,
   /\bcollected\s*(?:on|at)?\b/i,
+  // Medichecks / Inuvi print the draw as "Observation Date : 4-JUN-2026".
+  /\bobservation\s+date\b/i,
   /\bspecimen\s+received\b/i,
   /\bsample\s+(?:date|received|taken)\b/i,
   /\b(?:drawn|draw date)\b/i,

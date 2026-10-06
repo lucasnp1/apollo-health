@@ -22,7 +22,7 @@ import type { View } from '../app/views'
 import { ChartCard } from './dashboard/ChartCard'
 import { FeedChip, FeedList, FeedRow } from './FeedList'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogBar, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 const STEP = 4
@@ -183,18 +183,17 @@ function InsightSheet({ insight: i, onClose, onOpenTest, onLogBleed }: {
   const hasActions = !!onOpenTest || !!onLogBleed
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-        <div className="overflow-y-auto overscroll-contain px-5 pb-6 pt-5 sm:px-6">
-          <DialogHeader className="gap-2 pr-8 text-left">
-            <FeedChip status={{ label: i.chip, tone: i.tone === 'neutral' ? 'neutral' : i.tone }} className="self-start" />
-            <DialogTitle className="font-display text-[22px] font-semibold leading-[1.2] tracking-[-0.01em] text-balance">{i.title}</DialogTitle>
-            <DialogDescription className="text-[15px] leading-snug text-muted-foreground">{i.sub}</DialogDescription>
-          </DialogHeader>
-
-          {i.summary && <p className="mt-5 text-[15px] leading-[1.6] text-foreground/90 text-pretty">{i.summary}</p>}
+      <DialogContent sheet className="sm:max-w-lg">
+        <DialogHeader className="gap-2">
+          <FeedChip status={{ label: i.chip, tone: i.tone === 'neutral' ? 'neutral' : i.tone }} className="self-start" />
+          <DialogTitle className="text-[22px]">{i.title}</DialogTitle>
+          <DialogDescription>{i.sub}</DialogDescription>
+        </DialogHeader>
+        <DialogBody className="gap-6">
+          {i.summary && <p className="text-[15px] leading-[1.6] text-foreground/90 text-pretty">{i.summary}</p>}
 
           {i.signals.length > 0 && (
-            <section className="mt-6">
+            <section>
               {i.signalsTitle && <h3 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">{i.signalsTitle}</h3>}
               <ul className="mt-2 divide-y divide-border/70">
                 {i.signals.map((s) => (
@@ -212,7 +211,7 @@ function InsightSheet({ insight: i, onClose, onOpenTest, onLogBleed }: {
           )}
 
           {!!i.causes?.length && (
-            <section className="mt-6">
+            <section>
               <h3 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Why it happens on a protocol</h3>
               <ul className="mt-3 flex list-disc flex-col gap-2.5 pl-5 marker:text-muted-foreground/60">
                 {i.causes.map((c) => <li key={c} className="text-[15px] leading-[1.55] text-foreground/90 text-pretty">{c}</li>)}
@@ -221,7 +220,7 @@ function InsightSheet({ insight: i, onClose, onOpenTest, onLogBleed }: {
           )}
 
           {!!i.practices?.length && (
-            <section className="mt-6">
+            <section>
               <h3 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">What people usually do</h3>
               <p className="mt-1 text-[13px] text-muted-foreground">Common practice on a protocol, not a recommendation.</p>
               <ol className="mt-3 flex list-decimal flex-col gap-2.5 pl-5 marker:font-mono marker:text-[13px] marker:text-[var(--accent-ink)]">
@@ -229,12 +228,12 @@ function InsightSheet({ insight: i, onClose, onOpenTest, onLogBleed }: {
               </ol>
             </section>
           )}
-        </div>
+        </DialogBody>
         {hasActions && (
-          <div className="flex flex-col-reverse gap-2 border-t border-border bg-card px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-6">
-            {onOpenTest && <Button variant={onLogBleed ? 'outline' : 'default'} className="h-11" onClick={onOpenTest}>Open the test</Button>}
-            {onLogBleed && <Button className="h-11" onClick={onLogBleed}><Droplets className="size-4" /> Log a blood-letting</Button>}
-          </div>
+          <DialogBar>
+            {onOpenTest && <Button variant={onLogBleed ? 'outline' : 'default'} onClick={onOpenTest}>Open the test</Button>}
+            {onLogBleed && <Button onClick={onLogBleed}><Droplets className="size-4" /> Log a blood-letting</Button>}
+          </DialogBar>
         )}
       </DialogContent>
     </Dialog>

@@ -4,10 +4,11 @@
 // the saved name is never the file name.
 
 import { useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Plus, ScanText, Trash2, TriangleAlert } from 'lucide-react'
+import { ChevronDown, Plus, ScanText, Trash2, TriangleAlert } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type ExamMeta, type HealthFile } from '../lib/db'
 import { extractMarkersFromText, wasOcr } from '../lib/pdf'
+import { isTableText } from '../lib/labTable'
 import { dateFromFileName, dayOf, extractCollectionDate, fmtDay } from '../lib/dates'
 import { allMarkerMeta, canonicalize, SECTION_ORDER } from '../lib/markers'
 import { UK_UNIT } from '../lib/labUnits'
@@ -20,9 +21,9 @@ import { useToast } from '../lib/toast'
 import { printedValue } from '../views/bloods/feed'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field } from '@/components/ui/field'
 import { Segmented } from '@/components/ui/segmented'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogBar, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 export type EditorOpen =
@@ -59,7 +60,7 @@ type Form = {
   conditions: string[]
   notes: string
 }
-type Init = { form: Form; rows: Row[]; source: Draft['source']; fromFile?: string; ocr?: string; fileId?: number }
+type Init = { form: Form; rows: Row[]; source: Draft['source']; fromFile?: string; ocr?: string; fileId?: number; sheet?: boolean }
 
 let nextKey = 1
 const str = (v?: number) => (v === undefined || Number.isNaN(v) ? '' : String(v))
@@ -96,6 +97,7 @@ function initFrom(open: EditorOpen, file: HealthFile | undefined, test: LabTest 
       fromFile: file.name,
       ocr: wasOcr(text) ? (isImage ? 'Read from your photo with OCR.' : 'Read with OCR because this PDF has no text layer.') : undefined,
       fileId: file.id,
+      sheet: isTableText(text),
     }
   }
   if (open.mode === 'read') {
@@ -222,9 +224,11 @@ function EditorForm({ open, file, test, tests, onClose, onOpenTest }: {
           : addTo && split.add.length === 0 ? 'Nothing new to add'
             : undefined
   const n = addTo ? split.add.length : valid.length
-  const label = blocked ?? (mode === 'edit' ? 'Save changes'
+  // The button always names the action; what is in the way shows above it.
+  const label = mode === 'edit' ? 'Save changes'
     : addTo ? `Add ${n} to the ${fmtDay(addTo.date)} test`
-      : `${verb === 'save' ? 'Save' : 'Import'} ${n} marker${n === 1 ? '' : 's'}`)
+      : n === 0 ? (verb === 'save' ? 'Save test' : 'Import')
+        : `${verb === 'save' ? 'Save' : 'Import'} ${n} marker${n === 1 ? '' : 's'}`
 
   function updateRow(key: number, patch: Partial<Row>) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)))
@@ -294,7 +298,8 @@ function EditorForm({ open, file, test, tests, onClose, onOpenTest }: {
   const unconfirmed = mode === 'edit' && !!test?.needsCheck.includes('Draw date not confirmed') && form.dateSource !== 'user'
   const hint = !form.date ? (mode === 'manual' ? 'The day the blood was taken.' : DATE_HINT.none)
     : unconfirmed ? 'Check this date against the report. Saving confirms it.'
-      : form.dateSource ? DATE_HINT[form.dateSource] : undefined
+      : form.dateSource === 'report' && init.sheet ? 'Taken from the date column in the sheet.'
+        : form.dateSource ? DATE_HINT[form.dateSource] : undefined
   const toCheck = rows.filter((r) => r.check).length
   const labUnknown = (mode === 'file' || mode === 'read') && !init.form.lab && !lab
   // State starts as init.form / init.rows and every setter makes a new object, so references tell.
@@ -302,17 +307,24 @@ function EditorForm({ open, file, test, tests, onClose, onOpenTest }: {
   const requestClose = () => { if (!saving && (!dirty || confirm('Discard these results?'))) onClose() }
   const details = [form.fasted === 'yes' ? 'Fasted' : form.fasted === 'no' ? 'Not fasted' : '', form.drawTime, ...form.conditions].filter(Boolean).join(' · ')
 
+  // One grid for the column header and every row. Phones: the marker on its
+  // own line, then value, unit and range; wider screens: one line per marker.
+  const NUMBERS = 'grid grid-cols-[minmax(0,1.3fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-2'
+  const WIDE = 'sm:grid sm:grid-cols-[minmax(0,2.2fr)_repeat(4,minmax(0,1fr))_2.75rem] sm:items-start sm:gap-2'
+  const numberInput = 'h-11 px-2 font-mono tabular-nums placeholder:font-sans'
+
   return (
     <Dialog open onOpenChange={(o) => { if (!o) requestClose() }}>
       <DialogContent
         ref={contentRef}
+        sheet
         // A stray tap beside the sheet should never discard typed results.
         onInteractOutside={(e) => e.preventDefault()}
         // Focus the dialog, not the date field: on a phone that would open the picker at once.
         onOpenAutoFocus={(e) => { e.preventDefault(); contentRef.current?.focus() }}
-        className="flex max-h-[92dvh] flex-col gap-4 overflow-y-auto p-4 pb-0 sm:max-w-2xl sm:p-6 sm:pb-0"
+        className="sm:max-w-2xl"
       >
-        <DialogHeader className="gap-1 pr-8 text-left">
+        <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
             {mode === 'file' || mode === 'read'
@@ -320,207 +332,214 @@ function EditorForm({ open, file, test, tests, onClose, onOpenTest }: {
               : mode === 'edit' ? 'Fix a value, the date or the lab. Removed rows go to the archive.'
                 : 'One test is one blood draw. Add every marker from the report.'}
           </DialogDescription>
+          {init.fromFile && <p className="truncate text-[13px] text-muted-foreground">From {stripExt(init.fromFile)}</p>}
         </DialogHeader>
 
-        {init.ocr && (
-          <p className="flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-            <ScanText className="mt-0.5 size-3.5 shrink-0" />
-            <span>{init.ocr} Numbers can be misread, so compare each row with the report.</span>
-          </p>
-        )}
+        <DialogBody className="gap-6">
+          {init.ocr && (
+            <p className="flex items-start gap-2.5 rounded-lg bg-muted px-3.5 py-3 text-[13px] leading-relaxed text-muted-foreground">
+              <ScanText className="mt-0.5 size-4 shrink-0" />
+              <span>{init.ocr} Numbers can be misread, so compare each row with the report.</span>
+            </p>
+          )}
 
-        {/* About this test */}
-        <section className="flex flex-col gap-3" aria-label="About this test">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <Label htmlFor="te-date">Draw date</Label>
-              <Input
-                id="te-date"
-                type="date"
-                required
-                className="h-10"
-                max={dayOf(new Date().toISOString())}
-                value={form.date}
-                aria-describedby="te-date-hint"
-                onChange={(e) => set({ date: e.target.value, dateSource: 'user' })}
-              />
+          {/* About this test */}
+          <section className="flex flex-col gap-4" aria-label="About this test">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Draw date" htmlFor="te-date">
+                <Input
+                  id="te-date"
+                  type="date"
+                  required
+                  className="h-11"
+                  max={dayOf(new Date().toISOString())}
+                  value={form.date}
+                  aria-describedby="te-date-hint"
+                  onChange={(e) => set({ date: e.target.value, dateSource: 'user' })}
+                />
+              </Field>
+              <Field label="Lab" htmlFor="te-lab">
+                <Input id="te-lab" className="h-11" list="te-labs" value={form.lab} placeholder="Pick or type" autoComplete="off" aria-describedby={labUnknown ? 'te-lab-hint' : undefined} onChange={(e) => set({ lab: e.target.value })} />
+                <datalist id="te-labs">{LABS.map((l) => <option key={l} value={l} />)}</datalist>
+              </Field>
             </div>
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <Label htmlFor="te-lab">Lab</Label>
-              <Input id="te-lab" className="h-10" list="te-labs" value={form.lab} placeholder="Pick or type" autoComplete="off" aria-describedby={labUnknown ? 'te-lab-hint' : undefined} onChange={(e) => set({ lab: e.target.value })} />
-              <datalist id="te-labs">{LABS.map((l) => <option key={l} value={l} />)}</datalist>
-            </div>
-          </div>
-          {hint && <p id="te-date-hint" className={cn('-mt-1 text-xs', form.date || mode === 'manual' ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-400')}>{hint}</p>}
-          {labUnknown && <p id="te-lab-hint" className="-mt-1 text-xs text-muted-foreground">We could not tell which lab this is.</p>}
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="te-name">Test name <span className="font-normal text-muted-foreground">(optional)</span></Label>
-            <Input id="te-name" className="h-10" value={form.name} placeholder={defaultTestName(lab || undefined)} onChange={(e) => set({ name: e.target.value })} />
-          </div>
-          {init.fromFile && <p className="truncate text-xs text-muted-foreground">From file: {stripExt(init.fromFile)}</p>}
-
-          <div>
-            <button
-              type="button"
-              className="-mx-2 flex min-h-10 w-[calc(100%+1rem)] items-center gap-2 rounded-lg px-2 text-left text-sm font-medium hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              aria-expanded={detailsOpen}
-              onClick={() => setDetailsOpen(!detailsOpen)}
-            >
-              {detailsOpen ? <ChevronDown className="size-4 text-muted-foreground" /> : <ChevronRight className="size-4 text-muted-foreground" />}
-              Draw details
-              {!detailsOpen && details && <span className="min-w-0 truncate text-xs font-normal text-muted-foreground">{details}</span>}
-            </button>
-            {detailsOpen && (
-              <div className="mt-2 flex flex-col gap-3">
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor="te-time">Time</Label>
-                    <Input id="te-time" type="time" className="h-10" value={form.drawTime} onChange={(e) => set({ drawTime: e.target.value })} />
-                  </div>
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <span className="text-sm font-medium leading-none" id="te-fasted">Fasted</span>
-                    <Segmented
-                      value={form.fasted}
-                      onChange={(v) => set({ fasted: v })}
-                      ariaLabel="Fasted"
-                      className="w-full [&>button]:min-h-10"
-                      options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }]}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-sm font-medium leading-none">Before the draw</span>
-                  <div className="flex flex-wrap gap-2">
-                    {CONDITIONS.map((c) => {
-                      const on = form.conditions.includes(c)
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => set({ conditions: on ? form.conditions.filter((x) => x !== c) : [...form.conditions, c] })}
-                          className={cn(
-                            'min-h-10 rounded-md border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                            on ? 'border-foreground/40 bg-secondary text-foreground' : 'border-border text-muted-foreground hover:text-foreground',
-                          )}
-                        >
-                          {c}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="te-notes">Notes</Label>
-                  <textarea
-                    id="te-notes"
-                    rows={2}
-                    value={form.notes}
-                    onChange={(e) => set({ notes: e.target.value })}
-                    className="w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
-                  />
-                </div>
+            {(hint || labUnknown) && (
+              <div className="-mt-2 flex flex-col gap-1">
+                {hint && <p id="te-date-hint" className={cn('text-[13px] leading-snug', form.date || mode === 'manual' ? 'text-muted-foreground' : 'text-amber-700 dark:text-amber-400')}>{hint}</p>}
+                {labUnknown && <p id="te-lab-hint" className="text-[13px] leading-snug text-muted-foreground">We could not tell which lab this is.</p>}
               </div>
             )}
-          </div>
-        </section>
+            <Field label="Test name" htmlFor="te-name" optional>
+              <Input id="te-name" className="h-11" value={form.name} placeholder={defaultTestName(lab || undefined)} onChange={(e) => set({ name: e.target.value })} />
+            </Field>
 
-        {dupTest && !dupDismissed && (
-          <div role="alert" className="flex flex-col gap-2 rounded-md bg-amber-500/12 px-3 py-2.5 text-sm text-amber-800 dark:text-amber-300">
-            <p className="flex items-start gap-2">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-              <span>This looks like your {dupTest.provider ? `${dupTest.provider} ` : ''}test from {fmtDay(dupTest.date)} ({same!.matched} of {same!.overlap} values match).</span>
-            </p>
-            <div className="flex gap-2 pl-6">
-              <Button variant="outline" className="h-10" onClick={() => openDuplicate(dupTest.id)}>Open it</Button>
-              <Button
-                variant="ghost"
-                className="h-10"
-                // Nothing new for the duplicate itself: go straight to importing as a separate test.
-                onClick={() => { setDupDismissed(true); if (addTo?.id === dupTest.id && split.add.length === 0) setChoice({ target: dupTest.id, value: 'separate' }) }}
+            <div className="flex flex-col gap-4">
+              <button
+                type="button"
+                className="flex h-11 w-full items-center gap-3 rounded-md border border-input px-3 text-left text-sm font-medium transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30"
+                aria-expanded={detailsOpen}
+                onClick={() => setDetailsOpen(!detailsOpen)}
               >
-                {verb === 'save' ? 'Save' : 'Import'} anyway
-              </Button>
+                <span className="shrink-0">Draw details</span>
+                <span className="min-w-0 flex-1 truncate font-normal text-muted-foreground">{details || 'Time, fasting, what you did before'}</span>
+                <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform duration-200', detailsOpen && 'rotate-180')} />
+              </button>
+              {detailsOpen && (
+                <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3">
+                    <Field label="Time" htmlFor="te-time">
+                      <Input id="te-time" type="time" className="h-11" value={form.drawTime} onChange={(e) => set({ drawTime: e.target.value })} />
+                    </Field>
+                    <Field label="Fasted">
+                      <Segmented
+                        value={form.fasted}
+                        onChange={(v) => set({ fasted: v })}
+                        ariaLabel="Fasted"
+                        className="w-full [&>button]:min-h-9 [&>button]:px-1.5"
+                        options={[{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }, { value: 'unsure', label: 'Not sure' }]}
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Before the draw">
+                    <div className="flex flex-wrap gap-2">
+                      {CONDITIONS.map((c) => {
+                        const on = form.conditions.includes(c)
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            aria-pressed={on}
+                            onClick={() => set({ conditions: on ? form.conditions.filter((x) => x !== c) : [...form.conditions, c] })}
+                            className={cn(
+                              'h-9 rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                              on ? 'border-primary/50 bg-primary/12 text-foreground' : 'border-border text-muted-foreground hover:text-foreground',
+                            )}
+                          >
+                            {c}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </Field>
+                  <Field label="Notes" htmlFor="te-notes" optional>
+                    <textarea
+                      id="te-notes"
+                      rows={2}
+                      value={form.notes}
+                      onChange={(e) => set({ notes: e.target.value })}
+                      className="w-full min-w-0 resize-none rounded-md border border-input bg-transparent px-3 py-2.5 text-base shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
+                    />
+                  </Field>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          </section>
 
-        {showSame && sameTest && (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm">
-              You have a {sameTest.provider ? `${sameTest.provider} ` : ''}test from {fmtDay(sameTest.date)}. Is this the same blood draw?
-            </p>
-            <Segmented
-              value={addTo ? 'add' : 'separate'}
-              onChange={(v) => setChoice({ target: sameTest.id, value: v })}
-              ariaLabel="Same blood draw"
-              className="w-full [&>button]:min-h-10 [&>button]:leading-tight"
-              options={[{ value: 'add', label: `Add to the ${fmtDay(sameTest.date)} test` }, { value: 'separate', label: 'Keep as a separate test' }]}
-            />
-            {addTo && split.skipped > 0 && <p className="text-xs text-muted-foreground">{split.skipped} already in that test, skipped.</p>}
-          </div>
-        )}
-
-        {/* Rows. Phones get two lines per row: the marker, then its numbers. */}
-        <section aria-label="Results" className="flex flex-col">
-          <div className="sticky -top-4 z-10 -mx-4 grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] gap-x-1.5 border-b bg-card px-4 py-1.5 sm:-top-6 sm:-mx-6 sm:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_2.5rem] sm:px-6" aria-hidden="true">
-            {['Marker', 'Value', 'Unit', 'Low', 'High'].map((h, i) => (
-              <span key={h} className={cn('eyebrow text-[12px]', i === 0 && 'col-span-4 sm:col-span-1')}>{h}</span>
-            ))}
-          </div>
-          <datalist id="te-markers">{MARKER_LABELS.map((l) => <option key={l} value={l} />)}</datalist>
-          <ul className="flex flex-col">
-            {rows.map((r) => {
-              const p = parseEntry(r.value)
-              const filled = !!(r.marker.trim() || r.value.trim())
-              const bad = filled && ((p.value === undefined && !untouched(r)) || !r.marker.trim())
-              const name = r.marker || 'marker'
-              const skip = !!r.marker.trim() && skipKeys.has(canonicalKey(r.marker, r.unit).key)
-              const checkId = r.check ? `te-chk-${r.key}` : undefined
-              const typing = { autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'off', spellCheck: false } as const
-              return (
-                <li
-                  key={r.key}
-                  className={cn('grid grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] gap-1.5 border-b py-2 last:border-b-0 sm:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_2.5rem]', r.check && '-ml-2.5 border-l-2 border-l-amber-500/70 pl-2')}
+          {dupTest && !dupDismissed && (
+            <div role="alert" className="flex flex-col gap-3 rounded-lg bg-amber-500/12 px-3.5 py-3 text-sm text-amber-800 dark:text-amber-300">
+              <p className="flex items-start gap-2.5">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                <span>This looks like your {dupTest.provider ? `${dupTest.provider} ` : ''}test from {fmtDay(dupTest.date)} ({same!.matched} of {same!.overlap} values match).</span>
+              </p>
+              <div className="flex gap-2 pl-6.5">
+                <Button variant="outline" className="h-10" onClick={() => openDuplicate(dupTest.id)}>Open it</Button>
+                <Button
+                  variant="ghost"
+                  className="h-10"
+                  // Nothing new for the duplicate itself: go straight to importing as a separate test.
+                  onClick={() => { setDupDismissed(true); if (addTo?.id === dupTest.id && split.add.length === 0) setChoice({ target: dupTest.id, value: 'separate' }) }}
                 >
-                  <Input
-                    ref={(el) => { if (el && focusKey.current === r.key) { focusKey.current = undefined; el.focus() } }}
-                    className="col-span-3 h-10 sm:col-span-1"
-                    value={r.marker}
-                    list="te-markers"
-                    placeholder="Marker"
-                    aria-label="Marker"
-                    aria-invalid={!!r.value.trim() && !r.marker.trim()}
-                    aria-describedby={checkId}
-                    onChange={(e) => updateRow(r.key, { marker: e.target.value })}
-                    onBlur={() => fillUnit(r)}
-                  />
-                  <Input className="h-10 px-1.5 font-mono tabular-nums" {...typing} value={r.value} placeholder="Value" aria-label={`${name} value`} aria-invalid={bad} aria-describedby={checkId} onChange={(e) => updateRow(r.key, { value: e.target.value })} />
-                  <Input className="h-10 px-2 font-mono" value={r.unit} placeholder="Unit" aria-label={`${name} unit`} onChange={(e) => updateRow(r.key, { unit: e.target.value })} />
-                  <Input className="h-10 px-1.5 font-mono tabular-nums" {...typing} value={r.low} placeholder="Low" aria-label={`${name} range low`} onChange={(e) => updateRow(r.key, { low: e.target.value })} />
-                  <Input className="h-10 px-1.5 font-mono tabular-nums" {...typing} value={r.high} placeholder="High" aria-label={`${name} range high`} onChange={(e) => updateRow(r.key, { high: e.target.value })} />
-                  {/* After High for tab order; phones pin it beside the marker. */}
-                  <Button variant="ghost" size="icon" className="size-10 justify-self-end text-muted-foreground hover:text-destructive max-sm:col-start-4 max-sm:row-start-1" onClick={() => removeRow(r)} aria-label={`Remove ${name}`}>
-                    <Trash2 className="size-4" />
-                  </Button>
-                  {r.check && <p id={checkId} className="col-span-4 text-xs text-muted-foreground sm:col-span-6">Check this one against the report.</p>}
-                  {skip && <p className="col-span-4 text-xs text-muted-foreground sm:col-span-6">Already in that test, skipped.</p>}
-                </li>
-              )
-            })}
-          </ul>
-          <Button variant="outline" className="mt-2 h-10 self-start" onClick={() => { const row = blankRow(); focusKey.current = row.key; setRows((prev) => [...prev, row]) }}>
-            <Plus className="size-4" /> Add a marker
-          </Button>
-          <p className="mt-2 text-xs text-muted-foreground">A value like &lt;0.5 is kept as printed. Type &lt;5 in a range box for an upper limit only.</p>
-        </section>
+                  {verb === 'save' ? 'Save' : 'Import'} anyway
+                </Button>
+              </div>
+            </div>
+          )}
 
-        <div className="sticky bottom-0 z-20 -mx-4 mt-auto flex flex-col-reverse gap-2 border-t bg-card px-4 py-3 sm:-mx-6 sm:flex-row sm:justify-end sm:px-6">
-          <Button variant="outline" className="h-10" onClick={requestClose} disabled={saving}>Cancel</Button>
-          <Button className="h-10" onClick={() => void save()} disabled={!!blocked || saving}>
+          {showSame && sameTest && (
+            <Field label={`You have a ${sameTest.provider ? `${sameTest.provider} ` : ''}test from ${fmtDay(sameTest.date)}. Is this the same blood draw?`}>
+              <Segmented
+                value={addTo ? 'add' : 'separate'}
+                onChange={(v) => setChoice({ target: sameTest.id, value: v })}
+                ariaLabel="Same blood draw"
+                className="w-full [&>button]:min-h-9 [&>button]:leading-tight"
+                options={[{ value: 'add', label: `Add to the ${fmtDay(sameTest.date)} test` }, { value: 'separate', label: 'Keep separate' }]}
+              />
+              {addTo && split.skipped > 0 && <p className="text-[13px] text-muted-foreground">{split.skipped} already in that test, skipped.</p>}
+            </Field>
+          )}
+
+          {/* Results */}
+          <section aria-label="Results" className="flex flex-col">
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="text-sm font-medium">Results</h3>
+              <span className="text-[13px] text-muted-foreground">{valid.length} marker{valid.length === 1 ? '' : 's'}</span>
+            </div>
+            <div className="sticky -top-px z-10 -mx-5 mt-2 border-b border-border bg-card px-5 py-2 sm:-mx-6 sm:px-6" aria-hidden="true">
+              <div className={cn(NUMBERS, WIDE, 'text-[12px] font-medium text-muted-foreground')}>
+                <span className="hidden sm:block">Marker</span>
+                <span>Value</span><span>Unit</span><span>Low</span><span>High</span>
+              </div>
+            </div>
+            <datalist id="te-markers">{MARKER_LABELS.map((l) => <option key={l} value={l} />)}</datalist>
+            <ul className="flex flex-col">
+              {rows.map((r) => {
+                const p = parseEntry(r.value)
+                const filled = !!(r.marker.trim() || r.value.trim())
+                const bad = filled && ((p.value === undefined && !untouched(r)) || !r.marker.trim())
+                const name = r.marker || 'marker'
+                const skip = !!r.marker.trim() && skipKeys.has(canonicalKey(r.marker, r.unit).key)
+                const checkId = r.check ? `te-chk-${r.key}` : undefined
+                const typing = { autoComplete: 'off', autoCorrect: 'off', autoCapitalize: 'off', spellCheck: false } as const
+                return (
+                  <li key={r.key} className={cn('flex flex-col gap-2 border-b border-border/70 py-3 last:border-b-0', WIDE)}>
+                    <div className="flex gap-2 sm:contents">
+                      <Input
+                        ref={(el) => { if (el && focusKey.current === r.key) { focusKey.current = undefined; el.focus() } }}
+                        className="h-11 flex-1"
+                        value={r.marker}
+                        list="te-markers"
+                        placeholder="Marker"
+                        aria-label="Marker"
+                        aria-invalid={!!r.value.trim() && !r.marker.trim()}
+                        aria-describedby={checkId}
+                        onChange={(e) => updateRow(r.key, { marker: e.target.value })}
+                        onBlur={() => fillUnit(r)}
+                      />
+                      <Button variant="ghost" size="icon" className="size-11 shrink-0 text-muted-foreground hover:text-destructive sm:order-last" onClick={() => removeRow(r)} aria-label={`Remove ${name}`}>
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                    <div className={cn(NUMBERS, 'sm:contents')}>
+                      <Input className={cn(numberInput, r.check && 'border-amber-500/70')} {...typing} value={r.value} placeholder="Value" aria-label={`${name} value`} aria-invalid={bad} aria-describedby={checkId} onChange={(e) => updateRow(r.key, { value: e.target.value })} />
+                      <Input className={numberInput} {...typing} value={r.unit} placeholder="Unit" aria-label={`${name} unit`} onChange={(e) => updateRow(r.key, { unit: e.target.value })} />
+                      <Input className={numberInput} {...typing} value={r.low} placeholder="Low" aria-label={`${name} range low`} onChange={(e) => updateRow(r.key, { low: e.target.value })} />
+                      <Input className={numberInput} {...typing} value={r.high} placeholder="High" aria-label={`${name} range high`} onChange={(e) => updateRow(r.key, { high: e.target.value })} />
+                    </div>
+                    {r.check && (
+                      <p id={checkId} className="flex items-center gap-2 text-[13px] text-amber-700 sm:col-span-6 dark:text-amber-400">
+                        <span className="size-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
+                        Check this one against the report
+                      </p>
+                    )}
+                    {skip && <p className="text-[13px] text-muted-foreground sm:col-span-6">Already in that test, skipped.</p>}
+                  </li>
+                )
+              })}
+            </ul>
+            <Button variant="outline" className="mt-3 h-11 self-start" onClick={() => { const row = blankRow(); focusKey.current = row.key; setRows((prev) => [...prev, row]) }}>
+              <Plus className="size-4" /> Add a marker
+            </Button>
+            <p className="mt-3 text-[13px] leading-snug text-muted-foreground">A value like &lt;0.5 is kept as printed. Type &lt;5 in a range box for an upper limit only.</p>
+          </section>
+        </DialogBody>
+
+        {blocked && !saving && <p className="shrink-0 border-t border-border bg-card px-5 pt-3 text-[13px] text-amber-700 sm:px-6 sm:text-right dark:text-amber-400">{blocked}</p>}
+        <DialogBar className={cn(blocked && !saving && 'border-t-0 pt-3')}>
+          <Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button>
+          <Button onClick={() => void save()} disabled={!!blocked || saving}>
             {saving ? 'Saving…' : label}
           </Button>
-        </div>
+        </DialogBar>
       </DialogContent>
     </Dialog>
   )

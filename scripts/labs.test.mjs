@@ -648,3 +648,7 @@ Note,,,,,,`
   assert.equal(bleedNudge([], [bleed], '2027-03-01'), undefined)
   console.log('phlebotomy ok')
 }
+
+// "Observation Date" (Medichecks/Inuvi) is the draw date, and the birth date before it is ignored.
+assert.deepEqual(extractCollectionDate('D.O.B. : 15-FEB-2000 Sex : M Observation Date : 4-JUN-2026 PID : 2024097706', new Date('2026-10-06')), { date: '2026-06-04', source: 'report' })
+console.log('observation date ok')

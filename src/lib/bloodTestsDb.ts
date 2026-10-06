@@ -59,6 +59,20 @@ async function liveResults(examId: number): Promise<LabResult[]> {
   return (await db.results.where('examId').equals(examId).toArray()).filter(live)
 }
 
+/**
+ * Reports that already became a test but still say "Needs review" (an old
+ * sync race left some behind) are marked reviewed, so the queue only ever
+ * holds reports nobody has imported yet.
+ */
+export async function settleReviewQueue(): Promise<number> {
+  const queued = await db.files.filter((f) => f.status === 'Needs review' && !f.deletedAtSync).toArray()
+  if (queued.length === 0) return 0
+  const linked = new Set((await db.exams.filter((e) => live(e) && e.sourceFileId !== undefined).toArray()).map((e) => e.sourceFileId))
+  const done = queued.filter((f) => linked.has(f.id))
+  await Promise.all(done.map((f) => db.files.update(f.id!, { status: 'Reviewed' })))
+  return done.length
+}
+
 /** Save the editor's draft as a new test, into an existing test (same draw), or over the test being edited. */
 export async function saveTest(d: Draft, target: SaveTarget): Promise<Saved> {
   const exam = {

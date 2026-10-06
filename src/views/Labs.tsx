@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type Ref } from 'rea
 import { ChevronLeft, Droplet, FileText, Keyboard, Lock, Upload } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
+import { settleReviewQueue } from '../lib/bloodTestsDb'
 import { useBloodTests } from '../lib/useBloodTests'
 import { usePlan } from '../lib/plan'
 import { FeedList, FeedRow } from '../components/FeedList'
@@ -117,7 +118,13 @@ export function Labs({ onImport, onManual, onReviewFile, onEdit, onReviewRead }:
   const [route, go] = useBloodsRoute()
   const [mergeId, setMergeId] = useState<number>()
   // A parsed report that was never imported (the review sheet was closed).
-  const pending = useLiveQuery(() => db.files.filter((f) => f.status === 'Needs review' && !!f.extractedText && !f.archivedAt && !f.deletedAtSync).first(), [])
+  // One that already has a test is not pending; settleReviewQueue clears its flag.
+  const pending = useLiveQuery(async () => {
+    const linked = new Set((await db.exams.filter((e) => !e.archivedAt && !e.deletedAtSync).toArray()).map((e) => e.sourceFileId))
+    return db.files.filter((f) => f.status === 'Needs review' && !!f.extractedText && !f.archivedAt && !f.deletedAtSync && !linked.has(f.id)).first()
+  }, [])
+  const queued = useLiveQuery(() => db.files.where('status').equals('Needs review').count(), [])
+  useEffect(() => { if (queued) void settleReviewQueue() }, [queued])
 
   const screen = route.kind === 'home' ? route.tab
     : route.kind === 'test' ? `t${route.id}`

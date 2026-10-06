@@ -13,9 +13,9 @@ import { FeedList, FeedRow } from '../../components/FeedList'
 import { PanelCard } from '../../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Field, InputWithUnit } from '@/components/ui/field'
 import { Segmented } from '@/components/ui/segmented'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogBar, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const today = () => dayOf(new Date().toISOString())
 const SHOWN = 3
@@ -78,42 +78,50 @@ export function PhlebotomyDialog({ row, onClose }: { row?: Phlebotomy; onClose: 
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose() }}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-md">
-        <DialogHeader className="pr-8 text-left">
+      <DialogContent sheet className="sm:max-w-md">
+        <DialogHeader>
           <DialogTitle>{row ? 'Edit blood-letting' : 'Log a blood-letting'}</DialogTitle>
           <DialogDescription>Your next test shows what it did to your hematocrit.</DialogDescription>
         </DialogHeader>
-        <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); void save() }}>
-          <Segmented
-            ariaLabel="Kind"
-            value={kind}
-            onChange={setKind}
-            options={[{ value: 'therapeutic', label: 'Venesection' }, { value: 'donation', label: 'Donation' }]}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pb-date">Date</Label>
-              <Input id="pb-date" type="date" required max={today()} className="h-10" value={date} onChange={(e) => setDate(e.target.value)} />
+        <form id="pb-form" className="contents" onSubmit={(e) => { e.preventDefault(); void save() }}>
+          <DialogBody className="gap-4">
+            <Field label="Type">
+              <Segmented
+                ariaLabel="Type"
+                value={kind}
+                onChange={setKind}
+                className="w-full [&>button]:min-h-9"
+                options={[{ value: 'therapeutic', label: 'Venesection' }, { value: 'donation', label: 'Donation' }]}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Date" htmlFor="pb-date">
+                <Input id="pb-date" type="date" required max={today()} className="h-11" value={date} onChange={(e) => setDate(e.target.value)} />
+              </Field>
+              <Field label="Amount" htmlFor="pb-ml">
+                <InputWithUnit id="pb-ml" unit="mL" inputMode="numeric" className="h-11 font-mono tabular-nums placeholder:font-sans" placeholder={kind === 'donation' ? 'e.g. 470' : 'e.g. 500'} value={volume} onChange={(e) => setVolume(e.target.value.replace(/[^\d.,]/g, ''))} />
+              </Field>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="pb-ml">Amount <span className="font-normal text-muted-foreground">mL</span></Label>
-              <Input id="pb-ml" inputMode="numeric" className="h-10 text-base" placeholder={kind === 'donation' ? '470' : '500'} value={volume} onChange={(e) => setVolume(e.target.value.replace(/[^\d.,]/g, ''))} />
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="pb-place">Where <span className="font-normal text-muted-foreground">optional</span></Label>
-            <Input id="pb-place" className="h-10 text-base" placeholder="NHS, a clinic, a donor centre" value={place} onChange={(e) => setPlace(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="pb-notes">Notes <span className="font-normal text-muted-foreground">optional</span></Label>
-            <Input id="pb-notes" className="h-10 text-base" placeholder="How you felt, what they said" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
-          <DialogFooter className="gap-2">
-            {row && <Button type="button" variant="ghost" className="h-10 text-muted-foreground sm:mr-auto" onClick={() => void archive()} disabled={busy}>Archive</Button>}
-            <Button type="button" variant="outline" className="h-10" onClick={onClose} disabled={busy}>Cancel</Button>
-            <Button type="submit" className="h-10" disabled={!valid || busy}>{busy ? 'Saving…' : 'Save'}</Button>
-          </DialogFooter>
+            <Field label="Where" htmlFor="pb-place" optional>
+              <Input id="pb-place" className="h-11" placeholder="NHS, a clinic, a donor centre" value={place} onChange={(e) => setPlace(e.target.value)} />
+            </Field>
+            <Field label="Notes" htmlFor="pb-notes" optional>
+              <textarea
+                id="pb-notes"
+                rows={2}
+                className="w-full min-w-0 resize-none rounded-md border border-input bg-transparent px-3 py-2.5 text-base shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
+                placeholder="How you felt, what they said"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </Field>
+          </DialogBody>
         </form>
+        <DialogBar>
+          {row && <Button type="button" variant="ghost" className="text-muted-foreground sm:mr-auto" onClick={() => void archive()} disabled={busy}>Archive</Button>}
+          <Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button type="submit" form="pb-form" disabled={!valid || busy}>{busy ? 'Saving…' : 'Save'}</Button>
+        </DialogBar>
       </DialogContent>
     </Dialog>
   )
