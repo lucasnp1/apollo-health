@@ -22,6 +22,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { usePlan } from '../../lib/plan'
+import { bleedRowProps, useBleeds } from './bleedFeed'
+import { BLEED_MARKERS } from '../../lib/phlebotomy'
 import { changeFact, flagChip, markerChip, phaseLabel, plural, printedValue, SECTION_ICON } from './feed'
 
 const num = (v: number) => String(Number(v.toPrecision(4)))
@@ -151,6 +153,9 @@ export function MarkerScreen({ markerKey, focusExamId, tests, isPro, go, onEdit 
   }), [tests, markerKey])
   const series = useMemo(() => markerSeries(tests, markerKey), [tests, markerKey])
   const target = useLiveQuery(() => db.markerTargets.where('marker').equals(markerKey).first(), [markerKey])
+  // Bleeds move the blood count, so its marker screens show them in place.
+  const allBleeds = useBleeds()
+  const bleeds = BLEED_MARKERS.has(markerKey) ? allBleeds ?? [] : []
 
   if (rows.length === 0) {
     return <PanelCard><p className="feed-note text-muted-foreground">No results for this marker yet.</p></PanelCard>
@@ -227,6 +232,10 @@ export function MarkerScreen({ markerKey, focusExamId, tests, isPro, go, onEdit 
               )}
               {act !== undefined && <ReferenceLine y={act} stroke="var(--destructive)" strokeDasharray="4 4" strokeOpacity={0.6} />}
               {targetLines.map((y, i) => <ReferenceLine key={i} y={y} stroke="var(--muted-foreground)" strokeDasharray="2 4" />)}
+              {bleeds
+                .map((b) => parseISO(b.performedAt).getTime())
+                .filter((t) => t >= plotted[0].t && t <= plotted[plotted.length - 1].t)
+                .map((t) => <ReferenceLine key={`b${t}`} x={t} stroke="var(--primary)" strokeDasharray="3 3" strokeOpacity={0.7} label={{ value: 'Bled', position: 'insideTopRight', fontSize: 10, fill: 'var(--primary)' }} />)}
               <XAxis
                 type="number"
                 dataKey="t"
@@ -263,38 +272,15 @@ export function MarkerScreen({ markerKey, focusExamId, tests, isPro, go, onEdit 
         )}
       </ChartCard>
 
-      <PanelCard title="Every test">
+      <PanelCard title="Every test" subtitle={bleeds.length ? 'With your blood-lettings in between' : undefined}>
         <FeedList>
-          {rows.map(({ t, m }) => {
-            const p = series.points.find((x) => x.examId === t.id)
-            const conv = p?.converted && p.value !== undefined ? ` = ${num(p.value)} ${unit}` : ''
-            const facts: FeedFact[] = []
-            const phase = phaseLabel(t.timing.find((d) => d.androgen)?.phase)
-            if (phase) facts.push(phase)
-            if (isPro) {
-              const c = changeFact(m)
-              if (c) facts.push(c)
-            }
-            return (
-              <FeedRow
-                key={t.id}
-                icon={SECTION_ICON[m.section]}
-                title={<span className="font-mono tabular-nums">{printedValue(m)}{m.unit ? ` ${m.unit}` : ''}<span className="text-muted-foreground">{conv}</span></span>}
-                sub={[fmtDay(t.date), t.provider, `range ${fmtRange(m.low, m.high).replace(/^No range printed$/, 'not printed').toLowerCase()}`].filter(Boolean).join(' · ')}
-                status={flagChip(m)}
-                facts={facts}
-                selected={t.id === focusExamId}
-                onClick={() => go(`#test/${t.id}`)}
-              >
-                {/* A misread value is fixed (or removed) in that test's editor. */}
-                {t.id === focusExamId && (
-                  <Button variant="ghost" className="mt-1 h-10 text-muted-foreground" onClick={() => onEdit(t.id)}>
-                    <Pencil className="size-4" /> Edit this test
-                  </Button>
-                )}
-              </FeedRow>
-            )
+          {rows.flatMap(({ t, m }, i) => {
+            // Bleeds after this test and before the newer one sit above it.
+            const newer = rows[i - 1]?.t.date
+            const between = bleeds.filter((b) => b.performedAt >= dayOf(t.date) && (!newer || b.performedAt < dayOf(newer)))
+            return [...between.map((b) => <FeedRow key={`b${b.id}`} {...bleedRowProps(b, tests)} facts={undefined} />), row(t, m)]
           })}
+          {bleeds.filter((b) => b.performedAt < dayOf(rows[rows.length - 1].t.date)).map((b) => <FeedRow key={`b${b.id}`} {...bleedRowProps(b, tests)} facts={undefined} />)}
         </FeedList>
       </PanelCard>
 
@@ -302,4 +288,35 @@ export function MarkerScreen({ markerKey, focusExamId, tests, isPro, go, onEdit 
       <TargetEditor key={markerKey} markerKey={markerKey} target={target} unit={unit} low={last?.low} high={last?.high} />
     </div>
   )
+
+  function row(t: LabTest, m: TestMarker) {
+    const p = series.points.find((x) => x.examId === t.id)
+    const conv = p?.converted && p.value !== undefined ? ` = ${num(p.value)} ${unit}` : ''
+    const facts: FeedFact[] = []
+    const phase = phaseLabel(t.timing.find((d) => d.androgen)?.phase)
+    if (phase) facts.push(phase)
+    if (isPro) {
+      const c = changeFact(m)
+      if (c) facts.push(c)
+    }
+    return (
+      <FeedRow
+        key={t.id}
+        icon={SECTION_ICON[m.section]}
+        title={<span className="font-mono tabular-nums">{printedValue(m)}{m.unit ? ` ${m.unit}` : ''}<span className="text-muted-foreground">{conv}</span></span>}
+        sub={[fmtDay(t.date), t.provider, `range ${fmtRange(m.low, m.high).replace(/^No range printed$/, 'not printed').toLowerCase()}`].filter(Boolean).join(' · ')}
+        status={flagChip(m)}
+        facts={facts}
+        selected={t.id === focusExamId}
+        onClick={() => go(`#test/${t.id}`)}
+      >
+        {/* A misread value is fixed (or removed) in that test's editor. */}
+        {t.id === focusExamId && (
+          <Button variant="ghost" className="mt-1 h-10 text-muted-foreground" onClick={() => onEdit(t.id)}>
+            <Pencil className="size-4" /> Edit this test
+          </Button>
+        )}
+      </FeedRow>
+    )
+  }
 }

@@ -16,6 +16,7 @@ const BpTrendCard = lazy(() => import('../components/BpTrendCard').then((m) => (
 const WeightTrendCard = lazy(() => import('../components/WeightTrendCard').then((m) => ({ default: m.WeightTrendCard })))
 const WellbeingCard = lazy(() => import('../components/WellbeingCard').then((m) => ({ default: m.WellbeingCard })))
 const WellbeingSummaryCard = lazy(() => import('../components/WellbeingSummaryCard').then((m) => ({ default: m.WellbeingSummaryCard })))
+const BleedNudgeCard = lazy(() => import('../components/BleedNudgeCard').then((m) => ({ default: m.BleedNudgeCard })))
 
 const DAY = 86_400_000
 
@@ -227,6 +228,11 @@ export function Overview({
           after the at-a-glance tiles and before the detail charts. */}
       <Suspense fallback={null}>
         <WellbeingSummaryCard symptoms={symptoms} vitals={vitals} injections={injections} compounds={compounds} />
+      </Suspense>
+
+      {/* Blood-letting: only when hematocrit is high or a bleed awaits its retest. */}
+      <Suspense fallback={null}>
+        <BleedNudgeCard onOpen={() => onNavigate('labs')} />
       </Suspense>
 
       {/* Drug levels through time */}

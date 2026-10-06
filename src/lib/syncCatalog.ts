@@ -32,7 +32,7 @@ export type TableSpec = {
 // Parent-first order. Children depend on earlier entries.
 //   compounds → vials/protocols → protocolDoses → injections
 //   files     → exams           → results
-//   no-deps   : vitals, symptoms, markerTargets, goals, bodyMetrics
+//   no-deps   : vitals, symptoms, markerTargets, goals, bodyMetrics, phlebotomies
 export const TABLES: TableSpec[] = [
   {
     slug: 'compounds',
@@ -258,6 +258,18 @@ export const TABLES: TableSpec[] = [
       hrvMs: 'real',
       sleepHours: 'real',
       externalKey: 'text',
+      archivedAt: 'int',
+    },
+  },
+  {
+    slug: 'phlebotomies',
+    dexie: 'phlebotomies',
+    columns: {
+      performedAt: 'text',
+      kind: 'text',
+      volumeMl: 'real',
+      place: 'text',
+      notes: 'text',
       archivedAt: 'int',
     },
   },

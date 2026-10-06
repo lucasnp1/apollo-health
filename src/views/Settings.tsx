@@ -45,6 +45,7 @@ async function importJson(file: File) {
   if (Array.isArray(dump.symptoms)      && dump.symptoms.length)      await db.symptoms.bulkPut(dump.symptoms)
   if (Array.isArray(dump.markerTargets) && dump.markerTargets.length) await db.markerTargets.bulkPut(dump.markerTargets)
   if (Array.isArray(dump.bodyMetrics)   && dump.bodyMetrics.length)   await db.bodyMetrics.bulkPut(dump.bodyMetrics)
+  if (Array.isArray(dump.phlebotomies)  && dump.phlebotomies.length)  await db.phlebotomies.bulkPut(dump.phlebotomies)
 }
 
 async function exportJson() {
@@ -62,6 +63,7 @@ async function exportJson() {
     symptoms: await db.symptoms.toArray(),
     markerTargets: await db.markerTargets.toArray(),
     bodyMetrics: await db.bodyMetrics.toArray(),
+    phlebotomies: await db.phlebotomies.toArray(),
   }
   const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
@@ -186,6 +188,7 @@ function ArchiveCard({ onOpen }: { onOpen: () => void }) {
       db.symptoms.filter((s) => !!s.archivedAt).count(),
       db.files.filter((f) => !!f.archivedAt).count(),
       db.results.filter((r) => !!r.archivedAt).count(),
+      db.phlebotomies.filter((p) => !!p.archivedAt).count(),
     ])
     return counts.reduce((a, b) => a + b, 0)
   }, [], 0)

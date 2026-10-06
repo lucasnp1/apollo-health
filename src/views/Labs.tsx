@@ -20,6 +20,7 @@ import { MergeDialog, TestReport } from './bloods/TestReport'
 import { MarkerScreen } from './bloods/MarkerScreen'
 import { ComparePage } from './bloods/ComparePage'
 import { DoctorReport } from './bloods/DoctorReport'
+import { BleedsCard } from './bloods/Bleeds'
 import { valueTitle } from './bloods/feed'
 import { parseBloodsHash, type Route } from './bloods/route'
 
@@ -151,6 +152,8 @@ export function Labs({ onImport, onManual, onReviewFile, onEdit, onReviewRead }:
         {tests.length === 0
           ? <Empty isPro={isPro} onImport={onImport} onManual={onManual} />
           : <BloodsHome tests={tests} isPro={isPro} tab={route.tab} onTab={(t) => go(t === 'latest' ? '#latest' : `#${t}`, true)} go={go} onEdit={onEdit} onMerge={setMergeId} />}
+        {/* Beside the tests, not one of them: a bleed is logged, never imported. */}
+        {(route.tab === 'latest' || tests.length === 0) && <BleedsCard tests={tests} />}
         {merge}
       </div>
     )

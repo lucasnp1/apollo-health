@@ -4,6 +4,7 @@ import { Archive as ArchiveIcon, RotateCcw } from 'lucide-react'
 import { db } from '../lib/db'
 import { restoreRow, setFileArchived } from '../lib/archive'
 import { unitLabel } from '../lib/dose'
+import { phlebotomyTitle } from '../lib/phlebotomy'
 import { PanelCard, PanelEmpty } from '../components/dashboard/PanelCard'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -18,6 +19,7 @@ export function Archive() {
   const vitals = useLiveQuery(() => db.vitals.filter((v) => !!v.archivedAt).toArray(), [], [])
   const bodyMetrics = useLiveQuery(() => db.bodyMetrics.filter((b) => !!b.archivedAt).toArray(), [], [])
   const symptoms = useLiveQuery(() => db.symptoms.filter((s) => !!s.archivedAt).toArray(), [], [])
+  const bleeds = useLiveQuery(() => db.phlebotomies.filter((p) => !!p.archivedAt).toArray(), [], [])
   const compounds = useLiveQuery(() => db.compounds.toArray(), [], [])
   // Only show results archived on their own — ones archived with a file are
   // restored by restoring that file, so listing them here would double up.
@@ -37,6 +39,7 @@ export function Archive() {
     { key: 'inj', title: 'Injections', items: (injections ?? []).map((i) => ({ id: i.id!, label: `${compMap.get(i.compoundId)?.name ?? 'Injection'} · ${i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : '')}`, at: i.takenAt, restore: () => restoreRow('injections', i.id!) })) },
     { key: 'weight', title: 'Weight', items: (bodyMetrics ?? []).filter((b) => b.weightKg != null).map((b) => ({ id: b.id!, label: `${b.weightKg} kg`, at: b.measuredAt, restore: () => restoreRow('bodyMetrics', b.id!) })) },
     { key: 'bp', title: 'Blood pressure', items: (vitals ?? []).map((v) => ({ id: v.id!, label: `${v.systolic}/${v.diastolic}`, at: v.measuredAt, restore: () => restoreRow('vitals', v.id!) })) },
+    { key: 'bleed', title: 'Blood-letting', items: (bleeds ?? []).map((p) => ({ id: p.id!, label: phlebotomyTitle(p), at: p.performedAt, restore: () => restoreRow('phlebotomies', p.id!) })) },
     { key: 'sym', title: 'Symptoms', items: (symptoms ?? []).map((s) => ({ id: s.id!, label: 'Check-in', at: s.recordedAt, restore: () => restoreRow('symptoms', s.id!) })) },
     { key: 'labs', title: 'Lab results', items: (results ?? []).map((r) => ({ id: r.id!, label: `${r.marker} · ${r.rawValue}${r.unit ? ' ' + r.unit : ''}`, restore: () => restoreRow('results', r.id!) })) },
   ].filter((g) => g.items.length > 0)

@@ -218,6 +218,18 @@ export type Goal = {
   achievedAt?: string
 }
 
+// Blood taken off to bring hematocrit down: a therapeutic venesection or a
+// donation. Not a test, so it lives beside the tests, not in exams.
+export type Phlebotomy = {
+  id?: number
+  performedAt: string // yyyy-mm-dd
+  kind: 'therapeutic' | 'donation'
+  volumeMl?: number
+  place?: string
+  notes?: string
+  archivedAt?: number
+} & SyncFields
+
 // Timestamped body measurements imported from Apple Health, wearables, or manual entry.
 // Each row may carry a subset of metrics; nulls are normal.
 export type BodyMetric = {
@@ -273,6 +285,7 @@ export class MagnoDatabase extends Dexie {
   markerTargets!: Table<MarkerTarget, number>
   goals!: Table<Goal, number>
   bodyMetrics!: Table<BodyMetric, number>
+  phlebotomies!: Table<Phlebotomy, number>
 
   constructor() {
     super('apollo-health-local')
@@ -342,6 +355,9 @@ export class MagnoDatabase extends Dexie {
       goals: '++id, kind, achievedAt, &serverId, dirty, updatedAt',
       bodyMetrics: '++id, measuredAt, source, &externalKey, &serverId, dirty, updatedAt',
     })
+    this.version(6).stores({
+      phlebotomies: '++id, performedAt, &serverId, dirty, updatedAt',
+    })
   }
 }
 
@@ -368,6 +384,7 @@ const SYNC_TABLES = [
   'markerTargets',
   'goals',
   'bodyMetrics',
+  'phlebotomies',
 ] as const
 
 const SYNC_ONLY_FIELDS = new Set(['serverId', 'updatedAt', 'deletedAtSync', 'dirty'])

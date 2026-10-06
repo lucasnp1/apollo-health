@@ -1,10 +1,10 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Archive as ArchiveIcon, Brain, Check, CircleCheck, Clock, Eye, FileText, FlaskConical, HeartPulse, Scale, SlidersHorizontal, Syringe, TriangleAlert } from 'lucide-react'
+import { Archive as ArchiveIcon, Brain, Check, CircleCheck, Clock, Droplets, Eye, FileText, FlaskConical, HeartPulse, Scale, SlidersHorizontal, Syringe, TriangleAlert } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { format, parseISO, differenceInCalendarDays, isToday, isYesterday } from 'date-fns'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { compoundGroups, groupByCompoundId, type CompoundGroup } from '../lib/compounds'
-import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type Symptom, type VitalLog } from '../lib/db'
+import { db, type BodyMetric, type Compound, type InjectionLog, type LabExam, type Phlebotomy, type Symptom, type VitalLog } from '../lib/db'
 import { ALL_SYMPTOMS, chipTone, ratingOf } from '../lib/symptoms'
 import { archiveRow, restoreRow, setExamArchived, setFileArchived } from '../lib/archive'
 import { useUndoableDelete } from '../lib/useUndoableDelete'
@@ -17,9 +17,12 @@ import { usePlan } from '../lib/plan'
 import type { LabTest } from '../lib/labTests'
 import { fmtDay } from '../lib/dates'
 import { testRowProps } from './bloods/feed'
+import { bleedRowProps, useBleeds } from './bloods/bleedFeed'
 import { cn } from '@/lib/utils'
 
-type EventType = 'injection' | 'weight' | 'bp' | 'lab' | 'file' | 'symptom'
+const NO_BLEEDS: Phlebotomy[] = []
+
+type EventType = 'injection' | 'weight' | 'bp' | 'lab' | 'bleed' | 'file' | 'symptom'
 
 // Status chip on the right of a feed row.
 type Status = FeedStatus
@@ -50,6 +53,7 @@ const TYPE_LABELS: Record<EventType, string> = {
   weight: 'Weight',
   bp: 'BP',
   lab: 'Labs',
+  bleed: 'Blood-letting',
   file: 'Files',
   symptom: 'Symptoms',
 }
@@ -59,6 +63,7 @@ const TYPE_ICONS: Record<EventType, LucideIcon> = {
   weight: Scale,
   bp: HeartPulse,
   lab: FlaskConical,
+  bleed: Droplets,
   file: FileText,
   symptom: Brain,
 }
@@ -454,6 +459,7 @@ export function Timeline({
     [symptoms],
   )
 
+  const bleeds = useBleeds() ?? NO_BLEEDS
   // ── "All" overview events + tab counts ──
   const events = useMemo<TimelineEvent[]>(() => {
     const facts = (...xs: Array<string | undefined | false>) => xs.filter((x): x is string => typeof x === 'string' && x.length > 0)
@@ -519,6 +525,10 @@ export function Timeline({
           dateOnly: true,
         }
       }),
+      ...bleeds.map((b): TimelineEvent => {
+        const row = bleedRowProps(b, tests)
+        return { id: `p-${b.id}`, date: parseISO(b.performedAt), icon: row.icon, iconTone: row.iconTone, title: row.title, sub: b.place, status: LOGGED, note: b.notes, facts: row.facts ?? [], type: 'bleed', dateOnly: true }
+      }),
       ...fileRows.map((f): TimelineEvent => ({
         id: `f-${f.id ?? f.name}-${f.addedAt}`,
         date: parseISO(f.addedAt),
@@ -549,16 +559,17 @@ export function Timeline({
     ]
       .filter((e) => e.date.getTime() <= now)
       .sort((a, b) => b.date.getTime() - a.date.getTime())
-  }, [injections, vitals, tests, isPro, fileRows, symptoms, compoundMap, weightRows, now])
+  }, [injections, vitals, tests, isPro, fileRows, symptoms, compoundMap, weightRows, bleeds, now])
 
   const counts = useMemo<Record<EventType, number>>(() => ({
     injection: injections.length,
     weight: weightRows.length,
     bp: vitals.length,
     lab: exams.length,
+    bleed: bleeds.length,
     file: fileRows.length,
     symptom: symptoms.length,
-  }), [injections, weightRows, vitals, exams, fileRows, symptoms])
+  }), [injections, weightRows, vitals, exams, bleeds, fileRows, symptoms])
 
   // Compounds that actually appear in the injection log (for the sub-filter).
   // One chip per NAME, so five duplicate rows are one clickable compound.
@@ -640,6 +651,7 @@ export function Timeline({
       )}
 
       {activeType === null && <TimelineFeed events={events} onOpenTest={onOpenTest} />}
+      {activeType === 'bleed' && <TimelineFeed events={events.filter((e) => e.type === 'bleed')} onOpenTest={onOpenTest} />}
       {activeType === 'injection' && <DataGrid columns={INJ_COLS} rows={injRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-injection" empty="No injections logged." onArchive={(r) => archiveOne('injections', r.inj.id)} />}
       {activeType === 'weight' && <DataGrid columns={WEIGHT_COLS} rows={weightRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-weight" empty="No weight entries yet." onArchive={(r) => archiveOne('bodyMetrics', r.id)} />}
       {activeType === 'bp' && <DataGrid columns={BP_COLS} rows={bpRows} rowKey={(r) => r.key} storageKey="apollo-tl-cols-bp" empty="No blood pressure readings yet." onArchive={(r) => archiveOne('vitals', r.v.id)} />}

@@ -624,3 +624,27 @@ Note,,,,,,`
   assert.deepEqual([semi.markers[0].low, semi.markers[0].high, semi.date], [30, 400, '2026-10-01'])
   console.log('labTable ok')
 }
+
+// ── Blood-letting against hematocrit ──
+{
+  const { hctSeries, bleedEffect, bleedNudge } = await import('../src/lib/phlebotomy.ts')
+  const test = (date, value, high, labFlag) => ({ date, markers: [{ key: 'hematocrit', value, high, labFlag, read: 'watch' }] })
+  const series = hctSeries([test('2026-10-01', 0.56, 0.5, 'high'), test('2026-06-01', 49, 50, 'none')])
+  assert.deepEqual(series.map((h) => h.pct), [49, 56])
+  // High latest test, no bleed: offer to log one.
+  assert.equal(bleedNudge(series, [], '2026-10-06').tone, 'warn')
+  assert.match(bleedNudge(series, [], '2026-10-06').title, /56% on Oct 1, 2026, over the 50% limit/)
+  // Bleed after the test: retest reminder, 28 days on.
+  const bleed = { performedAt: '2026-10-04', kind: 'therapeutic', volumeMl: 500 }
+  const n = bleedNudge(series, [bleed], '2026-10-06')
+  assert.equal(n.title, 'Venesection · 500 mL 2 days ago')
+  assert.match(n.sub, /Nov 1, 2026/)
+  // Archived bleeds do not count; a test after the bleed ends the nudge if in range.
+  assert.equal(bleedNudge(series, [{ ...bleed, archivedAt: 1 }], '2026-10-06').tone, 'warn')
+  const after = hctSeries([test('2026-10-01', 0.56, 0.5, 'high'), test('2026-11-01', 0.49, 0.5, 'none')])
+  assert.equal(bleedNudge(after, [bleed], '2026-11-02'), undefined)
+  assert.equal(bleedEffect(bleed, after).text, 'Hematocrit 56% → 49% (Oct 1, 2026 to Nov 1, 2026)')
+  // Too long ago: quiet.
+  assert.equal(bleedNudge([], [bleed], '2027-03-01'), undefined)
+  console.log('phlebotomy ok')
+}

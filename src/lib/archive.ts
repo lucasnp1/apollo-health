@@ -4,7 +4,7 @@ import { db } from './db'
 // kept and archived_at propagates as a normal update). Setting updatedAt + dirty
 // explicitly guarantees the sync engine picks it up.
 
-export type ArchivableTable = 'injections' | 'vitals' | 'bodyMetrics' | 'symptoms' | 'results' | 'exams' | 'files'
+export type ArchivableTable = 'injections' | 'vitals' | 'bodyMetrics' | 'symptoms' | 'results' | 'exams' | 'files' | 'phlebotomies'
 
 type Archivable = { archivedAt?: number; updatedAt?: number; dirty?: 0 | 1 }
 

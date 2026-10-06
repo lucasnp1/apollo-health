@@ -247,6 +247,19 @@ export const TABLES: Record<string, TableSpec> = {
       ...CT,
     },
   },
+  phlebotomies: {
+    table: 'phlebotomies',
+    columns: {
+      id: { col: 'id', type: 'text' },
+      performedAt: { col: 'performed_at', type: 'text' },
+      kind: { col: 'kind', type: 'text' },
+      volumeMl: { col: 'volume_ml', type: 'real' },
+      place: { col: 'place', type: 'text' },
+      notes: { col: 'notes', type: 'text' },
+      ...ARCH,
+      ...CT,
+    },
+  },
 }
 
 // Convert a DB row (snake_case) into a client-shaped row (camelCase).

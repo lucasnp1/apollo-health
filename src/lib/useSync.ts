@@ -74,6 +74,7 @@ export function useSync(enabled: boolean): SyncStatus {
         db.results.where('dirty').equals(1).count(),
         db.bodyMetrics.where('dirty').equals(1).count(),
         db.symptoms.where('dirty').equals(1).count(),
+        db.phlebotomies.where('dirty').equals(1).count(),
       ])
       return counts.reduce((a, b) => a + b, 0)
     })
