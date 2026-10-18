@@ -16,6 +16,10 @@ export default function Tabs() {
         <NativeTabs.Trigger.Label>Timeline</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="calendar.day.timeline.left" />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="you">
+        <NativeTabs.Trigger.Label>You</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="person.crop.circle" />
+      </NativeTabs.Trigger>
     </NativeTabs>
   )
 }

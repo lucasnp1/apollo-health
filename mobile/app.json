@@ -46,7 +46,9 @@
           "cameraPermission": "Magno uses the camera to photograph a lab report and read its results on this phone.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

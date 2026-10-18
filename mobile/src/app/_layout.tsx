@@ -12,6 +12,8 @@ import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import { startAccount } from '@/account/auth'
+import { startSync } from '@/account/sync'
 import { loadData } from '@/data/persist'
 import { C, F } from '@/theme'
 
@@ -40,7 +42,11 @@ export default function Root() {
   })
   const [loaded, setLoaded] = useState(false)
   // A failed load still opens the app: writes are per row, so nothing already saved gets overwritten
-  useEffect(() => void loadData().catch(console.error).finally(() => setLoaded(true)), [])
+  // Sync starts once the data is in and the account is known; signed out, it does nothing
+  useEffect(() => void loadData().catch(console.error).finally(() => {
+    setLoaded(true)
+    void startAccount().then(startSync)
+  }), [])
   const ready = fonts && loaded
   useEffect(() => void (ready && SplashScreen.hideAsync()), [ready])
   if (!ready) return null
@@ -58,6 +64,9 @@ export default function Root() {
         <Stack.Screen name="labs/edit" options={{ ...LOG, title: 'Blood test' }} />
         <Stack.Screen name="labs/[id]" options={{ ...PUSH, headerBackTitle: 'Labs' }} />
         <Stack.Screen name="labs/marker/[key]" options={PUSH} />
+        <Stack.Screen name="account/sign-in" options={{ ...LOG, title: 'Sign in' }} />
+        <Stack.Screen name="account/codes" options={{ ...LOG, title: 'Recovery codes' }} />
+        <Stack.Screen name="account/delete" options={{ ...LOG, title: 'Delete account' }} />
       </Stack>
     </ThemeProvider>
     </GestureHandlerRootView>
