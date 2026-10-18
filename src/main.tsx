@@ -71,3 +71,12 @@ createRoot(document.getElementById('root')!).render(
     </ErrorBoundary>
   </StrictMode>,
 )
+
+// Dev-only Agentation toolbar: click an element, annotate it, paste the
+// selector-rich note to Claude. Vite strips this branch from prod builds.
+if (import.meta.env.DEV) {
+  void import('agentation').then(({ Agentation }) => {
+    const el = document.body.appendChild(document.createElement('div'))
+    createRoot(el).render(<Agentation />)
+  })
+}
