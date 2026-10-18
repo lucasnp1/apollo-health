@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { type TextInput, View } from 'react-native'
 import { db } from '@shared/lib/db'
 import { Input, Section, When } from '@/kit'
+import { pushBloodPressure } from '@/health'
 import { LogForm } from '@/LogForm'
 
 export default function LogBP() {
@@ -27,14 +28,14 @@ export default function LogBP() {
   return (
     <LogForm
       canSave={!!sys && !!dia}
-      onSave={() =>
-        db.vitals.add({
+      onSave={async () =>
+        void pushBloodPressure(await db.vitals.add({
           measuredAt: when.toISOString(),
           systolic: Number(sys),
           diastolic: Number(dia),
           pulse: pulse ? Number(pulse) : undefined,
           notes: notes.trim() || undefined,
-        })
+        }))
       }
     >
       <Section title="Reading">

@@ -3,20 +3,25 @@ import { formatDistanceToNow } from 'date-fns'
 import Constants from 'expo-constants'
 import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { signOut, useAccount } from '@/account/auth'
 import { syncNow, useSyncState } from '@/account/sync'
 import { exportAll } from '@/exportData'
+import { disableHealth, enableHealth, healthAvailable, useHealth } from '@/health'
 import { LIVE, usePro } from '@/money/pro'
 import { Card, Eyebrow } from '@/kit'
 import { C, F } from '@/theme'
+
+const toggleHealth = (on: boolean) =>
+  void (on ? enableHealth() : Promise.resolve(disableHealth())).catch((e) => Alert.alert("Couldn't reach Apple Health", String(e?.message ?? e)))
 
 export default function You() {
   const insets = useSafeAreaInsets()
   const acc = useAccount()
   const sync = useSyncState()
   const pro = usePro()
+  const health = useHealth()
 
   const out = () =>
     Alert.alert('Sign out?', 'Your data stays in your account and comes back when you sign in again. It is removed from this phone.', [
@@ -56,6 +61,24 @@ export default function You() {
         )}
         {sync.error && acc.status === 'authed' ? <Text style={y.small}>{sync.error}</Text> : null}
       </View>
+
+      {healthAvailable ? (
+        <View style={{ gap: 10 }}>
+          <Eyebrow>Apple Health</Eyebrow>
+          <Card style={{ gap: 6 }}>
+            <Pressable style={y.switchRow} onPress={() => toggleHealth(!health.on)} accessibilityRole="switch" accessibilityState={{ checked: health.on }}>
+              <Text style={y.label}>Weight and blood pressure</Text>
+              <Switch value={health.on} trackColor={{ true: C.primary }} onValueChange={toggleHealth} accessibilityElementsHidden />
+            </Pressable>
+            <Text style={y.small}>
+              {health.on
+                ? `What you log goes into Health, and readings from your scale or cuff come in here.${health.lastAt ? ` Last checked ${formatDistanceToNow(health.lastAt, { addSuffix: true })}.` : ''}`
+                : 'Send what you log to Apple Health, and bring in readings from a smart scale or a blood pressure cuff.'}
+            </Text>
+          </Card>
+          {health.on ? <Text style={y.small}>Choose exactly what Magno can read and write in the Health app: Profile &gt; Apps &gt; Magno.</Text> : null}
+        </View>
+      ) : null}
 
       <View style={{ gap: 10 }}>
         <Eyebrow>Plan</Eyebrow>
@@ -106,6 +129,7 @@ const y = StyleSheet.create({
   small: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18 },
   primary: { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   primaryText: { fontFamily: F.semi, fontSize: 16, color: C.primaryFg },
+  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 14 },
   sep: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
   label: { fontFamily: F.medium, fontSize: 16, color: C.fg },

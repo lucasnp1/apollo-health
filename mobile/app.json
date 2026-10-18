@@ -17,7 +17,13 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "CFBundleDisplayName": "Magno"
+        "CFBundleDisplayName": "Magno",
+        "NSHealthShareUsageDescription": "Magno reads your weight and blood pressure from Apple Health, for example from a smart scale or a blood pressure cuff, so they appear in your log.",
+        "NSHealthUpdateUsageDescription": "Magno saves the weight and blood pressure you log to Apple Health, so your other health apps can see them."
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
       }
     },
     "plugins": [

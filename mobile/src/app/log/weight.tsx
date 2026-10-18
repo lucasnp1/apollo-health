@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { db } from '@shared/lib/db'
 import { useBodyMetrics, useInjections } from '@/data/useLog'
 import { Input, Section, When } from '@/kit'
+import { pushWeight } from '@/health'
 import { LogForm, num } from '@/LogForm'
 
 export default function LogWeight() {
@@ -24,7 +25,7 @@ export default function LogWeight() {
   return (
     <LogForm
       canSave={ok}
-      onSave={() => db.bodyMetrics.add({ measuredAt: when.toISOString(), source: 'manual', weightKg: kg, notes: notes.trim() || undefined })}
+      onSave={async () => void pushWeight(await db.bodyMetrics.add({ measuredAt: when.toISOString(), source: 'manual', weightKg: kg, notes: notes.trim() || undefined }))}
     >
       <Section title="Body weight" hint={last !== undefined ? `Last logged: ${last} kg` : undefined}>
         <Input autoFocus keyboardType="decimal-pad" suffix="kg" placeholder={last !== undefined ? String(last) : 'e.g. 82.5'} value={weight} onChangeText={setWeight} accessibilityLabel="Body weight in kilograms" />

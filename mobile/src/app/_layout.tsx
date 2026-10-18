@@ -16,6 +16,7 @@ import { startAccount, useAccount } from '@/account/auth'
 import { billingFollowsAccount, startBilling } from '@/money/pro'
 import { startSync } from '@/account/sync'
 import { loadData } from '@/data/persist'
+import { startHealth } from '@/health'
 import { C, F } from '@/theme'
 
 SplashScreen.preventAutoHideAsync()
@@ -49,6 +50,7 @@ export default function Root() {
     void startAccount().then(() => {
       startSync()
       startBilling()
+      startHealth()
     })
   }), [])
   // purchases belong to the account: RevenueCat signs in and out with it

@@ -65,7 +65,10 @@ export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog
       return {
         id: `w-${w.id}`, kind: 'weight', table: 'bodyMetrics', rowId: w.id!, date: parseISO(w.measuredAt),
         title: `Weight ${w.weightKg} kg`,
-        sub: delta === undefined ? 'first entry' : Math.abs(delta) >= 0.05 ? `${arrow(delta)} vs last` : 'no change vs last',
+        sub: facts(
+          delta === undefined ? 'first entry' : Math.abs(delta) >= 0.05 ? `${arrow(delta)} vs last` : 'no change vs last',
+          w.source === 'apple_health' && 'Apple Health',
+        ),
         status: LOGGED, note: w.notes,
       }
     }),
