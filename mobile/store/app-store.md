@@ -3,8 +3,9 @@
 Everything App Store Connect asks for, ready to paste. Keep this file and the store in step, and both in step with the
 app and the website (prices in `mobile/src/money/plans.ts` and the web's `src/lib/plans.ts`).
 
-Nothing here is entered in App Store Connect yet. The app record, the products and every answer marked **(Lucas)**
-wait for Lucas.
+**Entered in App Store Connect on 18 Oct 2026** (app id 6824289899, record "Magno: Protocol Log", SKU magno-ios,
+primary language English (UK)): everything below except screenshots. Lucas said "you do it"; answers I chose are marked
+in the notes below so he can check them.
 
 ## Names and text
 
@@ -64,7 +65,7 @@ Terms: https://magno.fit/terms.html
 Privacy: https://magno.fit/privacy.html
 ```
 
-## In-app purchases (Lucas creates these in App Store Connect; RevenueCat is ready)
+## In-app purchases (created 18 Oct 2026; both "Ready to Submit", they go up with the first app version)
 
 | Product ID | Type | Price | Notes |
 |---|---|---|---|
@@ -77,21 +78,27 @@ attached, default offering with `$rc_monthly` and `$rc_lifetime`. The public SDK
 RevenueCat (I can't handle keys), and connecting the Stripe account to RevenueCat (Project settings > Stripe) so web
 purchases count there too. Then set `extra.billing.live` to `true`. Blocked today on Apple's Paid Apps agreement.
 
-## App Privacy (draft, Lucas confirms)
+## App Privacy (published 18 Oct 2026)
 
 - **Signed out:** no data collected. Everything stays on the device.
 - **Signed in (optional account):** Data Linked to You, used for App Functionality only, not for tracking:
   - Health & Fitness: health (injections, blood tests, blood pressure, weight, check-ins)
   - Contact Info: email address
   - Identifiers: user ID
-  - Purchases: purchase history (RevenueCat, once billing is on)
+  - Purchases: **not declared yet**: with billing off the app sends no purchase data. Add "Purchase history" when
+    `extra.billing.live` goes true.
 - Tracking: **No.** No third-party analytics or ads in the app.
 
-## Age rating (draft, Lucas answers the questionnaire)
+## Age rating (answered 18 Oct 2026)
 
-- Medical or Treatment Information: **Frequent** (the app is a medical log).
-- Alcohol, Tobacco, or Drug Use or References: **Infrequent/Mild** (prescription compounds are typed in by the user).
-- Everything else: None. Expect 17+ or 18+; that's fine for this audience.
+- Medical or Treatment Information: **Infrequent**. Apple defines it as content giving diagnoses or guidance; Magno
+  gives neither, but flags results outside the lab's range. Health or wellness topics (self-care advice): No.
+- Alcohol, Tobacco, or Drug Use or References: **Infrequent** (prescription compounds are typed in by the user).
+- Every feature question (parental controls, web, user content, social, chat, ads) and every other theme: None/No.
+- Calculated 13+, **overridden to 18+** because magno.fit's terms require users to be 18 (Apple asks the rating to match
+  the minimum age in the terms).
+- Regulated medical device declaration: **No, not a regulated medical device in any country.** Content rights: no
+  third-party content.
 
 ## Review notes
 
@@ -110,9 +117,13 @@ Magno Pro is free for everyone in this version (billing is not live yet).
 - [ ] **Account type (Guideline 5.1.1(ix)):** Apple asks that healthcare apps be submitted by a legal entity. Lucas chose
       to submit as an individual first (18 Oct 2026). If review rejects on 5.1.1(ix), convert the developer account to an
       organisation (needs a D-U-N-S number) and resubmit.
-- [ ] App ID `app.magno.ios` registered (developer.apple.com > Identifiers), then the App Store Connect record (Lucas).
+- [x] App ID `app.magno.ios` registered and the App Store Connect record created (18 Oct 2026).
+- [ ] **Lucas: accept the updated Apple Developer Program License Agreement** (banner in App Store Connect; only the
+      account holder can, and Apple blocks new app submissions until then).
 - [ ] Screenshots 6.9" (1320x2868) from the Release build with real-looking sample data (no real person's data).
-- [ ] Privacy answers and age rating (Lucas).
+- [x] Privacy answers and age rating (entered 18 Oct 2026; see above).
 - [ ] Export compliance: HTTPS only, no custom encryption, so `usesNonExemptEncryption: false` (already in app.json).
-- [ ] TestFlight build via `mobile/scripts/testflight.sh`; Lucas tests on his iPhone first.
-- [ ] Release: manual.
+- [x] TestFlight build 1 uploaded 18 Oct 2026; internal group "Me" (Lucas, automatic distribution). Next uploads:
+      `mobile/scripts/testflight.sh` (bumps the build number).
+- [ ] Lucas tests build 1 on his iPhone.
+- [x] Release: manual (set). Review contact: Lucas, same as Liber's. Sign-in required: off.
