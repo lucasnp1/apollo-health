@@ -8,6 +8,10 @@ export default function Tabs() {
         <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="house.fill" />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="labs">
+        <NativeTabs.Trigger.Label>Labs</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="testtube.2" />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="timeline">
         <NativeTabs.Trigger.Label>Timeline</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="calendar.day.timeline.left" />

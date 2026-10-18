@@ -2,17 +2,18 @@
 // statuses), minus labs and files until those land in the app.
 import { differenceInCalendarDays, format, isToday, isYesterday, parseISO } from 'date-fns'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '@shared/lib/db'
+import type { LabTest } from '@shared/lib/labTests'
 import { compoundGroups, groupByCompoundId } from '@shared/lib/compounds'
 import { ALL_SYMPTOMS, chipTone, ratingOf } from '@shared/lib/symptoms'
 import type { ArchivableTable } from '@shared/lib/archive'
 import type { Tone } from '@/theme'
 
-export type Kind = 'injection' | 'weight' | 'bp' | 'symptom'
+export type Kind = 'injection' | 'weight' | 'bp' | 'symptom' | 'lab'
 
 export type Event = {
   id: string
   kind: Kind
-  table: ArchivableTable
+  table: ArchivableTable | 'test'
   rowId: number
   date: Date
   title: string
@@ -21,9 +22,11 @@ export type Event = {
   note?: string
   /** The compound's colour, for injections */
   dot?: string
+  /** A blood test carries its draw day, not a time */
+  dateOnly?: boolean
 }
 
-export const KIND_LABEL: Record<Kind, string> = { injection: 'Injections', weight: 'Weight', bp: 'Blood pressure', symptom: 'Check-ins' }
+export const KIND_LABEL: Record<Kind, string> = { injection: 'Injections', weight: 'Weight', bp: 'Blood pressure', symptom: 'Check-ins', lab: 'Labs' }
 
 const LOGGED = { label: 'Logged', tone: 'neutral' } as const
 
@@ -41,7 +44,7 @@ export const unitLabel = (u?: string) => (u === 'iu' ? 'IU' : (u ?? ''))
 const arrow = (v: number) => `${v > 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(1)} kg`
 const facts = (...xs: Array<string | undefined | false>) => xs.filter((x): x is string => !!x).join(' · ') || undefined
 
-export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog[]; vitals: VitalLog[]; bodyMetrics: BodyMetric[]; symptoms: Symptom[] }): Event[] {
+export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog[]; vitals: VitalLog[]; bodyMetrics: BodyMetric[]; symptoms: Symptom[]; tests?: LabTest[] }): Event[] {
   const byId = groupByCompoundId(compoundGroups(d.compounds, d.injections))
   const weights = d.bodyMetrics.filter((b) => b.weightKg !== undefined).sort((a, b) => a.measuredAt.localeCompare(b.measuredAt))
   const now = Date.now()
@@ -95,6 +98,13 @@ export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog
         note: s.notes,
       }
     }),
+    ...(d.tests ?? []).map((t): Event => ({
+      id: `e-${t.id}`, kind: 'lab', table: 'test', rowId: t.id, date: parseISO(t.date), dateOnly: true,
+      title: t.title,
+      sub: facts(t.provider, `${t.counts.total} result${t.counts.total === 1 ? '' : 's'}`),
+      status: t.counts.outOfLabRange ? { label: `${t.counts.outOfLabRange} outside range`, tone: 'warn' } : LOGGED,
+      note: t.exam.notes,
+    })),
   ]
     .filter((e) => e.date.getTime() <= now)
     .sort((a, b) => b.date.getTime() - a.date.getTime())

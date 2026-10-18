@@ -50,6 +50,11 @@ export default function Root() {
         <Stack.Screen name="log/weight" options={{ ...LOG, title: 'Weight' }} />
         <Stack.Screen name="log/bp" options={{ ...LOG, title: 'Blood pressure' }} />
         <Stack.Screen name="log/checkin" options={{ ...LOG, title: 'Check-in' }} />
+        <Stack.Screen name="labs/edit" options={{ ...LOG, title: 'Blood test' }} />
+        <Stack.Screen
+          name="labs/[id]"
+          options={{ headerShown: true, headerBackTitle: 'Labs', headerStyle: { backgroundColor: C.bg }, headerTitleStyle: { fontFamily: F.semi, color: C.fg }, headerTintColor: C.primary, headerShadowVisible: false }}
+        />
       </Stack>
     </ThemeProvider>
   )

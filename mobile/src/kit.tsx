@@ -1,4 +1,6 @@
 // The few building blocks every screen uses, in the web's look: hairline cards, mono eyebrows, amber for the one action.
+import { DatePicker, Host } from '@expo/ui/swift-ui'
+import { datePickerStyle, tint } from '@expo/ui/swift-ui/modifiers'
 import * as Haptics from 'expo-haptics'
 import { forwardRef, type ReactNode } from 'react'
 import { Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native'
@@ -111,4 +113,24 @@ export const s = StyleSheet.create({
   segItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 9 },
   segOn: { backgroundColor: '#2c3036' },
   segText: { fontFamily: F.semi, fontSize: 15, color: C.muted },
+  when: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingRight: 8, borderRadius: 12 },
+  whenLabel: { fontFamily: F.medium, fontSize: 16, color: C.fg },
 })
+
+/** When it happened: now by default, any moment up to now. The native compact picker (SwiftUI DatePicker). */
+export function When({ value, onChange, time = true }: { value: Date; onChange: (d: Date) => void; time?: boolean }) {
+  return (
+    <View style={[s.card, s.when]}>
+      <Text style={s.whenLabel}>{time ? 'When' : 'Date'}</Text>
+      <Host matchContents colorScheme="dark">
+        <DatePicker
+          selection={value}
+          range={{ end: new Date() }}
+          displayedComponents={time ? ['date', 'hourAndMinute'] : ['date']}
+          onDateChange={onChange}
+          modifiers={[datePickerStyle('compact'), tint(C.primary)]}
+        />
+      </Host>
+    </View>
+  )
+}

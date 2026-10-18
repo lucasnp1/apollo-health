@@ -7,7 +7,7 @@ import { db, type InjectionLog } from '@shared/lib/db'
  * wins. Newest first. A copy of the web's src/lib/injections.ts dedupeInjections: that file also holds the vial maths,
  * which the iOS app must not ship (metro.config.js BANNED).
  */
-function dedupeInjections(list: InjectionLog[]): InjectionLog[] {
+export function dedupeInjections(list: InjectionLog[]): InjectionLog[] {
   const seen = new Set<string>()
   return [...list]
     .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))

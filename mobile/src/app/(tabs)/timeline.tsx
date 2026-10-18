@@ -4,7 +4,9 @@ import * as Haptics from 'expo-haptics'
 import { useMemo, useState } from 'react'
 import { ActionSheetIOS, Pressable, SectionList, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { archiveRow } from '@shared/lib/archive'
+import { archiveRow, setExamArchived } from '@shared/lib/archive'
+import { router } from 'expo-router'
+import { useTests } from '@/labs/useTests'
 import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
 import { EventRow } from '@/EventRow'
 import { Chips, Eyebrow } from '@/kit'
@@ -17,7 +19,7 @@ function archive(e: Event) {
   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
   ActionSheetIOS.showActionSheetWithOptions(
     { title: e.title, message: 'Archived entries leave your timeline and charts. They are kept, and you can bring them back.', options: ['Archive', 'Cancel'], destructiveButtonIndex: 0, cancelButtonIndex: 1, userInterfaceStyle: 'dark' },
-    (i) => void (i === 0 && archiveRow(e.table, e.rowId).catch(console.error)),
+    (i) => void (i === 0 && (e.table === 'test' ? setExamArchived(e.rowId, true) : archiveRow(e.table, e.rowId)).catch(console.error)),
   )
 }
 
@@ -28,9 +30,10 @@ export default function Timeline() {
   const vitals = useVitals()
   const bodyMetrics = useBodyMetrics()
   const symptoms = useSymptoms()
+  const tests = useTests()
   const [kind, setKind] = useState<Kind | undefined>()
 
-  const all = useMemo(() => buildEvents({ compounds, injections, vitals, bodyMetrics, symptoms }), [compounds, injections, vitals, bodyMetrics, symptoms])
+  const all = useMemo(() => buildEvents({ compounds, injections, vitals, bodyMetrics, symptoms, tests }), [compounds, injections, vitals, bodyMetrics, symptoms, tests])
   const sections = useMemo(() => byDay(kind ? all.filter((e) => e.kind === kind) : all), [all, kind])
 
   return (
@@ -51,7 +54,7 @@ export default function Timeline() {
       }
       renderSectionHeader={({ section }) => <Eyebrow style={t.day}>{section.title}</Eyebrow>}
       renderItem={({ item, index }) => (
-        <Pressable onLongPress={() => archive(item)} delayLongPress={350} style={({ pressed }) => [t.item, index === 0 && t.first, pressed && { opacity: 0.75 }]}>
+        <Pressable onPress={item.kind === 'lab' ? () => router.push({ pathname: '/labs/[id]', params: { id: String(item.rowId) } }) : undefined} onLongPress={() => archive(item)} delayLongPress={350} style={({ pressed }) => [t.item, index === 0 && t.first, pressed && { opacity: 0.75 }]}>
           {index ? <View style={t.sep} /> : null}
           <EventRow e={item} />
         </Pressable>

@@ -38,6 +38,14 @@
             "enableSceneSupport": true
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Magno opens the photo of a lab report you pick, to read its results on this phone.",
+          "cameraPermission": "Magno uses the camera to photograph a lab report and read its results on this phone.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

@@ -4,21 +4,24 @@ import { useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { db, type Symptom } from '@shared/lib/db'
 import { ALL_SYMPTOMS, chipTone, NEGATIVE, POSITIVE, ratingOf, type SymptomDef, withRating } from '@shared/lib/symptoms'
-import { Input, Section } from '@/kit'
+import { Input, Section, When } from '@/kit'
 import { LogForm } from '@/LogForm'
 import { C, F, TONE } from '@/theme'
 
 export default function LogCheckIn() {
   const [draft, setDraft] = useState<Partial<Symptom>>({})
   const [notes, setNotes] = useState('')
+  const [when, setWhen] = useState(() => new Date())
   const rated = ALL_SYMPTOMS.some((d) => ratingOf(draft, d) !== undefined)
   const row = (d: SymptomDef) => <Scale key={d.key} def={d} value={ratingOf(draft, d)} onChange={(v) => setDraft((f) => withRating(f, d, v))} />
 
   return (
-    <LogForm canSave={rated} onSave={() => db.symptoms.add({ recordedAt: new Date().toISOString(), ...draft, notes: notes.trim() || undefined } as Symptom)}>
+    <LogForm canSave={rated} onSave={() => db.symptoms.add({ recordedAt: when.toISOString(), ...draft, notes: notes.trim() || undefined } as Symptom)}>
       <Text style={k.lead}>Rate anything that applies and leave the rest blank. 0 means none at all.</Text>
       <Section title="Feeling good">{POSITIVE.map(row)}</Section>
       <Section title="To watch">{NEGATIVE.map(row)}</Section>
+      <When value={when} onChange={setWhen} />
+
       <Section title="Notes">
         <Input placeholder="Optional" value={notes} onChangeText={setNotes} multiline />
       </Section>

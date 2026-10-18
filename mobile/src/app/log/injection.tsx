@@ -8,7 +8,7 @@ import { compoundGroups, findCompoundByName, randomDistinctColor } from '@shared
 import { type Compound, db, type InjectionLog, type SyringeKey, type Unit } from '@shared/lib/db'
 import { canonicalSite, quickSites, type Route } from '@shared/lib/sites'
 import { useCompounds, useInjections } from '@/data/useLog'
-import { Chips, Input, Section, Segmented, s as kit } from '@/kit'
+import { Chips, Input, s as kit, Section, Segmented, When } from '@/kit'
 import { LogForm, num } from '@/LogForm'
 import { unitLabel } from '@/timeline'
 
@@ -56,6 +56,7 @@ export default function LogInjection() {
   const [site, setSite] = useState('')
   const [vial, setVial] = useState('')
   const [notes, setNotes] = useState('')
+  const [when, setWhen] = useState(() => new Date())
 
   const group = groups.find((g) => g.key === pick)
   const compound: Compound | undefined = group?.canonical ?? (pick === NEW && name.trim() ? findCompoundByName(compounds, name) : undefined)
@@ -108,7 +109,7 @@ export default function LogInjection() {
     const lines = [notes.trim(), sy && `Syringe: ${sy.label}`, vial.trim() && `Vial: ${vial.trim()}`].filter(Boolean)
     await db.injections.add({
       compoundId,
-      takenAt: new Date().toISOString(),
+      takenAt: when.toISOString(),
       ...(doseN > 0 && { dose: doseN }),
       unit: doseUnit,
       route,
@@ -174,6 +175,8 @@ export default function LogInjection() {
       <Section title="Vial">
         <Input placeholder="Optional, e.g. 250 mg/mL, or 10 mg + 2 mL water" value={vial} onChangeText={setVial} autoCorrect={false} />
       </Section>
+
+      <When value={when} onChange={setWhen} />
 
       <Section title="Notes">
         <Input placeholder="Optional" value={notes} onChangeText={setNotes} multiline />

@@ -11,6 +11,7 @@ export const KIND_ICON: Record<Kind, { sf: SymbolViewProps['name']; color: strin
   weight: { sf: 'scalemass.fill', color: C.blue },
   bp: { sf: 'heart.fill', color: C.rose },
   symptom: { sf: 'brain.head.profile', color: C.violet },
+  lab: { sf: 'testtube.2', color: C.good },
 }
 
 export const EventRow = memo(function EventRow({ e, showDay }: { e: Event; showDay?: string }) {
@@ -27,7 +28,7 @@ export const EventRow = memo(function EventRow({ e, showDay }: { e: Event; showD
           <Text style={r.title} numberOfLines={1}>{e.title}</Text>
         </View>
         <Text style={r.sub} numberOfLines={2}>
-          {[showDay, format(e.date, 'HH:mm'), e.sub].filter(Boolean).join(' · ')}
+          {[showDay, !e.dateOnly && format(e.date, 'HH:mm'), e.sub].filter(Boolean).join(' · ')}
         </Text>
         {e.note ? <Text style={r.note} numberOfLines={3}>{e.note}</Text> : null}
       </View>

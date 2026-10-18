@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { type TextInput, View } from 'react-native'
 import { db } from '@shared/lib/db'
-import { Input, Section } from '@/kit'
+import { Input, Section, When } from '@/kit'
 import { LogForm } from '@/LogForm'
 
 export default function LogBP() {
@@ -9,6 +9,7 @@ export default function LogBP() {
   const [dia, setDia] = useState('')
   const [pulse, setPulse] = useState('')
   const [notes, setNotes] = useState('')
+  const [when, setWhen] = useState(() => new Date())
   const diaRef = useRef<TextInput>(null)
   const pulseRef = useRef<TextInput>(null)
 
@@ -28,7 +29,7 @@ export default function LogBP() {
       canSave={!!sys && !!dia}
       onSave={() =>
         db.vitals.add({
-          measuredAt: new Date().toISOString(),
+          measuredAt: when.toISOString(),
           systolic: Number(sys),
           diastolic: Number(dia),
           pulse: pulse ? Number(pulse) : undefined,
@@ -47,6 +48,8 @@ export default function LogBP() {
         </View>
         <Input ref={pulseRef} keyboardType="number-pad" placeholder="Pulse (optional)" suffix="bpm" value={pulse} maxLength={3} onChangeText={digits('pulse', setPulse)} accessibilityLabel="Pulse" />
       </Section>
+      <When value={when} onChange={setWhen} />
+
       <Section title="Notes">
         <Input placeholder="Optional" value={notes} onChangeText={setNotes} multiline />
       </Section>

@@ -10,6 +10,7 @@ import Svg, { Circle, Polyline } from 'react-native-svg'
 import { ALL_SYMPTOMS, chipTone, customDefs, ratingOf } from '@shared/lib/symptoms'
 import { felt } from '@shared/lib/wellbeingSummary'
 import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
+import { useTests } from '@/labs/useTests'
 import { EventRow } from '@/EventRow'
 import { Card, Eyebrow } from '@/kit'
 import { buildEvents, dayTitle } from '@/timeline'
@@ -32,6 +33,7 @@ export default function Home() {
   const vitals = useVitals()
   const bodyMetrics = useBodyMetrics()
   const symptoms = useSymptoms()
+  const tests = useTests()
 
   const h = new Date().getHours()
   const greeting = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
@@ -71,8 +73,8 @@ export default function Home() {
   }, [symptoms])
 
   const recent = useMemo(
-    () => buildEvents({ compounds, injections, vitals, bodyMetrics, symptoms }).slice(0, 5),
-    [compounds, injections, vitals, bodyMetrics, symptoms],
+    () => buildEvents({ compounds, injections, vitals, bodyMetrics, symptoms, tests }).slice(0, 5),
+    [compounds, injections, vitals, bodyMetrics, symptoms, tests],
   )
 
   const bpColor = bp.sys === undefined ? C.fg : bp.sys >= 145 ? C.danger : bp.sys >= 135 ? C.warn : C.good

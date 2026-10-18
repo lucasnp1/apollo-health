@@ -31,10 +31,13 @@ function resolve(ctx, name, platform) {
 // @web/<path> is the web original itself, never swapped: a stand-in imports what it reuses from there. (Metro caches a
 // resolution per folder, not per file, so the swap must not depend on who imports.)
 const web = (name) => name.startsWith('@web/') && path.join(shared, name.slice('@web/'.length))
+const webOnly = path.join(app, 'src/data/webOnly.js')
 config.resolver.resolveRequest = (ctx, name, platform) => {
+  if (name.startsWith('pdfjs-dist') || name.startsWith('tesseract.js')) return { type: 'sourceFile', filePath: webOnly }
   const original = web(name)
   if (original) return ctx.resolveRequest(ctx, original, platform)
   const res = resolve(ctx, name, platform)
+  if (res.type === 'sourceFile' && res.filePath === path.join(shared, 'lib', 'ocr.ts')) return { type: 'sourceFile', filePath: webOnly }
   if (res.type === 'sourceFile' && BANNED.includes(res.filePath))
     throw new Error(`${path.basename(res.filePath)} must not ship in the iOS app (imported by ${ctx.originModulePath})`)
   if (res.type !== 'sourceFile' || !res.filePath.startsWith(path.join(shared, 'lib') + path.sep)) return res
