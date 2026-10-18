@@ -4,7 +4,7 @@ Everything App Store Connect asks for, ready to paste. Keep this file and the st
 app and the website (prices in `mobile/src/money/plans.ts` and the web's `src/lib/plans.ts`).
 
 **Entered in App Store Connect on 18 Oct 2026** (app id 6824289899, record "Magno: Protocol Log", SKU magno-ios,
-primary language English (UK)): everything below except screenshots. Lucas said "you do it"; answers I chose are marked
+primary language English (UK)): everything below, screenshots included. Lucas said "you do it"; answers I chose are marked
 in the notes below so he can check them.
 
 ## Names and text
@@ -120,10 +120,11 @@ Magno Pro is free for everyone in this version (billing is not live yet).
 - [x] App ID `app.magno.ios` registered and the App Store Connect record created (18 Oct 2026).
 - [ ] **Lucas: accept the updated Apple Developer Program License Agreement** (banner in App Store Connect; only the
       account holder can, and Apple blocks new app submissions until then).
-- [ ] Screenshots 6.9" (1320x2868) from the Release build with real-looking sample data (no real person's data).
+- [x] Screenshots: 6 uploaded 18 Oct 2026 at 1206x2622 (`store/screenshots-6.3/`; sources at 1320x2868 in
+      `store/screenshots-6.9/`), Release build with made-up sample data.
 - [x] Privacy answers and age rating (entered 18 Oct 2026; see above).
 - [ ] Export compliance: HTTPS only, no custom encryption, so `usesNonExemptEncryption: false` (already in app.json).
-- [x] TestFlight build 1 uploaded 18 Oct 2026; internal group "Me" (Lucas, automatic distribution). Next uploads:
+- [x] TestFlight build 1 uploaded and processed 18 Oct 2026 ("Ready to submit", invite sent); internal group "Me" (Lucas, automatic distribution). Next uploads:
       `mobile/scripts/testflight.sh` (bumps the build number).
 - [ ] Lucas tests build 1 on his iPhone.
 - [x] Release: manual (set). Review contact: Lucas, same as Liber's. Sign-in required: off.
