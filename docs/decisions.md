@@ -20,19 +20,37 @@ Decided by Lucas, 18 Oct 2026, for the iOS app only:
   enforced by metro.config.js. Lucas wants a better solution later.
 - Submit as an individual developer first. In-app purchase sits behind `extra.billing.live` (off) while Apple's Paid
   Apps agreement is stuck.
+- **Money (phase 6):** RevenueCat is the one place that decides who has paid. iPhone purchases go through Apple; the
+  web's Stripe account is connected to RevenueCat so web purchases count too, keyed by the Magno account id. Same
+  prices on iPhone as on the web: £4.99 a month, £99 lifetime. On 18 Oct 2026 Stripe had no Magno subscribers or
+  completed checkouts, so nothing needs migrating. Switching the website's own paywall check to RevenueCat is a web
+  change and waits for Lucas's OK.
 
 Syringe and vial details have no column of their own on an injection, so they are saved as lines under the note
 ("Syringe: 50 unit insulin", "Vial: 250 mg/mL"), which the web shows as well. The syringe is also remembered on the
 compound with the web's own key, so either app picks it again next time.
 
-### State, 18 Oct 2026 (phases 1 and 2 done)
+### State, 18 Oct 2026 (end of day: phases 1 to 6 built, 7 prepared)
 
-- Runs in the iOS simulator (iPhone 18 Pro, iOS 27) as a Release build with data kept on the device.
-- Home: greeting, Add to your log (injection, weight, blood pressure, check-in), pressure / weight / wellbeing tiles
-  with sparklines, latest five entries.
-- Timeline: every entry by day, filter by kind, press and hold to archive (restorable, like the web).
-- Not in the app yet: labs (phase 3), charts and "What needs a look" (phase 4), accounts and sync (phase 5),
-  in-app purchase (phase 6). Data stays on the phone until sync lands: nothing reaches magno.fit yet.
+All tested in the iOS simulator (iPhone 18 Pro, iOS 27), Release build:
+
+- **Logging:** injections (log, never calculate), weight, blood pressure, check-ins, each with a "When" picker for
+  past entries. Home (three tiles, trends, latest) and Timeline (by day, filter, archive).
+- **Labs:** import a PDF (PDFKit) or a photo (Vision), both read on the phone by `mobile/modules/labreader` and parsed
+  by the web's own `src/lib/pdf.ts`; check every row before saving; enter by hand; test detail against the lab's own
+  range; marker history. No interpretation of results (the web's plain-words reads are not in the app).
+- **Charts:** weight, blood pressure, and doses with lab results on one time axis (replaces the levels curve).
+- **Account (optional):** sign in or create, recovery codes, sync through the web's own engine, sign out (clears the
+  phone), delete account in the app. Tested against a local copy of the server; never against live magno.fit.
+- **Money:** RevenueCat project "Magno" set up (entitlement `pro`, `magno_pro_monthly`, `magno_pro_lifetime`, default
+  offering); paywall in the app; Pro = RevenueCat or the server's Stripe plan. `extra.billing.live` is off, so
+  everyone has Pro. Pro gates: lab import from PDF/photo and "Before:" (change since the last test), as on the web.
+- **Store:** `mobile/store/app-store.md` has every App Store Connect field, drafts for privacy and age rating, review
+  notes and the checklist.
+
+Open, for Lucas: the App Store Connect record and products, RevenueCat keys and the Stripe connection, privacy and age
+answers, then TestFlight. Note the web puts export behind Pro, which the iOS app does not (the playbook's "never
+paywall the user's own data or export"): his call whether the web follows.
 
 How to build it for the simulator:
 

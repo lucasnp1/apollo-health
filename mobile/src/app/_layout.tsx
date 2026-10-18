@@ -12,7 +12,8 @@ import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { startAccount } from '@/account/auth'
+import { startAccount, useAccount } from '@/account/auth'
+import { billingFollowsAccount, startBilling } from '@/money/pro'
 import { startSync } from '@/account/sync'
 import { loadData } from '@/data/persist'
 import { C, F } from '@/theme'
@@ -45,8 +46,15 @@ export default function Root() {
   // Sync starts once the data is in and the account is known; signed out, it does nothing
   useEffect(() => void loadData().catch(console.error).finally(() => {
     setLoaded(true)
-    void startAccount().then(startSync)
+    void startAccount().then(() => {
+      startSync()
+      startBilling()
+    })
   }), [])
+  // purchases belong to the account: RevenueCat signs in and out with it
+  const acc = useAccount()
+  const who = acc.status === 'authed' ? acc.user.id : acc.status
+  useEffect(() => void billingFollowsAccount().catch(console.error), [who])
   const ready = fonts && loaded
   useEffect(() => void (ready && SplashScreen.hideAsync()), [ready])
   if (!ready) return null
@@ -67,6 +75,7 @@ export default function Root() {
         <Stack.Screen name="account/sign-in" options={{ ...LOG, title: 'Sign in' }} />
         <Stack.Screen name="account/codes" options={{ ...LOG, title: 'Recovery codes' }} />
         <Stack.Screen name="account/delete" options={{ ...LOG, title: 'Delete account' }} />
+        <Stack.Screen name="pro" options={{ ...LOG, title: 'Magno Pro' }} />
       </Stack>
     </ThemeProvider>
     </GestureHandlerRootView>

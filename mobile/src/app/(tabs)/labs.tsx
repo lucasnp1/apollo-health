@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { fmtDay } from '@shared/lib/dates'
 import { defaultTestName } from '@shared/lib/labTests'
 import { setDraft } from '@/labs/draft'
+import { withPro } from '@/money/pro'
 import { readReport } from '@/labs/read'
 import { useTests } from '@/labs/useTests'
 import { Card, Eyebrow } from '@/kit'
@@ -75,7 +76,7 @@ export default function Labs() {
       (i) => {
         if (i === 3) return router.push('/labs/edit')
         const kind = (['pdf', 'photo', 'camera'] as const)[i]
-        if (kind) void importReport(kind, setBusy)
+        if (kind) withPro('Importing a blood test', () => void importReport(kind, setBusy))
       },
     )
 

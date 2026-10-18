@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { signOut, useAccount } from '@/account/auth'
 import { syncNow, useSyncState } from '@/account/sync'
 import { exportAll } from '@/exportData'
+import { LIVE, usePro } from '@/money/pro'
 import { Card, Eyebrow } from '@/kit'
 import { C, F } from '@/theme'
 
@@ -15,6 +16,7 @@ export default function You() {
   const insets = useSafeAreaInsets()
   const acc = useAccount()
   const sync = useSyncState()
+  const pro = usePro()
 
   const out = () =>
     Alert.alert('Sign out?', 'Your data stays in your account and comes back when you sign in again. It is removed from this phone.', [
@@ -53,6 +55,13 @@ export default function You() {
           </Card>
         )}
         {sync.error && acc.status === 'authed' ? <Text style={y.small}>{sync.error}</Text> : null}
+      </View>
+
+      <View style={{ gap: 10 }}>
+        <Eyebrow>Plan</Eyebrow>
+        <Card style={{ paddingVertical: 4 }}>
+          <Row label="Magno Pro" value={!LIVE ? 'Free while Magno is new' : pro ? 'Active' : 'See what it adds'} onPress={() => router.push('/pro')} last />
+        </Card>
       </View>
 
       <View style={{ gap: 10 }}>

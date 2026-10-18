@@ -8,6 +8,7 @@ import { prevText, printedValue, type TestMarker } from '@shared/lib/labTests'
 import { fmtRange } from '@shared/lib/labRules'
 import { SECTION_ORDER } from '@shared/lib/markers'
 import { useTests } from '@/labs/useTests'
+import { usePro } from '@/money/pro'
 import { Eyebrow } from '@/kit'
 import { C, F } from '@/theme'
 
@@ -49,12 +50,15 @@ export default function TestScreen() {
         renderSectionHeader={({ section }) => <Eyebrow style={{ marginTop: 22, marginBottom: 8 }}>{section.title}</Eyebrow>}
         renderItem={({ item, index }) => <Row m={item} first={index === 0} />}
         renderSectionFooter={() => <View style={d.foot} />}
+        ListFooterComponent={<Text style={d.note}>Results as your lab printed them, against the lab's own range. Ask your doctor what they mean for you.</Text>}
       />
     </>
   )
 }
 
 function Row({ m, first }: { m: TestMarker; first: boolean }) {
+  // the change since the last test is Pro, as on the web
+  const pro = usePro()
   const open = () => router.push({ pathname: '/labs/marker/[key]', params: { key: m.key } })
   const flag = m.labFlag === 'high' ? 'Above range' : m.labFlag === 'low' ? 'Below range' : undefined
   return (
@@ -71,7 +75,7 @@ function Row({ m, first }: { m: TestMarker; first: boolean }) {
         <Text style={d.meta}>Lab range {fmtRange(m.low, m.high).replace('No range printed', 'not printed')}</Text>
         {flag ? <Text style={[d.meta, { color: C.warn }]}>{flag}</Text> : null}
       </View>
-      {m.prev ? <Text style={d.meta}>Before: {prevText(m.prev)} {m.prev.unit} on {fmtDay(m.prev.date)}</Text> : null}
+      {m.prev && pro ? <Text style={d.meta}>Before: {prevText(m.prev)} {m.prev.unit} on {fmtDay(m.prev.date)}</Text> : null}
     </Pressable>
   )
 }
@@ -86,5 +90,6 @@ const d = StyleSheet.create({
   value: { fontFamily: F.monoSemi, fontSize: 16, color: C.fg },
   unit: { fontFamily: F.mono, fontSize: 12, color: C.muted },
   meta: { fontFamily: F.mono, fontSize: 12, color: C.muted },
+  note: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18, marginTop: 20 },
   foot: { height: 4, backgroundColor: C.card, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, borderWidth: StyleSheet.hairlineWidth, borderTopWidth: 0, borderColor: C.line },
 })
