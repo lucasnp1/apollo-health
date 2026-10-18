@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Magno",
+    "slug": "magno",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "magno",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0d0e11",
+    "ios": {
+      "bundleIdentifier": "app.magno.ios",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "appleTeamId": "69Y8AJD573",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "CFBundleDisplayName": "Magno"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0d0e11",
+          "image": "./assets/icon.png",
+          "imageWidth": 120
+        }
+      ],
+      "expo-sqlite",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "platforms": [
+      "ios"
+    ],
+    "extra": {
+      "billing": {
+        "live": false
+      }
+    }
+  }
+}
