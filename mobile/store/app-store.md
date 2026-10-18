@@ -74,8 +74,7 @@ Privacy: https://magno.fit/privacy.html
 
 RevenueCat project **Magno** (created 18 Oct 2026): app `Magno iOS` (app.magno.ios), entitlement `pro`, both products
 attached, default offering with `$rc_monthly` and `$rc_lifetime`. The public SDK key is in `app.json`
-(`extra.billing.revenuecatIosKey`). Still needed, by Lucas: the In-App Purchase key and the App Store Connect API key in
-RevenueCat (I can't handle keys), and connecting the Stripe account to RevenueCat (Project settings > Stripe) so web
+(`extra.billing.revenuecatIosKey`). Lucas added the In-App Purchase key and the App Store Connect API key (18 Oct 2026). Optional: connecting the Stripe account to RevenueCat (Project settings > Stripe) so web
 purchases count there too. Then set `extra.billing.live` to `true`. Blocked today on Apple's Paid Apps agreement.
 
 ## App Privacy (published 18 Oct 2026)
@@ -127,4 +126,7 @@ Magno Pro is free for everyone in this version (billing is not live yet).
 - [x] TestFlight build 1 uploaded and processed 18 Oct 2026 ("Ready to submit", invite sent); internal group "Me" (Lucas, automatic distribution). Next uploads:
       `mobile/scripts/testflight.sh` (bumps the build number).
 - [ ] Lucas tests build 1 on his iPhone.
+- [ ] Build 2 (18 Oct night) brings the plain-words reads of results back. Before submitting: rewrite the review notes
+      (they say results are not interpreted), recheck the age-rating "Medical info" answer and the description's
+      "It does not interpret" lines.
 - [x] Release: manual (set). Review contact: Lucas, same as Liber's. Sign-in required: off.

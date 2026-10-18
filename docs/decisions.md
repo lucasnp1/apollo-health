@@ -38,7 +38,7 @@ All tested in the iOS simulator (iPhone 18 Pro, iOS 27), Release build:
   past entries. Home (three tiles, trends, latest) and Timeline (by day, filter, archive).
 - **Labs:** import a PDF (PDFKit) or a photo (Vision), both read on the phone by `mobile/modules/labreader` and parsed
   by the web's own `src/lib/pdf.ts`; check every row before saving; enter by hand; test detail against the lab's own
-  range; marker history. No interpretation of results (the web's plain-words reads are not in the app).
+  range; marker history. (Changed 18 Oct night, see below: the web's plain-words reads are now in the app.)
 - **Charts:** weight, blood pressure, and doses with lab results on one time axis (replaces the levels curve).
 - **Account (optional):** sign in or create, recovery codes, sync through the web's own engine, sign out (clears the
   phone), delete account in the app. Tested against a local copy of the server; never against live magno.fit.
@@ -51,6 +51,30 @@ All tested in the iOS simulator (iPhone 18 Pro, iOS 27), Release build:
 Open, for Lucas: the App Store Connect record and products, RevenueCat keys and the Stripe connection, privacy and age
 answers, then TestFlight. Note the web puts export behind Pro, which the iOS app does not (the playbook's "never
 paywall the user's own data or export"): his call whether the web follows.
+
+### State, 18 Oct 2026 (night: TestFlight build 2)
+
+Lucas asked overnight for the Home widgets split, the bloods "what's up" read back, wellbeing back, an audit of
+everything the web had, notifications and the doctor export. Done and simulator-tested:
+
+- **Home:** one widget style (eyebrow, title, action) for Insights, Injections, Bloods, Wellbeing, Weight, Pressure and
+  Latest. Injections show each shot's dose and day per compound, with Week/Month/3M/All ranges; compounds with no shot
+  in the range are hidden.
+- **Interpretation is back (Lucas's call, overrides the earlier "no interpretation" line):** Home insights, the test
+  report's plain-words reads ("Read what this means"), marker explanations, using the web's own `homeInsights`,
+  `labFindings`, `labRules` and `labCopy`. Dosing is still log-only. Risk: Apple 1.4.1 and the medical-device line. The
+  App Store age-rating answer (Medical info: Infrequent), the not-a-medical-device declaration and the review notes
+  ("does not interpret results") must be revisited before submitting.
+- **Bloods:** Latest/Tests/Markers, add/edit/add-to-test with same-draw and duplicate checks, merge, compare, archive with
+  undo, blood-lettings, doctor PDF.
+- **Also:** Apple Health (weight and BP, both ways), reminders per kind (local notifications), export for your doctor
+  (PDF and CSV, free), archive, edit any entry, site rotation, change password, recovery codes, feedback.
+
+Not done yet: view the original lab file (needs file storage), CSV/XLSX lab import, personal marker targets, share
+image, onboarding, light theme, removing archived entries from Apple Health.
+
+**Money on iPhone, like Liber:** Apple in-app purchase through RevenueCat only; the app never talks to Stripe. Stripe
+only matters for the website, which can keep it or move to RevenueCat Web Billing later (a web change, Lucas's call).
 
 How to build it for the simulator:
 
