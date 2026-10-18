@@ -55,9 +55,10 @@ export default function TestScreen() {
 }
 
 function Row({ m, first }: { m: TestMarker; first: boolean }) {
+  const open = () => router.push({ pathname: '/labs/marker/[key]', params: { key: m.key } })
   const flag = m.labFlag === 'high' ? 'Above range' : m.labFlag === 'low' ? 'Below range' : undefined
   return (
-    <View style={[d.row, first && d.first]}>
+    <Pressable onPress={open} accessibilityRole="button" style={({ pressed }) => [d.row, first && d.first, pressed && { opacity: 0.75 }]}>
       {first ? null : <View style={d.sep} />}
       <View style={d.line}>
         <Text style={d.label} numberOfLines={2}>{m.label}</Text>
@@ -71,7 +72,7 @@ function Row({ m, first }: { m: TestMarker; first: boolean }) {
         {flag ? <Text style={[d.meta, { color: C.warn }]}>{flag}</Text> : null}
       </View>
       {m.prev ? <Text style={d.meta}>Before: {prevText(m.prev)} {m.prev.unit} on {fmtDay(m.prev.date)}</Text> : null}
-    </View>
+    </Pressable>
   )
 }
 

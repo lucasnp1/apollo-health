@@ -11,6 +11,7 @@ import { DarkTheme, Stack, ThemeProvider } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { loadData } from '@/data/persist'
 import { C, F } from '@/theme'
 
@@ -29,6 +30,9 @@ const LOG = {
   contentStyle: { backgroundColor: C.bg },
 } as const
 
+// A pushed screen with a native header
+const PUSH = { headerShown: true, headerStyle: { backgroundColor: C.bg }, headerTitleStyle: { fontFamily: F.semi, color: C.fg }, headerTintColor: C.primary, headerShadowVisible: false } as const
+
 export default function Root() {
   const [fonts] = useFonts({
     HankenGrotesk_400Regular, HankenGrotesk_500Medium, HankenGrotesk_600SemiBold, HankenGrotesk_700Bold,
@@ -42,6 +46,7 @@ export default function Root() {
   if (!ready) return null
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ThemeProvider value={THEME}>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
@@ -51,11 +56,10 @@ export default function Root() {
         <Stack.Screen name="log/bp" options={{ ...LOG, title: 'Blood pressure' }} />
         <Stack.Screen name="log/checkin" options={{ ...LOG, title: 'Check-in' }} />
         <Stack.Screen name="labs/edit" options={{ ...LOG, title: 'Blood test' }} />
-        <Stack.Screen
-          name="labs/[id]"
-          options={{ headerShown: true, headerBackTitle: 'Labs', headerStyle: { backgroundColor: C.bg }, headerTitleStyle: { fontFamily: F.semi, color: C.fg }, headerTintColor: C.primary, headerShadowVisible: false }}
-        />
+        <Stack.Screen name="labs/[id]" options={{ ...PUSH, headerBackTitle: 'Labs' }} />
+        <Stack.Screen name="labs/marker/[key]" options={PUSH} />
       </Stack>
     </ThemeProvider>
+    </GestureHandlerRootView>
   )
 }

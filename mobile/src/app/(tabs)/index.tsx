@@ -11,6 +11,7 @@ import { ALL_SYMPTOMS, chipTone, customDefs, ratingOf } from '@shared/lib/sympto
 import { felt } from '@shared/lib/wellbeingSummary'
 import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
 import { useTests } from '@/labs/useTests'
+import { Trends } from '@/charts/Trends'
 import { EventRow } from '@/EventRow'
 import { Card, Eyebrow } from '@/kit'
 import { buildEvents, dayTitle } from '@/timeline'
@@ -124,6 +125,8 @@ export default function Home() {
           sub={sym.n ? 'good / watch' : 'None in 7d'}
         />
       </View>
+
+      <Trends compounds={compounds} injections={injections} vitals={vitals} bodyMetrics={bodyMetrics} tests={tests ?? []} />
 
       <View style={{ gap: 12 }}>
         <View style={st.rowBetween}>
