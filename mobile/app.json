@@ -54,7 +54,9 @@
         }
       ],
       "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-notifications",
+      "./plugins/withLocalNotificationsOnly"
     ],
     "experiments": {
       "typedRoutes": true,

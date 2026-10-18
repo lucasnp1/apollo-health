@@ -22,6 +22,8 @@ export type Event = {
   note?: string
   /** The compound's colour, for injections */
   dot?: string
+  /** The compound group key (compoundGroups), for injections */
+  group?: string
   /** A blood test carries its draw day, not a time */
   dateOnly?: boolean
 }
@@ -57,7 +59,7 @@ export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog
         id: `i-${i.id}`, kind: 'injection', table: 'injections', rowId: i.id!, date: parseISO(i.takenAt),
         title: dose ? `${name} · ${dose}` : name,
         sub: facts(i.site, i.route, i.vialAmount && `drew ${i.vialAmount}`, i.needle),
-        status: LOGGED, note: i.notes, dot: c?.color,
+        status: LOGGED, note: i.notes, dot: c?.color, group: c?.key,
       }
     }),
     ...weights.map((w, n): Event => {

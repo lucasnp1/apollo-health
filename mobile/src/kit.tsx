@@ -3,7 +3,7 @@ import { DatePicker, Host } from '@expo/ui/swift-ui'
 import { datePickerStyle, tint } from '@expo/ui/swift-ui/modifiers'
 import * as Haptics from 'expo-haptics'
 import { forwardRef, type ReactNode } from 'react'
-import { Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native'
+import { ActionSheetIOS, Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native'
 import { C, F } from '@/theme'
 
 export function Eyebrow({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
@@ -113,6 +113,12 @@ export const s = StyleSheet.create({
   segItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 9 },
   segOn: { backgroundColor: '#2c3036' },
   segText: { fontFamily: F.semi, fontSize: 15, color: C.muted },
+  widgetHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  widgetTitle: { fontFamily: F.semi, fontSize: 19, color: C.fg, letterSpacing: -0.2 },
+  widgetSub: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18 },
+  pill: { borderRadius: 999, borderWidth: 1, borderColor: C.input, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.secondary },
+  pillPrimary: { backgroundColor: C.primary, borderColor: C.primary },
+  pillText: { fontFamily: F.semi, fontSize: 13, color: C.fg },
   when: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingRight: 8, borderRadius: 12 },
   whenLabel: { fontFamily: F.medium, fontSize: 16, color: C.fg },
 })
@@ -132,5 +138,78 @@ export function When({ value, onChange, time = true }: { value: Date; onChange: 
         />
       </Host>
     </View>
+  )
+}
+
+/**
+ * Every Home widget wears the same head: a mono eyebrow naming what it is, the title (the number or verdict that
+ * matters), a muted line under it, and one action on the right. Keep widgets consistent by building them on this.
+ */
+export function Widget({ eyebrow, title, sub, action, children, onPress }: {
+  eyebrow: string
+  title?: ReactNode
+  sub?: ReactNode
+  action?: ReactNode
+  children?: ReactNode
+  onPress?: () => void
+}) {
+  const head = (
+    <View style={s.widgetHead}>
+      <View style={{ flex: 1, gap: 4 }}>
+        <Eyebrow>{eyebrow}</Eyebrow>
+        {title ? <Text style={s.widgetTitle}>{title}</Text> : null}
+        {sub ? <Text style={s.widgetSub}>{sub}</Text> : null}
+      </View>
+      {action}
+    </View>
+  )
+  return (
+    <View style={[s.card, { gap: 14 }]}>
+      {onPress ? (
+        <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => pressed && { opacity: 0.7 }}>
+          {head}
+        </Pressable>
+      ) : (
+        head
+      )}
+      {children}
+    </View>
+  )
+}
+
+/** A small pill button for a widget's head: "3M", "+ Check in". */
+export function Pill({ label, onPress, primary }: { label: string; onPress: () => void; primary?: boolean }) {
+  return (
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={({ pressed }) => [s.pill, primary && s.pillPrimary, pressed && { opacity: 0.7 }]}>
+      <Text style={[s.pillText, primary && { color: C.primaryFg }]}>{label}</Text>
+    </Pressable>
+  )
+}
+
+export type RangeId = '1W' | '1M' | '3M' | '6M' | '1Y' | 'ALL'
+export const RANGE_LABEL: Record<RangeId, string> = { '1W': 'Week', '1M': 'Month', '3M': '3 months', '6M': '6 months', '1Y': 'Year', ALL: 'All time' }
+const RANGE_DAYS: Record<RangeId, number | null> = { '1W': 7, '1M': 30, '3M': 91, '6M': 182, '1Y': 365, ALL: null }
+/** The time span a range covers, ending now; `ALL` starts at the earliest of `times`. */
+export function rangeDomain(r: RangeId, times: number[]): [number, number] {
+  const now = Date.now()
+  const days = RANGE_DAYS[r]
+  if (days !== null) return [now - days * 86_400_000, now]
+  const first = times.length ? Math.min(...times) : now - 30 * 86_400_000
+  return [Math.min(first, now - 7 * 86_400_000), now]
+}
+
+/** Week, month, 3 months... in Apple's own menu, opened from a pill. */
+export function RangeMenu({ value, onChange }: { value: RangeId; onChange: (r: RangeId) => void }) {
+  const ids = Object.keys(RANGE_LABEL) as RangeId[]
+  return (
+    <Pill
+      label={`${RANGE_LABEL[value]} ▾`}
+      onPress={() =>
+        ActionSheetIOS.showActionSheetWithOptions(
+          { options: [...ids.map((i) => RANGE_LABEL[i]), 'Cancel'], cancelButtonIndex: ids.length, userInterfaceStyle: 'dark', title: 'Show' },
+          (i) => i < ids.length && onChange(ids[i]),
+        )
+      }
+    />
   )
 }

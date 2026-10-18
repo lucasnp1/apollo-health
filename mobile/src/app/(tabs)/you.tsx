@@ -48,6 +48,8 @@ export default function You() {
               onPress={() => void syncNow()}
               action="Sync now"
             />
+            <Row label="Change password" onPress={() => router.push('/account/password' as never)} />
+            <Row label="Recovery codes" onPress={() => router.push('/account/recovery' as never)} />
             <Row label="Sign out" onPress={out} danger />
             <Row label="Delete account" onPress={() => router.push('/account/delete')} danger last />
           </Card>
@@ -81,6 +83,14 @@ export default function You() {
       ) : null}
 
       <View style={{ gap: 10 }}>
+        <Eyebrow>Reminders and export</Eyebrow>
+        <Card style={{ paddingVertical: 4 }}>
+          <Row label="Reminders" value="Injection, weight, BP, check-in" onPress={() => router.push('/reminders')} />
+          <Row label="Export for your doctor" value="PDF or spreadsheet" onPress={() => router.push('/export')} last />
+        </Card>
+      </View>
+
+      <View style={{ gap: 10 }}>
         <Eyebrow>Plan</Eyebrow>
         <Card style={{ paddingVertical: 4 }}>
           <Row label="Magno Pro" value={!LIVE ? 'Free while Magno is new' : pro ? 'Active' : 'See what it adds'} onPress={() => router.push('/pro')} last />
@@ -90,6 +100,7 @@ export default function You() {
       <View style={{ gap: 10 }}>
         <Eyebrow>Your data</Eyebrow>
         <Card style={{ paddingVertical: 4 }}>
+          <Row label="Archive" value="Bring entries back" onPress={() => router.push('/archive' as never)} />
           <Row label="Export everything" value="JSON file" onPress={() => void exportAll().catch((e) => Alert.alert("Couldn't export", String(e?.message ?? e)))} last />
         </Card>
         <Text style={y.small}>Export is free, always. Your data is yours.</Text>
@@ -99,7 +110,8 @@ export default function You() {
         <Eyebrow>About</Eyebrow>
         <Card style={{ paddingVertical: 4 }}>
           <Row label="Privacy policy" onPress={() => void WebBrowser.openBrowserAsync('https://magno.fit/privacy.html')} />
-          <Row label="Terms" onPress={() => void WebBrowser.openBrowserAsync('https://magno.fit/terms.html')} last />
+          <Row label="Terms" onPress={() => void WebBrowser.openBrowserAsync('https://magno.fit/terms.html')} />
+          <Row label="Send feedback" onPress={() => router.push('/account/feedback' as never)} last />
         </Card>
         <Text style={y.small}>
           Magno is a log. It records what you did and what your tests measured, and never tells you what to take or how much. Talk to your

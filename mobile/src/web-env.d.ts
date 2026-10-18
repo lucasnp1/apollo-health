@@ -24,3 +24,15 @@ declare module 'tesseract.js' {
   export const OEM: any
   export const PSM: any
 }
+declare module 'lucide-react' {
+  export type LucideIcon = (props: Record<string, unknown>) => null
+  export const Activity: LucideIcon
+  export const Atom: LucideIcon
+  export const Droplet: LucideIcon
+  export const Filter: LucideIcon
+  export const Flame: LucideIcon
+  export const Heart: LucideIcon
+  export const Pill: LucideIcon
+  export const ShieldAlert: LucideIcon
+  export const Sun: LucideIcon
+}

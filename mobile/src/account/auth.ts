@@ -91,3 +91,21 @@ export async function deleteAccount(password: string) {
   await wipeAllLocalData()
   set({ status: 'guest' })
 }
+
+/** Change the password; the server signs out every other device, this one stays signed in. */
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  api.post('/api/auth/password', { currentPassword, newPassword })
+
+/** How many unused recovery codes the account has left. */
+export const recoveryStatus = () => api.get<{ remaining: number; total: number }>('/api/auth/recovery/status')
+
+/** Replaces the recovery codes (the old ones stop working). Re-asks the password. */
+export const regenerateCodes = async (password: string) =>
+  (await api.post<{ codes: string[] }>('/api/auth/recovery/generate', { password })).codes
+
+/** Feedback to the team, stored on the server with the account email. Needs to be signed in. */
+export const sendFeedback = (message: string) => api.post('/api/feedback', { message: message.trim() })
+
+export const SUPPORT_EMAIL = 'hello@theos.studio' // the web app's support address
+export const mailto = (subject: string, body = '') =>
+  `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`

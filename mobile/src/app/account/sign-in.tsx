@@ -2,13 +2,14 @@
 // there's no email reset yet).
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native'
+import { Linking, Pressable, ScrollView, StyleSheet, Text } from 'react-native'
 import { passwordOk } from '@shared/lib/password'
-import { resetWithCode, signIn, signUp } from '@/account/auth'
+import { mailto, resetWithCode, signIn, signUp } from '@/account/auth'
 import { syncNow } from '@/account/sync'
 import { setCodes } from '@/account/codes'
 import { Input, Section, Segmented } from '@/kit'
 import { C, F } from '@/theme'
+import { PasswordRules } from './password'
 
 type Mode = 'in' | 'up' | 'reset'
 
@@ -16,12 +17,13 @@ export default function SignIn() {
   const [mode, setMode] = useState<Mode>('in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
   const strong = passwordOk(password)
-  const ok = email.includes('@') && (mode === 'in' ? !!password : strong) && (mode !== 'reset' || code.trim().length > 3)
+  const ok = email.includes('@') && (mode === 'in' ? !!password : strong) && (mode !== 'reset' || code.trim().length > 3) && (mode !== 'up' || confirm === password)
 
   async function go() {
     if (!ok || busy) return
@@ -71,10 +73,7 @@ export default function SignIn() {
             <Input value={code} onChangeText={setCode} placeholder="XXXX-XXXX" autoCapitalize="characters" autoCorrect={false} />
           </Section>
         ) : null}
-        <Section
-          title={mode === 'reset' ? 'New password' : 'Password'}
-          hint={mode !== 'in' ? (password && !strong ? 'At least 10 characters, with upper and lower case letters and a number.' : 'At least 10 characters, with upper and lower case letters and a number.') : undefined}
-        >
+        <Section title={mode === 'reset' ? 'New password' : 'Password'}>
           <Input
             value={password}
             onChangeText={setPassword}
@@ -82,9 +81,15 @@ export default function SignIn() {
             secureTextEntry
             textContentType={mode === 'in' ? 'password' : 'newPassword'}
             autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
-            onSubmitEditing={go}
+            onSubmitEditing={mode === 'up' ? undefined : go}
           />
+          {mode !== 'in' ? <PasswordRules password={password} /> : null}
         </Section>
+        {mode === 'up' ? (
+          <Section title="Confirm password" hint={confirm && confirm !== password ? "The passwords don't match." : undefined}>
+            <Input value={confirm} onChangeText={setConfirm} placeholder="Password again" secureTextEntry textContentType="newPassword" autoComplete="new-password" onSubmitEditing={go} />
+          </Section>
+        ) : null}
         {error ? <Text style={s.error}>{error}</Text> : null}
         <Pressable onPress={go} disabled={!ok || busy} style={[s.primary, (!ok || busy) && { opacity: 0.45 }]} accessibilityRole="button">
           <Text style={s.primaryText}>{busy ? 'One moment…' : mode === 'up' ? 'Create account' : mode === 'reset' ? 'Reset and sign in' : 'Sign in'}</Text>
@@ -94,9 +99,16 @@ export default function SignIn() {
             <Text style={s.link}>Forgot your password?</Text>
           </Pressable>
         ) : mode === 'reset' ? (
-          <Pressable onPress={() => (setMode('in'), setError(''))} hitSlop={8}>
-            <Text style={s.link}>Back to sign in</Text>
-          </Pressable>
+          <>
+            <Pressable onPress={() => (setMode('in'), setError(''))} hitSlop={8}>
+              <Text style={s.link}>Back to sign in</Text>
+            </Pressable>
+            <Pressable onPress={() => void Linking.openURL(lockedOut(email))} hitSlop={8}>
+              <Text style={s.small}>
+                Locked out, with no codes left? <Text style={{ color: C.accentInk, fontFamily: F.semi }}>Email support</Text> and we'll help you back in.
+              </Text>
+            </Pressable>
+          </>
         ) : (
           <Text style={s.small}>
             Anything already on this phone is added to your new account. By creating an account you agree to the Terms and the Privacy policy (in You).
@@ -114,3 +126,19 @@ const s = StyleSheet.create({
   link: { fontFamily: F.semi, fontSize: 15, color: C.accentInk, textAlign: 'center' },
   small: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18 },
 })
+
+const lockedOut = (email: string) =>
+  mailto(
+    'Magno: locked out of my account',
+    [
+      'Hi,',
+      '',
+      "I can't sign in to Magno and I don't have my recovery codes.",
+      '',
+      `Account email: ${email.trim() || '(type it here)'}`,
+      'Device: iOS app',
+      `Date: ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`,
+      '',
+      'Please send me a link to set a new password.',
+    ].join('\n'),
+  )

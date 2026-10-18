@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import { type TextInput, View } from 'react-native'
-import { db } from '@shared/lib/db'
+import { db, type VitalLog } from '@shared/lib/db'
 import { Input, Section, When } from '@/kit'
 import { pushBloodPressure } from '@/health'
 import { LogForm } from '@/LogForm'
+import { useDirty, useEditRow } from '@/logging/useEntry'
 
 export default function LogBP() {
   const [sys, setSys] = useState('')
@@ -13,6 +14,31 @@ export default function LogBP() {
   const [when, setWhen] = useState(() => new Date())
   const diaRef = useRef<TextInput>(null)
   const pulseRef = useRef<TextInput>(null)
+  const { id, ready } = useEditRow(
+    (rowId) => db.vitals.get(rowId),
+    (v: VitalLog) => {
+      setSys(String(v.systolic))
+      setDia(String(v.diastolic))
+      setPulse(v.pulse ? String(v.pulse) : '')
+      setNotes(v.notes ?? '')
+      setWhen(new Date(v.measuredAt))
+    },
+  )
+  const { dirty } = useDirty({ sys, dia, pulse, notes, when }, ready)
+
+  async function save() {
+    const row = {
+      measuredAt: when.toISOString(),
+      systolic: Number(sys),
+      diastolic: Number(dia),
+      pulse: pulse ? Number(pulse) : undefined,
+      notes: notes.trim() || undefined,
+    }
+    if (id !== undefined) {
+      await db.vitals.update(id, row)
+      void pushBloodPressure(id)
+    } else void pushBloodPressure(await db.vitals.add(row))
+  }
 
   // Three digits fill systolic or diastolic, so the next field takes over with the keyboard still up (as on the web).
   // The last value per field is kept in a ref: keys typed fast arrive before a re-render, so render-time values lag.
@@ -28,20 +54,16 @@ export default function LogBP() {
   return (
     <LogForm
       canSave={!!sys && !!dia}
-      onSave={async () =>
-        void pushBloodPressure(await db.vitals.add({
-          measuredAt: when.toISOString(),
-          systolic: Number(sys),
-          diastolic: Number(dia),
-          pulse: pulse ? Number(pulse) : undefined,
-          notes: notes.trim() || undefined,
-        }))
-      }
+      onSave={save}
+      dirty={dirty}
+      loading={!ready}
+      title={id !== undefined ? 'Edit blood pressure' : undefined}
+      archive={id !== undefined ? { table: 'vitals', id } : undefined}
     >
       <Section title="Reading">
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}>
-            <Input autoFocus keyboardType="number-pad" placeholder="120" suffix="sys" value={sys} maxLength={3} onChangeText={digits('sys', setSys, diaRef)} accessibilityLabel="Systolic" />
+            <Input autoFocus={id === undefined} keyboardType="number-pad" placeholder="120" suffix="sys" value={sys} maxLength={3} onChangeText={digits('sys', setSys, diaRef)} accessibilityLabel="Systolic" />
           </View>
           <View style={{ flex: 1 }}>
             <Input ref={diaRef} keyboardType="number-pad" placeholder="80" suffix="dia" value={dia} maxLength={3} onChangeText={digits('dia', setDia, pulseRef)} accessibilityLabel="Diastolic" />

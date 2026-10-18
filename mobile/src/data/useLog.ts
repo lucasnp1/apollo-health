@@ -1,5 +1,6 @@
 // Everything the logging screens read, live. The same queries as the web app's App.tsx, so both show the same rows.
-import { useLiveQuery } from 'dexie-react-hooks'
+import { liveQuery } from 'dexie'
+import { useSyncExternalStore } from 'react'
 import { db, type InjectionLog } from '@shared/lib/db'
 
 /**
@@ -20,19 +21,37 @@ export function dedupeInjections(list: InjectionLog[]): InjectionLog[] {
     .sort((a, b) => b.takenAt.localeCompare(a.takenAt))
 }
 
-export const useCompounds = () => useLiveQuery(() => db.compounds.filter((c) => !c.archived && !c.deletedAtSync).toArray(), [], [])
+/**
+ * A live query shared by every screen that asks: one Dexie subscription per kind of data, started on first use, so
+ * moving between tabs never waits on a fresh query and a change re-renders each screen once.
+ */
+function shared<T>(query: () => Promise<T>, empty: T) {
+  let value = empty
+  let started = false
+  const subs = new Set<() => void>()
+  const start = () => {
+    if (started) return
+    started = true
+    liveQuery(query).subscribe({ next: (v) => ((value = v), subs.forEach((f) => f())), error: console.error })
+  }
+  const subscribe = (f: () => void) => (subs.add(f), () => void subs.delete(f))
+  return () => {
+    start()
+    return useSyncExternalStore(subscribe, () => value)
+  }
+}
 
-export const useInjections = () =>
-  useLiveQuery(
-    async () =>
-      dedupeInjections(await db.injections.orderBy('takenAt').reverse().filter((i) => !i.deletedAtSync && !i.archivedAt).limit(500).toArray()),
-    [],
-    [],
-  )
+const NONE: never[] = []
 
-export const useVitals = () => useLiveQuery(() => db.vitals.orderBy('measuredAt').reverse().filter((v) => !v.archivedAt).limit(200).toArray(), [], [])
+export const useCompounds = shared(() => db.compounds.filter((c) => !c.archived && !c.deletedAtSync).toArray(), NONE)
 
-export const useBodyMetrics = () =>
-  useLiveQuery(() => db.bodyMetrics.orderBy('measuredAt').reverse().filter((b) => !b.archivedAt).limit(200).toArray(), [], [])
+export const useInjections = shared(
+  async () => dedupeInjections(await db.injections.orderBy('takenAt').reverse().filter((i) => !i.deletedAtSync && !i.archivedAt).toArray()),
+  NONE,
+)
 
-export const useSymptoms = () => useLiveQuery(() => db.symptoms.orderBy('recordedAt').reverse().filter((s) => !s.archivedAt).limit(200).toArray(), [], [])
+export const useVitals = shared(() => db.vitals.orderBy('measuredAt').reverse().filter((v) => !v.archivedAt).toArray(), NONE)
+
+export const useBodyMetrics = shared(() => db.bodyMetrics.orderBy('measuredAt').reverse().filter((b) => !b.archivedAt).toArray(), NONE)
+
+export const useSymptoms = shared(() => db.symptoms.orderBy('recordedAt').reverse().filter((s) => !s.archivedAt).toArray(), NONE)

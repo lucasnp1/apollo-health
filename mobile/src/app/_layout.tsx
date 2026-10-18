@@ -17,6 +17,8 @@ import { billingFollowsAccount, startBilling } from '@/money/pro'
 import { startSync } from '@/account/sync'
 import { loadData } from '@/data/persist'
 import { startHealth } from '@/health'
+import { startReminders } from '@/reminders'
+import { Toaster } from '@/toast'
 import { C, F } from '@/theme'
 
 SplashScreen.preventAutoHideAsync()
@@ -51,6 +53,7 @@ export default function Root() {
       startSync()
       startBilling()
       startHealth()
+      startReminders()
     })
   }), [])
   // purchases belong to the account: RevenueCat signs in and out with it
@@ -72,13 +75,23 @@ export default function Root() {
         <Stack.Screen name="log/bp" options={{ ...LOG, title: 'Blood pressure' }} />
         <Stack.Screen name="log/checkin" options={{ ...LOG, title: 'Check-in' }} />
         <Stack.Screen name="labs/edit" options={{ ...LOG, title: 'Blood test' }} />
-        <Stack.Screen name="labs/[id]" options={{ ...PUSH, headerBackTitle: 'Labs' }} />
+        <Stack.Screen name="labs/[id]" options={{ ...PUSH, headerBackTitle: 'Bloods' }} />
         <Stack.Screen name="labs/marker/[key]" options={PUSH} />
         <Stack.Screen name="account/sign-in" options={{ ...LOG, title: 'Sign in' }} />
         <Stack.Screen name="account/codes" options={{ ...LOG, title: 'Recovery codes' }} />
         <Stack.Screen name="account/delete" options={{ ...LOG, title: 'Delete account' }} />
         <Stack.Screen name="pro" options={{ ...LOG, title: 'Magno Pro' }} />
+        <Stack.Screen name="reminders" options={{ ...PUSH, title: 'Reminders', headerBackTitle: 'You' }} />
+        <Stack.Screen name="export" options={{ ...PUSH, title: 'Export for your doctor', headerBackTitle: 'Back' }} />
+        <Stack.Screen name="insight" options={{ ...LOG, title: '' }} />
+        <Stack.Screen name="account/password" options={{ ...LOG, title: 'Change password' }} />
+        <Stack.Screen name="account/recovery" options={{ ...LOG, title: 'Recovery codes' }} />
+        <Stack.Screen name="account/feedback" options={{ ...LOG, title: 'Send feedback' }} />
+        <Stack.Screen name="log/bleed" options={{ ...LOG, title: 'Blood-letting' }} />
+        <Stack.Screen name="archive" options={{ ...PUSH, title: 'Archive', headerBackTitle: 'You' }} />
+        <Stack.Screen name="labs/compare" options={{ ...PUSH, title: 'Compare tests', headerBackTitle: 'Back' }} />
       </Stack>
+      <Toaster />
     </ThemeProvider>
     </GestureHandlerRootView>
   )

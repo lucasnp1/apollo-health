@@ -11,9 +11,11 @@ import { ALL_SYMPTOMS, chipTone, customDefs, ratingOf } from '@shared/lib/sympto
 import { felt } from '@shared/lib/wellbeingSummary'
 import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
 import { useTests } from '@/labs/useTests'
-import { Trends } from '@/charts/Trends'
+import { BloodsWidget, InjectionsWidget, InsightsWidget, PressureWidget, WeightWidget, WellbeingWidget } from '@/charts/Widgets'
+import { useInsights } from '@/insights/useInsights'
+import { usePro } from '@/money/pro'
 import { EventRow } from '@/EventRow'
-import { Card, Eyebrow } from '@/kit'
+import { Card, Eyebrow, Pill, Widget } from '@/kit'
 import { buildEvents, dayTitle } from '@/timeline'
 import { C, F } from '@/theme'
 
@@ -35,6 +37,8 @@ export default function Home() {
   const bodyMetrics = useBodyMetrics()
   const symptoms = useSymptoms()
   const tests = useTests()
+  const pro = usePro()
+  const insights = useInsights({ tests, vitals, injections, compounds, bodyMetrics, symptoms, pro })
 
   const h = new Date().getHours()
   const greeting = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
@@ -126,30 +130,30 @@ export default function Home() {
         />
       </View>
 
-      <Trends compounds={compounds} injections={injections} vitals={vitals} bodyMetrics={bodyMetrics} tests={tests ?? []} />
+      <InsightsWidget insights={insights} />
+      <InjectionsWidget compounds={compounds} injections={injections} />
+      <BloodsWidget tests={tests} pro={pro} />
+      <WellbeingWidget symptoms={symptoms} />
+      <WeightWidget bodyMetrics={bodyMetrics} injections={injections} />
+      <PressureWidget vitals={vitals} />
 
-      <View style={{ gap: 12 }}>
-        <View style={st.rowBetween}>
-          <Eyebrow>Latest</Eyebrow>
-          {recent.length ? (
-            <Pressable hitSlop={10} onPress={() => router.navigate('/timeline')}>
-              <Text style={st.link}>See all</Text>
-            </Pressable>
-          ) : null}
-        </View>
-        <Card style={{ paddingVertical: 4 }}>
-          {recent.length ? (
-            recent.map((e, i) => (
+      <Widget
+        eyebrow="Latest"
+        title={recent.length ? 'What you logged last' : 'Nothing logged yet'}
+        sub={recent.length ? undefined : 'Start with your next injection, or a weight or blood pressure reading.'}
+        action={recent.length ? <Pill label="See all" onPress={() => router.navigate('/timeline')} /> : undefined}
+      >
+        {recent.length ? (
+          <View>
+            {recent.map((e, i) => (
               <Fragment key={e.id}>
                 {i ? <View style={st.sep} /> : null}
                 <EventRow e={e} showDay={dayTitle(e.date)} />
               </Fragment>
-            ))
-          ) : (
-            <Text style={st.empty}>Nothing logged yet. Start with your next injection, or a weight or blood pressure reading.</Text>
-          )}
-        </Card>
-      </View>
+            ))}
+          </View>
+        ) : null}
+      </Widget>
     </ScrollView>
   )
 }
@@ -157,7 +161,7 @@ export default function Home() {
 function Stat({ label, value, unit, sub, color = C.fg, spark }: { label: string; value: React.ReactNode; unit?: string; sub: string; color?: string; spark?: number[] }) {
   return (
     <Card style={st.stat}>
-      <Eyebrow style={{ fontSize: 10, letterSpacing: 1.2 }}>{label}</Eyebrow>
+      <Eyebrow>{label}</Eyebrow>
       <Text style={[st.statValue, { color }]} numberOfLines={1} adjustsFontSizeToFit>
         {value}
         {unit ? <Text style={st.statUnit}> {unit}</Text> : null}
@@ -185,7 +189,7 @@ function Spark({ values }: { values: number[] }) {
 }
 
 const st = StyleSheet.create({
-  page: { paddingHorizontal: 16, gap: 28 },
+  page: { paddingHorizontal: 16, gap: 20 },
   h1: { fontFamily: F.semi, fontSize: 32, letterSpacing: -0.6, color: C.fg, marginTop: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   launch: {

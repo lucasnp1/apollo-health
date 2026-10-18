@@ -34,6 +34,8 @@ const web = (name) => name.startsWith('@web/') && path.join(shared, name.slice('
 const webOnly = path.join(app, 'src/data/webOnly.js')
 config.resolver.resolveRequest = (ctx, name, platform) => {
   if (name.startsWith('pdfjs-dist') || name.startsWith('tesseract.js')) return { type: 'sourceFile', filePath: webOnly }
+  // The web's icon set: shared lib files name icons for the web's own rows; the app draws SF Symbols instead
+  if (name === 'lucide-react') return { type: 'sourceFile', filePath: path.join(app, 'src/data/noIcons.js') }
   const original = web(name)
   if (original) return ctx.resolveRequest(ctx, original, platform)
   const res = resolve(ctx, name, platform)

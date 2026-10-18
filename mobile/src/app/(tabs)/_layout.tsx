@@ -9,7 +9,7 @@ export default function Tabs() {
         <NativeTabs.Trigger.Icon sf="house.fill" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="labs">
-        <NativeTabs.Trigger.Label>Labs</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Bloods</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="testtube.2" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="timeline">
