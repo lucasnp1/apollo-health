@@ -104,7 +104,7 @@ no sideways scrolling, and Export takes what's shown to the doctor export; no "f
   appearance. Light theme was done in build 3.
 
 **To do next (Lucas, 19 Oct 2026):** share image (MVP+). Dropped: viewing the original lab file (people keep it
-themselves). Open: archive the web app? (see below), the interpretation wording for App Review.
+themselves). Open: the interpretation wording for App Review.
 
 **Money on iPhone, like Liber:** Apple in-app purchase through RevenueCat only; the app never talks to Stripe. Stripe
 only matters for the website, which can keep it or move to RevenueCat Web Billing later (a web change, Lucas's call).
@@ -119,3 +119,18 @@ xcrun simctl install booted ios/build/dd/Build/Products/Release-iphonesimulator/
 ```
 
 CocoaPods needs `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`. `mobile/ios` is generated and not committed.
+
+### 19 Oct 2026: the web app is retired (Lucas: "archive the web app ... drop Stripe")
+
+On `main` (apollo-health), deployed to Pages `magnohq` (magno.fit):
+- `/app/` is a static "Magno is on iPhone" page with the App Store link (apps.apple.com/app/id6824289899, live once
+  approved). `/app/reset?token=` still sets a new password (app/reset.ts), for links an admin sends by hand. The PWA
+  service worker is replaced by one that removes itself (vite-plugin-pwa `selfDestroying`).
+- Kept: the landing page (copy, screenshots and pricing now match the iPhone app; App Store links), privacy and terms
+  (Apple + RevenueCat instead of Stripe), the free /read tool, the guides, and the whole account API (sign in, sync,
+  recovery, delete), which the iPhone app uses.
+- Stripe removed: functions/api/billing/*, _lib/stripe.ts, the delete-account Stripe call, the five Pages secrets, and
+  the live webhook endpoint disabled (we_1UKMlzATKxjqFpk5BEn6LxQr). Stripe products are left as they are.
+- Server is_pro now means an admin or a plan set by hand. The iPhone app's Pro = RevenueCat, or that.
+- The web app's code in src/ stays: src/lib is the iPhone app's shared logic. It is simply no longer built or served.
+- People who only kept data in a browser, with no account, can no longer open it (Lucas: no customers on the web).
