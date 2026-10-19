@@ -21,6 +21,7 @@ import { useDirty, useEditRow } from '@/logging/useEntry'
 import { C, F } from '@/theme'
 import { addCompound, routeOf, unitLabel, usedColours } from '@/log'
 import { isAncillary } from '@/timeline'
+import { vol } from '@/units'
 
 const NONE = ''
 const OTHER = '__other'
@@ -269,7 +270,7 @@ export default function LogInjection() {
         <FieldRow label="Syringe">
           <MenuPicker
             value={syringe ?? NONE}
-            options={[{ value: NONE, label: 'Not noted' }, ...SYRINGES.map((x) => ({ value: x.value as string, label: x.label }))]}
+            options={[{ value: NONE, label: 'Not noted' }, ...SYRINGES.map((x) => ({ value: x.value as string, label: vol(x.label) }))]}
             onChange={(v) => {
               const next = SYRINGES.find((x) => x.value === v)
               setSyringe(next?.value)
@@ -384,12 +385,12 @@ function CompoundLine({ r, options, history, fixedName, card, first, marks, onMa
           {compound ? (
             <Text style={kit.hint}>You already have {compound.name}: this shot goes with it.</Text>
           ) : (
-            <Segmented value={line.unit} onChange={(u) => onChange({ unit: u })} options={UNITS} />
+            <Segmented value={line.unit} onChange={(u) => onChange({ unit: u })} options={UNITS.map((o) => ({ ...o, label: vol(o.label) }))} />
           )}
         </>
       ) : null}
 
-      <Section title="Dose" hint={history?.last ? `Last time on this route: ${history.last}` : first ? 'As your prescriber or plan gives it.' : undefined}>
+      <Section title="Dose" hint={history?.last ? `Last time on this route: ${vol(history.last)}` : first ? 'As your prescriber or plan gives it.' : undefined}>
         <Input keyboardType="decimal-pad" placeholder="Amount" suffix={unitLabel(unit)} value={line.dose} onChangeText={(dose) => onChange({ dose })} accessibilityLabel={`Dose in ${unitLabel(unit)}`} />
       </Section>
 
@@ -419,7 +420,7 @@ function Drawn({ value, onChange, marks, onMarks }: { value: string; onChange: (
           <Input keyboardType="decimal-pad" placeholder="Optional" value={value} onChangeText={onChange} accessibilityLabel={`Amount drawn in ${marks}`} />
         </View>
         <View style={{ width: 150 }}>
-          <Segmented value={marks} onChange={onMarks} options={[{ value: 'units', label: 'units' }, { value: 'mL', label: 'mL' }]} />
+          <Segmented value={marks} onChange={onMarks} options={[{ value: 'units', label: 'units' }, { value: 'mL', label: vol('mL') }]} />
         </View>
       </View>
     </Section>

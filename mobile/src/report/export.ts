@@ -11,6 +11,7 @@ import { buildTests, printedValue, type LabTest } from '@shared/lib/labTests'
 import { ALL_SYMPTOMS, customDefs, ratingOf } from '@shared/lib/symptoms'
 import { dedupeInjections } from '@/data/useLog'
 import { DAY, doseText } from '@/log'
+import { getUnits, showWeight } from '@/units'
 import { isAncillary } from '@/timeline'
 import { logReportHtml, testReportHtml, type BpRow, type DoseRow, type WeightRow } from './html'
 
@@ -85,7 +86,7 @@ async function loadLog({ from, to, include, compoundIds }: LogOpts) {
   return {
     injections: include.injections || include.ancillaries ? doseRows(within(injections, (i) => i.takenAt, from, to), compounds) : undefined,
     weight: include.weight
-      ? within(bodyMetrics.filter((b) => b.weightKg !== undefined), (b) => b.measuredAt, from, to).map((b): WeightRow => ({ at: b.measuredAt, kg: b.weightKg!, notes: b.notes }))
+      ? within(bodyMetrics.filter((b) => b.weightKg !== undefined), (b) => b.measuredAt, from, to).map((b): WeightRow => ({ at: b.measuredAt, value: showWeight(b.weightKg!), unit: getUnits().weight, notes: b.notes }))
       : undefined,
     bp: include.bp ? within(vitals, (v) => v.measuredAt, from, to).map((v): BpRow => ({ at: v.measuredAt, sys: v.systolic, dia: v.diastolic, pulse: v.pulse, notes: v.notes })) : undefined,
     checkins: include.checkins ? within(symptoms, (s) => s.recordedAt, from, to) : undefined,
@@ -138,7 +139,7 @@ export async function exportCsv(opts: LogOpts): Promise<void> {
   const r = await loadLog(opts)
   const rows: unknown[][] = [['Type', 'Date', 'Time', 'Item', 'Value', 'Unit', 'Lab range', 'Flag', 'Route', 'Site', 'Notes']]
   for (const i of r.injections ?? []) rows.push(['Injection', ymd(i.at), hm(i.at), i.compound, i.dose, '', '', '', i.route, i.site, i.notes])
-  for (const w of r.weight ?? []) rows.push(['Weight', ymd(w.at), hm(w.at), 'Weight', w.kg, 'kg', '', '', '', '', w.notes])
+  for (const w of r.weight ?? []) rows.push(['Weight', ymd(w.at), hm(w.at), 'Weight', w.value, w.unit, '', '', '', '', w.notes])
   for (const b of r.bp ?? []) {
     rows.push(['Blood pressure', ymd(b.at), hm(b.at), 'Systolic/diastolic', `${b.sys}/${b.dia}`, 'mmHg', '', '', '', '', b.notes])
     if (b.pulse) rows.push(['Blood pressure', ymd(b.at), hm(b.at), 'Pulse', b.pulse, 'bpm', '', '', '', '', ''])

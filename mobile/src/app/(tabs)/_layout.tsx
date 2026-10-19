@@ -1,7 +1,11 @@
+import { useQuickActionRouting } from 'expo-quick-actions/router'
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
 import { C } from '@/theme'
 
 export default function Tabs() {
+  // The app icon's quick actions (app.json, expo-quick-actions): Log injection, BP, weight, Check in open that sheet.
+  // Here and not in the root layout, so the tabs are there to open it over.
+  useQuickActionRouting()
   return (
     <NativeTabs tintColor={C.primary}>
       <NativeTabs.Trigger name="index">

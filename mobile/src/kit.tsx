@@ -4,11 +4,18 @@ import { datePickerStyle, pickerStyle, tag, tint } from '@expo/ui/swift-ui/modif
 import * as Haptics from 'expo-haptics'
 import { SymbolView, type SymbolViewProps } from 'expo-symbols'
 import { forwardRef, type ReactNode } from 'react'
-import { Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native'
+import { Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, useWindowDimensions, View, type ViewStyle } from 'react-native'
 import { C, F, usePalette, useScheme } from '@/theme'
 
+// Text follows the iPhone's text size. Body text scales all the way; display text (titles, big numbers) and the mono
+// eyebrows scale less, as Apple's large titles do; at the accessibility sizes, side-by-side layouts stack.
+export const TITLE_SCALE = 1.3
+export const LABEL_SCALE = 1.5
+/** The person reads with one of the accessibility text sizes: grids go to one column, label rows stack. */
+export const useBigText = () => useWindowDimensions().fontScale >= 1.35
+
 export function Eyebrow({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
-  return <Text style={[s.eyebrow, style]}>{children}</Text>
+  return <Text style={[s.eyebrow, style]} maxFontSizeMultiplier={LABEL_SCALE}>{children}</Text>
 }
 
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
@@ -85,7 +92,7 @@ export function Segmented<T extends string>({ options, value, onChange }: { opti
             }}
             style={[s.segItem, on && s.segOn]}
           >
-            <Text style={[s.segText, on && { color: C.fg }]}>{o.label}</Text>
+            <Text style={[s.segText, on && { color: C.fg }]} maxFontSizeMultiplier={LABEL_SCALE}>{o.label}</Text>
           </Pressable>
         )
       })}
@@ -132,16 +139,18 @@ export const s = StyleSheet.create({
   add: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: C.input, borderStyle: 'dashed' },
   addText: { fontFamily: F.semi, fontSize: 15, color: C.accentInk },
   link: { fontFamily: F.semi, fontSize: 14, color: C.accentInk },
+  stacked: { flexDirection: 'column', alignItems: 'flex-start', paddingVertical: 12 },
   when: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 54, paddingVertical: 6, paddingRight: 8, borderRadius: 12 },
   whenLabel: { fontFamily: F.medium, fontSize: 16, color: C.fg },
 })
 
 /** A settings-style row: a label on the left, its control (a menu, a picker) on the right, centred. */
 export function FieldRow({ label, children }: { label: string; children: ReactNode }) {
+  const big = useBigText()
   return (
-    <View style={[s.card, s.when]}>
-      <Text style={s.whenLabel} numberOfLines={1}>{label}</Text>
-      <View style={{ flexShrink: 1, alignItems: 'flex-end', justifyContent: 'center' }}>{children}</View>
+    <View style={[s.card, s.when, big && s.stacked]}>
+      <Text style={s.whenLabel} numberOfLines={big ? undefined : 1}>{label}</Text>
+      <View style={big ? { alignSelf: 'stretch' } : { flexShrink: 1, alignItems: 'flex-end', justifyContent: 'center' }}>{children}</View>
     </View>
   )
 }
@@ -208,7 +217,7 @@ export function PageHeader({ eyebrow, title, action }: { eyebrow?: string; title
     <View>
       {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
       <View style={s.pageRow}>
-        <Text style={s.h1} numberOfLines={1}>{title}</Text>
+        <Text style={s.h1} numberOfLines={1} maxFontSizeMultiplier={TITLE_SCALE}>{title}</Text>
         {action}
       </View>
     </View>
@@ -270,8 +279,10 @@ export function MenuPicker<T extends string>({ value, options, onChange, label }
 }) {
   const scheme = useScheme()
   const pal = usePalette()
+  // At the accessibility text sizes the menu takes the row's width (and truncates) instead of running off the card
+  const big = useBigText()
   return (
-    <Host matchContents ignoreSafeArea="all" colorScheme={scheme}>
+    <Host matchContents={big ? { vertical: true } : true} style={big ? { alignSelf: 'stretch' } : undefined} ignoreSafeArea="all" colorScheme={scheme}>
       <Picker label={label} selection={value} onSelectionChange={(v) => onChange(v as T)} modifiers={[pickerStyle('menu'), tint(pal.accentInk)]}>
         {options.map((o) => (
           <SText key={o.value} modifiers={[tag(o.value)]}>{o.label}</SText>

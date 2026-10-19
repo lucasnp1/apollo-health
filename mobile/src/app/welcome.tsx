@@ -1,11 +1,13 @@
 // First run: what Magno is, what you inject, Apple Health, reminders and how it looks, one step a screen, every step
 // skippable. Shown once (localStorage `magno.onboarded`), from the root layout; You keeps every setting for later.
 import * as Haptics from 'expo-haptics'
+import { SymbolView } from 'expo-symbols'
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { findCompoundByName } from '@shared/lib/compounds'
+import { db, type Unit } from '@shared/lib/db'
 import { type Choice, CHOICE_LABEL, setAppearance, useAppearance } from '@/appearance'
 import { useAccount } from '@/account/auth'
 import { useCompounds, useInjections } from '@/data/useLog'
@@ -91,7 +93,8 @@ function Intro() {
   const { width, height } = useWindowDimensions()
   const [at, setAt] = useState(0)
   // The phone shot fills most of the screen, keeping the iPhone's own proportions
-  const shotH = Math.min(height * 0.5, 470)
+  // (0.42 leaves room for the caption under it and the sign-in line, down to the smallest iPhones)
+  const shotH = Math.min(height * 0.42, 440)
   const shotW = shotH * (1320 / 2868)
   return (
     <View style={{ flex: 1 }}>
@@ -136,21 +139,32 @@ function Intro() {
 }
 
 /** What you inject: a name and a route each, so the injection sheet knows them from the first shot. */
+// Names only, the most common injectables on a protocol, to save typing. Nothing about doses.
+const COMMON: { name: string; route: 'IM' | 'SubQ'; unit: Unit }[] = [
+  { name: 'Testosterone cypionate', route: 'IM', unit: 'mg' },
+  { name: 'Testosterone enanthate', route: 'IM', unit: 'mg' },
+  { name: 'Testosterone propionate', route: 'IM', unit: 'mg' },
+  { name: 'Sustanon 250', route: 'IM', unit: 'mg' },
+  { name: 'hCG', route: 'SubQ', unit: 'iu' },
+]
+
 function Compounds() {
   const compounds = useCompounds()
   const shots = useInjections()
   const [name, setName] = useState('')
   const [route, setRoute] = useState<'IM' | 'SubQ'>('IM')
-  async function add() {
-    const n = name.trim()
+  async function add(n = name.trim(), r = route, unit: Unit = 'mg') {
     if (!n) return
     if (findCompoundByName(compounds, n)) return Alert.alert('Already there', `${n} is on your list.`)
-    await addCompound({ name: n, category: 'Other', defaultDose: 0, unit: 'mg', defaultRoute: route }, usedColours(compounds))
+    await addCompound({ name: n, category: 'Other', defaultDose: 0, unit, defaultRoute: r }, usedColours(compounds))
     setName('')
   }
+  // Added by mistake: archived (kept, as everything in Magno), so it leaves the list and the injection sheet
+  const remove = (id: number) => void db.compounds.update(id, { archived: true })
   // Anything you've injected, or a compound that isn't filed as an ancillary (hCG is often filed as one but injected)
   const injected = new Set(shots.filter((i) => !isAncillary(i)).map((i) => i.compoundId))
   const list = compounds.filter((c) => !c.archived && (injected.has(c.id!) || (c.category !== 'Ancillary' && c.category !== 'Supplement')))
+  const common = COMMON.filter((c) => !findCompoundByName(compounds, c.name))
   return (
     <Page title="What do you inject?" sub="Add each compound once. Doses come later, when you log a shot. You can skip this.">
       {list.length ? (
@@ -160,11 +174,29 @@ function Compounds() {
               <View style={[w.cdot, { backgroundColor: c.color }]} />
               <Text style={[w.feature, { flex: 1 }]}>{c.name}</Text>
               <Text style={kit.hint}>{c.defaultRoute === 'SubQ' ? 'Subcutaneous' : c.defaultRoute === 'IM' ? 'Intramuscular' : ''}</Text>
+              {injected.has(c.id!) ? null : (
+                <Pressable onPress={() => remove(c.id!)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${c.name}`}>
+                  <SymbolView name="xmark.circle.fill" tintColor={C.faint} size={20} />
+                </Pressable>
+              )}
             </View>
           ))}
         </Card>
       ) : null}
-      <Input placeholder="Name, e.g. Testosterone cypionate" value={name} onChangeText={setName} autoCapitalize="words" autoCorrect={false} returnKeyType="done" onSubmitEditing={() => void add()} />
+      {common.length ? (
+        <View style={{ gap: 8 }}>
+          <Text style={kit.hint}>Common ones, one tap to add:</Text>
+          <View style={w.chips}>
+            {common.map((c) => (
+              <Pressable key={c.name} onPress={() => void add(c.name, c.route, c.unit)} style={({ pressed }) => [w.chip, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={`Add ${c.name}`}>
+                <SymbolView name="plus" tintColor={C.accentInk} size={12} />
+                <Text style={w.chipText}>{c.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+      <Input placeholder="Or type a name" value={name} onChangeText={setName} autoCapitalize="words" autoCorrect={false} returnKeyType="done" onSubmitEditing={() => void add()} />
       <Segmented value={route} onChange={setRoute} options={[{ value: 'IM', label: 'Intramuscular' }, { value: 'SubQ', label: 'Subcutaneous' }]} />
       <Pressable onPress={() => void add()} disabled={!name.trim()} style={[w.secondary, !name.trim() && { opacity: 0.5 }]} accessibilityRole="button">
         <Text style={w.secondaryText}>Add</Text>
@@ -227,6 +259,9 @@ const w = StyleSheet.create({
   pagerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.input },
   link: { fontFamily: F.semi, fontSize: 15, color: C.accentInk },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: C.card, borderWidth: StyleSheet.hairlineWidth, borderColor: C.line },
+  chipText: { fontFamily: F.medium, fontSize: 14, color: C.fg },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   cdot: { width: 10, height: 10, borderRadius: 5 },
   bottom: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 10 },

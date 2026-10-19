@@ -9,6 +9,7 @@ import { useSyncExternalStore } from 'react'
 import { Alert, AppState, Linking } from 'react-native'
 import { db } from '@shared/lib/db'
 import { DAY } from '@/log'
+import NextShot from '@/widgets/NextShot'
 
 export type Kind = 'injection' | 'ancillary' | 'weight' | 'bp' | 'checkin' | 'bloods'
 export type Timed = { on: boolean; time: string; days: number[] }
@@ -82,7 +83,31 @@ function after(from: Date, days: number) {
   return new Date(d.getTime() + (days - whole) * DAY)
 }
 
+/** When the next injection reminder fires, from the reminder settings and the last shot (for "every few days"). */
+export function nextInjectionReminder(lastShotAt: string | undefined, now = Date.now()): Date | undefined {
+  const r = state.injection
+  if (!r.on) return undefined
+  const [hour, minute] = hm(r.time)
+  if (r.mode === 'interval') {
+    const anchor = lastShotAt ? new Date(lastShotAt) : new Date(now)
+    anchor.setHours(hour, minute, 0, 0)
+    for (let n = lastShotAt ? 1 : 0; n < 1000; n++) {
+      const d = after(anchor, n * r.intervalDays)
+      if (d.getTime() > now) return d
+    }
+    return undefined
+  }
+  for (let i = 0; i < 8; i++) {
+    const d = new Date(now)
+    d.setDate(d.getDate() + i)
+    d.setHours(hour, minute, 0, 0)
+    if (r.days.includes(d.getDay()) && d.getTime() > now) return d
+  }
+  return undefined
+}
+
 export async function rescheduleAll() {
+  void updateWidget().catch((e) => console.warn('Magno: widget', e))
   const ours = (await Notifications.getAllScheduledNotificationsAsync()).filter((n) => n.identifier.startsWith(ID))
   await Promise.all(ours.map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)))
   if (!Object.values(state).some((r) => r.on) || !(await Notifications.getPermissionsAsync()).granted) return
@@ -167,4 +192,21 @@ export function startReminders() {
   }
   opened(Notifications.getLastNotificationResponse())
   Notifications.addNotificationResponseReceivedListener(opened)
+}
+
+/** The home-screen widget: the last shot and the next reminder, with an entry at each coming midnight so "Tomorrow"
+ * becomes "Today" on its own. Redone whenever the reminders are (a shot logged, a setting changed, the app back). */
+async function updateWidget() {
+  const last = await db.injections.orderBy('takenAt').reverse().filter((i) => !i.archivedAt && !i.deletedAtSync && i.route !== 'Oral' && i.route !== 'Other').first()
+  const props = { last: last ? Date.parse(last.takenAt) : undefined, next: nextInjectionReminder(last?.takenAt)?.getTime() }
+  const entries = [{ date: new Date(), props }]
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date()
+    d.setDate(d.getDate() + i)
+    d.setHours(0, 0, 1, 0)
+    entries.push({ date: d, props })
+  }
+  // the next reminder passing also changes what it shows: from then on it reads the one after
+  if (props.next) entries.push({ date: new Date(props.next + 60_000), props: { ...props, next: nextInjectionReminder(last?.takenAt, props.next + 60_000)?.getTime() } })
+  NextShot.updateTimeline(entries.sort((a, b) => a.date.getTime() - b.date.getTime()))
 }

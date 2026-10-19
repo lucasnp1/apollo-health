@@ -73,7 +73,8 @@ export function LogForm({ canSave, onSave, children, dirty = false, title, archi
     }
   }
 
-  const ready = canSave && !busy && !loading
+  // A saved entry only saves once something changed; a new one can save as it opened (a prefilled sheet you confirm)
+  const ready = canSave && !busy && !loading && (!archive || dirty)
   return (
     <>
       <Stack.Screen

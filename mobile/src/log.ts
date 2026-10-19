@@ -7,7 +7,7 @@ import { ratingOf, type SymptomDef } from '@shared/lib/symptoms'
 
 export const DAY = 86_400_000
 
-export const unitLabel = (u?: string) => (u === 'iu' ? 'IU' : (u ?? ''))
+export const unitLabel = (u?: string) => (u === 'iu' ? 'IU' : u === 'ml' ? 'mL' : (u ?? ''))
 
 /** A shot's dose as typed (an imported text wins), or with `drew`, what was drawn when no dose was noted. */
 export const doseText = (i: InjectionLog, { drew = false } = {}) =>

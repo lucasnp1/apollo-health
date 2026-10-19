@@ -38,12 +38,15 @@ export default function LogAncillary() {
   const compounds = useCompounds()
   const injections = useInjections()
   const symptoms = useSymptoms()
-  const [pick, setPick] = useState<string | undefined>()
+  // A new entry opens on the last ancillary you took, as you took it: a reminder's tap lands on a sheet to confirm.
+  // The stores fill before the app shows, so it's there on the first frame. Editing replaces it with the saved entry.
+  const [last] = useState(() => injections.find((i) => isAncillary(i) && compounds.some((c) => c.id === i.compoundId)))
+  const [pick, setPick] = useState<string | undefined>(last && String(last.compoundId))
   const [name, setName] = useState('')
-  const [dose, setDose] = useState('')
-  const [unit, setUnit] = useState<Unit>('mg')
-  const [form, setForm] = useState<Form>('Oral')
-  const [forList, setForList] = useState<string[]>([])
+  const [dose, setDose] = useState(last?.dose != null ? String(last.dose) : '')
+  const [unit, setUnit] = useState<Unit>(last?.unit ?? 'mg')
+  const [form, setForm] = useState<Form>(last?.route === 'Other' ? 'Other' : 'Oral')
+  const [forList, setForList] = useState<string[]>(() => splitNote(last?.notes).forList)
   const [notes, setNotes] = useState('')
   const [when, setWhen] = useState(() => new Date())
   const { id, ready } = useEditRow(

@@ -11,6 +11,7 @@ import { fmtDay } from '@shared/lib/dates'
 import { phlebotomyTitle } from '@shared/lib/phlebotomy'
 import { Eyebrow } from '@/kit'
 import { doseText } from '@/log'
+import { vol, weightText } from '@/units'
 import { showToast } from '@/toast'
 import { C, F } from '@/theme'
 
@@ -37,14 +38,14 @@ export default function Archive() {
       {
         title: 'Injections',
         data: data.injections.map((i) => {
-          const dose = doseText(i) || undefined
+          const dose = vol(doseText(i)) || undefined
           const name = byId.get(i.compoundId)?.name ?? 'Injection'
           return { key: `i-${i.id}`, label: dose ? `${name} · ${dose}` : name, at: i.takenAt, restore: () => restoreRow('injections', i.id!) }
         }),
       },
       {
         title: 'Weight',
-        data: data.bodyMetrics.filter((b) => b.weightKg != null).map((b) => ({ key: `w-${b.id}`, label: `${b.weightKg} kg`, at: b.measuredAt, restore: () => restoreRow('bodyMetrics', b.id!) })),
+        data: data.bodyMetrics.filter((b) => b.weightKg != null).map((b) => ({ key: `w-${b.id}`, label: weightText(b.weightKg!), at: b.measuredAt, restore: () => restoreRow('bodyMetrics', b.id!) })),
       },
       {
         title: 'Blood pressure',

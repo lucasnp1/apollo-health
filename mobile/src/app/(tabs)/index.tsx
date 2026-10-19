@@ -15,7 +15,8 @@ import { InjectionsWidget, InsightsWidget, PressureWidget, WeightWidget, Wellbei
 import { useInsights } from '@/insights/useInsights'
 import { usePro } from '@/money/pro'
 import { EventRow } from '@/EventRow'
-import { Card, Eyebrow, Pill, Widget } from '@/kit'
+import { Card, Eyebrow, Pill, TITLE_SCALE, useBigText, Widget } from '@/kit'
+import { showWeight, useUnits } from '@/units'
 import { buildEvents, dayTitle } from '@/timeline'
 import { C, F, type Palette, usePalette } from '@/theme'
 import { DAY, ratingMean, weightPoints } from '@/log'
@@ -32,6 +33,8 @@ const LAUNCH: Launch[] = [
 ]
 
 export default function Home() {
+  const big = useBigText()
+  const u = useUnits()
   const insets = useSafeAreaInsets()
   const pal = usePalette()
   const compounds = useCompounds()
@@ -84,8 +87,8 @@ export default function Home() {
 
   const recent = useMemo(
     // Only the newest few of each list (they come newest first): the whole history isn't needed for five rows
-    () => buildEvents({ compounds, injections: injections.slice(0, 6), vitals: vitals.slice(0, 6), bodyMetrics: bodyMetrics.slice(0, 7), symptoms: symptoms.slice(0, 6), tests: tests?.slice(0, 6) }).slice(0, 5),
-    [compounds, injections, vitals, bodyMetrics, symptoms, tests],
+    () => buildEvents({ compounds, injections: injections.slice(0, 6), vitals: vitals.slice(0, 6), bodyMetrics: bodyMetrics.slice(0, 7), symptoms: symptoms.slice(0, 6), tests: tests?.slice(0, 6), units: u }).slice(0, 5),
+    [compounds, injections, vitals, bodyMetrics, symptoms, tests, u],
   )
 
   const bpColor = bp.sys === undefined ? C.fg : bp.sys >= 145 ? C.danger : bp.sys >= 135 ? C.warn : C.good
@@ -94,7 +97,7 @@ export default function Home() {
     <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={[st.page, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 90 }]}>
       <View>
         <Eyebrow>{format(new Date(), 'EEEE, d MMMM')}</Eyebrow>
-        <Text style={st.h1}>{greeting}</Text>
+        <Text style={st.h1} maxFontSizeMultiplier={TITLE_SCALE}>{greeting}</Text>
       </View>
 
       <View style={{ gap: 12 }}>
@@ -106,7 +109,7 @@ export default function Home() {
               accessibilityRole="button"
               accessibilityLabel={`${l.label}, ${l.sub}`}
               onPress={() => (typeof l.href === 'function' ? router.navigate(l.href()) : router.push(l.href))}
-              style={({ pressed }) => [st.launch, l.primary && st.launchPrimary, pressed && { transform: [{ scale: 0.97 }], opacity: 0.85 }]}
+              style={({ pressed }) => [st.launch, big && st.full, l.primary && st.launchPrimary, pressed && { transform: [{ scale: 0.97 }], opacity: 0.85 }]}
             >
               <View style={[st.launchIcon, { backgroundColor: l.primary ? C.primary : pal[l.color] + '1f' }]}>
                 <SymbolView name={l.sf} tintColor={pal[l.color]} size={20} />
@@ -120,13 +123,13 @@ export default function Home() {
         </View>
       </View>
 
-      <View style={st.stats}>
-        <Stat label="Pressure" value={bp.sys !== undefined ? `${bp.sys}/${bp.dia}` : '–'} color={bpColor} sub={bp.n ? (bp.pulse ? `${bp.pulse} bpm · 7-day avg` : `7-day avg · ${bp.n}×`) : 'No readings'} spark={bp.spark} />
+      <View style={[st.stats, big && st.column]}>
+        <Stat label="Pressure" value={bp.sys !== undefined ? `${bp.sys}/${bp.dia}` : '–'} color={bpColor} sub={bp.n ? (bp.pulse ? `${bp.pulse} bpm · 7d` : `7-day avg`) : 'No readings'} spark={bp.spark} />
         <Stat
           label="Weight"
-          value={weight ? String(weight.kg) : '–'}
-          unit={weight ? 'kg' : undefined}
-          sub={weight ? (weight.delta !== undefined && Math.abs(weight.delta) >= 0.05 ? `${weight.delta > 0 ? '+' : ''}${weight.delta.toFixed(1)} kg` : 'No change') : 'Not logged'}
+          value={weight ? String(showWeight(weight.kg, u)) : '–'}
+          unit={weight ? u.weight : undefined}
+          sub={weight ? (weight.delta !== undefined && Math.abs(weight.delta) >= 0.05 ? `${weight.delta > 0 ? '+' : ''}${showWeight(weight.delta, u).toFixed(1)} ${u.weight}` : 'No change') : 'Not logged'}
           spark={weight?.spark}
         />
         <Stat
@@ -177,7 +180,7 @@ function Stat({ label, value, unit, sub, color = C.fg, spark, lines }: {
   return (
     <Card style={st.stat}>
       <Eyebrow>{label}</Eyebrow>
-      <Text style={[st.statValue, { color }]} numberOfLines={1} adjustsFontSizeToFit>
+      <Text style={[st.statValue, { color }]} numberOfLines={1} adjustsFontSizeToFit maxFontSizeMultiplier={TITLE_SCALE}>
         {value}
         {unit ? <Text style={st.statUnit}> {unit}</Text> : null}
       </Text>
@@ -227,6 +230,8 @@ const st = StyleSheet.create({
   launchLabel: { fontFamily: F.semi, fontSize: 16, color: C.fg, letterSpacing: -0.2 },
   launchSub: { fontFamily: F.body, fontSize: 13, color: C.muted, marginTop: 2 },
   stats: { flexDirection: 'row', gap: 10 },
+  column: { flexDirection: 'column' },
+  full: { width: '100%' },
   stat: { flex: 1, padding: 12, borderRadius: 14 },
   statValue: { fontFamily: F.monoSemi, fontSize: 20, marginTop: 8 },
   statUnit: { fontFamily: F.mono, fontSize: 12, color: C.muted },

@@ -2,9 +2,11 @@
 // pull-down menus; Export takes what's shown to the doctor export. Home's widgets open it filtered (params kind, range).
 // Tap an entry to edit it, press and hold to archive it with Undo (kept and restorable: Archive is never a delete).
 import * as Haptics from 'expo-haptics'
+import { SymbolView } from 'expo-symbols'
+import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable'
 import { router, useLocalSearchParams } from 'expo-router'
-import { memo, useEffect, useMemo, useState } from 'react'
-import { ActionSheetIOS, Pressable, SectionList, StyleSheet, Text, View } from 'react-native'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { ActionSheetIOS, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { archiveRow, restoreRow, setExamArchived } from '@shared/lib/archive'
 import { compoundGroups } from '@shared/lib/compounds'
@@ -14,6 +16,7 @@ import { EventRow } from '@/EventRow'
 import { Eyebrow, MenuPicker, PageHeader, Pill, RANGE_LABEL, RangeMenu, type RangeId, rangeDomain } from '@/kit'
 import { buildEvents, byDay, type Event, KIND_LABEL, type Kind } from '@/timeline'
 import { withUndo } from '@/toast'
+import { useUnits } from '@/units'
 import { C, F } from '@/theme'
 
 type Filter = Kind | 'all'
@@ -39,22 +42,58 @@ function archive(e: Event) {
     },
     (i) => {
       if (i === 1) return open(e)
-      if (i !== 0) return
-      const run = e.table === 'test'
-        ? withUndo('Test archived', () => setExamArchived(e.rowId, true), () => setExamArchived(e.rowId, false))
-        : withUndo('Entry archived', () => archiveRow(e.table as Exclude<Event['table'], 'test'>, e.rowId), () => restoreRow(e.table as Exclude<Event['table'], 'test'>, e.rowId))
-      void run.catch(console.error)
+      if (i === 0) archiveNow(e)
     },
   )
 }
 
-// One row, re-rendered only when its event or its place on the day's card changes
+// Archived with Undo in a toast: kept and restorable, so a swipe needs no confirmation
+function archiveNow(e: Event) {
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+  const run = e.table === 'test'
+    ? withUndo('Test archived', () => setExamArchived(e.rowId, true), () => setExamArchived(e.rowId, false))
+    : withUndo('Entry archived', () => archiveRow(e.table as Exclude<Event['table'], 'test'>, e.rowId), () => restoreRow(e.table as Exclude<Event['table'], 'test'>, e.rowId))
+  void run.catch(console.error)
+}
+
+// One row, re-rendered only when its event or its place on the day's card changes. Swipe left for Archive, as in Mail;
+// press and hold for the same choice in a menu.
 const Row = memo(function Row({ e, first }: { e: Event; first: boolean }) {
+  const swipe = useRef<SwipeableMethods>(null)
   return (
-    <Pressable onPress={() => open(e)} onLongPress={() => archive(e)} delayLongPress={350} accessibilityRole="button" accessibilityHint="Opens it to edit. Press and hold to archive." style={({ pressed }) => [t.item, first && t.first, pressed && { opacity: 0.75 }]}>
-      {first ? null : <View style={t.sep} />}
-      <EventRow e={e} />
-    </Pressable>
+    <View style={[t.item, first && t.first]}>
+      <ReanimatedSwipeable
+        ref={swipe}
+        friction={1.6}
+        rightThreshold={48}
+        overshootRight={false}
+        renderRightActions={() => (
+          <Pressable
+            onPress={() => (swipe.current?.close(), archiveNow(e))}
+            accessibilityRole="button"
+            accessibilityLabel="Archive"
+            style={({ pressed }) => [t.swipeAction, pressed && { opacity: 0.8 }]}
+          >
+            <SymbolView name="archivebox.fill" tintColor="#fff" size={18} />
+            <Text style={t.swipeText}>Archive</Text>
+          </Pressable>
+        )}
+      >
+        <Pressable
+          onPress={() => open(e)}
+          onLongPress={() => archive(e)}
+          delayLongPress={350}
+          accessibilityRole="button"
+          accessibilityHint="Opens it to edit. Swipe left or press and hold to archive."
+          accessibilityActions={[{ name: 'archive', label: 'Archive' }]}
+          onAccessibilityAction={(a) => a.nativeEvent.actionName === 'archive' && archiveNow(e)}
+          style={({ pressed }) => [t.content, pressed && { opacity: 0.75 }]}
+        >
+          {first ? null : <View style={t.sep} />}
+          <EventRow e={e} />
+        </Pressable>
+      </ReanimatedSwipeable>
+    </View>
   )
 })
 
@@ -71,6 +110,7 @@ export default function Timeline() {
   const bodyMetrics = useBodyMetrics()
   const symptoms = useSymptoms()
   const tests = useTests()
+  const units = useUnits()
   const params = useLocalSearchParams<{ kind?: string; range?: string; at?: string }>()
   const [kind, setKind] = useState<Filter>(ALL)
   const [compound, setCompound] = useState<string | undefined>()
@@ -81,9 +121,16 @@ export default function Timeline() {
     if (params.range && params.range in RANGE_LABEL) setRange(params.range as RangeId)
   }, [params.kind, params.range, params.at])
 
-  const everything = useMemo(() => buildEvents({ compounds, injections, vitals, bodyMetrics, symptoms, tests }), [compounds, injections, vitals, bodyMetrics, symptoms, tests])
+  const everything = useMemo(() => buildEvents({ compounds, injections, vitals, bodyMetrics, symptoms, tests, units }), [units, compounds, injections, vitals, bodyMetrics, symptoms, tests])
   const from = rangeDomain(range, everything.map((e) => e.date.getTime()))[0]
-  const all = useMemo(() => (range === 'ALL' ? everything : everything.filter((e) => e.date.getTime() >= from)), [everything, range, from])
+  const inRange = useMemo(() => (range === 'ALL' ? everything : everything.filter((e) => e.date.getTime() >= from)), [everything, range, from])
+  // Search reads what each row says: the name and dose, the facts under it, and the note
+  const [query, setQuery] = useState('')
+  const needle = query.trim().toLowerCase()
+  const all = useMemo(
+    () => (needle ? inRange.filter((e) => [e.title, e.sub, e.note].some((x) => x?.toLowerCase().includes(needle))) : inRange),
+    [inRange, needle],
+  )
 
   // Counts per kind and per compound, in one pass
   const { kinds, groups } = useMemo(() => {
@@ -119,6 +166,20 @@ export default function Timeline() {
   const header = (
     <View style={{ gap: 10, marginBottom: 8 }}>
       <PageHeader eyebrow={`${count} entr${count === 1 ? 'y' : 'ies'}`} title="Timeline" action={count ? <Pill label="Export" icon="square.and.arrow.up" onPress={exportShown} /> : undefined} />
+      <View style={t.search}>
+        <SymbolView name="magnifyingglass" tintColor={C.muted} size={16} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search entries"
+          placeholderTextColor={C.faint}
+          style={t.searchInput}
+          returnKeyType="search"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          accessibilityLabel="Search entries"
+        />
+      </View>
       <View style={t.filters}>
         <MenuPicker value={kind} onChange={(v) => (setKind(v), setCompound(undefined))} options={kinds} />
         {kind === 'injection' && groups.length > 1 ? (
@@ -136,6 +197,8 @@ export default function Timeline() {
       sections={sections}
       keyExtractor={keyExtractor}
       stickySectionHeadersEnabled={false}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
       initialNumToRender={14}
       maxToRenderPerBatch={16}
       updateCellsBatchingPeriod={40}
@@ -145,7 +208,7 @@ export default function Timeline() {
       renderItem={renderItem}
       renderSectionFooter={renderSectionFooter}
       ListEmptyComponent={
-        <Text style={t.empty}>{range !== 'ALL' ? 'Nothing in this range.' : kind !== ALL ? `No ${KIND_LABEL[kind].toLowerCase()} logged yet.` : 'Nothing logged yet. What you log on Home shows up here, newest first.'}</Text>
+        <Text style={t.empty}>{needle ? `Nothing matches "${query.trim()}".` : range !== 'ALL' ? 'Nothing in this range.' : kind !== ALL ? `No ${KIND_LABEL[kind].toLowerCase()} logged yet.` : 'Nothing logged yet. What you log on Home shows up here, newest first.'}</Text>
       }
     />
   )
@@ -153,10 +216,15 @@ export default function Timeline() {
 
 // Each day's rows sit on one card: first row rounds the top, the footer rounds the bottom
 const t = StyleSheet.create({
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.secondary, borderRadius: 12, paddingHorizontal: 12, minHeight: 40 },
+  searchInput: { flex: 1, fontFamily: F.body, fontSize: 16, color: C.fg, paddingVertical: 9 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4, marginLeft: -8 },
   day: { marginTop: 22, marginBottom: 8 },
-  item: { backgroundColor: C.card, paddingHorizontal: 14, borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth, borderColor: C.line },
+  item: { backgroundColor: C.card, overflow: 'hidden', borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth, borderColor: C.line },
   first: { borderTopLeftRadius: 16, borderTopRightRadius: 16, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 2 },
+  content: { backgroundColor: C.card, paddingHorizontal: 14 },
+  swipeAction: { width: 88, backgroundColor: C.danger, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  swipeText: { fontFamily: F.semi, fontSize: 13, color: '#fff' },
   foot: {
     height: 8, backgroundColor: C.card, borderBottomLeftRadius: 16, borderBottomRightRadius: 16,
     borderWidth: StyleSheet.hairlineWidth, borderTopWidth: 0, borderColor: C.line,

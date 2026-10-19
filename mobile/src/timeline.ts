@@ -8,6 +8,7 @@ import { ALL_SYMPTOMS, chipTone, ratingOf } from '@shared/lib/symptoms'
 import type { ArchivableTable } from '@shared/lib/archive'
 import { doseText } from '@/log'
 import type { Tone } from '@/theme'
+import { showWeight, type Units, vol, weightText } from '@/units'
 
 export type Kind = 'injection' | 'ancillary' | 'weight' | 'bp' | 'symptom' | 'lab'
 
@@ -45,33 +46,35 @@ export function bpStatus(sys: number, dia: number): { label: string; tone: Tone 
   return { label: 'Optimal', tone: 'good' }
 }
 
-const arrow = (v: number) => `${v > 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(1)} kg`
+const arrow = (kg: number, u: Units) => `${kg > 0 ? '▲' : '▼'} ${Math.abs(showWeight(kg, u)).toFixed(1)} ${u.weight}`
 const facts = (...xs: Array<string | undefined | false>) => xs.filter((x): x is string => !!x).join(' · ') || undefined
 
-export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog[]; vitals: VitalLog[]; bodyMetrics: BodyMetric[]; symptoms: Symptom[]; tests?: LabTest[] }): Event[] {
+/** Every entry as a row. `units` decides how weights and syringe volumes read (kg or lb, mL or cc). */
+export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog[]; vitals: VitalLog[]; bodyMetrics: BodyMetric[]; symptoms: Symptom[]; tests?: LabTest[]; units: Units }): Event[] {
+  const u = d.units
   const byId = groupByCompoundId(compoundGroups(d.compounds, d.injections))
   const weights = d.bodyMetrics.filter((b) => b.weightKg !== undefined).sort((a, b) => a.measuredAt.localeCompare(b.measuredAt))
   const now = Date.now()
   return [
     ...d.injections.map((i): Event => {
       const c = byId.get(i.compoundId)
-      const dose = doseText(i) || undefined
+      const dose = vol(doseText(i), u) || undefined
       const anc = isAncillary(i)
       const name = c?.name ?? (anc ? 'Ancillary' : 'Injection')
       return {
         id: `i-${i.id}`, kind: anc ? 'ancillary' : 'injection', table: 'injections', rowId: i.id!, date: new Date(i.takenAt),
         title: dose ? `${name} · ${dose}` : name,
-        sub: anc ? facts(i.route === 'Oral' ? 'by mouth' : 'other') : facts(i.site, i.route, i.vialAmount && `drew ${i.vialAmount}`, i.needle),
-        status: LOGGED, note: i.notes, dot: c?.color, group: c?.key,
+        sub: anc ? facts(i.route === 'Oral' ? 'by mouth' : 'other') : facts(i.site, i.route, i.vialAmount && `drew ${vol(i.vialAmount, u)}`, i.needle),
+        status: LOGGED, note: i.notes && vol(i.notes, u), dot: c?.color, group: c?.key,
       }
     }),
     ...weights.map((w, n): Event => {
       const delta = n > 0 ? w.weightKg! - weights[n - 1].weightKg! : undefined
       return {
         id: `w-${w.id}`, kind: 'weight', table: 'bodyMetrics', rowId: w.id!, date: new Date(w.measuredAt),
-        title: `Weight ${w.weightKg} kg`,
+        title: `Weight ${weightText(w.weightKg!, u)}`,
         sub: facts(
-          delta === undefined ? 'first entry' : Math.abs(delta) >= 0.05 ? `${arrow(delta)} vs last` : 'no change vs last',
+          delta === undefined ? 'first entry' : Math.abs(delta) >= 0.05 ? `${arrow(delta, u)} vs last` : 'no change vs last',
           w.source === 'apple_health' && 'Apple Health',
         ),
         status: LOGGED, note: w.notes,

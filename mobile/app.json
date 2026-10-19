@@ -64,6 +64,64 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.907236277182-0nqqc5tuvv1g34uh0fgs1ff4lfu87s0e"
         }
+      ],
+      [
+        "expo-quick-actions",
+        {
+          "iosActions": [
+            {
+              "id": "injection",
+              "title": "Log injection",
+              "icon": "symbol:syringe.fill",
+              "params": {
+                "href": "/log/injection"
+              }
+            },
+            {
+              "id": "bp",
+              "title": "Log blood pressure",
+              "icon": "symbol:heart.fill",
+              "params": {
+                "href": "/log/bp"
+              }
+            },
+            {
+              "id": "weight",
+              "title": "Log weight",
+              "icon": "symbol:scalemass.fill",
+              "params": {
+                "href": "/log/weight"
+              }
+            },
+            {
+              "id": "checkin",
+              "title": "Check in",
+              "icon": "symbol:brain.head.profile",
+              "params": {
+                "href": "/log/checkin"
+              }
+            }
+          ]
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "groupIdentifier": "group.app.magno.ios",
+          "widgets": [
+            {
+              "name": "NextShot",
+              "displayName": "Next shot",
+              "description": "When your last injection was and when the next reminder is due.",
+              "ios": {
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium"
+                ]
+              }
+            }
+          ]
+        }
       ]
     ],
     "experiments": {

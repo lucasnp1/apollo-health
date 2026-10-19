@@ -12,7 +12,8 @@ import { SECTION_ORDER, type LabSection } from '@shared/lib/markers'
 import { ALL_SYMPTOMS, customDefs, ratingOf } from '@shared/lib/symptoms'
 
 export type DoseRow = { at: string; compound: string; dose: string; route: string; site: string; notes?: string }
-export type WeightRow = { at: string; kg: number; notes?: string }
+/** A weight in the unit the person reads (`unit`: kg or lb). */
+export type WeightRow = { at: string; value: number; unit: string; notes?: string }
 export type BpRow = { at: string; sys: number; dia: number; pulse?: number; notes?: string }
 export type LogReport = {
   from: Date
@@ -244,8 +245,8 @@ export function logReportHtml(r: LogReport): string {
 
   if (r.weight) {
     parts.push(`<h2>Weight <span class="muted">(${r.weight.length} entries)</span></h2>${r.weight.length
-      ? lineChart([{ label: 'Weight', color: '#111', points: r.weight.map((w) => ({ t: ms(w.at), v: w.kg })) }], 'kg') +
-        table(['Date and time', 'Weight (kg)', 'Notes'], r.weight.map((w) => [esc(dayTime(w.at)), esc(w.kg), esc(w.notes)]), [1])
+      ? lineChart([{ label: 'Weight', color: '#111', points: r.weight.map((w) => ({ t: ms(w.at), v: w.value })) }], r.weight[0].unit) +
+        table(['Date and time', `Weight (${r.weight[0].unit})`, 'Notes'], r.weight.map((w) => [esc(dayTime(w.at)), esc(w.value), esc(w.notes)]), [1])
       : empty}`)
   }
 

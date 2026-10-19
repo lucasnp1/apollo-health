@@ -16,6 +16,7 @@ import { type HomeInsight, openInsight } from '@/insights/useInsights'
 import { Link, type RangeId, RangeMenu, rangeDomain, Widget } from '@/kit'
 import { doseText, ratingMean, weightPoints } from '@/log'
 import { isAncillary } from '@/timeline'
+import { showWeight, useUnits, vol } from '@/units'
 import { C, F, type Tone, toneHex, usePalette } from '@/theme'
 import { dateTicks, fmtTick, PAD, TimeChart, useCardWidth } from './TimeChart'
 
@@ -141,6 +142,7 @@ function Lane({ name, color, shots, domain, labels, chart }: {
   chart?: boolean
 }) {
   const pal = usePalette()
+  const u = useUnits()
   const cardWidth = useCardWidth()
   const [width, setWidth] = useState(chart ? cardWidth - (PAD.l - 6) - (PAD.r - 6) : cardWidth)
   const H = labels ? 38 : 22
@@ -153,7 +155,7 @@ function Lane({ name, color, shots, domain, labels, chart }: {
       <View style={w.laneHead}>
         <View style={[w.dot, { backgroundColor: color }]} />
         <Text style={w.laneName} numberOfLines={1}>{name}</Text>
-        <Text style={w.laneMeta}>{shots.length} · last {doseText(lastShot, { drew: true })} {format(Date.parse(lastShot.takenAt), 'EEE d MMM')}</Text>
+        <Text style={w.laneMeta}>{shots.length} · last {vol(doseText(lastShot, { drew: true }), u)} {format(Date.parse(lastShot.takenAt), 'EEE d MMM')}</Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[{ height: H }, chart && { marginLeft: PAD.l - 6, marginRight: PAD.r - 6 }]}>
         <Svg width={width} height={H}>
@@ -239,7 +241,8 @@ export function WellbeingWidget({ symptoms, compounds, injections }: { symptoms:
 export function WeightWidget({ bodyMetrics, injections }: { bodyMetrics: BodyMetric[]; injections: InjectionLog[] }) {
   const pal = usePalette()
   const [range, setRange] = useState<RangeId>('3M')
-  const pts = weightPoints(bodyMetrics, injections)
+  const u = useUnits()
+  const pts = weightPoints(bodyMetrics, injections).map((p) => ({ t: p.t, v: showWeight(p.v, u) }))
   if (!pts.length) return null
   const domain = rangeDomain(range, pts.map((p) => p.t))
   const shown = pts.filter((p) => p.t >= domain[0])
@@ -249,11 +252,11 @@ export function WeightWidget({ bodyMetrics, injections }: { bodyMetrics: BodyMet
   return (
     <Widget
       eyebrow="Weight"
-      title={`${lastP.v} kg`}
-      sub={change !== undefined ? `${change > 0 ? '+' : ''}${change.toFixed(1)} kg over this range` : `Logged ${fmtDay(new Date(lastP.t).toISOString())}`}
+      title={`${lastP.v} ${u.weight}`}
+      sub={change !== undefined ? `${change > 0 ? '+' : ''}${change.toFixed(1)} ${u.weight} over this range` : `Logged ${fmtDay(new Date(lastP.t).toISOString())}`}
       action={<RangeMenu value={range} onChange={setRange} />}
     >
-      {shown.length ? <TimeChart series={[{ label: 'Weight', color: pal.primary, points: shown }]} unit="kg" domain={domain} /> : <Text style={w.empty}>No weight in this range.</Text>}
+      {shown.length ? <TimeChart series={[{ label: 'Weight', color: pal.primary, points: shown }]} unit={u.weight} domain={domain} /> : <Text style={w.empty}>No weight in this range.</Text>}
     </Widget>
   )
 }

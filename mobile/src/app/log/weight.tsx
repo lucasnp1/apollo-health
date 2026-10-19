@@ -1,21 +1,27 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { type BodyMetric, db } from '@shared/lib/db'
 import { useBodyMetrics, useInjections } from '@/data/useLog'
 import { Input, Section, When } from '@/kit'
 import { pushWeight } from '@/health'
 import { LogForm, num } from '@/LogForm'
 import { useDirty, useEditRow } from '@/logging/useEntry'
+import { showWeight, toKg, useUnits, weightText } from '@/units'
 
 export default function LogWeight() {
   const bodyMetrics = useBodyMetrics()
   const injections = useInjections()
+  const u = useUnits()
   const [weight, setWeight] = useState('')
+  // The saved kg and how it showed: saved again unchanged, it keeps the exact kg (no lb round trip drift)
+  const loaded = useRef<{ text: string; kg: number } | undefined>(undefined)
   const [notes, setNotes] = useState('')
   const [when, setWhen] = useState(() => new Date())
   const { id, ready } = useEditRow(
     (rowId) => bodyMetrics.find((r) => r.id === rowId) ?? db.bodyMetrics.get(rowId),
     (b: BodyMetric) => {
-      setWeight(b.weightKg !== undefined ? String(b.weightKg) : '')
+      const text = b.weightKg !== undefined ? String(showWeight(b.weightKg, u)) : ''
+      if (b.weightKg !== undefined) loaded.current = { text, kg: b.weightKg }
+      setWeight(text)
       setNotes(b.notes ?? '')
       setWhen(new Date(b.measuredAt))
     },
@@ -29,7 +35,7 @@ export default function LogWeight() {
     for (const i of injections) if (i.weightKg !== undefined && Date.parse(i.takenAt) > best) [best, kg] = [Date.parse(i.takenAt), i.weightKg]
     return kg
   }, [bodyMetrics, injections, id])
-  const kg = num(weight)
+  const kg = loaded.current?.text === weight ? loaded.current.kg : toKg(num(weight), u)
   const ok = kg > 0 && kg < 500
 
   async function save() {
@@ -49,8 +55,16 @@ export default function LogWeight() {
       title={id !== undefined ? 'Edit weight' : undefined}
       archive={id !== undefined ? { table: 'bodyMetrics', id } : undefined}
     >
-      <Section title="Body weight" hint={last !== undefined && id === undefined ? `Last logged: ${last} kg` : undefined}>
-        <Input autoFocus={id === undefined} keyboardType="decimal-pad" suffix="kg" placeholder={last !== undefined ? String(last) : 'e.g. 82.5'} value={weight} onChangeText={setWeight} accessibilityLabel="Body weight in kilograms" />
+      <Section title="Body weight" hint={last !== undefined && id === undefined ? `Last logged: ${weightText(last, u)}` : undefined}>
+        <Input
+          autoFocus={id === undefined}
+          keyboardType="decimal-pad"
+          suffix={u.weight}
+          placeholder={last !== undefined ? String(showWeight(last, u)) : u.weight === 'lb' ? 'e.g. 182' : 'e.g. 82.5'}
+          value={weight}
+          onChangeText={setWeight}
+          accessibilityLabel={`Body weight in ${u.weight === 'lb' ? 'pounds' : 'kilograms'}`}
+        />
       </Section>
       <When value={when} onChange={setWhen} />
 

@@ -12,6 +12,7 @@ import { disableHealth, enableHealth, healthAvailable, useHealth } from '@/healt
 import { usePro } from '@/money/pro'
 import { type Choice, CHOICE_LABEL, setAppearance, useAppearance } from '@/appearance'
 import { Card, Eyebrow, MenuPicker, PageHeader, Pill } from '@/kit'
+import { setUnits, useUnits } from '@/units'
 import { C, F } from '@/theme'
 
 const toggleHealth = (on: boolean) =>
@@ -24,6 +25,7 @@ export default function You() {
   const pro = usePro()
   const health = useHealth()
   const look = useAppearance()
+  const units = useUnits()
 
   const out = () =>
     Alert.alert('Sign out?', 'Your data stays in your account and comes back when you sign in again. It is removed from this phone.', [
@@ -101,7 +103,16 @@ export default function You() {
             <Text style={y.label}>Appearance</Text>
             <MenuPicker value={look} onChange={setAppearance} options={(Object.keys(CHOICE_LABEL) as Choice[]).map((c) => ({ value: c, label: CHOICE_LABEL[c] }))} />
           </View>
+          <View style={[y.row, y.divided, { paddingVertical: 8 }]}>
+            <Text style={y.label}>Weight</Text>
+            <MenuPicker value={units.weight} onChange={(weight) => setUnits({ weight })} options={[{ value: 'kg', label: 'Kilograms (kg)' }, { value: 'lb', label: 'Pounds (lb)' }]} />
+          </View>
+          <View style={[y.row, y.divided, { paddingVertical: 8 }]}>
+            <Text style={y.label}>Syringe volume</Text>
+            <MenuPicker value={units.volume} onChange={(volume) => setUnits({ volume })} options={[{ value: 'mL', label: 'mL' }, { value: 'cc', label: 'cc' }]} />
+          </View>
         </Card>
+        <Text style={y.small}>Only how they read changes: what you saved stays the same, and doses in mg or tablets are never converted.</Text>
       </View>
 
       <View style={{ gap: 10 }}>
@@ -161,6 +172,7 @@ const y = StyleSheet.create({
   primaryText: { fontFamily: F.semi, fontSize: 16, color: C.primaryFg },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 14 },
+  divided: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   sep: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
   label: { fontFamily: F.medium, fontSize: 16, color: C.fg },
   value: { fontFamily: F.body, fontSize: 15, color: C.muted },
