@@ -1,7 +1,6 @@
-// Magno Pro: bought in the app through Apple (RevenueCat), or on magno.fit through Stripe. RevenueCat is the one
-// place that decides (docs/decisions.md): signed in, its customer is the Magno account, so a purchase follows the
-// person to the web and back. Until the Stripe account is connected to RevenueCat, the server's own is_pro (Stripe)
-// counts as well. Until billing is switched on (app.json extra.billing.live) everyone has Pro.
+// Magno Pro: bought in the app through Apple, decided by RevenueCat (docs/decisions.md). The web app and Stripe were
+// retired on 19 Oct 2026; the server's is_pro now only means an admin or a Pro set by hand on the account. Until
+// billing is switched on (app.json extra.billing.live) everyone has Pro.
 import Constants from 'expo-constants'
 import { router } from 'expo-router'
 import { useSyncExternalStore } from 'react'

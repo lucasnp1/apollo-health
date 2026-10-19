@@ -57,7 +57,7 @@ export default function You() {
           </Card>
         ) : (
           <Card style={{ gap: 12 }}>
-            <Text style={y.body}>Everything you log is kept on this phone. With a Magno account it's also backed up, and the same on magno.fit and your other devices.</Text>
+            <Text style={y.body}>Everything you log is kept on this phone. With a Magno account it's also backed up, and the same on your other devices.</Text>
             <Pressable style={y.primary} onPress={() => router.push('/account/sign-in')} accessibilityRole="button">
               <Text style={y.primaryText}>Sign in or create an account</Text>
             </Pressable>

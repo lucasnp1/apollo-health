@@ -37,7 +37,7 @@ export default function DeleteAccount() {
       <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <Text style={d.lead}>
           This permanently deletes {acc.status === 'authed' ? acc.user.email : 'your account'} and everything in it: every injection, reading,
-          check-in and blood test, on magno.fit and on this phone. A paid plan bought on the web is cancelled. It can't be undone.
+          check-in and blood test, from our server and this phone. It can't be undone. A Magno Pro subscription is billed by Apple, so cancel it in Settings, under your name, then Subscriptions.
         </Text>
         <Text style={d.small}>Want a copy first? Export everything from You before you delete.</Text>
         <Section title="Password">

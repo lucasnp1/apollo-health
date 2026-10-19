@@ -1,6 +1,6 @@
 // Magno Pro on the iPhone, written down once. Same prices as the web (src/lib/plans.ts; decided by Lucas, 18 Oct
 // 2026). The paywall shows the App Store's own prices, in each person's currency, once it has them; these until then.
-/** RevenueCat's name for what a purchase unlocks (project "Magno"). The web's Stripe plan counts too. */
+/** RevenueCat's name for what a purchase unlocks (project "Magno"). */
 export const ENTITLEMENT = 'pro'
 
 export type PlanId = 'monthly' | 'lifetime'
@@ -10,6 +10,6 @@ export const PLANS: Record<PlanId, { name: string; product: string; price: strin
 }
 
 /** What Pro adds in this app. Logging, charts, results typed in by hand and export are never behind Pro. */
-export const PRO_FEATURES = ['Import blood tests from a PDF or a photo, read on your phone', 'See what changed since your last test, marker by marker', 'The same Pro on magno.fit when you sign in']
+export const PRO_FEATURES = ['Import blood tests from a PDF, a photo or a spreadsheet, read on your phone', 'Your bloods read in plain words', 'See what changed since your last test, marker by marker']
 
 export const LEGAL = { terms: 'https://magno.fit/terms.html', privacy: 'https://magno.fit/privacy.html' }
