@@ -7,7 +7,7 @@ import { JetBrainsMono_400Regular } from '@expo-google-fonts/jetbrains-mono/400R
 import { JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono/500Medium'
 import { JetBrainsMono_600SemiBold } from '@expo-google-fonts/jetbrains-mono/600SemiBold'
 import { useFonts } from 'expo-font'
-import { DarkTheme, Stack, ThemeProvider } from 'expo-router'
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
@@ -19,16 +19,17 @@ import { loadData } from '@/data/persist'
 import { startHealth } from '@/health'
 import { startReminders } from '@/reminders'
 import { Toaster } from '@/toast'
-import { C, F } from '@/theme'
+import { startAppearance } from '@/appearance'
+import { C, F, usePalette, useScheme } from '@/theme'
 
 SplashScreen.preventAutoHideAsync()
+startAppearance()
 
-const THEME = { ...DarkTheme, colors: { ...DarkTheme.colors, background: C.bg, card: C.bg, text: C.fg, primary: C.primary, border: C.line } }
-
-// A log sheet: native page sheet with its own header (Cancel, the title, Save)
+// A log sheet: native page sheet with its own header (the X, the title, and the screen's own Save)
 const LOG = {
   presentation: 'modal',
   headerShown: true,
+  unstable_headerLeftItems: () => [{ type: 'button' as const, label: 'Close', icon: { type: 'sfSymbol' as const, name: 'xmark' as const }, onPress: () => router.back() }],
   headerStyle: { backgroundColor: C.bg },
   headerTitleStyle: { fontFamily: F.semi, color: C.fg },
   headerTintColor: C.primary,
@@ -60,20 +61,25 @@ export default function Root() {
   const acc = useAccount()
   const who = acc.status === 'authed' ? acc.user.id : acc.status
   useEffect(() => void billingFollowsAccount().catch(console.error), [who])
+  const scheme = useScheme()
+  const pal = usePalette()
+  const base = scheme === 'light' ? DefaultTheme : DarkTheme
+  const theme = { ...base, colors: { ...base.colors, background: pal.bg, card: pal.bg, text: pal.fg, primary: pal.primary, border: pal.line } }
   const ready = fonts && loaded
   useEffect(() => void (ready && SplashScreen.hideAsync()), [ready])
   if (!ready) return null
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-    <ThemeProvider value={THEME}>
-      <StatusBar style="light" />
+    <ThemeProvider value={theme}>
+      <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="log/injection" options={{ ...LOG, title: 'Injection' }} />
         <Stack.Screen name="log/weight" options={{ ...LOG, title: 'Weight' }} />
         <Stack.Screen name="log/bp" options={{ ...LOG, title: 'Blood pressure' }} />
         <Stack.Screen name="log/checkin" options={{ ...LOG, title: 'Check-in' }} />
+        <Stack.Screen name="log/ancillary" options={{ ...LOG, title: 'Ancillary' }} />
         <Stack.Screen name="labs/edit" options={{ ...LOG, title: 'Blood test' }} />
         <Stack.Screen name="labs/[id]" options={{ ...PUSH, headerBackTitle: 'Bloods' }} />
         <Stack.Screen name="labs/marker/[key]" options={PUSH} />

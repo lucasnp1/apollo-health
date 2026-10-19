@@ -2,17 +2,18 @@
 import * as Haptics from 'expo-haptics'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { chipTone, type SymptomDef } from '@shared/lib/symptoms'
-import { C, F, TONE } from '@/theme'
+import { C, F, toneHex, usePalette } from '@/theme'
 
 export function Scale({ def, value, onChange }: { def: SymptomDef; value: number | undefined; onChange: (v: number | undefined) => void }) {
+  const pal = usePalette()
   return (
     <View style={{ gap: 8 }}>
       <Text style={k.label}>{def.label}</Text>
       <View style={k.scale} accessibilityRole="radiogroup" accessibilityLabel={def.label}>
         {[0, 1, 2, 3, 4, 5].map((n) => {
           const on = value === n
-          const tone = TONE[on ? chipTone(n, def.direction) : 'neutral']
-          const ink = tone === C.muted ? C.fg : tone
+          const t = on ? chipTone(n, def.direction) : 'neutral'
+          const ink = t === 'neutral' ? pal.fg : toneHex(pal, t)
           return (
             <Pressable
               key={n}

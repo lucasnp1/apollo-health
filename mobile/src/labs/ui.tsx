@@ -7,12 +7,13 @@ import { fmtRange, retestLine } from '@shared/lib/labRules'
 import { type LabTest, printedValue, prevText, type TestMarker } from '@shared/lib/labTests'
 import { fmtDay } from '@shared/lib/dates'
 import { markerChip } from '@/labs/reads'
-import { C, F, TONE, type Tone } from '@/theme'
+import { C, F, TONE, type Tone, toneHex, usePalette } from '@/theme'
 
 export function Tag({ label, tone }: { label: string; tone: Tone }) {
   const t = TONE[tone]
+  const pal = usePalette()
   return (
-    <View style={[u.tag, { backgroundColor: t + '22' }]}>
+    <View style={[u.tag, { backgroundColor: toneHex(pal, tone) + '22' }]}>
       <Text style={[u.tagText, { color: t }]}>{label}</Text>
     </View>
   )
@@ -105,7 +106,7 @@ export const u = StyleSheet.create({
   tagText: { fontFamily: F.semi, fontSize: 12 },
   bar: { height: 14, justifyContent: 'center', marginTop: 2 },
   track: { position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, backgroundColor: C.secondary },
-  inRange: { position: 'absolute', height: 4, borderRadius: 2, backgroundColor: 'rgba(52,211,153,0.35)' },
+  inRange: { position: 'absolute', height: 4, borderRadius: 2, backgroundColor: C.goodBand },
   dotValue: { position: 'absolute', width: 12, height: 12, borderRadius: 6, marginLeft: -6, borderWidth: 2, borderColor: C.card },
   prev: { position: 'absolute', width: 10, height: 10, borderRadius: 5, marginLeft: -5, borderWidth: 2, borderColor: C.muted },
   row: { paddingVertical: 13, gap: 6 },

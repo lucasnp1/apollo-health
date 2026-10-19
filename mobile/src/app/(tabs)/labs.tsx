@@ -3,9 +3,9 @@
 // plain-words analysis) is not in the iOS app yet; see docs/decisions.md.
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { SymbolView, type SymbolViewProps } from 'expo-symbols'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ActionSheetIOS, ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { fmtDay } from '@shared/lib/dates'
@@ -79,15 +79,20 @@ export default function Labs() {
   const [busy, setBusy] = useState(false)
   const [tab, setTab] = useState<'latest' | 'tests' | 'markers'>('latest')
 
-  const add = () =>
+  // Home's "Blood test" button opens this tab with `add` set: show the add sheet
+  const { add: addParam } = useLocalSearchParams<{ add?: string }>()
+  useEffect(() => void (addParam && add()), [addParam])
+
+  function add() {
     ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['PDF report', 'Photo of a report', 'Take a photo', 'Enter by hand', 'Cancel'], cancelButtonIndex: 4, userInterfaceStyle: 'dark', title: 'Add a blood test' },
+      { options: ['PDF report', 'Photo of a report', 'Take a photo', 'Enter by hand', 'Cancel'], cancelButtonIndex: 4, title: 'Add a blood test' },
       (i) => {
         if (i === 3) return router.push('/labs/edit')
         const kind = (['pdf', 'photo', 'camera'] as const)[i]
         if (kind) withPro('Importing a blood test', () => void importReport(kind, setBusy))
       },
     )
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -291,6 +296,6 @@ const l = StyleSheet.create({
   miniValue: { fontFamily: F.mono, fontSize: 12, color: C.muted },
   outline: { flex: 1, borderWidth: 1, borderColor: C.input, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
   outlineText: { fontFamily: F.semi, fontSize: 14, color: C.fg },
-  busy: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(13,14,17,0.82)', alignItems: 'center', justifyContent: 'center', gap: 14 },
+  busy: { ...StyleSheet.absoluteFill, backgroundColor: C.scrim, alignItems: 'center', justifyContent: 'center', gap: 14 },
   busyText: { fontFamily: F.medium, fontSize: 16, color: C.fg },
 })

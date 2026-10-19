@@ -70,8 +70,21 @@ everything the web had, notifications and the doctor export. Done and simulator-
 - **Also:** Apple Health (weight and BP, both ways), reminders per kind (local notifications), export for your doctor
   (PDF and CSV, free), archive, edit any entry, site rotation, change password, recovery codes, feedback.
 
-Not done yet: view the original lab file (needs file storage), CSV/XLSX lab import, personal marker targets, share
-image, onboarding, light theme, removing archived entries from Apple Health.
+### 19 Oct 2026: Lucas's review of build 2, fixed for build 3
+
+Light mode (follows the phone, or set in You > Display; `src/theme.ts` dynamic colours, `src/appearance.ts`); Apple's
+sheet buttons (native X and prominent tick, `unstable_header*Items`); Injections widget: week by default, no site,
+title is the count (not a compound), "See all in Timeline" opens the Timeline filtered to injections and that range;
+Bloods widget removed (What needs a look already reads the bloods); pulse (bpm) on the Pressure widget and tile;
+Blood pressure next to Injection on Home, plus Ancillary and Blood test buttons; ancillaries (`log/ancillary`: route
+Oral or Other, compound category Ancillary, "For:" line naming the side effects) shown under the Wellbeing chart on
+the same time axis and as their own Timeline type; Timeline filters in Apple pull-down menus (type, compound, range),
+no sideways scrolling, and Export takes what's shown to the doctor export; no "free" copy in the app.
+
+**To do next (parked by Lucas, 19 Oct 2026, after the fixes above):** view the original lab file (needs file
+storage), CSV/XLSX lab import, personal marker targets, share image, onboarding, removing archived entries from Apple
+Health, the injection logger's check-in with custom symptoms; before submitting, rewrite the review notes for the
+plain-words reads.
 
 **Money on iPhone, like Liber:** Apple in-app purchase through RevenueCat only; the app never talks to Stripe. Stripe
 only matters for the website, which can keep it or move to RevenueCat Web Billing later (a web change, Lucas's call).

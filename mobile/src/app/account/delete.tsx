@@ -32,11 +32,6 @@ export default function DeleteAccount() {
       <Stack.Screen
         options={{
           title: 'Delete account',
-          headerLeft: () => (
-            <Pressable hitSlop={12} onPress={() => router.back()}>
-              <Text style={{ fontFamily: F.medium, fontSize: 17, color: C.muted }}>Cancel</Text>
-            </Pressable>
-          ),
         }}
       />
       <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>

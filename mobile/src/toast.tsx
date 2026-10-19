@@ -61,8 +61,8 @@ const s = StyleSheet.create({
   wrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
   toast: {
     flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14,
-    backgroundColor: '#2a2d33', borderWidth: StyleSheet.hairlineWidth, borderColor: C.line, maxWidth: 520, alignSelf: 'stretch',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+    backgroundColor: C.toast, borderWidth: StyleSheet.hairlineWidth, borderColor: C.line, maxWidth: 520, alignSelf: 'stretch',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
   },
   text: { flex: 1, fontFamily: F.medium, fontSize: 15, color: C.fg },
   action: { fontFamily: F.semi, fontSize: 15, color: C.accentInk },

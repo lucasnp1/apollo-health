@@ -1,10 +1,10 @@
 // The few building blocks every screen uses, in the web's look: hairline cards, mono eyebrows, amber for the one action.
-import { DatePicker, Host } from '@expo/ui/swift-ui'
-import { datePickerStyle, tint } from '@expo/ui/swift-ui/modifiers'
+import { DatePicker, Host, Picker, Text as SText } from '@expo/ui/swift-ui'
+import { datePickerStyle, pickerStyle, tag, tint } from '@expo/ui/swift-ui/modifiers'
 import * as Haptics from 'expo-haptics'
 import { forwardRef, type ReactNode } from 'react'
-import { ActionSheetIOS, Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native'
-import { C, F } from '@/theme'
+import { Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native'
+import { C, F, usePalette, useScheme } from '@/theme'
 
 export function Eyebrow({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[s.eyebrow, style]}>{children}</Text>
@@ -28,27 +28,29 @@ export function Section({ title, children, hint }: { title: string; children: Re
 export const Input = forwardRef<TextInput, TextInputProps & { suffix?: string }>(function Input({ suffix, style, ...props }, ref) {
   return (
     <View style={s.inputWrap}>
-      <TextInput ref={ref} placeholderTextColor={C.faint} keyboardAppearance="dark" selectionColor={C.primary} style={[s.input, style]} {...props} />
+      <TextInput ref={ref} placeholderTextColor={C.faint} selectionColor={C.primary} style={[s.input, style]} {...props} />
       {suffix ? <Text style={s.suffix}>{suffix}</Text> : null}
     </View>
   )
 })
 
 /** A choice among a few: tap to pick, tap the picked one again to clear it (when `clearable`). */
-export function Chips<T extends string>({ options, value, onChange, clearable }: {
+export function Chips<T extends string>({ options, value, onChange, clearable, selected }: {
   options: { value: T; label: string; dot?: string }[]
   value: T | undefined
   onChange: (v: T | undefined) => void
   clearable?: boolean
+  /** Several picked at once (then `value` is ignored) */
+  selected?: T[]
 }) {
   return (
     <View style={s.chips}>
       {options.map((o) => {
-        const on = o.value === value
+        const on = selected ? selected.includes(o.value) : o.value === value
         return (
           <Pressable
             key={o.value}
-            accessibilityRole="radio"
+            accessibilityRole={selected ? 'checkbox' : 'radio'}
             accessibilityState={{ selected: on }}
             onPress={() => {
               void Haptics.selectionAsync()
@@ -105,13 +107,13 @@ export const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, paddingVertical: 9, borderRadius: 999,
     borderWidth: 1, borderColor: C.input, backgroundColor: C.card,
   },
-  chipOn: { borderColor: C.primary, backgroundColor: 'rgba(251,182,54,0.12)' },
+  chipOn: { borderColor: C.primary, backgroundColor: C.primaryTint },
   chipText: { fontFamily: F.medium, fontSize: 15, color: C.muted },
   chipTextOn: { color: C.fg },
   dot: { width: 8, height: 8, borderRadius: 4 },
   seg: { flexDirection: 'row', backgroundColor: C.secondary, borderRadius: 12, padding: 3 },
   segItem: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 9 },
-  segOn: { backgroundColor: '#2c3036' },
+  segOn: { backgroundColor: C.segOn },
   segText: { fontFamily: F.semi, fontSize: 15, color: C.muted },
   widgetHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   widgetTitle: { fontFamily: F.semi, fontSize: 19, color: C.fg, letterSpacing: -0.2 },
@@ -125,16 +127,18 @@ export const s = StyleSheet.create({
 
 /** When it happened: now by default, any moment up to now. The native compact picker (SwiftUI DatePicker). */
 export function When({ value, onChange, time = true }: { value: Date; onChange: (d: Date) => void; time?: boolean }) {
+  const scheme = useScheme()
+  const pal = usePalette()
   return (
     <View style={[s.card, s.when]}>
       <Text style={s.whenLabel}>{time ? 'When' : 'Date'}</Text>
-      <Host matchContents colorScheme="dark">
+      <Host matchContents colorScheme={scheme}>
         <DatePicker
           selection={value}
           range={{ end: new Date() }}
           displayedComponents={time ? ['date', 'hourAndMinute'] : ['date']}
           onDateChange={onChange}
-          modifiers={[datePickerStyle('compact'), tint(C.primary)]}
+          modifiers={[datePickerStyle('compact'), tint(pal.primary)]}
         />
       </Host>
     </View>
@@ -198,18 +202,27 @@ export function rangeDomain(r: RangeId, times: number[]): [number, number] {
   return [Math.min(first, now - 7 * 86_400_000), now]
 }
 
-/** Week, month, 3 months... in Apple's own menu, opened from a pill. */
-export function RangeMenu({ value, onChange }: { value: RangeId; onChange: (r: RangeId) => void }) {
-  const ids = Object.keys(RANGE_LABEL) as RangeId[]
+/** A pull-down choice in Apple's own menu (SwiftUI Picker, menu style): shows the picked label, ticks it in the menu. */
+export function MenuPicker<T extends string>({ value, options, onChange, label }: {
+  value: T
+  options: { value: T; label: string }[]
+  onChange: (v: T) => void
+  label?: string
+}) {
+  const scheme = useScheme()
+  const pal = usePalette()
   return (
-    <Pill
-      label={`${RANGE_LABEL[value]} ▾`}
-      onPress={() =>
-        ActionSheetIOS.showActionSheetWithOptions(
-          { options: [...ids.map((i) => RANGE_LABEL[i]), 'Cancel'], cancelButtonIndex: ids.length, userInterfaceStyle: 'dark', title: 'Show' },
-          (i) => i < ids.length && onChange(ids[i]),
-        )
-      }
-    />
+    <Host matchContents colorScheme={scheme}>
+      <Picker label={label} selection={value} onSelectionChange={(v) => onChange(v as T)} modifiers={[pickerStyle('menu'), tint(pal.accentInk)]}>
+        {options.map((o) => (
+          <SText key={o.value} modifiers={[tag(o.value)]}>{o.label}</SText>
+        ))}
+      </Picker>
+    </Host>
   )
+}
+
+/** Week, month, 3 months... */
+export function RangeMenu({ value, onChange }: { value: RangeId; onChange: (r: RangeId) => void }) {
+  return <MenuPicker value={value} onChange={onChange} options={(Object.keys(RANGE_LABEL) as RangeId[]).map((r) => ({ value: r, label: RANGE_LABEL[r] }))} />
 }

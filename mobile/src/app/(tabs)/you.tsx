@@ -3,14 +3,15 @@ import { formatDistanceToNow } from 'date-fns'
 import Constants from 'expo-constants'
 import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Alert, type ColorValue, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { signOut, useAccount } from '@/account/auth'
 import { syncNow, useSyncState } from '@/account/sync'
 import { exportAll } from '@/exportData'
 import { disableHealth, enableHealth, healthAvailable, useHealth } from '@/health'
-import { LIVE, usePro } from '@/money/pro'
-import { Card, Eyebrow } from '@/kit'
+import { usePro } from '@/money/pro'
+import { type Choice, CHOICE_LABEL, setAppearance, useAppearance } from '@/appearance'
+import { Card, Eyebrow, MenuPicker } from '@/kit'
 import { C, F } from '@/theme'
 
 const toggleHealth = (on: boolean) =>
@@ -22,6 +23,7 @@ export default function You() {
   const sync = useSyncState()
   const pro = usePro()
   const health = useHealth()
+  const look = useAppearance()
 
   const out = () =>
     Alert.alert('Sign out?', 'Your data stays in your account and comes back when you sign in again. It is removed from this phone.', [
@@ -91,9 +93,19 @@ export default function You() {
       </View>
 
       <View style={{ gap: 10 }}>
+        <Eyebrow>Display</Eyebrow>
+        <Card style={{ paddingVertical: 4 }}>
+          <View style={[y.row, { paddingVertical: 8 }]}>
+            <Text style={y.label}>Appearance</Text>
+            <MenuPicker value={look} onChange={setAppearance} options={(Object.keys(CHOICE_LABEL) as Choice[]).map((c) => ({ value: c, label: CHOICE_LABEL[c] }))} />
+          </View>
+        </Card>
+      </View>
+
+      <View style={{ gap: 10 }}>
         <Eyebrow>Plan</Eyebrow>
         <Card style={{ paddingVertical: 4 }}>
-          <Row label="Magno Pro" value={!LIVE ? 'Free while Magno is new' : pro ? 'Active' : 'See what it adds'} onPress={() => router.push('/pro')} last />
+          <Row label="Magno Pro" value={pro ? 'Active' : 'See what it adds'} onPress={() => router.push('/pro')} last />
         </Card>
       </View>
 
@@ -103,7 +115,6 @@ export default function You() {
           <Row label="Archive" value="Bring entries back" onPress={() => router.push('/archive' as never)} />
           <Row label="Export everything" value="JSON file" onPress={() => void exportAll().catch((e) => Alert.alert("Couldn't export", String(e?.message ?? e)))} last />
         </Card>
-        <Text style={y.small}>Export is free, always. Your data is yours.</Text>
       </View>
 
       <View style={{ gap: 10 }}>
@@ -123,7 +134,7 @@ export default function You() {
   )
 }
 
-function Row({ label, value, onPress, action, danger, tone, last }: { label: string; value?: string; onPress?: () => void; action?: string; danger?: boolean; tone?: string; last?: boolean }) {
+function Row({ label, value, onPress, action, danger, tone, last }: { label: string; value?: string; onPress?: () => void; action?: string; danger?: boolean; tone?: ColorValue; last?: boolean }) {
   return (
     <Pressable onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined} style={({ pressed }) => [y.row, !last && y.sep, pressed && { opacity: 0.7 }]}>
       <Text style={[y.label, danger && { color: C.danger }]}>{label}</Text>

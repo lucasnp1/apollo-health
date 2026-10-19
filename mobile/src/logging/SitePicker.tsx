@@ -4,7 +4,7 @@
 import * as Haptics from 'expo-haptics'
 import { SymbolView } from 'expo-symbols'
 import { useMemo, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { type ColorValue, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { InjectionLog } from '@shared/lib/db'
 import { canonicalSite, type CatalogSite, customSite, groupOf, isCustomSite, quickSites, REGIONS, type Route, siteLabel } from '@shared/lib/sites'
 import { Chips, Eyebrow, Input, s as kit } from '@/kit'
@@ -21,7 +21,7 @@ function dayLabel(d: number): string {
 
 // rested: free. near: a spot next to it on the same muscle was used (soft). caution / avoid: you used THIS spot.
 type Status = 'rested' | 'near' | 'caution' | 'avoid'
-const INK: Record<Status, string> = { rested: C.good, near: C.warn, caution: C.warn, avoid: C.danger }
+const INK: Record<Status, ColorValue> = { rested: C.good, near: C.warn, caution: C.warn, avoid: C.danger }
 
 export function SitePicker({ route, value, injections, onChange }: {
   route: Route
@@ -143,7 +143,7 @@ const p = StyleSheet.create({
     flexBasis: '47%', flexGrow: 1, gap: 4, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12,
     borderWidth: 1, borderColor: C.input, backgroundColor: C.card,
   },
-  tileNext: { borderColor: C.primary + '80', borderStyle: 'dashed' },
+  tileNext: { borderColor: C.primaryLine, borderStyle: 'dashed' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   muscle: { flexShrink: 1, fontFamily: F.semi, fontSize: 15, color: C.fg },

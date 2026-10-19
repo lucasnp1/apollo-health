@@ -18,7 +18,7 @@ export default function ProScreen() {
 
   const purchase = async (id: PlanId) => {
     const pkg = plans?.[id]
-    if (!pkg) return Alert.alert('Not on sale yet', 'Magno Pro is free for everyone while the app is new.')
+    if (!pkg) return Alert.alert('Not on sale yet', 'Magno Pro purchases open soon. You already have everything it adds.')
     setBusy(id)
     try {
       if (await buy(pkg)) router.back()
@@ -34,11 +34,6 @@ export default function ProScreen() {
       <Stack.Screen
         options={{
           title: 'Magno Pro',
-          headerLeft: () => (
-            <Pressable hitSlop={12} onPress={() => router.back()}>
-              <Text style={{ fontFamily: F.medium, fontSize: 17, color: C.muted }}>Close</Text>
-            </Pressable>
-          ),
         }}
       />
       <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 22 }}>
@@ -51,8 +46,6 @@ export default function ProScreen() {
             </View>
           ))}
         </Card>
-        <Text style={p.small}>Logging, charts, results typed in by hand and exporting your data are free, always.</Text>
-
         {pro && LIVE ? (
           <Card style={{ gap: 10 }}>
             <Text style={p.feature}>You have Magno Pro.</Text>
@@ -62,7 +55,7 @@ export default function ProScreen() {
           </Card>
         ) : !LIVE ? (
           <Card>
-            <Text style={p.feature}>Magno Pro is free for everyone while the app is new. Enjoy it.</Text>
+            <Text style={p.feature}>You have Magno Pro.</Text>
           </Card>
         ) : (
           <View style={{ gap: 10 }}>
@@ -119,7 +112,7 @@ const p = StyleSheet.create({
   feature: { flex: 1, fontFamily: F.body, fontSize: 15, color: C.fg, lineHeight: 21 },
   small: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18 },
   plan: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderRadius: 14, borderWidth: 1, borderColor: C.input, backgroundColor: C.card },
-  planMain: { borderColor: 'rgba(251,182,54,0.5)', backgroundColor: 'rgba(251,182,54,0.06)' },
+  planMain: { borderColor: C.primaryLine, backgroundColor: C.primarySoft },
   planName: { fontFamily: F.semi, fontSize: 17, color: C.fg },
   note: { fontFamily: F.medium, fontSize: 13, color: C.accentInk, marginTop: 2 },
   price: { fontFamily: F.monoSemi, fontSize: 17, color: C.fg },

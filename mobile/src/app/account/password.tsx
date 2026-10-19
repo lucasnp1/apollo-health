@@ -58,7 +58,7 @@ export default function ChangePassword() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Change password', headerLeft: () => <CancelButton /> }} />
+      <Stack.Screen options={{ title: 'Change password' }} />
       <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         {done ? (
           <>

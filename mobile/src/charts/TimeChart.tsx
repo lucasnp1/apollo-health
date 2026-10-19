@@ -7,13 +7,13 @@ import { useMemo, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Svg, { Circle, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg'
-import { C, F } from '@/theme'
+import { C, F, usePalette } from '@/theme'
 
 export type Pt = { t: number; v: number }
 export type Series = { label: string; color: string; points: Pt[] }
 export type Domain = [number, number]
 
-const PAD = { l: 34, r: 10, t: 8, b: 20 }
+export const PAD = { l: 34, r: 10, t: 8, b: 20 }
 
 /** Round ticks that frame lo..hi: the first at or below lo, the last at or above hi, three to five in all */
 export function niceTicks(lo: number, hi: number, n = 4): number[] {
@@ -40,6 +40,7 @@ export function TimeChart({ series, domain, band, unit, height = 150, yRange }: 
   /** a fixed scale, e.g. [0, 5] for check-in averages */
   yRange?: [number, number]
 }) {
+  const pal = usePalette()
   const [w, setW] = useState(0)
   const [at, setAt] = useState<number | undefined>()
 
@@ -95,18 +96,18 @@ export function TimeChart({ series, domain, band, unit, height = 150, yRange }: 
                   width={iw}
                   y={y(band.high ?? Math.max(...ticks))}
                   height={Math.max(0, y(band.low ?? Math.min(...ticks)) - y(band.high ?? Math.max(...ticks)))}
-                  fill={C.good}
+                  fill={pal.good}
                   opacity={0.08}
                 />
               ) : null}
               {ticks.map((v) => (
-                <Line key={v} x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke={C.line} strokeWidth={StyleSheet.hairlineWidth} />
+                <Line key={v} x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke={pal.line} strokeWidth={StyleSheet.hairlineWidth} />
               ))}
               {ticks.map((v) => (
-                <SvgText key={`l${v}`} x={PAD.l - 6} y={y(v) + 3.5} fontSize={10} fontFamily={F.mono} fill={C.faint} textAnchor="end">{fmtV(v)}</SvgText>
+                <SvgText key={`l${v}`} x={PAD.l - 6} y={y(v) + 3.5} fontSize={10} fontFamily={F.mono} fill={pal.faint} textAnchor="end">{fmtV(v)}</SvgText>
               ))}
               {dateTicks(domain).map((t, i, all) => (
-                <SvgText key={t} x={x(t)} y={height - 5} fontSize={10} fontFamily={F.mono} fill={C.faint} textAnchor={i === 0 ? 'start' : i === all.length - 1 ? 'end' : 'middle'}>
+                <SvgText key={t} x={x(t)} y={height - 5} fontSize={10} fontFamily={F.mono} fill={pal.faint} textAnchor={i === 0 ? 'start' : i === all.length - 1 ? 'end' : 'middle'}>
                   {fmtTick(t, domain)}
                 </SvgText>
               ))}
@@ -116,12 +117,12 @@ export function TimeChart({ series, domain, band, unit, height = 150, yRange }: 
                 ) : null,
               )}
               {series.map((s) =>
-                s.points.length <= 14 ? s.points.map((p) => <Circle key={`${s.label}${p.t}`} cx={x(p.t)} cy={y(p.v)} r={4} fill={s.color} stroke={C.card} strokeWidth={2} />) : null,
+                s.points.length <= 14 ? s.points.map((p) => <Circle key={`${s.label}${p.t}`} cx={x(p.t)} cy={y(p.v)} r={4} fill={s.color} stroke={pal.card} strokeWidth={2} />) : null,
               )}
               {at !== undefined && when !== undefined ? (
                 <>
-                  <Line x1={x(when)} x2={x(when)} y1={PAD.t} y2={height - PAD.b} stroke={C.muted} strokeWidth={1} />
-                  {series.map((s, i) => (shown[i] ? <Circle key={`h${s.label}`} cx={x(shown[i]!.t)} cy={y(shown[i]!.v)} r={5} fill={s.color} stroke={C.fg} strokeWidth={2} /> : null))}
+                  <Line x1={x(when)} x2={x(when)} y1={PAD.t} y2={height - PAD.b} stroke={pal.muted} strokeWidth={1} />
+                  {series.map((s, i) => (shown[i] ? <Circle key={`h${s.label}`} cx={x(shown[i]!.t)} cy={y(shown[i]!.v)} r={5} fill={s.color} stroke={pal.fg} strokeWidth={2} /> : null))}
                 </>
               ) : null}
             </Svg>

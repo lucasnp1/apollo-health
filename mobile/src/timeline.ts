@@ -8,7 +8,7 @@ import { ALL_SYMPTOMS, chipTone, ratingOf } from '@shared/lib/symptoms'
 import type { ArchivableTable } from '@shared/lib/archive'
 import type { Tone } from '@/theme'
 
-export type Kind = 'injection' | 'weight' | 'bp' | 'symptom' | 'lab'
+export type Kind = 'injection' | 'ancillary' | 'weight' | 'bp' | 'symptom' | 'lab'
 
 export type Event = {
   id: string
@@ -28,7 +28,10 @@ export type Event = {
   dateOnly?: boolean
 }
 
-export const KIND_LABEL: Record<Kind, string> = { injection: 'Injections', weight: 'Weight', bp: 'Blood pressure', symptom: 'Check-ins', lab: 'Labs' }
+export const KIND_LABEL: Record<Kind, string> = { injection: 'Injections', ancillary: 'Ancillaries', weight: 'Weight', bp: 'Blood pressure', symptom: 'Check-ins', lab: 'Labs' }
+
+/** Taken by mouth or another way (a cream, a spray): logged from the Ancillary sheet, not a shot. */
+export const isAncillary = (i: Pick<InjectionLog, 'route'>) => i.route === 'Oral' || i.route === 'Other'
 
 const LOGGED = { label: 'Logged', tone: 'neutral' } as const
 
@@ -54,11 +57,12 @@ export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog
     ...d.injections.map((i): Event => {
       const c = byId.get(i.compoundId)
       const dose = i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : undefined)
-      const name = c?.name ?? 'Injection'
+      const anc = isAncillary(i)
+      const name = c?.name ?? (anc ? 'Ancillary' : 'Injection')
       return {
-        id: `i-${i.id}`, kind: 'injection', table: 'injections', rowId: i.id!, date: parseISO(i.takenAt),
+        id: `i-${i.id}`, kind: anc ? 'ancillary' : 'injection', table: 'injections', rowId: i.id!, date: parseISO(i.takenAt),
         title: dose ? `${name} · ${dose}` : name,
-        sub: facts(i.site, i.route, i.vialAmount && `drew ${i.vialAmount}`, i.needle),
+        sub: anc ? facts(i.route === 'Oral' ? 'by mouth' : 'other') : facts(i.site, i.route, i.vialAmount && `drew ${i.vialAmount}`, i.needle),
         status: LOGGED, note: i.notes, dot: c?.color, group: c?.key,
       }
     }),

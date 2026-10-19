@@ -1,4 +1,4 @@
-// Everything you logged, as one JSON file to save or send: free for everyone, always (never behind a paywall).
+// Everything you logged, as one JSON file to save or send: never behind a paywall.
 import { File, Paths } from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
 import { db } from '@shared/lib/db'

@@ -1,4 +1,4 @@
-// The shell every log sheet shares: Cancel and Save in the native header, a scrolling form that clears the keyboard.
+// The shell every log sheet shares: the native X and Save tick in the header, a scrolling form that clears the keyboard.
 // With `dirty`, leaving by Cancel or by swiping the sheet down asks first. With `archive` (editing a saved entry), a
 // red "Archive this entry" closes the form, with Undo in a toast.
 import * as Haptics from 'expo-haptics'
@@ -79,16 +79,10 @@ export function LogForm({ canSave, onSave, children, dirty = false, title, archi
       <Stack.Screen
         options={{
           ...(title && { title }),
-          headerLeft: () => (
-            <Pressable hitSlop={12} onPress={() => router.back()} accessibilityRole="button">
-              <Text style={{ fontFamily: F.medium, fontSize: 17, color: C.muted }}>Cancel</Text>
-            </Pressable>
-          ),
-          headerRight: () => (
-            <Pressable hitSlop={12} disabled={!ready} onPress={save} accessibilityRole="button">
-              <Text style={{ fontFamily: F.semi, fontSize: 17, color: ready ? C.primary : C.faint }}>Save</Text>
-            </Pressable>
-          ),
+          // Apple's sheet buttons (iOS 26): the X is in the layout's LOG options; Save is the prominent tick
+          unstable_headerRightItems: () => [
+            { type: 'button', label: 'Save', icon: { type: 'sfSymbol', name: 'checkmark' }, variant: 'prominent', tintColor: C.primary, disabled: !ready, onPress: save },
+          ],
         }}
       />
       <ScrollView
@@ -128,8 +122,8 @@ export const num = (s: string) => (s.trim() ? Number(s.trim().replace(',', '.'))
 
 const l = StyleSheet.create({
   archive: {
-    alignItems: 'center', paddingVertical: 15, borderRadius: 12, backgroundColor: C.danger + '14',
-    borderWidth: StyleSheet.hairlineWidth, borderColor: C.danger + '55',
+    alignItems: 'center', paddingVertical: 15, borderRadius: 12, backgroundColor: C.dangerSoft,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: C.dangerLine,
   },
   archiveText: { fontFamily: F.semi, fontSize: 16, color: C.danger },
   archiveHint: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18, textAlign: 'center', marginTop: 8 },

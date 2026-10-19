@@ -36,7 +36,7 @@ export default function Recovery() {
   const low = status && status.remaining <= 2
   return (
     <>
-      <Stack.Screen options={{ title: 'Recovery codes', headerLeft: () => <CancelButton /> }} />
+      <Stack.Screen options={{ title: 'Recovery codes' }} />
       <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <Card style={{ gap: 6 }}>
           <Text style={[k.count, low && { color: C.warn }]}>

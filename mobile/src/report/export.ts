@@ -10,10 +10,12 @@ import { fmtRange } from '@shared/lib/labRules'
 import { buildTests, printedValue, type LabTest } from '@shared/lib/labTests'
 import { ALL_SYMPTOMS, customDefs, ratingOf } from '@shared/lib/symptoms'
 import { dedupeInjections } from '@/data/useLog'
+import { isAncillary } from '@/timeline'
 import { logReportHtml, testReportHtml, type BpRow, type DoseRow, type WeightRow } from './html'
 
-export type Include = { injections: boolean; weight: boolean; bp: boolean; checkins: boolean; bloods: boolean }
-export type LogOpts = { from: Date; to: Date; include: Include; name?: string }
+export type Include = { injections: boolean; ancillaries: boolean; weight: boolean; bp: boolean; checkins: boolean; bloods: boolean }
+/** `compoundIds`: only shots of these compounds (the Timeline's compound filter); ancillaries are not narrowed by it. */
+export type LogOpts = { from: Date; to: Date; include: Include; name?: string; compoundIds?: number[] }
 
 const live = (r: { archivedAt?: number; deletedAtSync?: number }) => !r.archivedAt && !r.deletedAtSync
 /** Display only (the web's unitLabel lives in dose.ts, which the iOS app must not ship). */
@@ -66,10 +68,14 @@ const doseRows = (shots: InjectionLog[], compounds: Compound[]): DoseRow[] => {
 const within = <T>(rows: T[], at: (r: T) => string, from: Date, to: Date) =>
   rows.filter((r) => { const t = Date.parse(at(r)); return t >= from.getTime() && t <= to.getTime() }).sort((a, b) => at(b).localeCompare(at(a)))
 
-async function loadLog({ from, to, include }: LogOpts) {
+async function loadLog({ from, to, include, compoundIds }: LogOpts) {
   const [compounds, injections, vitals, bodyMetrics, symptoms, tests] = await Promise.all([
     db.compounds.toArray(), // archived compounds keep their names
-    include.injections ? db.injections.filter(live).toArray() : [],
+    include.injections || include.ancillaries
+      ? db.injections
+          .filter((i) => live(i) && (isAncillary(i) ? include.ancillaries : include.injections && (!compoundIds || compoundIds.includes(i.compoundId))))
+          .toArray()
+      : [],
     include.bp ? db.vitals.filter(live).toArray() : [],
     include.weight ? db.bodyMetrics.filter(live).toArray() : [],
     include.checkins ? db.symptoms.filter(live).toArray() : [],
@@ -78,7 +84,7 @@ async function loadLog({ from, to, include }: LogOpts) {
   // Lab dates are calendar days: compare days, never instants.
   const fromDay = format(from, 'yyyy-MM-dd'), toDay = format(to, 'yyyy-MM-dd')
   return {
-    injections: include.injections ? doseRows(within(injections, (i) => i.takenAt, from, to), compounds) : undefined,
+    injections: include.injections || include.ancillaries ? doseRows(within(injections, (i) => i.takenAt, from, to), compounds) : undefined,
     weight: include.weight
       ? within(bodyMetrics.filter((b) => b.weightKg !== undefined), (b) => b.measuredAt, from, to).map((b): WeightRow => ({ at: b.measuredAt, kg: b.weightKg!, notes: b.notes }))
       : undefined,

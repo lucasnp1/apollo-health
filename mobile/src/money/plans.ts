@@ -9,7 +9,7 @@ export const PLANS: Record<PlanId, { name: string; product: string; price: strin
   lifetime: { name: 'Lifetime', product: 'magno_pro_lifetime', price: '£99', per: 'once' },
 }
 
-/** What Pro adds in this app. Logging, charts, results typed in by hand and export are free, always. */
+/** What Pro adds in this app. Logging, charts, results typed in by hand and export are never behind Pro. */
 export const PRO_FEATURES = ['Import blood tests from a PDF or a photo, read on your phone', 'See what changed since your last test, marker by marker', 'The same Pro on magno.fit when you sign in']
 
 export const LEGAL = { terms: 'https://magno.fit/terms.html', privacy: 'https://magno.fit/privacy.html' }

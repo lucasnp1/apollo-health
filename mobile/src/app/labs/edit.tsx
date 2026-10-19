@@ -261,6 +261,6 @@ const e = StyleSheet.create({
   small: { fontFamily: F.body, fontSize: 12, color: C.muted, lineHeight: 17 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   cond: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: C.input, backgroundColor: C.card },
-  condOn: { borderColor: C.primary, backgroundColor: 'rgba(251,182,54,0.12)' },
+  condOn: { borderColor: C.primary, backgroundColor: C.primaryTint },
   condText: { fontFamily: F.medium, fontSize: 14, color: C.muted },
 })

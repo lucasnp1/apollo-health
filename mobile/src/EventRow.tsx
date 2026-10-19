@@ -4,23 +4,25 @@ import { SymbolView, type SymbolViewProps } from 'expo-symbols'
 import { memo } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import type { Event, Kind } from '@/timeline'
-import { C, F, TONE } from '@/theme'
+import { C, F, type Palette, TONE, toneHex, usePalette } from '@/theme'
 
-export const KIND_ICON: Record<Kind, { sf: SymbolViewProps['name']; color: string }> = {
-  injection: { sf: 'syringe.fill', color: C.primary },
-  weight: { sf: 'scalemass.fill', color: C.blue },
-  bp: { sf: 'heart.fill', color: C.rose },
-  symptom: { sf: 'brain.head.profile', color: C.violet },
-  lab: { sf: 'testtube.2', color: C.good },
+export const KIND_ICON: Record<Kind, { sf: SymbolViewProps['name']; color: keyof Palette }> = {
+  injection: { sf: 'syringe.fill', color: 'primary' },
+  ancillary: { sf: 'pills.fill', color: 'teal' },
+  weight: { sf: 'scalemass.fill', color: 'blue' },
+  bp: { sf: 'heart.fill', color: 'rose' },
+  symptom: { sf: 'brain.head.profile', color: 'violet' },
+  lab: { sf: 'testtube.2', color: 'good' },
 }
 
 export const EventRow = memo(function EventRow({ e, showDay }: { e: Event; showDay?: string }) {
   const icon = KIND_ICON[e.kind]
+  const pal = usePalette()
   const tone = TONE[e.status.tone]
   return (
     <View style={r.row}>
-      <View style={[r.icon, { backgroundColor: icon.color + '1f' }]}>
-        <SymbolView name={icon.sf} tintColor={icon.color} size={17} />
+      <View style={[r.icon, { backgroundColor: pal[icon.color] + '1f' }]}>
+        <SymbolView name={icon.sf} tintColor={pal[icon.color]} size={17} />
       </View>
       <View style={{ flex: 1, gap: 3 }}>
         <View style={r.top}>
@@ -33,7 +35,7 @@ export const EventRow = memo(function EventRow({ e, showDay }: { e: Event; showD
         {e.note ? <Text style={r.note} numberOfLines={3}>{e.note}</Text> : null}
       </View>
       {e.status.tone !== 'neutral' ? (
-        <View style={[r.status, { backgroundColor: tone + '1f' }]}>
+        <View style={[r.status, { backgroundColor: toneHex(pal, e.status.tone) + '1f' }]}>
           <Text style={[r.statusText, { color: tone }]}>{e.status.label}</Text>
         </View>
       ) : null}

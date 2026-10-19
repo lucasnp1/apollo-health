@@ -5,10 +5,11 @@ import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { currentInsight } from '@/insights/useInsights'
 import { Eyebrow } from '@/kit'
-import { C, F, TONE, type Tone } from '@/theme'
+import { C, F, TONE, type Tone, toneHex, usePalette } from '@/theme'
 
 export default function InsightScreen() {
   const [i] = useState(currentInsight)
+  const pal = usePalette()
   if (!i) return null
   const tone = TONE[(i.tone === 'neutral' ? 'neutral' : i.tone) as Tone]
   return (
@@ -16,16 +17,11 @@ export default function InsightScreen() {
       <Stack.Screen
         options={{
           title: i.area,
-          headerLeft: () => (
-            <Pressable hitSlop={12} onPress={() => router.back()}>
-              <Text style={{ fontFamily: F.medium, fontSize: 17, color: C.muted }}>Close</Text>
-            </Pressable>
-          ),
         }}
       />
       <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 48, gap: 22 }}>
         <View style={{ gap: 8 }}>
-          <View style={[s.chip, { backgroundColor: tone + '22' }]}>
+          <View style={[s.chip, { backgroundColor: toneHex(pal, i.tone === 'neutral' ? 'neutral' : (i.tone as Tone)) + '22' }]}>
             <Text style={[s.chipText, { color: tone }]}>{i.chip}</Text>
           </View>
           <Text style={s.title}>{i.title}</Text>

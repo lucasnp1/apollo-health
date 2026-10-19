@@ -1,34 +1,40 @@
 // Export for your doctor: the log for a range as a PDF or one spreadsheet. Only what you logged and what your labs
 // measured, against each lab's own range (the web's ExportSheet).
-import { subMonths } from 'date-fns'
-import { Stack } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { Stack, useLocalSearchParams } from 'expo-router'
+import { useEffect, useMemo, useState } from 'react'
+import { compoundGroups } from '@shared/lib/compounds'
+import { useCompounds, useInjections } from '@/data/useLog'
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
-import { Card, Chips, Input, Section } from '@/kit'
+import { Card, Input, RANGE_LABEL, type RangeId, RangeMenu, rangeDomain, Section } from '@/kit'
 import { exportCsv, exportLogPdf, getPatientName, setPatientName, type Include } from '@/report/export'
 import { C, F } from '@/theme'
 
-type Range = '1M' | '3M' | '6M' | '1Y' | 'ALL'
-const RANGES: { value: Range; label: string }[] = [
-  { value: '1M', label: 'Last month' },
-  { value: '3M', label: '3 months' },
-  { value: '6M', label: '6 months' },
-  { value: '1Y', label: 'Year' },
-  { value: 'ALL', label: 'All' },
-]
-const MONTHS: Record<Exclude<Range, 'ALL'>, number> = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12 }
 
 const ROWS: { key: keyof Include; label: string }[] = [
   { key: 'injections', label: 'Injections' },
+  { key: 'ancillaries', label: 'Ancillaries' },
   { key: 'weight', label: 'Weight' },
   { key: 'bp', label: 'Blood pressure' },
   { key: 'checkins', label: 'Check-ins' },
   { key: 'bloods', label: 'Blood tests' },
 ]
 
+// The Timeline's kinds, as the export's sections
+const FROM_KIND: Record<string, keyof Include> = { injection: 'injections', ancillary: 'ancillaries', weight: 'weight', bp: 'bp', symptom: 'checkins', lab: 'bloods' }
+
 export default function Export() {
-  const [range, setRange] = useState<Range>('3M')
-  const [include, setInclude] = useState<Include>({ injections: true, weight: true, bp: true, checkins: true, bloods: true })
+  // Opened from the Timeline: what it showed (kinds, one compound, the range)
+  const params = useLocalSearchParams<{ range?: string; kinds?: string; group?: string }>()
+  const compounds = useCompounds()
+  const injections = useInjections()
+  const [range, setRange] = useState<RangeId>(params.range && params.range in RANGE_LABEL ? (params.range as RangeId) : '3M')
+  const [include, setInclude] = useState<Include>(() => {
+    const only = params.kinds ? FROM_KIND[params.kinds] : undefined
+    const all = { injections: true, ancillaries: true, weight: true, bp: true, checkins: true, bloods: true }
+    return only ? (Object.fromEntries(Object.keys(all).map((k) => [k, k === only])) as Include) : all
+  })
+  const group = useMemo(() => (params.group ? compoundGroups(compounds, injections).find((g) => g.key === params.group) : undefined), [params.group, compounds, injections])
+  const [onlyGroup, setOnlyGroup] = useState(true)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState<'pdf' | 'csv'>()
 
@@ -37,11 +43,12 @@ export default function Export() {
   const any = Object.values(include).some(Boolean)
   const run = async (kind: 'pdf' | 'csv') => {
     const to = new Date()
-    const from = range === 'ALL' ? new Date(0) : subMonths(to, MONTHS[range])
+    const from = range === 'ALL' ? new Date(0) : new Date(rangeDomain(range, [])[0])
+    const compoundIds = group && onlyGroup && include.injections ? group.ids : undefined
     setBusy(kind)
     try {
       await setPatientName(name)
-      await (kind === 'pdf' ? exportLogPdf({ from, to, include, name }) : exportCsv({ from, to, include, name }))
+      await (kind === 'pdf' ? exportLogPdf({ from, to, include, name, compoundIds }) : exportCsv({ from, to, include, name, compoundIds }))
     } catch (e) {
       Alert.alert("Couldn't export", String((e as Error)?.message ?? e))
     } finally {
@@ -58,9 +65,10 @@ export default function Export() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 28 }}
       >
-        <Section title="Date range">
-          <Chips options={RANGES} value={range} onChange={(v) => v && setRange(v)} />
-        </Section>
+        <Card style={[e.row, { paddingVertical: 8 }]}>
+          <Text style={e.label}>Date range</Text>
+          <RangeMenu value={range} onChange={setRange} />
+        </Card>
 
         <Section title="Include">
           <Card style={{ paddingVertical: 4 }}>
@@ -75,6 +83,14 @@ export default function Export() {
               )
             })}
           </Card>
+          {group && include.injections ? (
+            <Card style={{ paddingVertical: 4 }}>
+              <Pressable onPress={() => setOnlyGroup((v) => !v)} accessibilityRole="switch" accessibilityState={{ checked: onlyGroup }} style={e.row}>
+                <Text style={[e.label, { flexShrink: 1 }]}>Only {group.name} shots</Text>
+                <Switch value={onlyGroup} onValueChange={setOnlyGroup} trackColor={{ true: C.primary }} accessibilityElementsHidden />
+              </Pressable>
+            </Card>
+          ) : null}
         </Section>
 
         <Section title="Your name (optional)" hint="Printed at the top of the PDF. It stays on this phone and is never synced.">

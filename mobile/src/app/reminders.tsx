@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Card, Chips, Segmented, s as k } from '@/kit'
 import { type Kind, type Timed, setReminder, useReminders } from '@/reminders'
-import { C, F } from '@/theme'
+import { C, F, useScheme } from '@/theme'
 
 const LABEL: Record<Kind, { title: string; off: string }> = {
   injection: { title: 'Injections', off: 'A nudge on injection days.' },
@@ -120,11 +120,12 @@ function Time({ value, onChange }: { value: string; onChange: (t: string) => voi
   const [h, m] = value.split(':').map(Number)
   const d = new Date()
   d.setHours(h, m, 0, 0)
+  const scheme = useScheme()
   const pad = (n: number) => String(n).padStart(2, '0')
   return (
     <View style={st.row}>
       <Text style={st.label}>Time</Text>
-      <Host matchContents colorScheme="dark">
+      <Host matchContents colorScheme={scheme}>
         <DatePicker
           selection={d}
           displayedComponents={['hourAndMinute']}

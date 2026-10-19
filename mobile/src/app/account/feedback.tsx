@@ -34,7 +34,7 @@ export default function Feedback() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Send feedback', headerLeft: () => <CancelButton /> }} />
+      <Stack.Screen options={{ title: 'Send feedback' }} />
       <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         {sent ? (
           <>

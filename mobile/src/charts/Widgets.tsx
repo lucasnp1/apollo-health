@@ -1,6 +1,7 @@
-// Home's widgets, one job each, all on the same head (kit Widget): what needs a look, injections, bloods, wellbeing,
-// weight, blood pressure. Each has its own time range. Nothing here models a level or works out a dose: injections
-// show what was logged, bloods what the lab measured (docs/decisions.md).
+// Home's widgets, one job each, all on the same head (kit Widget): what needs a look (it reads the bloods too, so
+// there's no separate bloods widget), injections, wellbeing with the ancillaries taken for it, weight, blood pressure.
+// Each has its own time range. Nothing here models a level or works out a dose: injections show what was logged
+// (docs/decisions.md).
 import { format } from 'date-fns'
 import { router } from 'expo-router'
 import { Fragment, useMemo, useState } from 'react'
@@ -10,14 +11,12 @@ import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '@sha
 import { compoundGroups } from '@shared/lib/compounds'
 import { fmtDay } from '@shared/lib/dates'
 import { countLine } from '@shared/lib/homeInsights'
-import { type LabTest, markerSeries } from '@shared/lib/labTests'
 import { NEGATIVE, POSITIVE, ratingOf } from '@shared/lib/symptoms'
 import { type HomeInsight, openInsight } from '@/insights/useInsights'
-import { Chips, Pill, type RangeId, RangeMenu, rangeDomain, Widget } from '@/kit'
-import { testChip, verdictLine } from '@/labs/reads'
-import { unitLabel } from '@/timeline'
-import { C, F, TONE, type Tone } from '@/theme'
-import { dateTicks, fmtTick, TimeChart } from './TimeChart'
+import { Pill, type RangeId, RangeMenu, rangeDomain, Widget } from '@/kit'
+import { isAncillary, unitLabel } from '@/timeline'
+import { C, F, type Tone, toneHex, usePalette } from '@/theme'
+import { dateTicks, fmtTick, PAD, TimeChart } from './TimeChart'
 
 const DAY = 86_400_000
 // Checked with the dataviz validator on the dark card (#15171a)
@@ -26,7 +25,7 @@ const DIA = '#3b82f6'
 const GOOD = '#10b981'
 
 function ToneChip({ label, tone }: { label: string; tone: Tone }) {
-  const t = TONE[tone]
+  const t = toneHex(usePalette(), tone)
   return (
     <View style={[w.chip, { backgroundColor: t + '22' }]}>
       <Text style={[w.chipText, { color: t }]}>{label}</Text>
@@ -77,75 +76,75 @@ export function InsightsWidget({ insights }: { insights?: HomeInsight[] }) {
 
 const doseText = (i: InjectionLog) => i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : i.vialAmount ? `drew ${i.vialAmount}` : '')
 
-/**
- * Every shot logged in the range, per compound: when, and how much. A compound with no shot in the range (stopped, or
- * not pinned lately) doesn't show.
- */
-export function InjectionsWidget({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
-  const [range, setRange] = useState<RangeId>('1M')
-  const [list, setList] = useState(false)
-  const domain = rangeDomain(range, injections.map((i) => Date.parse(i.takenAt)))
-  const lanes = useMemo(
+const IN_RANGE: Record<RangeId, string> = { '1W': 'in the last 7 days', '1M': 'in the last month', '3M': 'in the last 3 months', '6M': 'in the last 6 months', '1Y': 'in the last year', ALL: 'in all' }
+
+/** Each compound's lane of shots: a dot per shot with its dose, only compounds with a shot in the range. */
+function useLanes(compounds: Compound[], shots: InjectionLog[], domain: [number, number]) {
+  return useMemo(
     () =>
-      compoundGroups(compounds, injections)
+      compoundGroups(compounds, shots)
         .map((g) => ({
           ...g,
-          shots: injections
+          shots: shots
             .filter((i) => g.ids.includes(i.compoundId) && Date.parse(i.takenAt) >= domain[0] && Date.parse(i.takenAt) <= domain[1])
             .sort((a, b) => a.takenAt.localeCompare(b.takenAt)),
         }))
         .filter((g) => g.shots.length)
         .sort((a, b) => b.shots[b.shots.length - 1].takenAt.localeCompare(a.shots[a.shots.length - 1].takenAt)),
-    [compounds, injections, domain[0]],
+    [compounds, shots, domain[0]],
   )
-  const last = injections[0]
-  const lastName = last && compoundGroups(compounds, injections).find((g) => g.ids.includes(last.compoundId))?.name
+}
+
+/**
+ * Every shot logged in the range, per compound: when, and how much. A compound with no shot in the range (stopped, or
+ * not pinned lately) doesn't show. Ancillaries taken by mouth are on Wellbeing, not here.
+ */
+export function InjectionsWidget({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
+  const pal = usePalette()
+  const [range, setRange] = useState<RangeId>('1W')
+  const shots = useMemo(() => injections.filter((i) => !isAncillary(i)), [injections])
+  const domain = rangeDomain(range, shots.map((i) => Date.parse(i.takenAt)))
+  const lanes = useLanes(compounds, shots, domain)
+  const last = shots[0]
   const total = lanes.reduce((n, l) => n + l.shots.length, 0)
+  const all = () => router.navigate({ pathname: '/timeline', params: { kind: 'injection', range, at: String(Date.now()) } })
   return (
     <Widget
       eyebrow="Injections"
-      title={last ? `${lastName ?? 'Injection'} · ${doseText(last)}` : 'No shots logged'}
-      sub={last ? `Last shot ${fmtDay(last.takenAt)}, ${format(Date.parse(last.takenAt), 'HH:mm')}${last.site ? ` · ${last.site}` : ''}` : 'Log a shot from Add to your log.'}
+      title={!last ? 'No shots logged' : total ? `${total} shot${total === 1 ? '' : 's'} ${IN_RANGE[range]}` : `No shots ${IN_RANGE[range]}`}
+      sub={last ? `Last shot ${fmtDay(last.takenAt)}, ${format(Date.parse(last.takenAt), 'HH:mm')}` : 'Log a shot from Add to your log.'}
       action={<RangeMenu value={range} onChange={setRange} />}
     >
       {lanes.length ? (
         <>
           {lanes.map((l) => (
-            <Lane key={l.key} name={l.name} color={l.color ?? C.primary} shots={l.shots} domain={domain} labels={range === '1W' || range === '1M'} />
+            <Lane key={l.key} name={l.name} color={l.color ?? pal.primary} shots={l.shots} domain={domain} labels={range === '1W' || range === '1M'} />
           ))}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             {dateTicks(domain, 3).map((t) => (
               <Text key={t} style={w.tick}>{fmtTick(t, domain)}</Text>
             ))}
           </View>
-          <Pressable onPress={() => setList((v) => !v)} hitSlop={8}>
-            <Text style={w.link}>{list ? 'Hide the list' : `List all ${total} shot${total === 1 ? '' : 's'}`}</Text>
+          <Pressable onPress={all} hitSlop={8} accessibilityRole="link">
+            <Text style={w.link}>See all {total} in Timeline ›</Text>
           </Pressable>
-          {list ? (
-            <View>
-              {lanes
-                .flatMap((l) => l.shots.map((s) => ({ s, name: l.name, color: l.color ?? C.primary })))
-                .sort((a, b) => b.s.takenAt.localeCompare(a.s.takenAt))
-                .map(({ s, name, color }, n) => (
-                  <View key={s.id} style={[w.shot, n > 0 && w.sep]}>
-                    <View style={[w.dot, { backgroundColor: color }]} />
-                    <Text style={w.shotDate}>{format(Date.parse(s.takenAt), 'EEE d MMM')}</Text>
-                    <Text style={w.shotName} numberOfLines={1}>{name}</Text>
-                    <Text style={w.shotDose}>{doseText(s)}</Text>
-                  </View>
-                ))}
-            </View>
-          ) : null}
         </>
-      ) : (
-        <Text style={w.empty}>No shots in this range.</Text>
-      )}
+      ) : null}
     </Widget>
   )
 }
 
 /** One compound: its name, count and last dose, then a dot per shot on the time axis, labelled with the dose when there's room. */
-function Lane({ name, color, shots, domain, labels }: { name: string; color: string; shots: InjectionLog[]; domain: [number, number]; labels: boolean }) {
+function Lane({ name, color, shots, domain, labels, chart }: {
+  name: string
+  color: string
+  shots: InjectionLog[]
+  domain: [number, number]
+  labels: boolean
+  /** Line its dots up with a TimeChart above it */
+  chart?: boolean
+}) {
+  const pal = usePalette()
   const [width, setWidth] = useState(0)
   const H = labels ? 38 : 22
   const x = (t: number) => 6 + ((t - domain[0]) / (domain[1] - domain[0] || 1)) * (width - 12)
@@ -159,19 +158,19 @@ function Lane({ name, color, shots, domain, labels }: { name: string; color: str
         <Text style={w.laneName} numberOfLines={1}>{name}</Text>
         <Text style={w.laneMeta}>{shots.length} · last {doseText(lastShot)} {format(Date.parse(lastShot.takenAt), 'EEE d MMM')}</Text>
       </View>
-      <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height: H }}>
+      <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[{ height: H }, chart && { marginLeft: PAD.l - 6, marginRight: PAD.r - 6 }]}>
         {width ? (
           <Svg width={width} height={H}>
-            <Line x1={0} x2={width} y1={H - 8} y2={H - 8} stroke={C.line} strokeWidth={1} />
+            <Line x1={0} x2={width} y1={H - 8} y2={H - 8} stroke={pal.line} strokeWidth={1} />
             {shots.map((s) => {
               const cx = x(Date.parse(s.takenAt))
               const show = labels && cx - lastLabelX > 34
               if (show) lastLabelX = cx
               return (
                 <Fragment key={s.id}>
-                  <Circle cx={cx} cy={H - 8} r={4.5} fill={color} stroke={C.card} strokeWidth={2} />
+                  <Circle cx={cx} cy={H - 8} r={4.5} fill={color} stroke={pal.card} strokeWidth={2} />
                   {show ? (
-                    <SvgText x={cx} y={H - 18} fontSize={10} fontFamily={F.mono} fill={C.muted} textAnchor="middle">
+                    <SvgText x={cx} y={H - 18} fontSize={10} fontFamily={F.mono} fill={pal.muted} textAnchor="middle">
                       {s.dose != null ? String(s.dose) : ''}
                     </SvgText>
                   ) : null}
@@ -185,52 +184,6 @@ function Lane({ name, color, shots, domain, labels }: { name: string; color: str
   )
 }
 
-// ── Bloods ───────────────────────────────────────────────────────────────────
-
-export function BloodsWidget({ tests, pro }: { tests?: LabTest[]; pro: boolean }) {
-  const [range, setRange] = useState<RangeId>('1Y')
-  const [key, setKey] = useState<string | undefined>()
-  const markers = useMemo(() => {
-    const seen = new Map<string, { key: string; label: string; n: number }>()
-    for (const t of tests ?? []) for (const m of t.markers) seen.set(m.key, { key: m.key, label: m.label, n: (seen.get(m.key)?.n ?? 0) + 1 })
-    const all = [...seen.values()].sort((a, b) => Number(b.key === 'total_testosterone') - Number(a.key === 'total_testosterone') || b.n - a.n)
-    const repeated = all.filter((m) => m.n > 1)
-    return (repeated.length ? repeated : all).slice(0, 6)
-  }, [tests])
-  if (!tests) return null
-  const latest = tests[0]
-  if (!latest)
-    return (
-      <Widget eyebrow="Bloods" title="No blood tests yet" sub="Import a PDF or a photo of your report in Labs, and see what it says." action={<Pill label="Add" primary onPress={() => router.navigate('/labs')} />} />
-    )
-  const marker = markers.find((m) => m.key === key) ?? markers[0]
-  const series = marker ? markerSeries(tests, marker.key) : undefined
-  const domain = rangeDomain(range, tests.map((t) => Date.parse(t.date)))
-  const pts = (series?.points ?? []).filter((p) => p.value !== undefined && p.t >= domain[0] - DAY && p.t <= domain[1]).map((p) => ({ t: p.t, v: p.value! }))
-  const last = series?.points[series.points.length - 1]
-  const chip = testChip(latest, pro)
-  const open = () => router.push({ pathname: '/labs/[id]', params: { id: String(latest.id) } })
-  return (
-    <Widget eyebrow="Bloods" title={verdictLine(latest, pro)} sub={`Latest test ${fmtDay(latest.date)}${latest.provider ? ` · ${latest.provider}` : ''}`} action={<Pill label="Open" onPress={open} />} onPress={open}>
-      {chip ? (
-        <View style={{ flexDirection: 'row' }}>
-          <ToneChip label={chip.label} tone={chip.tone} />
-        </View>
-      ) : null}
-      {markers.length > 1 ? <Chips options={markers.map((m) => ({ value: m.key, label: m.label }))} value={marker?.key} onChange={(v) => v && setKey(v)} /> : null}
-      {pts.length ? (
-        <TimeChart series={[{ label: marker!.label, color: GOOD, points: pts }]} unit={series?.unit} band={{ low: last?.low, high: last?.high }} domain={domain} height={140} />
-      ) : (
-        <Text style={w.empty}>No {marker?.label} result in this range.</Text>
-      )}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={w.small}>Shaded: the lab's range.</Text>
-        <RangeMenu value={range} onChange={setRange} />
-      </View>
-    </Widget>
-  )
-}
-
 // ── Wellbeing ────────────────────────────────────────────────────────────────
 
 const mean = (s: Symptom, defs: typeof POSITIVE) => {
@@ -239,9 +192,13 @@ const mean = (s: Symptom, defs: typeof POSITIVE) => {
 }
 
 /** How you've been: the feel-good average and the side-effect average per check-in, 0 to 5, and a check-in button. */
-export function WellbeingWidget({ symptoms }: { symptoms: Symptom[] }) {
+export function WellbeingWidget({ symptoms, compounds, injections }: { symptoms: Symptom[]; compounds: Compound[]; injections: InjectionLog[] }) {
+  const pal = usePalette()
   const [range, setRange] = useState<RangeId>('3M')
   const domain = rangeDomain(range, symptoms.map((s) => Date.parse(s.recordedAt)))
+  // What you took for side effects, on the same time axis as the side-effect line
+  const ancillaries = useMemo(() => injections.filter(isAncillary), [injections])
+  const lanes = useLanes(compounds, ancillaries, domain)
   const inRange = symptoms.filter((s) => Date.parse(s.recordedAt) >= domain[0]).sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
   const good = inRange.flatMap((s) => {
     const v = mean(s, POSITIVE)
@@ -270,6 +227,14 @@ export function WellbeingWidget({ symptoms }: { symptoms: Symptom[] }) {
             height={130}
             yRange={[0, 5]}
           />
+          {lanes.length ? (
+            <View style={{ gap: 8 }}>
+              <Text style={w.small}>Ancillaries taken</Text>
+              {lanes.map((l) => (
+                <Lane key={l.key} name={l.name} color={l.color ?? pal.primary} shots={l.shots} domain={domain} labels={range === '1W' || range === '1M'} chart />
+              ))}
+            </View>
+          ) : null}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Text style={w.small}>Averages, 0 to 5.</Text>
             <RangeMenu value={range} onChange={setRange} />
@@ -278,6 +243,9 @@ export function WellbeingWidget({ symptoms }: { symptoms: Symptom[] }) {
       ) : symptoms.length ? (
         <Text style={w.empty}>No check-ins in this range.</Text>
       ) : null}
+      <Pressable onPress={() => router.push('/log/ancillary')} hitSlop={8} accessibilityRole="button">
+        <Text style={w.link}>+ Log an ancillary</Text>
+      </Pressable>
     </Widget>
   )
 }
@@ -285,6 +253,7 @@ export function WellbeingWidget({ symptoms }: { symptoms: Symptom[] }) {
 // ── Weight and blood pressure ────────────────────────────────────────────────
 
 export function WeightWidget({ bodyMetrics, injections }: { bodyMetrics: BodyMetric[]; injections: InjectionLog[] }) {
+  const pal = usePalette()
   const [range, setRange] = useState<RangeId>('3M')
   const pts = useMemo(() => {
     const out: { t: number; v: number }[] = []
@@ -305,7 +274,7 @@ export function WeightWidget({ bodyMetrics, injections }: { bodyMetrics: BodyMet
       sub={change !== undefined ? `${change > 0 ? '+' : ''}${change.toFixed(1)} kg over this range` : `Logged ${fmtDay(new Date(lastP.t).toISOString())}`}
       action={<RangeMenu value={range} onChange={setRange} />}
     >
-      {shown.length ? <TimeChart series={[{ label: 'Weight', color: C.primary, points: shown }]} unit="kg" domain={domain} /> : <Text style={w.empty}>No weight in this range.</Text>}
+      {shown.length ? <TimeChart series={[{ label: 'Weight', color: pal.primary, points: shown }]} unit="kg" domain={domain} /> : <Text style={w.empty}>No weight in this range.</Text>}
     </Widget>
   )
 }
@@ -317,11 +286,13 @@ export function PressureWidget({ vitals }: { vitals: VitalLog[] }) {
   const domain = rangeDomain(range, sorted.map((v) => Date.parse(v.measuredAt)))
   const shown = sorted.filter((v) => Date.parse(v.measuredAt) >= domain[0])
   const avg = (xs: number[]) => Math.round(xs.reduce((a, b) => a + b, 0) / xs.length)
+  const pulses = shown.flatMap((v) => (v.pulse ? [v.pulse] : []))
+  const lastV = sorted[sorted.length - 1]
   return (
     <Widget
       eyebrow="Blood pressure"
-      title={shown.length ? `${avg(shown.map((v) => v.systolic))}/${avg(shown.map((v) => v.diastolic))} average` : 'No readings in this range'}
-      sub={shown.length ? `${shown.length} reading${shown.length === 1 ? '' : 's'} in this range` : undefined}
+      title={shown.length ? `${avg(shown.map((v) => v.systolic))}/${avg(shown.map((v) => v.diastolic))} average${pulses.length ? ` · ${avg(pulses)} bpm` : ''}` : 'No readings in this range'}
+      sub={`Last ${lastV.systolic}/${lastV.diastolic}${lastV.pulse ? `, pulse ${lastV.pulse} bpm` : ''} · ${fmtDay(lastV.measuredAt)}${shown.length ? ` · ${shown.length} in this range` : ''}`}
       action={<RangeMenu value={range} onChange={setRange} />}
     >
       {shown.length ? (

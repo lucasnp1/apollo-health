@@ -53,7 +53,7 @@ export default function MarkerScreen() {
 
         {pts.length ? (
           <Widget eyebrow="Over time" sub={`Shaded: the lab's range on your latest test${bled.length ? '. Blood-lettings are listed below.' : '.'}`}>
-            <TimeChart series={[{ label: latest.label, color: C.good, points: pts }]} unit={series?.unit} band={{ low: last?.low, high: last?.high }} domain={[t0 - 3 * DAY, Date.now()]} height={180} />
+            <TimeChart series={[{ label: latest.label, color: '#10b981', points: pts }]} unit={series?.unit} band={{ low: last?.low, high: last?.high }} domain={[t0 - 3 * DAY, Date.now()]} height={180} />
             {series?.dropped ? <Text style={m.muted}>{series.dropped} older result{series.dropped === 1 ? ' is' : 's are'} in a unit that can't be converted, so not plotted.</Text> : null}
           </Widget>
         ) : null}

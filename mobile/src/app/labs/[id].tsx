@@ -47,7 +47,7 @@ export default function TestScreen() {
   const more = () => {
     const merge = mergeCandidates(test, tests)
     const opts = ['Edit this test', 'Add more results', ...(merge.length ? ['Merge with another test'] : []), ...(tests.length > 1 ? ['Compare with another test'] : []), 'Report for your doctor (PDF)', 'Archive this test', 'Cancel']
-    ActionSheetIOS.showActionSheetWithOptions({ options: opts, destructiveButtonIndex: opts.length - 2, cancelButtonIndex: opts.length - 1, userInterfaceStyle: 'dark' }, (i) => {
+    ActionSheetIOS.showActionSheetWithOptions({ options: opts, destructiveButtonIndex: opts.length - 2, cancelButtonIndex: opts.length - 1 }, (i) => {
       const o = opts[i]
       if (o === 'Edit this test') router.push({ pathname: '/labs/edit', params: { mode: 'edit', id: String(test.id) } })
       else if (o === 'Add more results') router.push({ pathname: '/labs/edit', params: { mode: 'add', id: String(test.id) } })
@@ -68,11 +68,7 @@ export default function TestScreen() {
       <Stack.Screen
         options={{
           title: test.title,
-          headerRight: () => (
-            <Pressable hitSlop={12} onPress={more} accessibilityLabel="More actions">
-              <SymbolView name="ellipsis.circle" tintColor={C.primary} size={24} />
-            </Pressable>
-          ),
+          unstable_headerRightItems: () => [{ type: 'button', label: 'More', icon: { type: 'sfSymbol', name: 'ellipsis' }, onPress: more, accessibilityLabel: 'More actions' }],
         }}
       />
       <ScrollView style={{ backgroundColor: C.bg }} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: 16, paddingBottom: 60, gap: 16 }}>
@@ -198,7 +194,7 @@ function pickMerge(test: LabTest, candidates: LabTest[]) {
   if (!candidates.length) return Alert.alert('Nothing to merge', 'No other test is within two weeks of this one.')
   const opts = [...candidates.map((c) => `${c.title} · ${fmtDay(c.date)} (${c.counts.total} markers)`), 'Cancel']
   ActionSheetIOS.showActionSheetWithOptions(
-    { title: 'Merge into this test', message: 'Its results join this one; the other test is archived, so you can bring it back.', options: opts, cancelButtonIndex: opts.length - 1, userInterfaceStyle: 'dark' },
+    { title: 'Merge into this test', message: 'Its results join this one; the other test is archived, so you can bring it back.', options: opts, cancelButtonIndex: opts.length - 1 },
     (i) => {
       const src = candidates[i]
       if (!src) return
@@ -213,7 +209,7 @@ function pickMerge(test: LabTest, candidates: LabTest[]) {
 function pickCompare(test: LabTest, tests: LabTest[]) {
   const others = tests.filter((t) => t.id !== test.id)
   const opts = [...others.map((o) => `${o.title} · ${fmtDay(o.date)}`), 'Cancel']
-  ActionSheetIOS.showActionSheetWithOptions({ title: 'Compare with', options: opts, cancelButtonIndex: opts.length - 1, userInterfaceStyle: 'dark' }, (i) => {
+  ActionSheetIOS.showActionSheetWithOptions({ title: 'Compare with', options: opts, cancelButtonIndex: opts.length - 1 }, (i) => {
     const o = others[i]
     if (o) router.push({ pathname: '/labs/compare', params: { a: String(test.id), b: String(o.id) } } as never)
   })
