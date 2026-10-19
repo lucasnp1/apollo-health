@@ -13,6 +13,7 @@ export type ApiUser = {
   onboarded?: boolean
   // Sign in with Apple (iPhone app); has_password false: made with Apple, no password set
   apple?: boolean
+  google?: boolean
   has_password?: boolean
 }
 
