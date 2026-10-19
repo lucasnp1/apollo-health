@@ -122,8 +122,8 @@ Magno Pro: a monthly subscription with a one-month free trial, or a one-time lif
       to submit as an individual first (18 Oct 2026). If review rejects on 5.1.1(ix), convert the developer account to an
       organisation (needs a D-U-N-S number) and resubmit.
 - [x] App ID `app.magno.ios` registered and the App Store Connect record created (18 Oct 2026).
-- [ ] **Lucas: accept the updated Apple Developer Program License Agreement** (banner in App Store Connect; only the
-      account holder can, and Apple blocks new app submissions until then).
+- [x] Agreements (19 Oct 2026): Free and Paid Apps active, Wise bank account active, W-8BEN active (UK treaty,
+      Article 12(1), 0%), MRDP answered (no personal services). DSA trader status still "in review" at Apple.
 - [x] Screenshots: 6 uploaded 18 Oct 2026 at 1206x2622 (`store/screenshots-6.3/`; sources at 1320x2868 in
       `store/screenshots-6.9/`), Release build with made-up sample data.
 - [x] Privacy answers and age rating (entered 18 Oct 2026; see above).
@@ -135,3 +135,12 @@ Magno Pro: a monthly subscription with a one-month free trial, or a one-time lif
       and retest lines removed, Lucas 19 Oct 2026). Review notes and description rewritten to match; age rating stays
       "Medical or Treatment Information: Infrequent".
 - [x] Release: manual (set). Review contact: Lucas, same as Liber's. Sign-in required: off.
+
+## Ready to submit (19 Oct 2026, build 6)
+
+- Billing live (`extra.billing.live: true`); StoreKit returns both products. Build 6 selected on version 1.0.
+- 6 new screenshots (1206x2622, dark, sample data, Pro view). App Privacy now also declares Purchase history
+  (linked, app functionality, no tracking). Review notes and description rewritten (no advice lines).
+- Both purchases have their review screenshot (`store/iap-review.png`); monthly has the 1-month free intro offer.
+- To submit: version 1.0 > Add for review; in the draft submission add the Magno Pro subscription group and the
+  lifetime purchase (the first ones must go with a version), then Submit. Release is manual.
