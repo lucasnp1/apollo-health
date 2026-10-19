@@ -7,7 +7,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { type ColorValue, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Polyline } from 'react-native-svg'
-import { ALL_SYMPTOMS, chipTone, customDefs, NEGATIVE, POSITIVE, ratingOf, type SymptomDef } from '@shared/lib/symptoms'
+import { ALL_SYMPTOMS, chipTone, customDefs, NEGATIVE, POSITIVE, ratingOf } from '@shared/lib/symptoms'
 import { felt } from '@shared/lib/wellbeingSummary'
 import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
 import { useTests } from '@/labs/useTests'
@@ -18,8 +18,8 @@ import { EventRow } from '@/EventRow'
 import { Card, Eyebrow, Pill, Widget } from '@/kit'
 import { buildEvents, dayTitle } from '@/timeline'
 import { C, F, type Palette, usePalette } from '@/theme'
+import { DAY, ratingMean, weightPoints } from '@/log'
 
-const DAY = 86_400_000
 
 type Launch = { href: Href | (() => Href); label: string; sub: string; sf: SymbolViewProps['name']; color: keyof Palette; primary?: boolean }
 const LAUNCH: Launch[] = [
@@ -59,14 +59,11 @@ export default function Home() {
   }, [vitals])
 
   const weight = useMemo(() => {
-    const pts: { ms: number; kg: number }[] = []
-    for (const b of bodyMetrics) if (b.weightKg !== undefined) pts.push({ ms: Date.parse(b.measuredAt), kg: b.weightKg })
-    for (const i of injections) if (i.weightKg !== undefined) pts.push({ ms: Date.parse(i.takenAt), kg: i.weightKg })
-    pts.sort((a, b) => a.ms - b.ms)
+    const pts = weightPoints(bodyMetrics, injections)
     if (!pts.length) return undefined
     const last = pts[pts.length - 1]
     const prev = pts[pts.length - 2]
-    return { kg: last.kg, delta: prev ? last.kg - prev.kg : undefined, spark: pts.slice(-12).map((p) => p.kg) }
+    return { kg: last.v, delta: prev ? last.v - prev.v : undefined, spark: pts.slice(-12).map((p) => p.v) }
   }, [bodyMetrics, injections])
 
   const sym = useMemo(() => {
@@ -82,13 +79,9 @@ export default function Home() {
         else if (chipTone(v, def.direction) === 'good') good += 1
       }
     // The last dozen check-ins as two 0-5 lines, the same as the Wellbeing widget
-    const avg = (row: (typeof symptoms)[number], ds: SymptomDef[]) => {
-      const vs = ds.map((d) => ratingOf(row, d)).filter((v): v is number => typeof v === 'number')
-      return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : undefined
-    }
     const last = symptoms.slice(0, 12).reverse()
-    const goodLine = last.map((r) => avg(r, POSITIVE)).filter((v): v is number => v !== undefined)
-    const watchLine = last.map((r) => avg(r, NEGATIVE)).filter((v): v is number => v !== undefined)
+    const goodLine = last.map((r) => ratingMean(r, POSITIVE)).filter((v): v is number => v !== undefined)
+    const watchLine = last.map((r) => ratingMean(r, NEGATIVE)).filter((v): v is number => v !== undefined)
     return { n: recent.length, good, watch, goodLine, watchLine }
   }, [symptoms])
 
@@ -245,8 +238,5 @@ const st = StyleSheet.create({
   statValue: { fontFamily: F.monoSemi, fontSize: 20, marginTop: 8 },
   statUnit: { fontFamily: F.mono, fontSize: 12, color: C.muted },
   statSub: { fontFamily: F.body, fontSize: 12, color: C.muted, marginTop: 2 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  link: { fontFamily: F.semi, fontSize: 15, color: C.accentInk },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: C.line, marginLeft: 46 },
-  empty: { fontFamily: F.body, fontSize: 15, color: C.muted, lineHeight: 21, paddingVertical: 14 },
 })

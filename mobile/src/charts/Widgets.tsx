@@ -11,14 +11,14 @@ import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '@sha
 import { compoundGroups } from '@shared/lib/compounds'
 import { fmtDay } from '@shared/lib/dates'
 import { countLine } from '@shared/lib/homeInsights'
-import { NEGATIVE, POSITIVE, ratingOf } from '@shared/lib/symptoms'
+import { NEGATIVE, POSITIVE } from '@shared/lib/symptoms'
 import { type HomeInsight, openInsight } from '@/insights/useInsights'
 import { type RangeId, RangeMenu, rangeDomain, Widget } from '@/kit'
-import { isAncillary, unitLabel } from '@/timeline'
+import { doseText, ratingMean, weightPoints } from '@/log'
+import { isAncillary } from '@/timeline'
 import { C, F, type Tone, toneHex, usePalette } from '@/theme'
 import { dateTicks, fmtTick, PAD, TimeChart } from './TimeChart'
 
-const DAY = 86_400_000
 // Checked with the dataviz validator on the dark card (#15171a)
 const SYS = '#f43f5e'
 const DIA = '#3b82f6'
@@ -75,7 +75,6 @@ export function InsightsWidget({ insights }: { insights?: HomeInsight[] }) {
 
 // ── Injections ───────────────────────────────────────────────────────────────
 
-const doseText = (i: InjectionLog) => i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : i.vialAmount ? `drew ${i.vialAmount}` : '')
 
 const IN_RANGE: Record<RangeId, string> = { '1W': 'in the last 7 days', '1M': 'in the last month', '3M': 'in the last 3 months', '6M': 'in the last 6 months', '1Y': 'in the last year', ALL: 'in all' }
 
@@ -157,7 +156,7 @@ function Lane({ name, color, shots, domain, labels, chart }: {
       <View style={w.laneHead}>
         <View style={[w.dot, { backgroundColor: color }]} />
         <Text style={w.laneName} numberOfLines={1}>{name}</Text>
-        <Text style={w.laneMeta}>{shots.length} · last {doseText(lastShot)} {format(Date.parse(lastShot.takenAt), 'EEE d MMM')}</Text>
+        <Text style={w.laneMeta}>{shots.length} · last {doseText(lastShot, { drew: true })} {format(Date.parse(lastShot.takenAt), 'EEE d MMM')}</Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[{ height: H }, chart && { marginLeft: PAD.l - 6, marginRight: PAD.r - 6 }]}>
         {width ? (
@@ -187,11 +186,6 @@ function Lane({ name, color, shots, domain, labels, chart }: {
 
 // ── Wellbeing ────────────────────────────────────────────────────────────────
 
-const mean = (s: Symptom, defs: typeof POSITIVE) => {
-  const vs = defs.map((d) => ratingOf(s, d)).filter((v): v is number => typeof v === 'number')
-  return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : undefined
-}
-
 /** How you've been: the feel-good average and the side-effect average per check-in, 0 to 5, and a check-in button. */
 export function WellbeingWidget({ symptoms, compounds, injections }: { symptoms: Symptom[]; compounds: Compound[]; injections: InjectionLog[] }) {
   const pal = usePalette()
@@ -202,11 +196,11 @@ export function WellbeingWidget({ symptoms, compounds, injections }: { symptoms:
   const lanes = useLanes(compounds, ancillaries, domain)
   const inRange = symptoms.filter((s) => Date.parse(s.recordedAt) >= domain[0]).sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
   const good = inRange.flatMap((s) => {
-    const v = mean(s, POSITIVE)
+    const v = ratingMean(s, POSITIVE)
     return v === undefined ? [] : [{ t: Date.parse(s.recordedAt), v }]
   })
   const watch = inRange.flatMap((s) => {
-    const v = mean(s, NEGATIVE)
+    const v = ratingMean(s, NEGATIVE)
     return v === undefined ? [] : [{ t: Date.parse(s.recordedAt), v }]
   })
   const lastAt = symptoms[0]?.recordedAt
@@ -250,12 +244,7 @@ export function WellbeingWidget({ symptoms, compounds, injections }: { symptoms:
 export function WeightWidget({ bodyMetrics, injections }: { bodyMetrics: BodyMetric[]; injections: InjectionLog[] }) {
   const pal = usePalette()
   const [range, setRange] = useState<RangeId>('3M')
-  const pts = useMemo(() => {
-    const out: { t: number; v: number }[] = []
-    for (const b of bodyMetrics) if (b.weightKg !== undefined) out.push({ t: Date.parse(b.measuredAt), v: b.weightKg })
-    for (const i of injections) if (i.weightKg !== undefined) out.push({ t: Date.parse(i.takenAt), v: i.weightKg })
-    return out.sort((a, b) => a.t - b.t)
-  }, [bodyMetrics, injections])
+  const pts = weightPoints(bodyMetrics, injections)
   if (!pts.length) return null
   const domain = rangeDomain(range, pts.map((p) => p.t))
   const shown = pts.filter((p) => p.t >= domain[0])
@@ -318,10 +307,6 @@ const w = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   laneName: { flex: 1, fontFamily: F.medium, fontSize: 14, color: C.fg },
   laneMeta: { fontFamily: F.mono, fontSize: 11, color: C.muted },
-  shot: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
-  shotDate: { width: 92, fontFamily: F.mono, fontSize: 12, color: C.muted },
-  shotName: { flex: 1, fontFamily: F.body, fontSize: 14, color: C.fg },
-  shotDose: { fontFamily: F.monoMedium, fontSize: 13, color: C.fg },
   empty: { fontFamily: F.body, fontSize: 14, color: C.muted },
   small: { fontFamily: F.body, fontSize: 12, color: C.muted },
 })

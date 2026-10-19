@@ -195,9 +195,16 @@ export function labInsight(f: Finding, test: { id: number; date: string }, bleed
 }
 
 /** A bleed waiting on its retest, or high hematocrit with none logged (when no bloods row says it). */
-export function bleedInsight(n: BleedNudge | undefined): HomeInsight | undefined {
+/** `nextSteps: false` (the iPhone app, for App Review) says what was logged instead of when to retest. */
+export function bleedInsight(n: BleedNudge | undefined, { nextSteps = true } = {}): HomeInsight | undefined {
   if (!n) return undefined
-  return { id: 'bleed', kind: 'bleed', tone: n.tone, area: 'Blood-letting', title: n.title, sub: n.sub, chip: n.tone === 'warn' ? 'High' : 'Retest', signals: [], logBleed: n.tone === 'warn' }
+  const retest = n.tone !== 'warn'
+  return {
+    id: 'bleed', kind: 'bleed', tone: n.tone, area: 'Blood-letting', title: n.title,
+    sub: retest && !nextSteps ? 'Your next hematocrit result will show what it did' : n.sub,
+    chip: !retest ? 'High' : nextSteps ? 'Retest' : 'Logged',
+    signals: [], logBleed: !retest,
+  }
 }
 
 /** The newest test is too old to say much about now. */

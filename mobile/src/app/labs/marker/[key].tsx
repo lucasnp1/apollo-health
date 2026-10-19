@@ -19,8 +19,8 @@ import { useBleeds } from '@/labs/useBleeds'
 import { useTests } from '@/labs/useTests'
 import { usePro } from '@/money/pro'
 import { C, F } from '@/theme'
+import { DAY } from '@/log'
 
-const DAY = 86_400_000
 
 export default function MarkerScreen() {
   const { key } = useLocalSearchParams<{ key: string }>()

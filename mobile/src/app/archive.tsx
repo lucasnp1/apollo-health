@@ -10,7 +10,7 @@ import { compoundGroups, groupByCompoundId } from '@shared/lib/compounds'
 import { fmtDay } from '@shared/lib/dates'
 import { phlebotomyTitle } from '@shared/lib/phlebotomy'
 import { Eyebrow } from '@/kit'
-import { unitLabel } from '@/timeline'
+import { doseText } from '@/log'
 import { showToast } from '@/toast'
 import { C, F } from '@/theme'
 
@@ -37,7 +37,7 @@ export default function Archive() {
       {
         title: 'Injections',
         data: data.injections.map((i) => {
-          const dose = i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : undefined)
+          const dose = doseText(i) || undefined
           const name = byId.get(i.compoundId)?.name ?? 'Injection'
           return { key: `i-${i.id}`, label: dose ? `${name} · ${dose}` : name, at: i.takenAt, restore: () => restoreRow('injections', i.id!) }
         }),

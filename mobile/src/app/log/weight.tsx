@@ -13,7 +13,7 @@ export default function LogWeight() {
   const [notes, setNotes] = useState('')
   const [when, setWhen] = useState(() => new Date())
   const { id, ready } = useEditRow(
-    (rowId) => db.bodyMetrics.get(rowId),
+    (rowId) => bodyMetrics.find((r) => r.id === rowId) ?? db.bodyMetrics.get(rowId),
     (b: BodyMetric) => {
       setWeight(b.weightKg !== undefined ? String(b.weightKg) : '')
       setNotes(b.notes ?? '')

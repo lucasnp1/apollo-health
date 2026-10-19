@@ -8,12 +8,11 @@ import { type ColorValue, Pressable, StyleSheet, Text, View } from 'react-native
 import type { InjectionLog } from '@shared/lib/db'
 import { canonicalSite, type CatalogSite, customSite, groupOf, isCustomSite, quickSites, REGIONS, type Route, siteLabel } from '@shared/lib/sites'
 import { FieldRow, Input, MenuPicker, s as kit } from '@/kit'
+import { DAY, routeOf } from '@/log'
 import { C, F } from '@/theme'
 
-const DAY = 86_400_000
 const NONE = ''
 const OTHER = '__other'
-const routeOf = (i: InjectionLog): Route => (i.route === 'SubQ' ? 'SubQ' : 'IM')
 
 function dayLabel(d: number): string {
   if (d < 0.5) return 'today'

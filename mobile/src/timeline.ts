@@ -6,6 +6,7 @@ import type { LabTest } from '@shared/lib/labTests'
 import { compoundGroups, groupByCompoundId } from '@shared/lib/compounds'
 import { ALL_SYMPTOMS, chipTone, ratingOf } from '@shared/lib/symptoms'
 import type { ArchivableTable } from '@shared/lib/archive'
+import { doseText } from '@/log'
 import type { Tone } from '@/theme'
 
 export type Kind = 'injection' | 'ancillary' | 'weight' | 'bp' | 'symptom' | 'lab'
@@ -44,8 +45,6 @@ export function bpStatus(sys: number, dia: number): { label: string; tone: Tone 
   return { label: 'Optimal', tone: 'good' }
 }
 
-export const unitLabel = (u?: string) => (u === 'iu' ? 'IU' : (u ?? ''))
-
 const arrow = (v: number) => `${v > 0 ? '▲' : '▼'} ${Math.abs(v).toFixed(1)} kg`
 const facts = (...xs: Array<string | undefined | false>) => xs.filter((x): x is string => !!x).join(' · ') || undefined
 
@@ -56,7 +55,7 @@ export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog
   return [
     ...d.injections.map((i): Event => {
       const c = byId.get(i.compoundId)
-      const dose = i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : undefined)
+      const dose = doseText(i) || undefined
       const anc = isAncillary(i)
       const name = c?.name ?? (anc ? 'Ancillary' : 'Injection')
       return {

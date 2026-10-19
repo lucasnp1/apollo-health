@@ -7,10 +7,10 @@ import { AppState } from 'react-native'
 import { useSyncExternalStore } from 'react'
 import { db } from '@shared/lib/db'
 import { Health } from '../modules/health'
+import { DAY } from '@/log'
 
 type State = { on: boolean; weightSince: number; bpSince: number; lastAt?: number; imported?: number }
 const KEY = 'magno.health'
-const DAY = 86_400_000
 const fresh = (): State => ({ on: false, weightSince: Date.now() - 730 * DAY, bpSince: Date.now() - 730 * DAY })
 let state: State = (() => {
   try {

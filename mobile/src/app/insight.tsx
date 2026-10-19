@@ -84,7 +84,6 @@ const s = StyleSheet.create({
   signalValue: { fontFamily: F.monoMedium, fontSize: 15, color: C.fg },
   signalText: { fontFamily: F.body, fontSize: 14, color: C.muted, lineHeight: 20, paddingLeft: 18 },
   bullet: { fontFamily: F.body, fontSize: 15, color: C.fg, lineHeight: 22, opacity: 0.92 },
-  small: { fontFamily: F.body, fontSize: 13, color: C.muted },
   button: { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
   secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.input },
   buttonText: { fontFamily: F.semi, fontSize: 16, color: C.primaryFg },

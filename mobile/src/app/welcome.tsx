@@ -5,8 +5,7 @@ import { router, Stack } from 'expo-router'
 import { useState } from 'react'
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { compoundGroups, findCompoundByName, randomDistinctColor } from '@shared/lib/compounds'
-import { db } from '@shared/lib/db'
+import { findCompoundByName } from '@shared/lib/compounds'
 import { type Choice, CHOICE_LABEL, setAppearance, useAppearance } from '@/appearance'
 import { useAccount } from '@/account/auth'
 import { useCompounds, useInjections } from '@/data/useLog'
@@ -14,18 +13,12 @@ import { isAncillary } from '@/timeline'
 import { enableHealth, healthAvailable, useHealth } from '@/health'
 import { Card, FieldRow, Input, MenuPicker, s as kit, Segmented } from '@/kit'
 import Reminders from './reminders'
+import { addCompound, usedColours } from '@/log'
+import { markOnboarded } from '@/onboarding'
 import { C, F } from '@/theme'
 
-const KEY = 'magno.onboarded'
-export const needsOnboarding = () => {
-  try {
-    return !localStorage.getItem(KEY)
-  } catch {
-    return false
-  }
-}
 const finish = () => {
-  try { localStorage.setItem(KEY, String(Date.now())) } catch {}
+  markOnboarded()
   router.back()
 }
 
@@ -152,10 +145,7 @@ function Compounds() {
     const n = name.trim()
     if (!n) return
     if (findCompoundByName(compounds, n)) return Alert.alert('Already there', `${n} is on your list.`)
-    await db.compounds.add({
-      name: n, category: 'Other', defaultDose: 0, unit: 'mg', schedule: 'As needed', defaultRoute: route,
-      color: randomDistinctColor(compoundGroups(compounds).map((g) => g.color ?? '').filter(Boolean)),
-    })
+    await addCompound({ name: n, category: 'Other', defaultDose: 0, unit: 'mg', defaultRoute: route }, usedColours(compounds))
     setName('')
   }
   // Anything you've injected, or a compound that isn't filed as an ancillary (hCG is often filed as one but injected)

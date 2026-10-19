@@ -23,22 +23,26 @@ export function dedupeInjections(list: InjectionLog[]): InjectionLog[] {
 
 /**
  * A live query shared by every screen that asks: one Dexie subscription per kind of data, started on first use, so
- * moving between tabs never waits on a fresh query and a change re-renders each screen once.
+ * moving between tabs never waits on a fresh query and a change re-renders each screen once. `prime()` starts it early
+ * and resolves on the first value: the root layout awaits it so the first frame already has the data.
  */
-function shared<T>(query: () => Promise<T>, empty: T) {
+export function shared<T>(query: () => Promise<T>, empty: T) {
   let value = empty
-  let started = false
+  let first: Promise<void> | undefined
   const subs = new Set<() => void>()
-  const start = () => {
-    if (started) return
-    started = true
-    liveQuery(query).subscribe({ next: (v) => ((value = v), subs.forEach((f) => f())), error: console.error })
-  }
+  const prime = () =>
+    (first ??= new Promise<void>((done) =>
+      liveQuery(query).subscribe({
+        next: (v) => ((value = v), subs.forEach((f) => f()), done()),
+        error: (e) => (console.error(e), done()),
+      }),
+    ))
   const subscribe = (f: () => void) => (subs.add(f), () => void subs.delete(f))
-  return () => {
-    start()
+  const use = () => {
+    void prime()
     return useSyncExternalStore(subscribe, () => value)
   }
+  return Object.assign(use, { prime })
 }
 
 const NONE: never[] = []

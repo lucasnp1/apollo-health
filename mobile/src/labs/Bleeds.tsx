@@ -30,7 +30,7 @@ export function BleedsSection() {
     <Widget
       eyebrow="Blood-letting"
       sub={bleeds.length ? 'Venesections and donations, read against your hematocrit' : 'A venesection or donation, so your next test shows what it did'}
-      action={<Pill label="+ Log" onPress={() => router.push('/log/bleed' as never)} />}
+      action={<Pill label="+ Log" onPress={() => router.push('/log/bleed')} />}
     >
       {list.length ? (
         <View>
@@ -51,7 +51,7 @@ function BleedRow({ p, series, first }: { p: Phlebotomy; series: ReturnType<type
   const fell = effect.before && effect.after ? effect.after.pct < effect.before.pct : undefined
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/log/bleed', params: { id: String(p.id) } } as never)}
+      onPress={() => router.push({ pathname: '/log/bleed', params: { id: String(p.id) } })}
       accessibilityRole="button"
       style={({ pressed }) => [b.row, !first && b.sep, pressed && { opacity: 0.7 }]}
     >

@@ -51,12 +51,6 @@ export async function startAccount() {
   }
 }
 
-/** Re-read the account, e.g. its plan after a purchase. */
-export async function refreshAccount() {
-  const user = await me().catch(() => undefined)
-  if (user) set({ status: 'authed', user })
-}
-
 const signedIn = async (fallback: ApiUser) => set({ status: 'authed', user: (await me().catch(() => null)) ?? fallback })
 
 export async function signIn(email: string, password: string) {

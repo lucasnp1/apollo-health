@@ -8,6 +8,7 @@ import { router } from 'expo-router'
 import { useSyncExternalStore } from 'react'
 import { Alert, AppState, Linking } from 'react-native'
 import { db } from '@shared/lib/db'
+import { DAY } from '@/log'
 
 export type Kind = 'injection' | 'ancillary' | 'weight' | 'bp' | 'checkin' | 'bloods'
 export type Timed = { on: boolean; time: string; days: number[] }
@@ -16,7 +17,6 @@ export type Bloods = { on: boolean; everyWeeks: number }
 export type State = { injection: Injection; ancillary: Timed; weight: Timed; bp: Timed; checkin: Timed; bloods: Bloods }
 
 const KEY = 'magno.reminders'
-const DAY = 86_400_000
 const ID = 'magno-'
 const AHEAD = 8
 

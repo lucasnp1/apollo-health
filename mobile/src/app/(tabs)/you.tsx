@@ -33,7 +33,7 @@ export default function You() {
 
   return (
     <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 90, gap: 28 }}>
-      <PageHeader eyebrow="Settings" title="You" action={<Pill label="Feedback" icon="bubble.left" onPress={() => router.push('/account/feedback' as never)} />} />
+      <PageHeader eyebrow="Settings" title="You" action={<Pill label="Feedback" icon="bubble.left" onPress={() => router.push('/account/feedback')} />} />
 
       <View style={{ gap: 10 }}>
         <Eyebrow>Account</Eyebrow>
@@ -51,8 +51,8 @@ export default function You() {
               <Row label="Signed in with" value={acc.user.apple ? 'Apple' : 'Google'} />
             ) : (
               <>
-                <Row label="Change password" onPress={() => router.push('/account/password' as never)} />
-                <Row label="Recovery codes" value="If you forget your password" onPress={() => router.push('/account/recovery' as never)} />
+                <Row label="Change password" onPress={() => router.push('/account/password')} />
+                <Row label="Recovery codes" value="If you forget your password" onPress={() => router.push('/account/recovery')} />
               </>
             )}
             <Row label="Sign out" onPress={out} last />
@@ -114,7 +114,7 @@ export default function You() {
       <View style={{ gap: 10 }}>
         <Eyebrow>Your data</Eyebrow>
         <Card style={{ paddingVertical: 4 }}>
-          <Row label="Archive" value="Bring entries back" onPress={() => router.push('/archive' as never)} />
+          <Row label="Archive" value="Bring entries back" onPress={() => router.push('/archive')} />
           <Row label="Export everything" value="JSON file" onPress={() => void exportAll().catch((e) => Alert.alert("Couldn't export", String(e?.message ?? e)))} last />
         </Card>
       </View>
@@ -124,7 +124,7 @@ export default function You() {
         <Card style={{ paddingVertical: 4 }}>
           <Row label="Privacy policy" onPress={() => void WebBrowser.openBrowserAsync('https://magno.fit/privacy.html')} />
           <Row label="Terms" onPress={() => void WebBrowser.openBrowserAsync('https://magno.fit/terms.html')} />
-          <Row label="Send feedback" onPress={() => router.push('/account/feedback' as never)} last />
+          <Row label="Send feedback" onPress={() => router.push('/account/feedback')} last />
         </Card>
         <Text style={y.small}>
           Magno is a log. It records what you did and what your tests measured, and never tells you what to take or how much. Talk to your
@@ -155,7 +155,6 @@ function Row({ label, value, onPress, action, danger, tone, last }: { label: str
 }
 
 const y = StyleSheet.create({
-  h1: { fontFamily: F.semi, fontSize: 32, letterSpacing: -0.6, color: C.fg, marginTop: 6 },
   body: { fontFamily: F.body, fontSize: 15, color: C.fg, lineHeight: 21, opacity: 0.9 },
   small: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18 },
   primary: { backgroundColor: C.primary, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },

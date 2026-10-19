@@ -25,12 +25,6 @@ export function PasswordRules({ password }: { password: string }) {
   )
 }
 
-export const CancelButton = () => (
-  <Pressable hitSlop={12} onPress={() => router.back()}>
-    <Text style={{ fontFamily: F.medium, fontSize: 17, color: C.muted }}>Cancel</Text>
-  </Pressable>
-)
-
 export default function ChangePassword() {
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')

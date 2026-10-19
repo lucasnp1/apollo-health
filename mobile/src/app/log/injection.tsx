@@ -5,20 +5,21 @@
 // As on the web: several compounds can share one syringe (one row each, same moment), a check-in can ride along, and
 // opening the logger brings back the last syringe you used on the route. With an `id` param it edits that shot.
 import { SymbolView } from 'expo-symbols'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { type CompoundGroup, compoundGroups, compoundKey, findCompoundByName, groupByCompoundId, randomDistinctColor } from '@shared/lib/compounds'
+import { type CompoundGroup, compoundGroups, compoundKey, findCompoundByName, groupByCompoundId } from '@shared/lib/compounds'
 import { type Compound, db, type InjectionLog, type Symptom, type SyringeKey, type Unit } from '@shared/lib/db'
 import { canonicalSite, type Route } from '@shared/lib/sites'
 import { NEGATIVE, POSITIVE, ratingOf, withRating } from '@shared/lib/symptoms'
-import { dedupeInjections, useCompounds, useInjections } from '@/data/useLog'
+import { useCompounds, useInjections } from '@/data/useLog'
 import { Card, Eyebrow, FieldRow, Input, MenuPicker, s as kit, Section, Segmented, When } from '@/kit'
 import { LogForm, num } from '@/LogForm'
 import { Scale } from '@/logging/Scale'
 import { SitePicker } from '@/logging/SitePicker'
 import { useDirty, useEditRow } from '@/logging/useEntry'
 import { C, F } from '@/theme'
-import { isAncillary, unitLabel } from '@/timeline'
+import { addCompound, routeOf, unitLabel, usedColours } from '@/log'
+import { isAncillary } from '@/timeline'
 
 const NEW = 'new'
 const UNITS: { value: Unit; label: string }[] = [
@@ -44,9 +45,9 @@ const NEEDLES: Record<Mark, string[]> = {
 }
 
 /** Lines this logger adds under your note, so the web shows them too: "Syringe: …", "Vial: …". */
-const noteLine = (notes: string | undefined, label: string) => notes?.match(new RegExp(`^${label}: (.*)$`, 'm'))?.[1]
+const LINE = { Syringe: /^Syringe: (.*)$/m, Vial: /^Vial: (.*)$/m }
+const noteLine = (notes: string | undefined, label: keyof typeof LINE) => notes?.match(LINE[label])?.[1]
 const stripLines = (notes: string | undefined) => (notes ?? '').split('\n').filter((l) => !/^(Syringe|Vial): /.test(l)).join('\n').trim()
-const routeOf = (i: InjectionLog): Route => (i.route === 'SubQ' ? 'SubQ' : 'IM')
 
 /** One compound in the syringe. `pick` is a compound group key, NEW for a typed name, or nothing yet. */
 type Line = { key: string; pick?: string; name: string; unit: Unit; dose: string; drawn: string; vial: string; vialNew?: boolean }
@@ -105,11 +106,17 @@ export default function LogInjection() {
   const injections = useMemo(() => all.filter((i) => !isAncillary(i)), [all])
   const groups = useMemo(() => sortedGroups(compounds, injections), [compounds, injections])
 
-  const [route, setRoute] = useState<Route>('IM')
-  const [lines, setLines] = useState<Line[]>(() => [blank()])
-  const [marks, setMarks] = useState<Mark>('mL')
-  const [syringe, setSyringe] = useState<SyringeKey | undefined>()
-  const [needle, setNeedle] = useState('')
+  // A new shot opens on the last syringe you used: IM unless you only ever log SubQ, as on the web. The stores fill
+  // before the app shows, so this is there on the first frame. Editing replaces it with the saved shot.
+  const [start] = useState(() => {
+    const r: Route = injections.some((i) => routeOf(i) === 'IM') || !injections.length ? 'IM' : 'SubQ'
+    return { r, p: prefillFor(r, groups, injections) }
+  })
+  const [route, setRoute] = useState<Route>(start.r)
+  const [lines, setLines] = useState<Line[]>(start.p.lines)
+  const [marks, setMarks] = useState<Mark>(start.p.marks ?? 'mL')
+  const [syringe, setSyringe] = useState<SyringeKey | undefined>(start.p.syringe)
+  const [needle, setNeedle] = useState(start.p.needle)
   const [needleOther, setNeedleOther] = useState(false)
   const [site, setSite] = useState('')
   const [notes, setNotes] = useState('')
@@ -122,15 +129,17 @@ export default function LogInjection() {
   const [editName, setEditName] = useState('Injection')
   const loadedDose = useRef('')
   const { id, ready } = useEditRow(
-    (rowId) => db.injections.get(rowId),
+    (rowId) => all.find((r) => r.id === rowId) ?? db.injections.get(rowId),
     (row: InjectionLog) => {
       const drawn = row.vialAmount?.trim().match(/^([\d.,]+)\s*(units|mL)$/i)
       const sy = SYRINGES.find((x) => x.label === noteLine(row.notes, 'Syringe'))
       const dose = row.dose != null ? String(row.dose) : ''
       loadedDose.current = dose
       setEdit(row)
-      // Read directly: an archived compound is not in the live list
-      void db.compounds.get(row.compoundId).then((c) => c && setEditName(c.name))
+      // An archived compound is not in the live list: read it from the database
+      const c = compounds.find((x) => x.id === row.compoundId)
+      if (c) setEditName(c.name)
+      else void db.compounds.get(row.compoundId).then((x) => x && setEditName(x.name))
       setRoute(routeOf(row))
       setLines([{ ...blank(), unit: row.unit, dose, drawn: drawn?.[1] ?? '', vial: noteLine(row.notes, 'Vial') ?? '' }])
       setMarks(drawn ? (drawn[2].toLowerCase() === 'units' ? 'units' : 'mL') : (sy?.marks ?? 'mL'))
@@ -142,30 +151,7 @@ export default function LogInjection() {
     },
   )
   const editing = id !== undefined
-  const { dirty, rebase } = useDirty({ route, lines: lines.map(({ key: _key, ...rest }) => rest), marks, syringe, needle, site, notes, when, feel }, ready)
-
-  // A new shot opens on the last syringe you used: IM unless you only ever log SubQ, as on the web. Read once, straight
-  // from the database, so the compounds and the shots are both there (the live lists each start out empty).
-  const hydrated = useRef(false)
-  useEffect(() => {
-    if (editing) return
-    let live = true
-    void (async () => {
-      const [cs, rows] = await Promise.all([
-        db.compounds.toArray().then((rows) => rows.filter((c) => !c.archived && !c.deletedAtSync)),
-        db.injections.toArray().then((rows) => rows.filter((i) => !i.deletedAtSync && !i.archivedAt).sort((a, b) => b.takenAt.localeCompare(a.takenAt)).slice(0, 60)),
-      ])
-      const shots = dedupeInjections(rows).filter((i) => !isAncillary(i))
-      if (!live || hydrated.current || !cs.length) return
-      hydrated.current = true
-      const r: Route = shots.some((i) => routeOf(i) === 'IM') || !shots.length ? 'IM' : 'SubQ'
-      apply(r, prefillFor(r, sortedGroups(cs, shots), shots))
-      rebase()
-    })()
-    return () => void (live = false)
-    // once, on open
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing])
+  const { dirty } = useDirty({ route, lines: lines.map(({ key: _key, ...rest }) => rest), marks, syringe, needle, site, notes, when, feel }, ready)
 
   function apply(r: Route, p: Prefill) {
     setRoute(r)
@@ -179,7 +165,6 @@ export default function LogInjection() {
   function changeRoute(r: Route) {
     if (r === route) return
     if (editing) return setRoute(r)
-    hydrated.current = true
     apply(r, prefillFor(r, groups, injections))
     setSite('')
   }
@@ -245,7 +230,7 @@ export default function LogInjection() {
       })
       return
     }
-    const colours = compounds.map((c) => c.color).filter(Boolean)
+    const colours = usedColours(compounds)
     const made = new Map<string, number>()
     for (const r of used) {
       const memory = { defaultRoute: route, ...(r.doseN > 0 && { lastDose: r.doseN }), ...(syringe && { syringe }) }
@@ -255,17 +240,7 @@ export default function LogInjection() {
         await db.compounds.update(compoundId, memory)
       } else if (made.has(compoundKey(r.l.name))) compoundId = made.get(compoundKey(r.l.name))!
       else {
-        const color = randomDistinctColor(colours)
-        colours.push(color)
-        compoundId = (await db.compounds.add({
-          name: r.l.name.trim(),
-          category: 'Other',
-          defaultDose: r.doseN > 0 ? r.doseN : 0,
-          unit: r.l.unit,
-          schedule: 'As needed',
-          color,
-          ...memory,
-        })) as number
+        compoundId = await addCompound({ name: r.l.name, category: 'Other', defaultDose: r.doseN > 0 ? r.doseN : 0, unit: r.l.unit, ...memory }, colours)
         made.set(compoundKey(r.l.name), compoundId)
       }
       // Written directly, one row per compound in the syringe (never logInjection: it carries the vial maths)
@@ -299,14 +274,20 @@ export default function LogInjection() {
   }, [groups, injections, route])
   // Per compound: what you did last time on this route (to read back, never to work anything out) and the vials you've used
   const history = useMemo(() => {
+    const byId = groupByCompoundId(groups)
     const out = new Map<string, { last?: string; vials: string[] }>()
-    for (const g of groups) {
-      const mine = injections.filter((i) => g.ids.includes(i.compoundId))
-      const prev = mine.find((i) => routeOf(i) === route && i.id !== id)
-      const vials = [...new Set(mine.map((i) => noteLine(i.notes, 'Vial')).filter((v): v is string => !!v))]
-      const dose = prev && (prev.rawDose ?? (prev.dose != null ? `${prev.dose} ${unitLabel(prev.unit)}` : ''))
-      const last = prev ? [dose, prev.vialAmount && `drew ${prev.vialAmount}`, noteLine(prev.notes, 'Vial')].filter(Boolean).join(', ') : undefined
-      out.set(g.key, { last: last || undefined, vials })
+    // one pass, newest first: the first shot on this route is "last time", every vial note counts once
+    for (const i of injections) {
+      const g = byId.get(i.compoundId)
+      if (!g) continue
+      let h = out.get(g.key)
+      if (!h) out.set(g.key, (h = { vials: [] }))
+      const vial = noteLine(i.notes, 'Vial')
+      if (vial && !h.vials.includes(vial)) h.vials.push(vial)
+      if (h.last === undefined && routeOf(i) === route && i.id !== id) {
+        const dose = i.rawDose ?? (i.dose != null ? `${i.dose} ${unitLabel(i.unit)}` : '')
+        h.last = [dose, i.vialAmount && `drew ${i.vialAmount}`, vial].filter(Boolean).join(', ')
+      }
     }
     return out
   }, [groups, injections, route, id])

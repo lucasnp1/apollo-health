@@ -3,10 +3,12 @@ import { type TextInput, View } from 'react-native'
 import { db, type VitalLog } from '@shared/lib/db'
 import { Input, Section, When } from '@/kit'
 import { pushBloodPressure } from '@/health'
+import { useVitals } from '@/data/useLog'
 import { LogForm } from '@/LogForm'
 import { useDirty, useEditRow } from '@/logging/useEntry'
 
 export default function LogBP() {
+  const vitals = useVitals()
   const [sys, setSys] = useState('')
   const [dia, setDia] = useState('')
   const [pulse, setPulse] = useState('')
@@ -15,7 +17,7 @@ export default function LogBP() {
   const diaRef = useRef<TextInput>(null)
   const pulseRef = useRef<TextInput>(null)
   const { id, ready } = useEditRow(
-    (rowId) => db.vitals.get(rowId),
+    (rowId) => vitals.find((r) => r.id === rowId) ?? db.vitals.get(rowId),
     (v: VitalLog) => {
       setSys(String(v.systolic))
       setDia(String(v.diastolic))

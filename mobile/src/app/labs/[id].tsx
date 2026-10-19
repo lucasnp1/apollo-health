@@ -1,7 +1,6 @@
 // One blood test as its own report: what it says overall, when it was drawn against your shots, then every section
 // with each result read against the lab's range (and, with Pro, Magno's read: act, watch, expected or fine, why, and
 // no "what people usually do" on iOS: flags and explanations only, decided 19 Oct 2026). Informational; it never prescribes.
-import { SymbolView } from 'expo-symbols'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { ActionSheetIOS, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -18,7 +17,7 @@ import { useTests } from '@/labs/useTests'
 import { usePro } from '@/money/pro'
 import { exportTestPdf } from '@/report/export'
 import { showToast, withUndo } from '@/toast'
-import { unitLabel } from '@/timeline'
+import { unitLabel } from '@/log'
 import { C, F } from '@/theme'
 
 const DATE_SOURCE: Record<string, string> = {
@@ -199,7 +198,7 @@ function pickCompare(test: LabTest, tests: LabTest[]) {
   const opts = [...others.map((o) => `${o.title} · ${fmtDay(o.date)}`), 'Cancel']
   ActionSheetIOS.showActionSheetWithOptions({ title: 'Compare with', options: opts, cancelButtonIndex: opts.length - 1 }, (i) => {
     const o = others[i]
-    if (o) router.push({ pathname: '/labs/compare', params: { a: String(test.id), b: String(o.id) } } as never)
+    if (o) router.push({ pathname: '/labs/compare', params: { a: String(test.id), b: String(o.id) } })
   })
 }
 

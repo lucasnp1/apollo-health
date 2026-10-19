@@ -10,6 +10,7 @@ import { fmtRange } from '@shared/lib/labRules'
 import { buildTests, printedValue, type LabTest } from '@shared/lib/labTests'
 import { ALL_SYMPTOMS, customDefs, ratingOf } from '@shared/lib/symptoms'
 import { dedupeInjections } from '@/data/useLog'
+import { DAY, doseText } from '@/log'
 import { isAncillary } from '@/timeline'
 import { logReportHtml, testReportHtml, type BpRow, type DoseRow, type WeightRow } from './html'
 
@@ -19,8 +20,6 @@ export type LogOpts = { from: Date; to: Date; include: Include; name?: string; c
 
 const live = (r: { archivedAt?: number; deletedAtSync?: number }) => !r.archivedAt && !r.deletedAtSync
 /** Display only (the web's unitLabel lives in dose.ts, which the iOS app must not ship). */
-const unitLabel = (u: string) => (u === 'iu' ? 'IU' : u)
-const doseText = (i: InjectionLog) => i.rawDose ?? (i.dose !== undefined ? `${i.dose} ${unitLabel(i.unit)}` : '')
 
 // ── Patient name: on this phone only (db.meta never syncs), shared with the web report's key ─────────────────────
 
@@ -114,7 +113,7 @@ export async function exportTestPdf(testId: number): Promise<void> {
   const end = new Date(`${dayOf(t.date)}T${time}`)
   let doses: DoseRow[] = []
   if (!Number.isNaN(end.getTime())) {
-    const start = new Date(end.getTime() - 42 * 86_400_000)
+    const start = new Date(end.getTime() - 42 * DAY)
     start.setHours(0, 0, 0, 0)
     const shots = await db.injections.where('takenAt').between(start.toISOString(), end.toISOString(), true, true).filter(live).toArray()
     doses = doseRows(shots, compounds).reverse() // oldest first, as the web report

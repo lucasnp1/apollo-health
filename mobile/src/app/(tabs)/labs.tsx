@@ -15,7 +15,7 @@ import { withPro } from '@/money/pro'
 import { readReport, readSheet } from '@/labs/read'
 import { exportTestPdf } from '@/report/export'
 import { useTests } from '@/labs/useTests'
-import { Card, Eyebrow, Segmented, Widget, PageHeader } from '@/kit'
+import { Card, Segmented, Widget, PageHeader } from '@/kit'
 import { BleedsSection } from '@/labs/Bleeds'
 import { attentionOf, MarkerRow, Tag } from '@/labs/ui'
 import { phaseLabel, testChip, verdictLine } from '@/labs/reads'
@@ -200,7 +200,7 @@ function Latest({ tests, pro }: { tests: LabTest[]; pro: boolean }) {
 
       <View style={{ flexDirection: 'row', gap: 10 }}>
         {tests.length > 1 ? (
-          <Pressable style={l.outline} onPress={() => router.push({ pathname: '/labs/compare', params: { a: String(t.id), b: String(previous?.id ?? tests[1].id) } } as never)}>
+          <Pressable style={l.outline} onPress={() => router.push({ pathname: '/labs/compare', params: { a: String(t.id), b: String(previous?.id ?? tests[1].id) } })}>
             <Text style={l.outlineText}>Compare with previous</Text>
           </Pressable>
         ) : null}
@@ -283,7 +283,6 @@ function Empty() {
 }
 
 const l = StyleSheet.create({
-  h1: { fontFamily: F.semi, fontSize: 32, letterSpacing: -0.6, color: C.fg, marginTop: 6 },
   add: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.primary, borderRadius: 12, paddingVertical: 15 },
   addText: { fontFamily: F.semi, fontSize: 17, color: C.primaryFg },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },

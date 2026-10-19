@@ -6,7 +6,6 @@ import { recoveryStatus, regenerateCodes } from '@/account/auth'
 import { setCodes } from '@/account/codes'
 import { Card, Input, Section } from '@/kit'
 import { C, F } from '@/theme'
-import { CancelButton } from './password'
 
 export default function Recovery() {
   const [status, setStatus] = useState<{ remaining: number; total: number } | null>(null)

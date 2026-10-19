@@ -30,7 +30,7 @@ export default function LogCheckIn() {
   const [newLabel, setNewLabel] = useState('')
   const [newDir, setNewDir] = useState<'positive' | 'negative'>('negative')
   const { id, ready } = useEditRow(
-    (rowId) => db.symptoms.get(rowId),
+    (rowId) => symptoms.find((r) => r.id === rowId) ?? db.symptoms.get(rowId),
     (row: Symptom) => {
       setDraft(ratingsOf(row))
       setNotes(row.notes ?? '')

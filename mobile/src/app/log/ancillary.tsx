@@ -4,13 +4,14 @@
 // note, as syringe and vial are; the Wellbeing widget shows these next to the side-effect line.
 import { useMemo, useState } from 'react'
 import { Text, View } from 'react-native'
-import { compoundGroups, findCompoundByName, randomDistinctColor } from '@shared/lib/compounds'
+import { findCompoundByName } from '@shared/lib/compounds'
 import { db, type InjectionLog, type Unit } from '@shared/lib/db'
 import { customDefs, NEGATIVE } from '@shared/lib/symptoms'
 import { useCompounds, useInjections, useSymptoms } from '@/data/useLog'
 import { FieldRow, Input, MenuPicker, s as kit, Section, Segmented, When } from '@/kit'
 import { LogForm, num } from '@/LogForm'
 import { useDirty, useEditRow } from '@/logging/useEntry'
+import { addCompound, usedColours } from '@/log'
 import { isAncillary } from '@/timeline'
 
 const NEW = '__new'
@@ -46,7 +47,7 @@ export default function LogAncillary() {
   const [notes, setNotes] = useState('')
   const [when, setWhen] = useState(() => new Date())
   const { id, ready } = useEditRow(
-    (rowId) => db.injections.get(rowId),
+    (rowId) => injections.find((r) => r.id === rowId) ?? db.injections.get(rowId),
     (row: InjectionLog) => {
       setPick(String(row.compoundId))
       setDose(row.dose != null ? String(row.dose) : (row.rawDose ?? ''))
@@ -115,14 +116,7 @@ export default function LogAncillary() {
     if (id !== undefined) return db.injections.update(id, { ...row, rawDose: undefined })
     let compoundId = pick && pick !== NEW ? Number(pick) : findCompoundByName(compounds, name)?.id
     if (compoundId === undefined)
-      compoundId = (await db.compounds.add({
-        name: name.trim(),
-        category: 'Ancillary',
-        defaultDose: doseN > 0 ? doseN : 0,
-        unit,
-        schedule: 'As needed',
-        color: randomDistinctColor(compoundGroups(compounds).map((g) => g.color ?? '').filter(Boolean)),
-      })) as number
+      compoundId = await addCompound({ name, category: 'Ancillary', defaultDose: doseN > 0 ? doseN : 0, unit }, usedColours(compounds))
     return db.injections.add({ compoundId, ...row })
   }
 

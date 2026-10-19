@@ -17,14 +17,19 @@ import { startAccount, useAccount } from '@/account/auth'
 import { billingFollowsAccount, startBilling } from '@/money/pro'
 import { startSync } from '@/account/sync'
 import { loadData } from '@/data/persist'
+import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
+import { useBleeds } from '@/labs/useBleeds'
+import { useTests } from '@/labs/useTests'
 import { startHealth } from '@/health'
 import { startReminders } from '@/reminders'
 import { Toaster } from '@/toast'
-import { needsOnboarding } from './welcome'
+import { needsOnboarding } from '@/onboarding'
 import { startAppearance } from '@/appearance'
 import { C, F, usePalette, useScheme } from '@/theme'
 
 SplashScreen.preventAutoHideAsync()
+// The shared stores fill before the splash hides, so the first frame of every tab already has its data
+const prime = () => Promise.all([useCompounds, useInjections, useVitals, useBodyMetrics, useSymptoms, useTests, useBleeds].map((s) => s.prime()))
 startAppearance()
 
 // A log sheet: native page sheet with its own header (the X, the title, and the screen's own Save)
@@ -50,7 +55,7 @@ export default function Root() {
   const [loaded, setLoaded] = useState(false)
   // A failed load still opens the app: writes are per row, so nothing already saved gets overwritten
   // Sync starts once the data is in and the account is known; signed out, it does nothing
-  useEffect(() => void loadData().catch(console.error).finally(() => {
+  useEffect(() => void loadData().catch(console.error).then(prime).finally(() => {
     setLoaded(true)
     // Background work waits until Home has drawn, so it doesn't compete with the first screen
     void startAccount().then(() =>

@@ -6,7 +6,6 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text } from 'react-native'
 import { mailto, sendFeedback, SUPPORT_EMAIL, useAccount } from '@/account/auth'
 import { Input, Section } from '@/kit'
 import { C, F } from '@/theme'
-import { CancelButton } from './password'
 
 export default function Feedback() {
   const acc = useAccount()

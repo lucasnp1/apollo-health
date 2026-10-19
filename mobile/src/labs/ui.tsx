@@ -115,5 +115,4 @@ export const u = StyleSheet.create({
   flag: { fontFamily: F.monoSemi, fontSize: 12 },
   meta: { fontFamily: F.mono, fontSize: 12, color: C.muted },
   reason: { fontFamily: F.body, fontSize: 14, color: C.fg, lineHeight: 20, opacity: 0.9 },
-  next: { fontFamily: F.body, fontSize: 14, color: C.muted, lineHeight: 20 },
 })

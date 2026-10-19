@@ -1,7 +1,6 @@
 // Every entry, newest first, by day. Filter by kind (and by compound under Injections) and by date range, in Apple's
 // pull-down menus; Export takes what's shown to the doctor export. Home's widgets open it filtered (params kind, range).
 // Tap an entry to edit it, press and hold to archive it with Undo (kept and restorable: Archive is never a delete).
-import { useLiveQuery } from 'dexie-react-hooks'
 import * as Haptics from 'expo-haptics'
 import { router, useLocalSearchParams } from 'expo-router'
 import { memo, useEffect, useMemo, useState } from 'react'
@@ -9,11 +8,10 @@ import { ActionSheetIOS, Pressable, SectionList, StyleSheet, Text, View } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { archiveRow, restoreRow, setExamArchived } from '@shared/lib/archive'
 import { compoundGroups } from '@shared/lib/compounds'
-import { db } from '@shared/lib/db'
 import { useTests } from '@/labs/useTests'
-import { dedupeInjections, useCompounds } from '@/data/useLog'
+import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
 import { EventRow } from '@/EventRow'
-import { Eyebrow, MenuPicker, PageHeader, Pill, RANGE_LABEL, type RangeId, rangeDomain } from '@/kit'
+import { Eyebrow, MenuPicker, PageHeader, Pill, RANGE_LABEL, RangeMenu, type RangeId, rangeDomain } from '@/kit'
 import { buildEvents, byDay, type Event, KIND_LABEL, type Kind } from '@/timeline'
 import { withUndo } from '@/toast'
 import { C, F } from '@/theme'
@@ -21,13 +19,6 @@ import { C, F } from '@/theme'
 type Filter = Kind | 'all'
 const KINDS = Object.keys(KIND_LABEL) as Kind[]
 const ALL = 'all'
-
-// The whole history, not the latest few hundred the logging screens read
-const useAllInjections = () =>
-  useLiveQuery(async () => dedupeInjections(await db.injections.toArray().then((rows) => rows.filter((i) => !i.deletedAtSync && !i.archivedAt))), [], [])
-const useAllVitals = () => useLiveQuery(() => db.vitals.toArray().then((rows) => rows.filter((v) => !v.archivedAt)), [], [])
-const useAllBody = () => useLiveQuery(() => db.bodyMetrics.toArray().then((rows) => rows.filter((b) => !b.archivedAt)), [], [])
-const useAllSymptoms = () => useLiveQuery(() => db.symptoms.toArray().then((rows) => rows.filter((s) => !s.archivedAt)), [], [])
 
 const FORM: Partial<Record<Kind, '/log/injection' | '/log/ancillary' | '/log/weight' | '/log/bp' | '/log/checkin'>> = {
   injection: '/log/injection', ancillary: '/log/ancillary', weight: '/log/weight', bp: '/log/bp', symptom: '/log/checkin',
@@ -75,10 +66,10 @@ const keyExtractor = (e: Event) => e.id
 export default function Timeline() {
   const insets = useSafeAreaInsets()
   const compounds = useCompounds()
-  const injections = useAllInjections()
-  const vitals = useAllVitals()
-  const bodyMetrics = useAllBody()
-  const symptoms = useAllSymptoms()
+  const injections = useInjections()
+  const vitals = useVitals()
+  const bodyMetrics = useBodyMetrics()
+  const symptoms = useSymptoms()
   const tests = useTests()
   const params = useLocalSearchParams<{ kind?: string; range?: string; at?: string }>()
   const [kind, setKind] = useState<Filter>(ALL)
@@ -133,7 +124,7 @@ export default function Timeline() {
         {kind === 'injection' && groups.length > 1 ? (
           <MenuPicker value={shown ?? ALL} onChange={(v) => setCompound(v === ALL ? undefined : v)} options={[{ value: ALL, label: 'All compounds' }, ...groups]} />
         ) : null}
-        <MenuPicker value={range} onChange={setRange} options={(Object.keys(RANGE_LABEL) as RangeId[]).map((r) => ({ value: r, label: RANGE_LABEL[r] }))} />
+        <RangeMenu value={range} onChange={setRange} />
       </View>
     </View>
   )
@@ -162,7 +153,6 @@ export default function Timeline() {
 
 // Each day's rows sit on one card: first row rounds the top, the footer rounds the bottom
 const t = StyleSheet.create({
-  h1: { fontFamily: F.semi, fontSize: 32, letterSpacing: -0.6, color: C.fg, marginTop: 6 },
   filters: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4, marginLeft: -8 },
   day: { marginTop: 22, marginBottom: 8 },
   item: { backgroundColor: C.card, paddingHorizontal: 14, borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth, borderColor: C.line },
