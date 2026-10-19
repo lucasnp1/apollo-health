@@ -103,7 +103,7 @@ export default function TestScreen() {
         {test.timing.length ? (
           <Widget eyebrow="At the draw" sub={phaseLabel(test) ?? 'Your logged shots before this test'}>
             {test.timing.map((d) => (
-              <View key={d.group} style={s.timing}>
+              <View key={d.group} style={s.timingStack}>
                 <Text style={s.timingName}>{d.name}</Text>
                 <Text style={s.meta}>
                   {d.dose != null ? `${d.dose} ${unitLabel(d.unit)} · ` : ''}
@@ -208,6 +208,8 @@ const s = StyleSheet.create({
   meta: { fontFamily: F.mono, fontSize: 12, color: C.muted },
   note: { fontFamily: F.body, fontSize: 14, color: C.fg, opacity: 0.85, lineHeight: 20 },
   timing: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, paddingVertical: 4 },
+  // a compound's name over its timing: side by side, a long name was squeezed to one letter a line
+  timingStack: { gap: 2, paddingVertical: 4 },
   timingName: { flex: 1, fontFamily: F.medium, fontSize: 15, color: C.fg },
   value: { fontFamily: F.monoMedium, fontSize: 14, color: C.fg },
   link: { fontFamily: F.semi, fontSize: 14, color: C.accentInk },

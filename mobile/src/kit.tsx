@@ -29,7 +29,7 @@ export function Section({ title, children, hint }: { title: string; children: Re
 export const Input = forwardRef<TextInput, TextInputProps & { suffix?: string }>(function Input({ suffix, style, ...props }, ref) {
   return (
     <View style={s.inputWrap}>
-      <TextInput ref={ref} placeholderTextColor={C.faint} selectionColor={C.primary} style={[s.input, style]} {...props} />
+      <TextInput ref={ref} placeholderTextColor={C.faint} selectionColor={C.primary} style={[s.input, suffix ? { paddingRight: 18 + suffix.length * 9 } : null, style]} {...props} />
       {suffix ? <Text style={s.suffix}>{suffix}</Text> : null}
     </View>
   )

@@ -53,6 +53,7 @@ export type StorePlans = { monthly?: PurchasesPackage; lifetime?: PurchasesPacka
 /** The plans as the App Store sells them here; null before billing is set up (the paywall shows list prices). */
 export async function storePlans(): Promise<StorePlans | null> {
   if (!LIVE || !KEY) return null
+  startBilling() // the paywall can open before the deferred start at launch
   const packages = (await Purchases.getOfferings()).current?.availablePackages ?? []
   return { monthly: packages.find((p) => p.packageType === PACKAGE_TYPE.MONTHLY), lifetime: packages.find((p) => p.packageType === PACKAGE_TYPE.LIFETIME) }
 }

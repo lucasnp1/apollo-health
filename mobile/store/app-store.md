@@ -113,7 +113,7 @@ Apple Health: with the user's permission it reads and writes weight and blood pr
 
 No account is needed; every feature except backup works signed out. Account deletion: You > Delete account.
 Lab import reads PDFs with PDFKit, photos with Vision and spreadsheets on the device; nothing is uploaded.
-Magno Pro is free for everyone in this version (billing is not live yet).
+Magno Pro: a monthly subscription with a one-month free trial, or a one-time lifetime purchase (In-App Purchase, through RevenueCat). Open You > Magno Pro, or any Pro feature such as Bloods > Add > PDF report. Restore purchases is on the same screen.
 ```
 
 ## Before submitting

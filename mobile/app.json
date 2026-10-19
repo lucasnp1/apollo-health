@@ -67,7 +67,7 @@
     ],
     "extra": {
       "billing": {
-        "live": false,
+        "live": true,
         "revenuecatIosKey": "appl_zXdvrtNUtkubvbpJdbOfrifyZzE"
       }
     }

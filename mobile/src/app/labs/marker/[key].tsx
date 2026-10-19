@@ -143,15 +143,15 @@ function TargetEditor({ markerKey, target, unit, low, high }: { markerKey: strin
     <Widget
       eyebrow="Your target"
       title={target ? `${fmtRange(target.low, target.high)} ${target.unit ?? unit}` : undefined}
-      sub="Your own range, from you and your doctor. Results are read against it instead of the lab's."
+      sub={`Your own range, from you and your doctor. Results are read against it instead of the lab's${low !== undefined || high !== undefined ? ` (${fmtRange(low, high)})` : ''}.`}
       action={target && !changed ? <Pill label="Remove" onPress={() => void remove()} /> : can ? <Pill label="Save" primary onPress={() => void save()} /> : undefined}
     >
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <View style={{ flex: 1 }}>
-          <Input keyboardType="decimal-pad" placeholder={low !== undefined ? `Low (lab ${low})` : 'Low'} value={loV} onChangeText={setLo} suffix={unit} accessibilityLabel="Target low" />
+          <Input keyboardType="decimal-pad" placeholder="Low" value={loV} onChangeText={setLo} suffix={unit} accessibilityLabel="Target low" />
         </View>
         <View style={{ flex: 1 }}>
-          <Input keyboardType="decimal-pad" placeholder={high !== undefined ? `High (lab ${high})` : 'High'} value={hiV} onChangeText={setHi} suffix={unit} accessibilityLabel="Target high" />
+          <Input keyboardType="decimal-pad" placeholder="High" value={hiV} onChangeText={setHi} suffix={unit} accessibilityLabel="Target high" />
         </View>
       </View>
     </Widget>
