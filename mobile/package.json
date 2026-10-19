@@ -12,6 +12,7 @@
     "dexie": "^4.4.6",
     "dexie-react-hooks": "^4.4.0",
     "expo": "~57.0.27",
+    "expo-apple-authentication": "~57.0.2",
     "expo-blur": "~57.0.3",
     "expo-build-properties": "~57.0.22",
     "expo-clipboard": "~57.0.2",

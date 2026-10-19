@@ -10,7 +10,7 @@
     "backgroundColor": "#0d0e11",
     "ios": {
       "bundleIdentifier": "app.magno.ios",
-      "buildNumber": "5",
+      "buildNumber": "6",
       "supportsTablet": false,
       "appleTeamId": "69Y8AJD573",
       "config": {
@@ -24,7 +24,8 @@
       "entitlements": {
         "com.apple.developer.healthkit": true,
         "com.apple.developer.healthkit.access": []
-      }
+      },
+      "usesAppleSignIn": true
     },
     "plugins": [
       "expo-router",
@@ -56,7 +57,8 @@
       "expo-sharing",
       "expo-web-browser",
       "expo-notifications",
-      "./plugins/withLocalNotificationsOnly"
+      "./plugins/withLocalNotificationsOnly",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true,

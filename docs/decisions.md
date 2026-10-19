@@ -148,3 +148,16 @@ On `main` (apollo-health), deployed to Pages `magnohq` (magno.fit):
   Bloods and You (button centred on the title), one Pill size. You: Feedback button top right, Delete account at the
   very bottom. Recovery codes stay: with reset emails off they are the only way back into an account.
 - Onboarding opens on a carousel of the real screens (the website's), assets/onboarding.
+
+### 19 Oct 2026: sign-in options (build 7, for 1.0.1)
+
+- **Sign in with Apple** (Lucas): Apple's button first on the sign-in sheet. Server `/api/auth/apple` checks the
+  identity token against Apple's keys (functions/_lib/apple.ts, jwt.ts); `_lib/social.ts` links the same Apple ID to
+  the same account, links an existing account by verified email, or makes one with no password (`has_password` 0: no
+  password or recovery-code rows in You; delete confirms with Apple). The name isn't requested. Apple login revoked on
+  delete once Pages secrets APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY are set (Lucas creates the key).
+  D1 columns via migrations 0016 (applied with `d1 execute --file`).
+- **Sign in with Google**: server ready (`/api/auth/google`, `_lib/google.ts`, migration 0017); off until
+  GOOGLE_CLIENT_IDS is set. The app button needs the iOS OAuth client ID (Lucas creates it) and a rebuild.
+- **Forgot password by email**: the app sends the reset link (`/api/auth/forgot`), the link opens magno.fit/app/reset.
+  Mail is off until RESEND_API_KEY + MAIL_FROM are set; until then the app falls back to recovery codes.

@@ -1,14 +1,15 @@
-// Sign in, create an account, or reset a forgotten password with a recovery code (the account's own way back in:
-// there's no email reset yet).
+// Sign in with Apple (first, Apple's own button), or with an email: sign in, create an account, or reset a forgotten
+// password with a recovery code (the account's own way back in: there's no email reset yet).
+import * as AppleAuthentication from 'expo-apple-authentication'
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
-import { Linking, Pressable, ScrollView, StyleSheet, Text } from 'react-native'
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { passwordOk } from '@shared/lib/password'
-import { mailto, resetWithCode, signIn, signUp } from '@/account/auth'
+import { mailto, requestReset, resetWithCode, signIn, signInWithApple, signUp } from '@/account/auth'
 import { syncNow } from '@/account/sync'
 import { setCodes } from '@/account/codes'
 import { Input, Section, Segmented } from '@/kit'
-import { C, F } from '@/theme'
+import { C, F, useScheme } from '@/theme'
 import { PasswordRules } from './password'
 
 type Mode = 'in' | 'up' | 'reset'
@@ -21,15 +22,24 @@ export default function SignIn() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Forgot password: first a link by email; recovery codes when email isn't available (or the person picks them)
+  const [resetStep, setResetStep] = useState<'email' | 'sent' | 'code'>('email')
+  const scheme = useScheme()
 
   const strong = passwordOk(password)
-  const ok = email.includes('@') && (mode === 'in' ? !!password : strong) && (mode !== 'reset' || code.trim().length > 3) && (mode !== 'up' || confirm === password)
+  const linkStep = mode === 'reset' && resetStep !== 'code'
+  const ok = email.includes('@') && (linkStep || ((mode === 'in' ? !!password : strong) && (mode !== 'reset' || code.trim().length > 3) && (mode !== 'up' || confirm === password)))
 
   async function go() {
     if (!ok || busy) return
     setBusy(true)
     setError('')
     try {
+      if (linkStep) {
+        const how = await requestReset(email)
+        setResetStep(how === 'email' ? 'sent' : 'code')
+        return
+      }
       if (mode === 'up') {
         const codes = await signUp(email, password)
         void syncNow()
@@ -49,6 +59,22 @@ export default function SignIn() {
     }
   }
 
+  async function apple() {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    try {
+      if (await signInWithApple()) {
+        void syncNow()
+        router.back()
+      }
+    } catch (e) {
+      setError((e as Error).message || "Couldn't sign in with Apple. Try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <>
       <Stack.Screen
@@ -58,16 +84,38 @@ export default function SignIn() {
       />
       <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         {mode !== 'reset' ? (
+          <View style={{ gap: 14 }}>
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonStyle={scheme === 'dark' ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={12}
+              style={{ height: 50 }}
+              onPress={() => void apple()}
+            />
+            <Text style={s.or}>or with your email</Text>
+          </View>
+        ) : null}
+        {mode !== 'reset' ? (
           <Segmented value={mode} onChange={(m) => (setMode(m), setError(''))} options={[{ value: 'in', label: 'Sign in' }, { value: 'up', label: 'Create account' }]} />
         ) : null}
         <Section title="Email">
           <Input value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" autoCapitalize="none" autoCorrect={false} textContentType="username" autoComplete="email" />
         </Section>
-        {mode === 'reset' ? (
+        {linkStep ? (
+          resetStep === 'sent' ? (
+            <Text style={s.small}>
+              If there's a Magno account for that email, a link to set a new password is on its way. It works for an hour. Open it, set the password, then sign in here.
+            </Text>
+          ) : (
+            <Text style={s.small}>We'll email you a link to set a new password.</Text>
+          )
+        ) : null}
+        {mode === 'reset' && !linkStep ? (
           <Section title="Recovery code" hint="One of the codes you saved when you created the account. Each works once.">
             <Input value={code} onChangeText={setCode} placeholder="XXXX-XXXX" autoCapitalize="characters" autoCorrect={false} />
           </Section>
         ) : null}
+        {linkStep ? null : (
         <Section title={mode === 'reset' ? 'New password' : 'Password'}>
           <Input
             value={password}
@@ -80,6 +128,7 @@ export default function SignIn() {
           />
           {mode !== 'in' ? <PasswordRules password={password} /> : null}
         </Section>
+        )}
         {mode === 'up' ? (
           <Section title="Confirm password" hint={confirm && confirm !== password ? "The passwords don't match." : undefined}>
             <Input value={confirm} onChangeText={setConfirm} placeholder="Password again" secureTextEntry textContentType="newPassword" autoComplete="new-password" onSubmitEditing={go} />
@@ -87,10 +136,10 @@ export default function SignIn() {
         ) : null}
         {error ? <Text style={s.error}>{error}</Text> : null}
         <Pressable onPress={go} disabled={!ok || busy} style={[s.primary, (!ok || busy) && { opacity: 0.45 }]} accessibilityRole="button">
-          <Text style={s.primaryText}>{busy ? 'One moment…' : mode === 'up' ? 'Create account' : mode === 'reset' ? 'Reset and sign in' : 'Sign in'}</Text>
+          <Text style={s.primaryText}>{busy ? 'One moment…' : mode === 'up' ? 'Create account' : linkStep ? (resetStep === 'sent' ? 'Send it again' : 'Email me a link') : mode === 'reset' ? 'Reset and sign in' : 'Sign in'}</Text>
         </Pressable>
         {mode === 'in' ? (
-          <Pressable onPress={() => (setMode('reset'), setError(''))} hitSlop={8}>
+          <Pressable onPress={() => (setMode('reset'), setResetStep('email'), setError(''))} hitSlop={8}>
             <Text style={s.link}>Forgot your password?</Text>
           </Pressable>
         ) : mode === 'reset' ? (
@@ -98,6 +147,11 @@ export default function SignIn() {
             <Pressable onPress={() => (setMode('in'), setError(''))} hitSlop={8}>
               <Text style={s.link}>Back to sign in</Text>
             </Pressable>
+            {resetStep !== 'code' ? (
+              <Pressable onPress={() => (setResetStep('code'), setError(''))} hitSlop={8}>
+                <Text style={s.link}>Use a recovery code instead</Text>
+              </Pressable>
+            ) : null}
             <Pressable onPress={() => void Linking.openURL(lockedOut(email))} hitSlop={8}>
               <Text style={s.small}>
                 Locked out, with no codes left? <Text style={{ color: C.accentInk, fontFamily: F.semi }}>Email support</Text> and we'll help you back in.
@@ -120,6 +174,7 @@ const s = StyleSheet.create({
   primaryText: { fontFamily: F.semi, fontSize: 17, color: C.primaryFg },
   link: { fontFamily: F.semi, fontSize: 15, color: C.accentInk, textAlign: 'center' },
   small: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18 },
+  or: { fontFamily: F.medium, fontSize: 13, color: C.muted, textAlign: 'center' },
 })
 
 const lockedOut = (email: string) =>

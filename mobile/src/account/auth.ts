@@ -2,6 +2,7 @@
 // and syncs it with magno.fit through the web's own sync engine (account/sync.ts). The server's session cookie is
 // kept by iOS's own cookie store, as a browser keeps it. The web's useAuth.ts reads Vite's import.meta.env and wipes
 // data its own way, so this is the app's small version of it over the same endpoints.
+import * as AppleAuthentication from 'expo-apple-authentication'
 import { useSyncExternalStore } from 'react'
 import { api, type ApiUser } from '@shared/lib/api'
 import { wipeAllLocalData } from '@shared/lib/db'
@@ -61,11 +62,41 @@ export async function signIn(email: string, password: string) {
   await signedIn(res.user)
 }
 
+/** Asks Apple for the person's identity (Face ID sheet); null when they cancel. */
+async function appleCredential() {
+  try {
+    return await AppleAuthentication.signInAsync({
+      requestedScopes: [AppleAuthentication.AppleAuthenticationScope.EMAIL],
+    })
+  } catch (e) {
+    if ((e as { code?: string }).code === 'ERR_REQUEST_CANCELED') return null
+    throw e
+  }
+}
+
+/**
+ * Sign in with Apple: the same Apple ID always opens the same account; the first time, an account with the same email
+ * is used, otherwise one is made, with no password and so no recovery codes. False when the person cancels.
+ */
+export async function signInWithApple(): Promise<boolean> {
+  const c = await appleCredential()
+  if (!c?.identityToken) return false
+  // The name Apple can share isn't sent: Magno doesn't use it, so it isn't collected
+  const res = await api.post<{ user: ApiUser }>('/api/auth/apple', { identityToken: c.identityToken, authorizationCode: c.authorizationCode })
+  await signedIn(res.user)
+  return true
+}
+
 /** Creates the account; the recovery codes are shown once, right after. */
 export async function signUp(email: string, password: string): Promise<string[]> {
   const res = await api.post<{ user: ApiUser; recoveryCodes?: string[] }>('/api/auth/signup', { email: email.trim(), password, source: 'ios' })
   await signedIn(res.user)
   return res.recoveryCodes ?? []
+}
+
+/** Emails a reset link when the server can send mail ('email'); 'unavailable' means use a recovery code instead. */
+export async function requestReset(email: string): Promise<'email' | 'unavailable'> {
+  return (await api.post<{ delivery: 'email' | 'unavailable' }>('/api/auth/forgot', { email: email.trim() })).delivery
 }
 
 /** A forgotten password, reset with one of the account's recovery codes. Signs this phone in. */
@@ -90,6 +121,16 @@ export async function deleteAccount(password: string) {
   await api.post('/api/auth/delete', { password })
   await wipeAllLocalData()
   set({ status: 'guest' })
+}
+
+/** The same, for an account signed in with Apple: Apple confirms it's them instead of a password. False if cancelled. */
+export async function deleteAccountWithApple(): Promise<boolean> {
+  const c = await appleCredential()
+  if (!c?.identityToken) return false
+  await api.post('/api/auth/delete', { appleIdentityToken: c.identityToken })
+  await wipeAllLocalData()
+  set({ status: 'guest' })
+  return true
 }
 
 /** Change the password; the server signs out every other device, this one stays signed in. */

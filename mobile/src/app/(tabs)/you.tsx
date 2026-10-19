@@ -47,8 +47,14 @@ export default function You() {
               onPress={() => void syncNow()}
               action="Sync now"
             />
-            <Row label="Change password" onPress={() => router.push('/account/password' as never)} />
-            <Row label="Recovery codes" value="If you forget your password" onPress={() => router.push('/account/recovery' as never)} />
+            {acc.user.has_password === false ? (
+              <Row label="Signed in with" value="Apple" />
+            ) : (
+              <>
+                <Row label="Change password" onPress={() => router.push('/account/password' as never)} />
+                <Row label="Recovery codes" value="If you forget your password" onPress={() => router.push('/account/recovery' as never)} />
+              </>
+            )}
             <Row label="Sign out" onPress={out} last />
           </Card>
         ) : (

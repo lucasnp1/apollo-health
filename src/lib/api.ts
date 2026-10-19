@@ -11,6 +11,9 @@ export type ApiUser = {
   plan_until?: number | null
   is_pro?: boolean
   onboarded?: boolean
+  // Sign in with Apple (iPhone app); has_password false: made with Apple, no password set
+  apple?: boolean
+  has_password?: boolean
 }
 
 class ApiError extends Error {

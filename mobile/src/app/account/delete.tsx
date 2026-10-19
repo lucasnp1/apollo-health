@@ -3,7 +3,7 @@
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native'
-import { deleteAccount, useAccount } from '@/account/auth'
+import { deleteAccount, deleteAccountWithApple, useAccount } from '@/account/auth'
 import { Input, Section } from '@/kit'
 import { C, F } from '@/theme'
 
@@ -13,13 +13,15 @@ export default function DeleteAccount() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  // An account made with Apple has no password: Apple confirms it's them instead
+  const viaApple = acc.status === 'authed' && !!acc.user.apple && acc.user.has_password === false
+
   async function go() {
-    if (!password || busy) return
+    if ((!viaApple && !password) || busy) return
     setBusy(true)
     setError('')
     try {
-      await deleteAccount(password)
-      router.back()
+      if (viaApple ? await deleteAccountWithApple() : (await deleteAccount(password), true)) router.back()
     } catch (e) {
       setError((e as Error).message || "Couldn't delete the account. Try again.")
     } finally {
@@ -40,12 +42,16 @@ export default function DeleteAccount() {
           check-in and blood test, from our server and this phone. It can't be undone. A Magno Pro subscription is billed by Apple, so cancel it in Settings, under your name, then Subscriptions.
         </Text>
         <Text style={d.small}>Want a copy first? Export everything from You before you delete.</Text>
-        <Section title="Password">
-          <Input value={password} onChangeText={setPassword} placeholder="Your password" secureTextEntry textContentType="password" autoComplete="current-password" />
-        </Section>
+        {viaApple ? (
+          <Text style={d.small}>Apple will ask you to confirm with Face ID. Your Apple sign-in for Magno is removed too.</Text>
+        ) : (
+          <Section title="Password">
+            <Input value={password} onChangeText={setPassword} placeholder="Your password" secureTextEntry textContentType="password" autoComplete="current-password" />
+          </Section>
+        )}
         {error ? <Text style={d.error}>{error}</Text> : null}
-        <Pressable onPress={go} disabled={!password || busy} style={[d.danger, (!password || busy) && { opacity: 0.45 }]} accessibilityRole="button">
-          <Text style={d.dangerText}>{busy ? 'Deleting…' : 'Delete my account'}</Text>
+        <Pressable onPress={go} disabled={(!viaApple && !password) || busy} style={[d.danger, ((!viaApple && !password) || busy) && { opacity: 0.45 }]} accessibilityRole="button">
+          <Text style={d.dangerText}>{busy ? 'Deleting…' : viaApple ? 'Confirm with Apple and delete' : 'Delete my account'}</Text>
         </Pressable>
       </ScrollView>
     </>
