@@ -2,24 +2,63 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#14161c" />
-    <meta name="description" content="Your private tracker for injections, blood pressure, weight, symptoms and lab results." />
+    <meta name="description" content="Magno is now an iPhone app: injections, blood tests, weight and blood pressure in one log." />
     <link rel="icon" type="image/png" sizes="32x32" href="/logo-32.png" />
-    <link rel="icon" type="image/png" sizes="64x64" href="/logo-64.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/logo-192.png" />
     <link rel="apple-touch-icon" href="/logo-180.png" />
-    <!-- Self-hosted type (offline-capable PWA, no render-blocking third-party). @font-face lives in index.css. -->
-    <link rel="preload" href="/fonts/hanken-grotesk.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/jetbrains-mono.woff2" as="font" type="font/woff2" crossorigin />
-    <meta property="og:title" content="Magno" />
-    <meta property="og:description" content="Your private tracker for injections, blood pressure, weight, symptoms and lab results." />
-    <meta property="og:image" content="/logo-512.png" />
-    <meta property="og:type" content="website" />
-    <title>Magno</title>
+    <meta name="robots" content="noindex" />
+    <title>Magno is on iPhone</title>
+    <!-- The web app was retired on 19 Oct 2026 (docs/decisions.md). This page sends people to the App Store, and still
+         takes a password-reset link (/app/reset?token=...) so a link sent by hand keeps working. -->
+    <style>
+      @font-face{font-family:'Hanken Grotesk';src:url('/fonts/hanken-grotesk.woff2') format('woff2');font-weight:100 900;font-display:swap}
+      @font-face{font-family:'JetBrains Mono';src:url('/fonts/jetbrains-mono.woff2') format('woff2');font-weight:100 800;font-display:swap}
+      :root{color-scheme:dark;--bg:#14161c;--card:#1d2027;--fg:#f2f3f5;--muted:#aeb2bb;--border:rgba(255,255,255,.1);--amber:#e7b45a;--amber-fg:#1d1105}
+      @media (prefers-color-scheme: light){:root{color-scheme:light;--bg:#fafbfc;--card:#fff;--fg:#22262e;--muted:#5f6573;--border:rgba(30,40,60,.14);--amber:#b8842a;--amber-fg:#fff}}
+      *{box-sizing:border-box}
+      body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+      main{max-width:520px;margin:0 auto;padding:64px 20px 80px}
+      img.logo{width:64px;height:64px;border-radius:14px}
+      .eyebrow{font:600 11px/1 'JetBrains Mono',ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin:28px 0 12px}
+      h1{font-size:32px;line-height:1.15;letter-spacing:-.02em;margin:0 0 12px}
+      p{margin:0 0 14px;color:var(--muted)}
+      .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin:22px 0}
+      .card p{color:var(--fg);margin:0 0 8px}
+      .btn{display:inline-block;background:var(--amber);color:var(--amber-fg);font-weight:600;text-decoration:none;border-radius:12px;padding:13px 20px;border:0;font-size:16px;cursor:pointer}
+      a{color:var(--amber)}
+      input{width:100%;font:inherit;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--fg);margin:0 0 12px}
+      [hidden]{display:none!important}
+      .small{font-size:14px}
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <main>
+      <img class="logo" src="/logo-128.png" alt="Magno" />
+
+      <section id="moved">
+        <p class="eyebrow">Magno is on iPhone</p>
+        <h1>The web app has moved to the App Store.</h1>
+        <p>Injections, blood tests, weight and blood pressure, in one log on your iPhone, with Apple Health.</p>
+        <p><a class="btn" href="https://apps.apple.com/app/id6824289899">Get Magno on the App Store</a></p>
+        <div class="card">
+          <p><strong>Had a Magno account?</strong></p>
+          <p class="small">Sign in on the iPhone app with the same email and password. Everything you logged is there.</p>
+        </div>
+        <p class="small"><a href="/">magno.fit</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="mailto:hello@theos.studio">hello@theos.studio</a></p>
+      </section>
+
+      <section id="reset" hidden>
+        <p class="eyebrow">Magno account</p>
+        <h1>Set a new password</h1>
+        <p>Then sign in on the iPhone app with your email and this password.</p>
+        <form id="reset-form">
+          <input id="pw" type="password" autocomplete="new-password" placeholder="New password: 8+ characters, upper and lower case, a number" minlength="8" required />
+          <button class="btn" type="submit">Set password</button>
+        </form>
+        <p id="reset-msg" class="small" role="status"></p>
+      </section>
+    </main>
+    <script type="module" src="./reset.ts"></script>
   </body>
 </html>

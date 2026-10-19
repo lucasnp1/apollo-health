@@ -5,19 +5,12 @@ export type Env = {
   // Static assets of the deployment (Pages provides this binding).
   ASSETS: { fetch: (request: Request) => Promise<Response> }
   FILES?: R2Bucket // optional until the bucket binding is configured.
-  // Billing (Stripe). All optional; gating is off until BILLING_ENABLED === '1'
-  // and STRIPE_SECRET_KEY is set. Add these as Cloudflare Pages secrets.
-  BILLING_ENABLED?: string
-  STRIPE_SECRET_KEY?: string
-  STRIPE_WEBHOOK_SECRET?: string
-  STRIPE_PRICE_MONTHLY?: string
-  STRIPE_PRICE_LIFETIME?: string
   // Optional bearer token that lets the weekly digest script read
   // /api/admin/stats without a browser session.
   ADMIN_STATS_TOKEN?: string
   /** Set only after the custom domain resolves; enables the legacy-host 301. */
   CANONICAL_HOST?: string
-  APP_URL?: string // e.g. https://magno.fit (checkout return URLs, reset links)
+  APP_URL?: string // e.g. https://magno.fit (reset links)
   // Transactional email (password resets) via Resend. Dormant until both are set.
   RESEND_API_KEY?: string
   MAIL_FROM?: string // e.g. "Magno <no-reply@example.com>"

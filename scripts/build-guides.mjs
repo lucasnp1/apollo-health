@@ -92,7 +92,7 @@ function shell({ title, description, canonical, jsonld, body, ogImage = '/og.png
 <body>
 <header class="site">
   <a class="brand" href="/"><img src="/logo-badge.svg" alt="" width="28" height="28" />Magno <span>Health</span></a>
-  <nav><a href="/guides/">Guides</a><a href="/read">Read my bloods</a><a href="/app/?ref=guides">Open the app</a></nav>
+  <nav><a href="/guides/">Guides</a><a href="/read">Read my bloods</a><a href="https://apps.apple.com/app/id6824289899">Get the iPhone app</a></nav>
 </header>
 <main>
 ${body}
@@ -107,7 +107,7 @@ ${body}
 }
 
 const disclaimerBox = `<div class="box"><p class="eyebrow">Not medical advice</p><p style="margin:0">This is how experienced TRT users read the number and what they usually do about it. Every decision about your protocol belongs to you and a clinician who knows you.</p></div>`
-const ctaBlock = (ref) => `<div class="card"><p class="eyebrow">Read yours</p><p><strong>Drop your lab PDF or a photo and get every marker read like this, in plain words.</strong> Free, no account, nothing leaves your browser. Save it in the app to see the change since your last test.</p><p class="cta"><a class="btn primary" href="/read?ref=${ref}">Read my bloods</a><a class="btn ghost" href="/app/?signup=1&amp;ref=${ref}">Start tracking</a></p></div>`
+const ctaBlock = (ref) => `<div class="card"><p class="eyebrow">Read yours</p><p><strong>Drop your lab PDF or a photo and get every marker read like this, in plain words.</strong> Free, no account, nothing leaves your browser. Track it in the iPhone app to see the change since your last test.</p><p class="cta"><a class="btn primary" href="/read?ref=${ref}">Read my bloods</a><a class="btn ghost" href="https://apps.apple.com/app/id6824289899">Get the iPhone app</a></p></div>`
 
 // ── Marker guides
 const metas = allMarkerMeta()

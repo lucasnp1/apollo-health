@@ -2,7 +2,6 @@
 
 import type { AuthedUser, Env } from './types'
 import { sha256Hex } from './crypto'
-import { isProUser } from './stripe'
 
 const COOKIE_NAME = 'apollo_session'
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -60,7 +59,9 @@ export async function readSession(env: Env, request: Request): Promise<AuthedUse
     plan: row.plan ?? 'free',
     plan_kind: row.plan_kind,
     plan_until: row.plan_until,
-    is_pro: isProUser(env, row),
+    // Stripe was dropped with the web app (19 Oct 2026): purchases live in RevenueCat now. Pro here is only an admin
+    // or a plan set on the row by hand.
+    is_pro: row.is_admin === 1 || (row.plan === 'pro' && (row.plan_until == null || row.plan_until > Date.now())),
     onboarded: row.onboarded_at != null,
   }
 }

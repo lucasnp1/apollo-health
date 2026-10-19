@@ -15,8 +15,7 @@ import { format, parseISO } from 'date-fns'
 import { guideUrl } from '../lib/guides'
 import { buildFindings, type Finding } from '../lib/labFindings'
 import { labStats, rangeStatus, type LabStats } from '../lib/labStats'
-import { captureRef, withRef } from '../lib/ref'
-import { stashPendingRead } from '../lib/pendingRead'
+import { captureRef } from '../lib/ref'
 import { track } from '../lib/track'
 import { LabAnalysisCard, LabSummaryCard, ShareReadButton } from '../components/LabAnalysis'
 import { FeedList, FeedRow, type FeedStatus } from '../components/FeedList'
@@ -148,8 +147,9 @@ export function ReadPage() {
     if (f) void read(f)
   }
 
-  const signupHref = withRef('/app/?signup=1', 'read')
-  const appHref = withRef('/app/', 'read')
+  // The web app was retired on 19 Oct 2026: both go to the iPhone app
+  const signupHref = 'https://apps.apple.com/app/id6824289899'
+  const appHref = 'https://apps.apple.com/app/id6824289899'
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -159,7 +159,7 @@ export function ReadPage() {
             <img src="/logo-badge.svg" alt="" width="28" height="28" className="size-7 rounded-[8px]" />
             <span className="text-[15px] font-semibold tracking-[-0.01em]">Magno</span>
           </a>
-          <a href={appHref} className="text-sm text-muted-foreground transition-colors hover:text-foreground">Open the app</a>
+          <a href={appHref} className="text-sm text-muted-foreground transition-colors hover:text-foreground">Get the iPhone app</a>
         </div>
       </header>
 
@@ -341,28 +341,15 @@ export function ReadPage() {
               <p className="eyebrow text-primary">Keep it</p>
               <h2 className="font-display text-[22px] font-semibold leading-tight tracking-[-0.01em]">Save this read and track the next one.</h2>
               <p className="feed-note mt-2 max-w-[560px] text-muted-foreground">
-                In the app every marker gets its own history, the change since your last test, and the same read on your injections, blood pressure and weight. Free to log; the bloods read is part of Pro, with the first month free.
+                In the Magno iPhone app every marker gets its own history, the change since your last test, and the same read on your injections, blood pressure and weight. Free to log; the bloods read is part of Pro, with the first month free.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild size="lg">
                   <a
                     href={signupHref}
-                    onClick={() => {
-                      track('read-save')
-                      // Hand the parsed read over so sign-up does not ask for
-                      // the same file twice. Best effort: if storage is blocked
-                      // the link still works and they re-upload.
-                      stashPendingRead({
-                        exam: { name: state.exam.name, collectedAt: state.exam.collectedAt || undefined, labName: state.exam.labName, company: state.exam.company, meta: state.exam.meta },
-                        // The lab's printed names, as the app keeps them.
-                        results: state.results.map((r, i) => ({
-                          marker: state.rows[i]?.marker.trim() || r.marker, value: r.value, rawValue: r.rawValue,
-                          unit: r.unit, low: r.low, high: r.high, status: state.rows[i]?.flag,
-                        })),
-                      })
-                    }}
+                    onClick={() => track('read-save')}
                   >
-                    Save it in Magno <ArrowRight className="size-4" /></a>
+                    Get Magno for iPhone <ArrowRight className="size-4" /></a>
                 </Button>
                 <Button variant="outline" size="lg" onClick={() => setState({ kind: 'idle' })}>
                   <RotateCcw className="size-4" /> Read another file

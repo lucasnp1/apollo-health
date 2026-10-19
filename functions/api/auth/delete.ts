@@ -2,12 +2,11 @@ import type { PagesFunction, Env } from '../../_lib/types'
 import { verifyPassword, type HashAlgorithm } from '../../_lib/crypto'
 import { expiredCookie, ipHash, jsonError, jsonOk, requireUser } from '../../_lib/auth'
 import { wrap } from '../../_lib/handler'
-import { stripeApi, stripeConfigured } from '../../_lib/stripe'
 
 // POST /api/auth/delete { password }
 // Permanently deletes the account and every row that belongs to it. The
 // password is re-checked so a borrowed phone can't wipe someone's history.
-// Order: cancel billing (best effort) -> drop file blobs -> delete rows.
+// Order: drop file blobs -> delete rows.
 
 // Every table that carries a user_id. Kept explicit rather than trusting
 // ON DELETE CASCADE so the wipe is complete even if a table was created
@@ -32,9 +31,9 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   if (!password) return jsonError('Enter your password to confirm', 400)
 
   const row = await env.DB
-    .prepare('SELECT password_hash, password_salt, iterations, algorithm, stripe_customer_id FROM users WHERE id = ?')
+    .prepare('SELECT password_hash, password_salt, iterations, algorithm FROM users WHERE id = ?')
     .bind(auth.user.id)
-    .first<{ password_hash: string; password_salt: string; iterations: number; algorithm: string; stripe_customer_id: string | null }>()
+    .first<{ password_hash: string; password_salt: string; iterations: number; algorithm: string }>()
   if (!row) return jsonError('Unauthorized', 401)
 
   const ok = await verifyPassword((row.algorithm as HashAlgorithm) ?? 'pbkdf2', password, row.password_salt, row.password_hash, row.iterations)
@@ -43,15 +42,6 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   const userId = auth.user.id
   const now = Date.now()
   const iph = await ipHash(request)
-
-  // 1) Billing: deleting the Stripe customer also cancels any live subscription.
-  if (stripeConfigured(env) && row.stripe_customer_id) {
-    try {
-      await stripeApi(env, 'DELETE', `/customers/${encodeURIComponent(row.stripe_customer_id)}`)
-    } catch (err) {
-      console.warn('[delete] stripe customer delete failed', userId, err)
-    }
-  }
 
   // 2) File blobs in R2 (when the bucket is bound).
   if (env.FILES) {

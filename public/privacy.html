@@ -40,7 +40,7 @@
   <nav><a href="/">Magno</a><a href="/terms">Terms of Service</a><a href="/privacy" aria-current="page">Privacy Policy</a></nav>
   <p class="eyebrow">Magno</p>
   <h1>Privacy Policy</h1>
-  <p class="meta">Last updated September 2, 2026</p>
+  <p class="meta">Last updated October 19, 2026</p>
 
   <div class="card">
     <p><strong>The short version.</strong> Magno stores the health data you type in, on your device and in your private account. We don't run analytics or ad trackers, we don't sell or share your data, and you can export or delete everything yourself from Settings at any time. Questions: <a href="mailto:hello@theos.studio">hello@theos.studio</a>.</p>
@@ -62,8 +62,8 @@
   <p><strong>Where you came from.</strong> If you arrived from one of our own links, such as the Read my bloods page or a guide, we store a short tag saying which one. It is a plain word like "read", not a tracker, and it is the only thing we keep about where you came from. Our public pages also count how many times each page was opened per day, as a number, with no cookie, IP address or browser details attached.</p>
   <p><strong>Health data you enter.</strong> Everything you log in the app: compounds and doses, injections and injection sites, blood pressure and pulse, weight and body measurements, symptom check-ins, lab results, notes, and any lab report PDFs you upload. You choose what to enter. We never collect health data from anywhere else.</p>
   <p><strong>Security records.</strong> When you sign in, sign up, reset a password or make a similar change, we keep a short log entry with the time, the type of action, a shortened hash of your IP address and your browser type. We use it to throttle abuse and investigate problems. We don't store raw IP addresses.</p>
-  <p><strong>Feedback.</strong> If you send feedback from Settings, we keep the message along with your account email and browser type so we can reply.</p>
-  <p><strong>Billing.</strong> If you subscribe to Magno Pro, payment is handled by Stripe. We store your Stripe customer and subscription identifiers and your plan status. We never see or store your card number.</p>
+  <p><strong>Feedback.</strong> If you send feedback from the app, we keep the message along with your account email and browser type so we can reply.</p>
+  <p><strong>Purchases.</strong> Magno Pro is bought in the iPhone app and paid through Apple. RevenueCat tells the app whether you have Pro: it receives an anonymous app user id (your Magno account id when you are signed in) and Apple's record of the purchase. We never see your card or Apple ID details.</p>
 
   <h3>Apple Health (iPhone app)</h3>
   <p>If you turn on Apple Health in the Magno iPhone app, Magno reads your weight and blood pressure from Apple Health (for example from a smart scale or a blood pressure cuff) and writes the weight and blood pressure you log in Magno to Apple Health. It is off until you turn it on, and you choose exactly what Magno can read and write in the Health app. Data from Apple Health is used only to show your log in Magno. It is never used for advertising, never sold or shared, and never stored in iCloud by Magno. If you have a Magno account, readings brought in from Apple Health sync to your account like anything else you log, and you can delete them, or your whole account, at any time.</p>
@@ -88,18 +88,19 @@
   <p>We don't use your data to train models, build profiles, or for marketing.</p>
 
   <h2>5. Where your data lives</h2>
-  <p>Magno is local-first: your data is kept in your browser's storage on each device you use, and a copy is synced to your private account so you can recover it and use it on other devices.</p>
+  <p>Magno is local-first: your data is kept on your iPhone, and when you have an account a copy is synced to it so you can recover it and use it on other devices. Without an account nothing leaves the phone.</p>
   <p>The account copy is stored on Cloudflare's infrastructure (database and file storage). All traffic uses HTTPS, and Cloudflare encrypts stored data at rest. Cloudflare runs a global network, so your data may be stored or processed outside the United Kingdom under Cloudflare's standard contractual safeguards for international transfers.</p>
   <p>We rely on a small number of service providers, each of which only receives what it needs to do its job:</p>
   <ul>
-    <li><strong>Cloudflare</strong> hosts the app, the database and file storage.</li>
-    <li><strong>Stripe</strong> processes payments for Magno Pro.</li>
+    <li><strong>Cloudflare</strong> hosts this website, the account database and file storage.</li>
+    <li><strong>Apple</strong> processes payments for Magno Pro through the App Store.</li>
+    <li><strong>RevenueCat</strong> keeps the record of who has Magno Pro.</li>
     <li><strong>Resend</strong> delivers transactional emails such as password resets.</li>
   </ul>
 
   <h2>6. How long we keep it</h2>
   <p>We keep your data for as long as your account exists. When you delete your account, everything tied to it is permanently removed from our servers right away, and the app clears the copy on the device you deleted it from. Encrypted infrastructure backups may hold a copy for up to 30 days before it is purged automatically.</p>
-  <p>If you use the app on more than one device, clear it from the others too by signing out and removing the app or its site data.</p>
+  <p>If you use the app on more than one device, clear it from the others too by signing out or removing the app.</p>
 
   <h2>7. Your rights and controls</h2>
   <ul>
@@ -126,7 +127,7 @@
   <h2>12. Contact</h2>
   <p>Email <a href="mailto:hello@theos.studio">hello@theos.studio</a> for anything about your data or this policy.</p>
 
-  <footer>Magno · <a href="/terms">Terms of Service</a> · <a href="/app/">Back to the app</a></footer>
+  <footer>Magno · <a href="/terms">Terms of Service</a> · <a href="/">Back to magno.fit</a></footer>
 </main>
 </body>
 </html>

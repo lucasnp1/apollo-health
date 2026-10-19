@@ -15,7 +15,7 @@ export default defineConfig({
     // Vite 8 / Rolldown chunk splitting
     rolldownOptions: {
       // Three pages: the marketing landing at /, the public "Read my bloods"
-      // tool at /read, and the app at /app/.
+      // tool at /read, and /app/, now a page pointing to the iPhone app.
       input: {
         landing: fileURLToPath(new URL('./index.html', import.meta.url)),
         read: fileURLToPath(new URL('./read.html', import.meta.url)),
@@ -42,6 +42,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
+      // The web app was retired on 19 Oct 2026: this service worker replaces the old one and removes itself, so an
+      // installed copy stops serving the cached app and shows the "Magno is on iPhone" page instead.
+      selfDestroying: true,
       registerType: 'autoUpdate',
       workbox: {
         skipWaiting: true,        // activate new SW immediately, no waiting
