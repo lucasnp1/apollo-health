@@ -30,11 +30,13 @@ export const dateTicks = ([t0, t1]: Domain, n = 4) => Array.from({ length: n }, 
 export const fmtTick = (t: number, [t0, t1]: Domain) => format(t, t1 - t0 > 400 * 86_400_000 ? 'MMM yy' : 'd MMM')
 const fmtV = (v: number) => String(Number(v.toPrecision(4)))
 
-export function TimeChart({ series, domain, band, unit, height = 150, yRange }: {
+export function TimeChart({ series, domain, band, guides, unit, height = 150, yRange }: {
   series: Series[]
   domain: Domain
   /** the lab's reference range, shaded */
   band?: { low?: number; high?: number }
+  /** dashed lines, e.g. your own target */
+  guides?: number[]
   unit?: string
   height?: number
   /** a fixed scale, e.g. [0, 5] for check-in averages */
@@ -45,13 +47,13 @@ export function TimeChart({ series, domain, band, unit, height = 150, yRange }: 
   const [at, setAt] = useState<number | undefined>()
 
   const { y, ticks } = useMemo(() => {
-    const vs = series.flatMap((s) => s.points.map((p) => p.v)).concat([band?.low, band?.high].filter((v): v is number => v !== undefined))
+    const vs = series.flatMap((s) => s.points.map((p) => p.v)).concat([band?.low, band?.high, ...(guides ?? [])].filter((v): v is number => v !== undefined))
     const ticks = yRange ? Array.from({ length: yRange[1] - yRange[0] + 1 }, (_, i) => yRange[0] + i) : niceTicks(Math.min(...vs), Math.max(...vs))
     const lo = ticks[0]
     const hi = ticks[ticks.length - 1]
     const ih = height - PAD.t - PAD.b
     return { y: (v: number) => PAD.t + ih - ((v - lo) / (hi - lo)) * ih, ticks }
-  }, [series, band, height, yRange?.[0], yRange?.[1]])
+  }, [series, band, guides?.join(), height, yRange?.[0], yRange?.[1]])
 
   const iw = Math.max(1, w - PAD.l - PAD.r)
   const x = (t: number) => PAD.l + ((t - domain[0]) / (domain[1] - domain[0] || 1)) * iw
@@ -100,6 +102,9 @@ export function TimeChart({ series, domain, band, unit, height = 150, yRange }: 
                   opacity={0.08}
                 />
               ) : null}
+              {(guides ?? []).map((v) => (
+                <Line key={`g${v}`} x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke={pal.muted} strokeWidth={1} strokeDasharray="3 4" />
+              ))}
               {ticks.map((v) => (
                 <Line key={v} x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke={pal.line} strokeWidth={StyleSheet.hairlineWidth} />
               ))}

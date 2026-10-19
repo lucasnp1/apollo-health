@@ -103,10 +103,22 @@ export async function loadData() {
       if (!by.has(r.tbl)) by.set(r.tbl, [])
       by.get(r.tbl)!.push(JSON.parse(r.val))
     }
-    // queued, not awaited, inside the transaction: it stays open until all of them finish
-    await db.transaction('rw', db.tables, () => {
-      for (const [t, vals] of by) void db.table(t).bulkPut(vals)
-    })
+    // Straight into IndexedDB, under Dexie: these rows are already saved, so the web's sync hooks (which make Dexie
+    // look up every row before a put) and this file's own copy-to-SQLite have nothing to do. Several times faster.
+    await db.open()
+    const idb = db.backendDB()
+    const stores = [...by.keys()].filter((t) => idb.objectStoreNames.contains(t))
+    if (stores.length)
+      await new Promise<void>((resolve, reject) => {
+        const tx = idb.transaction(stores, 'readwrite')
+        for (const t of stores) {
+          const store = tx.objectStore(t)
+          for (const v of by.get(t)!) store.put(v)
+        }
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+        tx.onabort = () => reject(tx.error)
+      })
     keepTransactionsShort()
   } finally {
     loading = false

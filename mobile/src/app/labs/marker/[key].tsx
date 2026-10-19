@@ -2,14 +2,17 @@
 // against the range (with blood-lettings marked), what the marker is and why it moves on a protocol, and every
 // result (each opens its test).
 import { router, Stack, useLocalSearchParams } from 'expo-router'
-import { useMemo } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { useMemo, useState } from 'react'
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { db, type MarkerTarget } from '@shared/lib/db'
+import { toUnit } from '@shared/lib/labUnits'
 import { fmtDay } from '@shared/lib/dates'
 import { MARKER_COPY } from '@shared/lib/labCopy'
 import { markerSeries } from '@shared/lib/labTests'
 import { fmtRange } from '@shared/lib/labRules'
 import { TimeChart } from '@/charts/TimeChart'
-import { Eyebrow, Widget } from '@/kit'
+import { Eyebrow, Input, Pill, Widget } from '@/kit'
 import { markerChip } from '@/labs/reads'
 import { RangeBar, Tag } from '@/labs/ui'
 import { useBleeds } from '@/labs/useBleeds'
@@ -27,6 +30,7 @@ export default function MarkerScreen() {
   const latestTest = tests?.find((t) => t.markers.some((m) => m.key === key))
   const latest = latestTest?.markers.find((m) => m.key === key)
   const series = useMemo(() => (tests ? markerSeries(tests, key) : undefined), [tests, key])
+  const target = useLiveQuery(() => db.markerTargets.where('marker').equals(key).first(), [key])
   if (!tests || !latest || !latestTest) return <Stack.Screen options={{ title: 'Result' }} />
   const pts = (series?.points ?? []).filter((p) => p.value !== undefined).map((p) => ({ t: p.t, v: p.value! }))
   const last = series?.points[series.points.length - 1]
@@ -35,6 +39,10 @@ export default function MarkerScreen() {
   const chip = markerChip(latest, pro)
   const notLatest = tests[0] && latestTest.id !== tests[0].id
   const bled = key === 'hematocrit' || key === 'hemoglobin' ? (bleeds ?? []) : []
+  // Your target, in the chart's unit, as dashed lines
+  const guides = [target?.low, target?.high]
+    .map((v) => (v === undefined ? undefined : toUnit(key, v, target?.unit, series?.unit ?? latest.unit)))
+    .filter((v): v is number => v !== undefined)
   return (
     <>
       <Stack.Screen options={{ title: latest.label, headerBackTitle: 'Back' }} />
@@ -52,11 +60,13 @@ export default function MarkerScreen() {
         </Widget>
 
         {pts.length ? (
-          <Widget eyebrow="Over time" sub={`Shaded: the lab's range on your latest test${bled.length ? '. Blood-lettings are listed below.' : '.'}`}>
-            <TimeChart series={[{ label: latest.label, color: '#10b981', points: pts }]} unit={series?.unit} band={{ low: last?.low, high: last?.high }} domain={[t0 - 3 * DAY, Date.now()]} height={180} />
+          <Widget eyebrow="Over time" sub={`Shaded: the lab's range on your latest test${guides.length ? '. Dashed: your target' : ''}${bled.length ? '. Blood-lettings are listed below.' : '.'}`}>
+            <TimeChart series={[{ label: latest.label, color: '#10b981', points: pts }]} unit={series?.unit} band={{ low: last?.low, high: last?.high }} guides={guides} domain={[t0 - 3 * DAY, Date.now()]} height={180} />
             {series?.dropped ? <Text style={m.muted}>{series.dropped} older result{series.dropped === 1 ? ' is' : 's are'} in a unit that can't be converted, so not plotted.</Text> : null}
           </Widget>
         ) : null}
+
+        <TargetEditor markerKey={key} target={target} unit={series?.unit ?? latest.unit} low={latest.low} high={latest.high} />
 
         {copy ? (
           <Widget eyebrow="What it is">
@@ -110,6 +120,54 @@ export default function MarkerScreen() {
         </Pressable>
       </ScrollView>
     </>
+  )
+}
+
+/** Your own range for this marker: results are read against it instead of the lab's (the web's TargetEditor). */
+function TargetEditor({ markerKey, target, unit, low, high }: { markerKey: string; target?: MarkerTarget; unit: string; low?: number; high?: number }) {
+  const shown = (v?: number) => {
+    if (v === undefined || !target) return ''
+    const c = toUnit(markerKey, v, target.unit, unit)
+    return String(Number((c ?? v).toPrecision(4)))
+  }
+  const [lo, setLo] = useState<string | null>(null)
+  const [hi, setHi] = useState<string | null>(null)
+  const loV = lo ?? shown(target?.low)
+  const hiV = hi ?? shown(target?.high)
+  const parse = (x: string) => (x.trim() === '' || !Number.isFinite(Number(x.replace(',', '.'))) ? undefined : Number(x.replace(',', '.')))
+  const changed = lo !== null || hi !== null
+  const can = changed && (parse(loV) !== undefined || parse(hiV) !== undefined)
+
+  async function save() {
+    const data = { marker: markerKey, low: parse(loV), high: parse(hiV), unit }
+    if (data.low !== undefined && data.high !== undefined && data.low >= data.high) return Alert.alert('Check the numbers', 'Low should be below high.')
+    if (target?.id) await db.markerTargets.update(target.id, data)
+    else await db.markerTargets.add(data)
+    setLo(null)
+    setHi(null)
+  }
+  async function remove() {
+    await db.markerTargets.where('marker').equals(markerKey).delete()
+    setLo(null)
+    setHi(null)
+  }
+
+  return (
+    <Widget
+      eyebrow="Your target"
+      title={target ? `${fmtRange(target.low, target.high)} ${target.unit ?? unit}` : undefined}
+      sub="Your own range, from you and your doctor. Results are read against it instead of the lab's."
+      action={target && !changed ? <Pill label="Remove" onPress={() => void remove()} /> : can ? <Pill label="Save" primary onPress={() => void save()} /> : undefined}
+    >
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <Input keyboardType="decimal-pad" placeholder={low !== undefined ? `Low (lab ${low})` : 'Low'} value={loV} onChangeText={setLo} suffix={unit} accessibilityLabel="Target low" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Input keyboardType="decimal-pad" placeholder={high !== undefined ? `High (lab ${high})` : 'High'} value={hiV} onChangeText={setHi} suffix={unit} accessibilityLabel="Target high" />
+        </View>
+      </View>
+    </Widget>
   )
 }
 

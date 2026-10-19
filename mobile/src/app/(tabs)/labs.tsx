@@ -12,7 +12,7 @@ import { fmtDay } from '@shared/lib/dates'
 import { defaultTestName } from '@shared/lib/labTests'
 import { setDraft } from '@/labs/draft'
 import { withPro } from '@/money/pro'
-import { readReport } from '@/labs/read'
+import { readReport, readSheet } from '@/labs/read'
 import { exportTestPdf } from '@/report/export'
 import { useTests } from '@/labs/useTests'
 import { Card, Eyebrow, Segmented, Widget } from '@/kit'
@@ -27,10 +27,16 @@ import { C, F } from '@/theme'
 const today = () => new Date().toISOString().slice(0, 10)
 
 /** Read a report, hand its rows to the editor to check, and open it. */
-async function importReport(kind: 'pdf' | 'photo' | 'camera', busy: (b: boolean) => void) {
+const SHEETS = ['text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+
+async function importReport(kind: 'pdf' | 'photo' | 'camera' | 'sheet', busy: (b: boolean) => void) {
   let uri: string | undefined
   let name: string | undefined
-  if (kind === 'pdf') {
+  if (kind === 'sheet') {
+    const r = await DocumentPicker.getDocumentAsync({ type: SHEETS, copyToCacheDirectory: true })
+    if (r.canceled) return
+    ;({ uri, name } = r.assets[0])
+  } else if (kind === 'pdf') {
     const r = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true })
     if (r.canceled) return
     ;({ uri, name } = r.assets[0])
@@ -45,7 +51,7 @@ async function importReport(kind: 'pdf' | 'photo' | 'camera', busy: (b: boolean)
   }
   busy(true)
   try {
-    const read = await readReport(uri, kind === 'pdf' ? 'pdf' : 'photo', name)
+    const read = kind === 'sheet' ? await readSheet(uri, name ?? 'results.csv') : await readReport(uri, kind === 'pdf' ? 'pdf' : 'photo', name)
     if (!read.markers.length)
       return Alert.alert('No results found', "Magno couldn't find any results in that report. You can enter them by hand instead.", [
         { text: 'Enter by hand', onPress: () => router.push('/labs/edit') },
@@ -56,7 +62,7 @@ async function importReport(kind: 'pdf' | 'photo' | 'camera', busy: (b: boolean)
       name: defaultTestName(read.provider),
       company: read.provider,
       meta: { dateSource: read.date ? 'report' : 'user' },
-      source: kind === 'pdf' ? 'pdf' : 'photo',
+      source: kind === 'pdf' || kind === 'sheet' ? 'pdf' : 'photo',
       rows: read.markers.map((m) => ({
         marker: m.marker, value: m.value, rawValue: m.rawValue ?? String(m.value), unit: m.unit, low: m.low, high: m.high, status: m.flag,
         // ponytail: confidence rides along on the row for the editor; saveTest ignores fields it doesn't know
@@ -85,10 +91,10 @@ export default function Labs() {
 
   function add() {
     ActionSheetIOS.showActionSheetWithOptions(
-      { options: ['PDF report', 'Photo of a report', 'Take a photo', 'Enter by hand', 'Cancel'], cancelButtonIndex: 4, title: 'Add a blood test' },
+      { options: ['PDF report', 'Photo of a report', 'Take a photo', 'Spreadsheet (CSV or Excel)', 'Enter by hand', 'Cancel'], cancelButtonIndex: 5, title: 'Add a blood test' },
       (i) => {
-        if (i === 3) return router.push('/labs/edit')
-        const kind = (['pdf', 'photo', 'camera'] as const)[i]
+        if (i === 4) return router.push('/labs/edit')
+        const kind = (['pdf', 'photo', 'camera', 'sheet'] as const)[i]
         if (kind) withPro('Importing a blood test', () => void importReport(kind, setBusy))
       },
     )

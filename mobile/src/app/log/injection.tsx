@@ -12,13 +12,13 @@ import { type Compound, db, type InjectionLog, type Symptom, type SyringeKey, ty
 import { canonicalSite, type Route } from '@shared/lib/sites'
 import { NEGATIVE, POSITIVE, ratingOf, withRating } from '@shared/lib/symptoms'
 import { dedupeInjections, useCompounds, useInjections } from '@/data/useLog'
-import { Card, Chips, Eyebrow, Input, s as kit, Section, Segmented, When } from '@/kit'
+import { Card, Eyebrow, FieldRow, Input, MenuPicker, s as kit, Section, Segmented, When } from '@/kit'
 import { LogForm, num } from '@/LogForm'
 import { Scale } from '@/logging/Scale'
 import { SitePicker } from '@/logging/SitePicker'
 import { useDirty, useEditRow } from '@/logging/useEntry'
 import { C, F } from '@/theme'
-import { unitLabel } from '@/timeline'
+import { isAncillary, unitLabel } from '@/timeline'
 
 const NEW = 'new'
 const UNITS: { value: Unit; label: string }[] = [
@@ -49,9 +49,11 @@ const stripLines = (notes: string | undefined) => (notes ?? '').split('\n').filt
 const routeOf = (i: InjectionLog): Route => (i.route === 'SubQ' ? 'SubQ' : 'IM')
 
 /** One compound in the syringe. `pick` is a compound group key, NEW for a typed name, or nothing yet. */
-type Line = { key: string; pick?: string; name: string; unit: Unit; dose: string; drawn: string; vial: string }
+type Line = { key: string; pick?: string; name: string; unit: Unit; dose: string; drawn: string; vial: string; vialNew?: boolean }
 let seq = 0
 const blank = (): Line => ({ key: `l${++seq}`, name: '', unit: 'mg', dose: '', drawn: '', vial: '' })
+const NONE = ''
+const OTHER = '__other'
 
 type Prefill = { lines: Line[]; syringe?: SyringeKey; marks?: Mark; needle: string }
 
@@ -98,7 +100,9 @@ function sortedGroups(compounds: Compound[], shots: InjectionLog[]) {
 
 export default function LogInjection() {
   const compounds = useCompounds()
-  const injections = useInjections()
+  const all = useInjections()
+  // Ancillaries (pills, creams) have their own sheet: they never count as a shot here
+  const injections = useMemo(() => all.filter((i) => !isAncillary(i)), [all])
   const groups = useMemo(() => sortedGroups(compounds, injections), [compounds, injections])
 
   const [route, setRoute] = useState<Route>('IM')
@@ -106,6 +110,7 @@ export default function LogInjection() {
   const [marks, setMarks] = useState<Mark>('mL')
   const [syringe, setSyringe] = useState<SyringeKey | undefined>()
   const [needle, setNeedle] = useState('')
+  const [needleOther, setNeedleOther] = useState(false)
   const [site, setSite] = useState('')
   const [notes, setNotes] = useState('')
   const [when, setWhen] = useState(() => new Date())
@@ -147,10 +152,10 @@ export default function LogInjection() {
     let live = true
     void (async () => {
       const [cs, rows] = await Promise.all([
-        db.compounds.filter((c) => !c.archived && !c.deletedAtSync).toArray(),
-        db.injections.orderBy('takenAt').reverse().filter((i) => !i.deletedAtSync && !i.archivedAt).limit(60).toArray(),
+        db.compounds.toArray().then((rows) => rows.filter((c) => !c.archived && !c.deletedAtSync)),
+        db.injections.toArray().then((rows) => rows.filter((i) => !i.deletedAtSync && !i.archivedAt).sort((a, b) => b.takenAt.localeCompare(a.takenAt)).slice(0, 60)),
       ])
-      const shots = dedupeInjections(rows)
+      const shots = dedupeInjections(rows).filter((i) => !isAncillary(i))
       if (!live || hydrated.current || !cs.length) return
       hydrated.current = true
       const r: Route = shots.some((i) => routeOf(i) === 'IM') || !shots.length ? 'IM' : 'SubQ'
@@ -279,9 +284,38 @@ export default function LogInjection() {
       await db.symptoms.add({ recordedAt: takenAt, ...feel, notes: notes.trim() || undefined } as Symptom)
   }
 
-  const chips = [...groups.map((g) => ({ value: g.key, label: g.name, dot: g.color })), { value: NEW, label: '+ New' }]
+  // Only compounds that belong on this route: ones you've injected this way, set to it, or never injected yet
+  const options = useMemo(() => {
+    const on = new Set<number>()
+    const any = new Set<number>()
+    for (const i of injections) {
+      any.add(i.compoundId)
+      if (routeOf(i) === route) on.add(i.compoundId)
+    }
+    const fits = (g: CompoundGroup) =>
+      g.ids.some((x) => on.has(x)) || g.canonical.defaultRoute === route ||
+      (!g.ids.some((x) => any.has(x)) && g.canonical.category !== 'Ancillary' && g.canonical.category !== 'Supplement')
+    return groups.filter(fits).map((g) => ({ value: g.key, label: g.name }))
+  }, [groups, injections, route])
+  // Per compound: what you did last time on this route (to read back, never to work anything out) and the vials you've used
+  const history = useMemo(() => {
+    const out = new Map<string, { last?: string; vials: string[] }>()
+    for (const g of groups) {
+      const mine = injections.filter((i) => g.ids.includes(i.compoundId))
+      const prev = mine.find((i) => routeOf(i) === route && i.id !== id)
+      const vials = [...new Set(mine.map((i) => noteLine(i.notes, 'Vial')).filter((v): v is string => !!v))]
+      const dose = prev && (prev.rawDose ?? (prev.dose != null ? `${prev.dose} ${unitLabel(prev.unit)}` : ''))
+      const last = prev ? [dose, prev.vialAmount && `drew ${prev.vialAmount}`, noteLine(prev.notes, 'Vial')].filter(Boolean).join(', ') : undefined
+      out.set(g.key, { last: last || undefined, vials })
+    }
+    return out
+  }, [groups, injections, route, id])
   const several = lines.length > 1
   const needles = NEEDLES[sy?.marks ?? marks]
+  // Needles you typed before show in the menu too
+  const myNeedles = useMemo(() => [...new Set(injections.map((i) => i.needle?.trim()).filter((n): n is string => !!n && !needles.includes(n)))], [injections, needles])
+  const needleOptions = [...needles, ...myNeedles]
+  const typingNeedle = needleOther || (!!needle && !needleOptions.includes(needle))
 
   return (
     <LogForm
@@ -296,12 +330,13 @@ export default function LogInjection() {
         <Segmented value={route} onChange={changeRoute} options={[{ value: 'IM', label: 'Intramuscular' }, { value: 'SubQ', label: 'Subcutaneous' }]} />
       </Section>
 
-      <Section title={several ? 'Compounds (one syringe)' : 'Compound'}>
+      <Section title={several ? 'Compounds (one syringe)' : 'What you injected'}>
         {resolved.map((r, n) => (
           <CompoundLine
             key={r.l.key}
             r={r}
-            chips={chips}
+            options={options}
+            history={r.g ? history.get(r.g.key) : undefined}
             fixedName={editing ? editName : undefined}
             card={several}
             first={n === 0}
@@ -320,22 +355,29 @@ export default function LogInjection() {
         )}
       </Section>
 
-      <Section title="Syringe">
-        <Chips
-          options={SYRINGES}
-          value={syringe}
-          clearable
-          onChange={(v) => {
-            setSyringe(v)
-            const next = SYRINGES.find((x) => x.value === v)
-            if (next) setMarks(next.marks)
-          }}
-        />
-      </Section>
-
-      <Section title="Needle">
-        <Chips options={needles.map((n) => ({ value: n, label: n }))} value={needles.includes(needle) ? needle : undefined} onChange={(v) => setNeedle(v ?? '')} clearable />
-        <Input placeholder="Or type it, e.g. 25G 1 in (optional)" value={needles.includes(needle) ? '' : needle} onChangeText={setNeedle} autoCorrect={false} />
+      <Section title="Syringe and needle">
+        <FieldRow label="Syringe">
+          <MenuPicker
+            value={syringe ?? NONE}
+            options={[{ value: NONE, label: 'Not noted' }, ...SYRINGES.map((x) => ({ value: x.value as string, label: x.label }))]}
+            onChange={(v) => {
+              const next = SYRINGES.find((x) => x.value === v)
+              setSyringe(next?.value)
+              if (next) setMarks(next.marks)
+            }}
+          />
+        </FieldRow>
+        <FieldRow label="Needle">
+          <MenuPicker
+            value={typingNeedle ? OTHER : needle || NONE}
+            options={[{ value: NONE, label: 'Not noted' }, ...needleOptions.map((n) => ({ value: n, label: n })), { value: OTHER, label: 'Other…' }]}
+            onChange={(v) => {
+              setNeedleOther(v === OTHER)
+              setNeedle(v === OTHER || v === NONE ? '' : v)
+            }}
+          />
+        </FieldRow>
+        {typingNeedle ? <Input autoFocus={needleOther && !needle} placeholder="Needle, e.g. 25G 1 in" value={needle} onChangeText={setNeedle} autoCorrect={false} /> : null}
       </Section>
 
       <Section title="Site">
@@ -372,12 +414,13 @@ export default function LogInjection() {
   )
 }
 
-type Resolved = { l: Line; compound?: Compound; unit: Unit }
+type Resolved = { l: Line; g?: CompoundGroup; compound?: Compound; unit: Unit }
 
 /** One compound in the syringe: which one, the dose as given, what you drew, and its vial. */
-function CompoundLine({ r, chips, fixedName, card, first, marks, onMarks, onChoose, onChange, onRemove }: {
+function CompoundLine({ r, options, history, fixedName, card, first, marks, onMarks, onChoose, onChange, onRemove }: {
   r: Resolved
-  chips: { value: string; label: string; dot?: string }[]
+  options: { value: string; label: string }[]
+  history?: { last?: string; vials: string[] }
   /** Editing a saved shot: the compound stays as it was */
   fixedName?: string
   card: boolean
@@ -389,10 +432,12 @@ function CompoundLine({ r, chips, fixedName, card, first, marks, onMarks, onChoo
   onRemove?: () => void
 }) {
   const { l: line, compound, unit } = r
-  const hasChips = chips.length > 1
-  const typing = !fixedName && (line.pick === NEW || !hasChips)
+  const hasOptions = options.length > 0
+  const typing = !fixedName && (line.pick === NEW || !hasOptions)
+  const vials = history?.vials ?? []
+  const typingVial = !!line.vialNew || (!!line.vial && !vials.includes(line.vial))
   const body = (
-    <View style={{ gap: 14 }}>
+    <View style={{ gap: 12 }}>
       {onRemove ? (
         <View style={l.lineHead}>
           <Eyebrow>{first ? 'First compound' : 'Also in this syringe'}</Eyebrow>
@@ -406,16 +451,21 @@ function CompoundLine({ r, chips, fixedName, card, first, marks, onMarks, onChoo
           <Text style={l.fixedName}>{fixedName}</Text>
           <Text style={kit.hint}>The compound of a saved shot stays as it is. To change it, archive this one and log it again.</Text>
         </View>
-      ) : hasChips ? (
-        <Chips options={chips} value={line.pick} onChange={onChoose} />
+      ) : hasOptions ? (
+        <FieldRow label="Compound">
+          <MenuPicker
+            value={line.pick ?? NONE}
+            options={[...(line.pick ? [] : [{ value: NONE, label: 'Choose' }]), ...options, { value: NEW, label: 'New compound…' }]}
+            onChange={(v) => v !== NONE && onChoose(v)}
+          />
+        </FieldRow>
       ) : null}
       {typing ? (
         <>
           <Input
-            autoFocus={hasChips || first}
+            autoFocus={hasOptions || first}
             placeholder="Name, e.g. Testosterone cypionate"
             value={line.name}
-            onFocus={() => line.pick !== NEW && onChoose(NEW)}
             onChangeText={(name) => onChange({ name, pick: NEW })}
             autoCapitalize="words"
             autoCorrect={false}
@@ -424,20 +474,27 @@ function CompoundLine({ r, chips, fixedName, card, first, marks, onMarks, onChoo
           {compound ? (
             <Text style={kit.hint}>You already have {compound.name}: this shot goes with it.</Text>
           ) : (
-            <Chips options={UNITS} value={line.unit} onChange={(u) => u && onChange({ unit: u })} />
+            <Segmented value={line.unit} onChange={(u) => onChange({ unit: u })} options={UNITS} />
           )}
         </>
       ) : null}
 
-      <Section title="Dose" hint={first ? 'As your prescriber or plan gives it.' : undefined}>
+      <Section title="Dose" hint={history?.last ? `Last time on this route: ${history.last}` : first ? 'As your prescriber or plan gives it.' : undefined}>
         <Input keyboardType="decimal-pad" placeholder="Amount" suffix={unitLabel(unit)} value={line.dose} onChangeText={(dose) => onChange({ dose })} accessibilityLabel={`Dose in ${unitLabel(unit)}`} />
       </Section>
 
       <Drawn value={line.drawn} onChange={(drawn) => onChange({ drawn })} marks={marks} onMarks={onMarks} />
 
-      <Section title="Vial">
-        <Input placeholder="Optional, e.g. 250 mg/mL, or 10 mg + 2 mL water" value={line.vial} onChangeText={(vial) => onChange({ vial })} autoCorrect={false} />
-      </Section>
+      <FieldRow label="Vial">
+        <MenuPicker
+          value={typingVial ? OTHER : line.vial || NONE}
+          options={[{ value: NONE, label: 'Not noted' }, ...vials.map((v) => ({ value: v, label: v })), { value: OTHER, label: 'New vial…' }]}
+          onChange={(v) => onChange(v === OTHER ? { vialNew: true, vial: '' } : { vialNew: false, vial: v === NONE ? '' : v })}
+        />
+      </FieldRow>
+      {typingVial ? (
+        <Input autoFocus={!!line.vialNew && !line.vial} placeholder="e.g. 250 mg/mL, or 10 mg + 2 mL water" value={line.vial} onChangeText={(vial) => onChange({ vial })} autoCorrect={false} accessibilityLabel="New vial" />
+      ) : null}
     </View>
   )
   return card ? <Card>{body}</Card> : body

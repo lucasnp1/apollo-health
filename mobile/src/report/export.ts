@@ -46,8 +46,8 @@ async function loadTests(): Promise<LabTest[]> {
     db.results.toArray(),
     db.files.toArray(),
     db.markerTargets.toArray(),
-    db.compounds.filter((c) => !c.deletedAtSync).toArray(),
-    db.injections.filter((i) => !i.deletedAtSync && !i.archivedAt).toArray(),
+    db.compounds.toArray().then((rows) => rows.filter((c) => !c.deletedAtSync)),
+    db.injections.toArray().then((rows) => rows.filter((i) => !i.deletedAtSync && !i.archivedAt)),
   ])
   return buildTests({ exams, results, files, targets, compounds, injections: dedupeInjections(injections) })
 }
@@ -76,9 +76,9 @@ async function loadLog({ from, to, include, compoundIds }: LogOpts) {
           .filter((i) => live(i) && (isAncillary(i) ? include.ancillaries : include.injections && (!compoundIds || compoundIds.includes(i.compoundId))))
           .toArray()
       : [],
-    include.bp ? db.vitals.filter(live).toArray() : [],
-    include.weight ? db.bodyMetrics.filter(live).toArray() : [],
-    include.checkins ? db.symptoms.filter(live).toArray() : [],
+    include.bp ? db.vitals.toArray().then((rows) => rows.filter(live)) : [],
+    include.weight ? db.bodyMetrics.toArray().then((rows) => rows.filter(live)) : [],
+    include.checkins ? db.symptoms.toArray().then((rows) => rows.filter(live)) : [],
     include.bloods ? loadTests() : [],
   ])
   // Lab dates are calendar days: compare days, never instants.

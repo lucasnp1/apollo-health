@@ -20,8 +20,8 @@ function start() {
       db.results.toArray(),
       db.files.toArray(),
       db.markerTargets.toArray(),
-      db.compounds.filter((c) => !c.deletedAtSync).toArray(),
-      db.injections.filter((i) => !i.deletedAtSync && !i.archivedAt).toArray(),
+      db.compounds.toArray().then((rows) => rows.filter((c) => !c.deletedAtSync)),
+      db.injections.toArray().then((rows) => rows.filter((i) => !i.deletedAtSync && !i.archivedAt)),
     ])
     return buildTests({ exams, results, files, targets, compounds, injections: dedupeInjections(injections) })
   }).subscribe({

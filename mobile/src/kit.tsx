@@ -121,9 +121,19 @@ export const s = StyleSheet.create({
   pill: { borderRadius: 999, borderWidth: 1, borderColor: C.input, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.secondary },
   pillPrimary: { backgroundColor: C.primary, borderColor: C.primary },
   pillText: { fontFamily: F.semi, fontSize: 13, color: C.fg },
-  when: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingRight: 8, borderRadius: 12 },
+  when: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 54, paddingVertical: 6, paddingRight: 8, borderRadius: 12 },
   whenLabel: { fontFamily: F.medium, fontSize: 16, color: C.fg },
 })
+
+/** A settings-style row: a label on the left, its control (a menu, a picker) on the right, centred. */
+export function FieldRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View style={[s.card, s.when]}>
+      <Text style={s.whenLabel} numberOfLines={1}>{label}</Text>
+      <View style={{ flexShrink: 1, alignItems: 'flex-end', justifyContent: 'center' }}>{children}</View>
+    </View>
+  )
+}
 
 /** When it happened: now by default, any moment up to now. The native compact picker (SwiftUI DatePicker). */
 export function When({ value, onChange, time = true }: { value: Date; onChange: (d: Date) => void; time?: boolean }) {
@@ -132,7 +142,7 @@ export function When({ value, onChange, time = true }: { value: Date; onChange: 
   return (
     <View style={[s.card, s.when]}>
       <Text style={s.whenLabel}>{time ? 'When' : 'Date'}</Text>
-      <Host matchContents colorScheme={scheme}>
+      <Host matchContents ignoreSafeArea="all" colorScheme={scheme} style={{ alignSelf: 'center' }}>
         <DatePicker
           selection={value}
           range={{ end: new Date() }}
@@ -212,7 +222,7 @@ export function MenuPicker<T extends string>({ value, options, onChange, label }
   const scheme = useScheme()
   const pal = usePalette()
   return (
-    <Host matchContents colorScheme={scheme}>
+    <Host matchContents ignoreSafeArea="all" colorScheme={scheme}>
       <Picker label={label} selection={value} onSelectionChange={(v) => onChange(v as T)} modifiers={[pickerStyle('menu'), tint(pal.accentInk)]}>
         {options.map((o) => (
           <SText key={o.value} modifiers={[tag(o.value)]}>{o.label}</SText>

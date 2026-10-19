@@ -1,6 +1,8 @@
 // A lab report into markers: the native reader (modules/labreader) gets the text on the phone, then the web's own
 // parser (src/lib/pdf.ts extractMarkersFromText, dates, provider) reads it, so both apps find the same rows.
+import { File } from 'expo-file-system'
 import { extractCollectionDate } from '@shared/lib/dates'
+import { parseCsv, parseLabTable, TABLE_SENTINEL, toCsv } from '@shared/lib/labTable'
 import { detectProvider } from '@shared/lib/labTests'
 import { type ExtractedMarker, extractMarkersFromText } from '@shared/lib/pdf'
 import { type Item, LabReader } from '../../modules/labreader'
@@ -64,4 +66,14 @@ export async function readReport(uri: string, kind: 'pdf' | 'photo', fileName?: 
     ocr,
     text,
   }
+}
+
+/** A spreadsheet of results (CSV, TSV or Excel): one row per marker, columns found by their header, by the web's own
+ * parser (src/lib/labTable.ts). Excel is unzipped on the phone (modules/labreader SheetReader.swift). */
+export async function readSheet(uri: string, fileName: string): Promise<ReadResult> {
+  if (!LabReader) throw new Error('The report reader is not in this build')
+  const rows = /\.xlsx$/i.test(fileName) ? await LabReader.readSheet(uri) : parseCsv(await new File(uri).text())
+  const text = rows.length ? `${TABLE_SENTINEL}\n${toCsv(rows)}` : ''
+  const { markers, date } = text ? parseLabTable(text) : { markers: [], date: undefined }
+  return { markers, date, provider: detectProvider(rows.flat().join(' '), fileName), ocr: false, text }
 }

@@ -81,10 +81,30 @@ Oral or Other, compound category Ancillary, "For:" line naming the side effects)
 the same time axis and as their own Timeline type; Timeline filters in Apple pull-down menus (type, compound, range),
 no sideways scrolling, and Export takes what's shown to the doctor export; no "free" copy in the app.
 
-**To do next (parked by Lucas, 19 Oct 2026, after the fixes above):** view the original lab file (needs file
-storage), CSV/XLSX lab import, personal marker targets, share image, onboarding, removing archived entries from Apple
-Health, the injection logger's check-in with custom symptoms; before submitting, rewrite the review notes for the
-plain-words reads.
+### 19 Oct 2026, later: Lucas's second review, fixed for build 4
+
+- **Injection sheet:** compound, vial, syringe, needle and "Other site" are single native menus (no pill lists). The
+  compound menu shows only compounds injected on that route (or set to it, or never injected); ancillaries never show.
+  Vials are remembered per compound and picked again ("New vial…" to type one). Under the dose: what you did last time
+  on that route ("50 mg, drew 0.25 mL, 250 mg/mL"), read back from your log. Dose and draw are still never converted
+  into each other (Apple 1.4.2). Site tiles show both dates: this exact spot, and the spot next to it on the same muscle.
+  The When and menu rows no longer drift up near the bottom of a sheet (SwiftUI hosts ignore the safe area).
+- **Wellbeing tile** on Home has the two 0-5 lines, like the weight and pressure tiles.
+- **Apple Health never deletes, either way** (Lucas): already true; written into src/health.ts.
+- **Faster start:** the saved rows go straight into IndexedDB at launch (no Dexie hooks), queries read whole tables
+  instead of walking cursors, Home's Latest reads only the newest rows, the charts below the fold draw a frame later,
+  sync/Health/reminders/billing start after the first screen, and the shared protocolAtDraw formats the draw day once
+  per test instead of once per dose. With a realistic history (2,000 weights, 450 BP, 340 shots, 13 tests) on the
+  simulator: splash gone 0.82 s -> 0.58 s, all logs on screen 1.9 s -> ~1.0 s, blood tests ~1.5 s.
+- **Personal target ranges** per marker (marker screen > Your target): the web's markerTargets, read by the shared
+  rules, dashed lines on the chart.
+- **Spreadsheet import** (Bloods > Add > Spreadsheet): CSV/TSV by the web's parseLabTable; Excel unzipped on the phone
+  by modules/labreader SheetReader.swift (Compression + XMLParser).
+- **Onboarding** (app/welcome.tsx, once): welcome + sign in, what you inject (name + route), Apple Health, reminders,
+  appearance. Light theme was done in build 3.
+
+**To do next (Lucas, 19 Oct 2026):** share image (MVP+). Dropped: viewing the original lab file (people keep it
+themselves). Open: archive the web app? (see below), the interpretation wording for App Review.
 
 **Money on iPhone, like Liber:** Apple in-app purchase through RevenueCat only; the app never talks to Stripe. Stripe
 only matters for the website, which can keep it or move to RevenueCat Web Billing later (a web change, Lucas's call).

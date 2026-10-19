@@ -11,6 +11,13 @@ public final class LabReaderModule: Module {
   public func definition() -> ModuleDefinition {
     Name("LabReader")
 
+    // An .xlsx file's first sheet: string[][] (SheetReader.swift)
+    AsyncFunction("readSheet") { (uri: String, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        do { promise.resolve(try SheetReader.rows(Data(contentsOf: Self.url(uri)))) } catch { promise.reject("ERR_LAB_SHEET", error.localizedDescription) }
+      }
+    }
+
     // { pages: { items, ocr }[] }
     AsyncFunction("readPdf") { (uri: String, promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {

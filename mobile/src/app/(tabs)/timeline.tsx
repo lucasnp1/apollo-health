@@ -24,10 +24,10 @@ const ALL = 'all'
 
 // The whole history, not the latest few hundred the logging screens read
 const useAllInjections = () =>
-  useLiveQuery(async () => dedupeInjections(await db.injections.filter((i) => !i.deletedAtSync && !i.archivedAt).toArray()), [], [])
-const useAllVitals = () => useLiveQuery(() => db.vitals.filter((v) => !v.archivedAt).toArray(), [], [])
-const useAllBody = () => useLiveQuery(() => db.bodyMetrics.filter((b) => !b.archivedAt).toArray(), [], [])
-const useAllSymptoms = () => useLiveQuery(() => db.symptoms.filter((s) => !s.archivedAt).toArray(), [], [])
+  useLiveQuery(async () => dedupeInjections(await db.injections.toArray().then((rows) => rows.filter((i) => !i.deletedAtSync && !i.archivedAt))), [], [])
+const useAllVitals = () => useLiveQuery(() => db.vitals.toArray().then((rows) => rows.filter((v) => !v.archivedAt)), [], [])
+const useAllBody = () => useLiveQuery(() => db.bodyMetrics.toArray().then((rows) => rows.filter((b) => !b.archivedAt)), [], [])
+const useAllSymptoms = () => useLiveQuery(() => db.symptoms.toArray().then((rows) => rows.filter((s) => !s.archivedAt)), [], [])
 
 const FORM: Partial<Record<Kind, '/log/injection' | '/log/ancillary' | '/log/weight' | '/log/bp' | '/log/checkin'>> = {
   injection: '/log/injection', ancillary: '/log/ancillary', weight: '/log/weight', bp: '/log/bp', symptom: '/log/checkin',

@@ -1,6 +1,8 @@
 // Apple Health, when switched on in You: weight and blood pressure you log in Magno go into Health, and readings other
 // apps put in Health (a smart scale, a blood pressure cuff) come into Magno. Off until the person turns it on.
 // Kept on this phone (localStorage): another device has its own Health and its own switch.
+// Never deletes, either way (Lucas, 19 Oct 2026): archiving or editing in Magno leaves Health's copy alone (an edit
+// rewrites the same sample by its sync id), and a reading removed from Health stays in Magno. Keep it that way.
 import { AppState } from 'react-native'
 import { useSyncExternalStore } from 'react'
 import { db } from '@shared/lib/db'
@@ -52,8 +54,8 @@ export async function pushBloodPressure(rowId: number) {
 /** What was logged in Magno before the switch went on. */
 async function pushHistory() {
   const [weights, vitals] = await Promise.all([
-    db.bodyMetrics.filter((b) => b.source === 'manual' && b.weightKg !== undefined && !b.archivedAt && !(b as { deletedAtSync?: number }).deletedAtSync).toArray(),
-    db.vitals.filter((v) => !v.archivedAt && !(v as { healthId?: string }).healthId).toArray(),
+    db.bodyMetrics.toArray().then((rows) => rows.filter((b) => b.source === 'manual' && b.weightKg !== undefined && !b.archivedAt && !(b as { deletedAtSync?: number }).deletedAtSync)),
+    db.vitals.toArray().then((rows) => rows.filter((v) => !v.archivedAt && !(v as { healthId?: string }).healthId)),
   ])
   for (const b of weights) await pushWeight(b.id!)
   for (const v of vitals) await pushBloodPressure(v.id!)

@@ -125,7 +125,7 @@ function Time({ value, onChange }: { value: string; onChange: (t: string) => voi
   return (
     <View style={st.row}>
       <Text style={st.label}>Time</Text>
-      <Host matchContents colorScheme={scheme}>
+      <Host matchContents ignoreSafeArea="all" colorScheme={scheme}>
         <DatePicker
           selection={d}
           displayedComponents={['hourAndMinute']}

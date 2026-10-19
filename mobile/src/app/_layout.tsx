@@ -11,6 +11,7 @@ import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider } from 'expo-rout
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
+import { InteractionManager } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { startAccount, useAccount } from '@/account/auth'
 import { billingFollowsAccount, startBilling } from '@/money/pro'
@@ -19,6 +20,7 @@ import { loadData } from '@/data/persist'
 import { startHealth } from '@/health'
 import { startReminders } from '@/reminders'
 import { Toaster } from '@/toast'
+import { needsOnboarding } from './welcome'
 import { startAppearance } from '@/appearance'
 import { C, F, usePalette, useScheme } from '@/theme'
 
@@ -50,12 +52,17 @@ export default function Root() {
   // Sync starts once the data is in and the account is known; signed out, it does nothing
   useEffect(() => void loadData().catch(console.error).finally(() => {
     setLoaded(true)
-    void startAccount().then(() => {
-      startSync()
-      startBilling()
-      startHealth()
-      startReminders()
-    })
+    // Background work waits until Home has drawn, so it doesn't compete with the first screen
+    void startAccount().then(() =>
+      InteractionManager.runAfterInteractions(() =>
+        setTimeout(() => {
+          startSync()
+          startBilling()
+          startHealth()
+          startReminders()
+        }, 800),
+      ),
+    )
   }), [])
   // purchases belong to the account: RevenueCat signs in and out with it
   const acc = useAccount()
@@ -66,7 +73,12 @@ export default function Root() {
   const base = scheme === 'light' ? DefaultTheme : DarkTheme
   const theme = { ...base, colors: { ...base.colors, background: pal.bg, card: pal.bg, text: pal.fg, primary: pal.primary, border: pal.line } }
   const ready = fonts && loaded
-  useEffect(() => void (ready && SplashScreen.hideAsync()), [ready])
+  useEffect(() => {
+    if (!ready) return
+    void SplashScreen.hideAsync()
+    // First run: the setup walk-through, once
+    if (needsOnboarding()) setTimeout(() => router.push('/welcome'), 250)
+  }, [ready])
   if (!ready) return null
 
   return (
@@ -95,6 +107,7 @@ export default function Root() {
         <Stack.Screen name="account/feedback" options={{ ...LOG, title: 'Send feedback' }} />
         <Stack.Screen name="log/bleed" options={{ ...LOG, title: 'Blood-letting' }} />
         <Stack.Screen name="archive" options={{ ...PUSH, title: 'Archive', headerBackTitle: 'You' }} />
+        <Stack.Screen name="welcome" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
         <Stack.Screen name="labs/compare" options={{ ...PUSH, title: 'Compare tests', headerBackTitle: 'Back' }} />
       </Stack>
       <Toaster />

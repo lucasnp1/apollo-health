@@ -4,4 +4,4 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@shared/lib/db'
 import { liveBleeds } from '@shared/lib/phlebotomy'
 
-export const useBleeds = () => useLiveQuery(async () => liveBleeds(await db.phlebotomies.filter((p) => !p.deletedAtSync).toArray()), [])
+export const useBleeds = () => useLiveQuery(async () => liveBleeds(await db.phlebotomies.toArray().then((rows) => rows.filter((p) => !p.deletedAtSync))), [])

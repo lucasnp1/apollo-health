@@ -3,11 +3,11 @@
 import { format } from 'date-fns'
 import { type Href, router } from 'expo-router'
 import { SymbolView, type SymbolViewProps } from 'expo-symbols'
-import { Fragment, useMemo } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { type ColorValue, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Polyline } from 'react-native-svg'
-import { ALL_SYMPTOMS, chipTone, customDefs, ratingOf } from '@shared/lib/symptoms'
+import { ALL_SYMPTOMS, chipTone, customDefs, NEGATIVE, POSITIVE, ratingOf, type SymptomDef } from '@shared/lib/symptoms'
 import { felt } from '@shared/lib/wellbeingSummary'
 import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
 import { useTests } from '@/labs/useTests'
@@ -34,6 +34,9 @@ const LAUNCH: Launch[] = [
 export default function Home() {
   const insets = useSafeAreaInsets()
   const pal = usePalette()
+  // The top of Home draws first; the charts below it a frame later, so the app opens without waiting on them
+  const [below, setBelow] = useState(false)
+  useEffect(() => void requestAnimationFrame(() => setBelow(true)), [])
   const compounds = useCompounds()
   const injections = useInjections()
   const vitals = useVitals()
@@ -78,11 +81,20 @@ export default function Home() {
         if (felt(s, def)) watch += 1
         else if (chipTone(v, def.direction) === 'good') good += 1
       }
-    return { n: recent.length, good, watch }
+    // The last dozen check-ins as two 0-5 lines, the same as the Wellbeing widget
+    const avg = (row: (typeof symptoms)[number], ds: SymptomDef[]) => {
+      const vs = ds.map((d) => ratingOf(row, d)).filter((v): v is number => typeof v === 'number')
+      return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : undefined
+    }
+    const last = symptoms.slice(0, 12).reverse()
+    const goodLine = last.map((r) => avg(r, POSITIVE)).filter((v): v is number => v !== undefined)
+    const watchLine = last.map((r) => avg(r, NEGATIVE)).filter((v): v is number => v !== undefined)
+    return { n: recent.length, good, watch, goodLine, watchLine }
   }, [symptoms])
 
   const recent = useMemo(
-    () => buildEvents({ compounds, injections, vitals, bodyMetrics, symptoms, tests }).slice(0, 5),
+    // Only the newest few of each list (they come newest first): the whole history isn't needed for five rows
+    () => buildEvents({ compounds, injections: injections.slice(0, 6), vitals: vitals.slice(0, 6), bodyMetrics: bodyMetrics.slice(0, 7), symptoms: symptoms.slice(0, 6), tests: tests?.slice(0, 6) }).slice(0, 5),
     [compounds, injections, vitals, bodyMetrics, symptoms, tests],
   )
 
@@ -131,14 +143,19 @@ export default function Home() {
           label="Wellbeing"
           value={sym.n ? <><Text style={{ color: C.good }}>{sym.good}</Text><Text style={{ color: C.faint }}> / </Text><Text style={{ color: C.danger }}>{sym.watch}</Text></> : '–'}
           sub={sym.n ? 'good / watch' : 'None in 7d'}
+          lines={sym.goodLine.length > 1 ? [{ values: sym.goodLine, color: pal.good }, { values: sym.watchLine, color: pal.danger }] : undefined}
         />
       </View>
 
       <InsightsWidget insights={insights} />
+      {below ? (
+        <>
       <InjectionsWidget compounds={compounds} injections={injections} />
       <WellbeingWidget symptoms={symptoms} compounds={compounds} injections={injections} />
       <WeightWidget bodyMetrics={bodyMetrics} injections={injections} />
       <PressureWidget vitals={vitals} />
+        </>
+      ) : null}
 
       <Widget
         eyebrow="Latest"
@@ -161,7 +178,16 @@ export default function Home() {
   )
 }
 
-function Stat({ label, value, unit, sub, color = C.fg, spark }: { label: string; value: React.ReactNode; unit?: string; sub: string; color?: ColorValue; spark?: number[] }) {
+function Stat({ label, value, unit, sub, color = C.fg, spark, lines }: {
+  label: string
+  value: React.ReactNode
+  unit?: string
+  sub: string
+  color?: ColorValue
+  spark?: number[]
+  /** Two or more lines on a fixed 0-5 scale (check-ins) */
+  lines?: { values: number[]; color: string }[]
+}) {
   return (
     <Card style={st.stat}>
       <Eyebrow>{label}</Eyebrow>
@@ -171,23 +197,33 @@ function Stat({ label, value, unit, sub, color = C.fg, spark }: { label: string;
       </Text>
       <Text style={st.statSub} numberOfLines={1}>{sub}</Text>
       {spark && spark.length > 1 ? <Spark values={spark} /> : null}
+      {lines ? <Spark lines={lines} /> : null}
     </Card>
   )
 }
 
-/** The web's MiniSpark: a normalised line over the last dozen values. */
-function Spark({ values }: { values: number[] }) {
+/** The web's MiniSpark: a normalised line over the last dozen values; or several lines on a 0-5 scale. */
+function Spark({ values, lines }: { values?: number[]; lines?: { values: number[]; color: string }[] }) {
   const pal = usePalette()
   const W = 100
   const H = 24
-  const min = Math.min(...values)
-  const span = Math.max(...values) - min || 1
-  const pts = values.map((v, i) => [(i / (values.length - 1)) * W, H - ((v - min) / span) * (H - 4) - 2])
-  const [lx, ly] = pts[pts.length - 1]
+  const series = lines ?? [{ values: values ?? [], color: pal.muted }]
+  const min = lines ? 0 : Math.min(...series[0].values)
+  const span = lines ? 5 : Math.max(...series[0].values) - min || 1
+  const pts = (vs: number[]) => vs.map((v, i) => [(i / Math.max(1, vs.length - 1)) * W, H - ((v - min) / span) * (H - 4) - 2])
   return (
     <Svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ height: 22, width: '100%', marginTop: 8 }}>
-      <Polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke={pal.muted} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      <Circle cx={lx} cy={ly} r={2} fill={pal.muted} />
+      {series.map((sr) => {
+        if (sr.values.length < 2) return null
+        const p = pts(sr.values)
+        const [lx, ly] = p[p.length - 1]
+        return (
+          <Fragment key={sr.color}>
+            <Polyline points={p.map((x) => x.join(',')).join(' ')} fill="none" stroke={sr.color} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            <Circle cx={lx} cy={ly} r={2} fill={sr.color} />
+          </Fragment>
+        )
+      })}
     </Svg>
   )
 }

@@ -21,12 +21,12 @@ const newest = (items: Item[]) => items.sort((a, b) => (b.at ?? '').localeCompar
 
 export default function Archive() {
   const data = useLiveQuery(async () => ({
-    injections: await db.injections.filter(archived).toArray(),
-    bodyMetrics: await db.bodyMetrics.filter(archived).toArray(),
-    vitals: await db.vitals.filter(archived).toArray(),
-    symptoms: await db.symptoms.filter(archived).toArray(),
-    exams: await db.exams.filter(archived).toArray(),
-    bleeds: await db.phlebotomies.filter(archived).toArray(),
+    injections: await db.injections.toArray().then((rows) => rows.filter(archived)),
+    bodyMetrics: await db.bodyMetrics.toArray().then((rows) => rows.filter(archived)),
+    vitals: await db.vitals.toArray().then((rows) => rows.filter(archived)),
+    symptoms: await db.symptoms.toArray().then((rows) => rows.filter(archived)),
+    exams: await db.exams.toArray().then((rows) => rows.filter(archived)),
+    bleeds: await db.phlebotomies.toArray().then((rows) => rows.filter(archived)),
     compounds: await db.compounds.toArray(),
   }), [])
 

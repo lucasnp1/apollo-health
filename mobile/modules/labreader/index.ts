@@ -8,6 +8,8 @@ export type Item = { s: string; x: number; y: number; w: number; h: number }
 type Reader = {
   readPdf(uri: string): Promise<{ pages: { items: Item[]; ocr: boolean }[] }>
   readImage(uri: string): Promise<{ items: Item[] }>
+  /** An .xlsx file's first sheet, as rows of cells */
+  readSheet(uri: string): Promise<string[][]>
 }
 
 export const LabReader = requireOptionalNativeModule<Reader>('LabReader')

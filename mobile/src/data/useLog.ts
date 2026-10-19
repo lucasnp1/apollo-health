@@ -43,15 +43,21 @@ function shared<T>(query: () => Promise<T>, empty: T) {
 
 const NONE: never[] = []
 
-export const useCompounds = shared(() => db.compounds.filter((c) => !c.archived && !c.deletedAtSync).toArray(), NONE)
+// Whole tables read in one go and filtered here: fake-indexeddb walks a cursor (or an index) one record per tick, which
+// made Home's first queries take over a second on a real history; getAll is several times faster.
+async function newest<T>(rows: Promise<T[]>, keep: (r: T) => boolean, at: (r: T) => string): Promise<T[]> {
+  return (await rows).filter(keep).sort((a, b) => at(b).localeCompare(at(a)))
+}
+
+export const useCompounds = shared(() => db.compounds.toArray().then((rows) => rows.filter((c) => !c.archived && !c.deletedAtSync)), NONE)
 
 export const useInjections = shared(
-  async () => dedupeInjections(await db.injections.orderBy('takenAt').reverse().filter((i) => !i.deletedAtSync && !i.archivedAt).toArray()),
+  async () => dedupeInjections((await db.injections.toArray()).filter((i) => !i.deletedAtSync && !i.archivedAt)),
   NONE,
 )
 
-export const useVitals = shared(() => db.vitals.orderBy('measuredAt').reverse().filter((v) => !v.archivedAt).toArray(), NONE)
+export const useVitals = shared(() => newest(db.vitals.toArray(), (v) => !v.archivedAt, (v) => v.measuredAt), NONE)
 
-export const useBodyMetrics = shared(() => db.bodyMetrics.orderBy('measuredAt').reverse().filter((b) => !b.archivedAt).toArray(), NONE)
+export const useBodyMetrics = shared(() => newest(db.bodyMetrics.toArray(), (b) => !b.archivedAt, (b) => b.measuredAt), NONE)
 
-export const useSymptoms = shared(() => db.symptoms.orderBy('recordedAt').reverse().filter((s) => !s.archivedAt).toArray(), NONE)
+export const useSymptoms = shared(() => newest(db.symptoms.toArray(), (s) => !s.archivedAt, (s) => s.recordedAt), NONE)

@@ -1,16 +1,18 @@
-// Where the shot went, with rotation, as the web's SitePicker: each rotation site says how rested it is (this exact
-// spot N days ago, or a neighbour used N days ago), the longest rested one is marked Next, and "Other site" opens
-// every site for the route by body region, plus typing your own.
+// Where the shot went, with rotation, as the web's SitePicker: each rotation site shows when this exact spot was last
+// used and when the spot next to it on the same muscle was, the longest rested one is marked Next, and "Other site" is
+// one menu of every other site for the route, plus typing your own.
 import * as Haptics from 'expo-haptics'
 import { SymbolView } from 'expo-symbols'
 import { useMemo, useState } from 'react'
 import { type ColorValue, Pressable, StyleSheet, Text, View } from 'react-native'
 import type { InjectionLog } from '@shared/lib/db'
 import { canonicalSite, type CatalogSite, customSite, groupOf, isCustomSite, quickSites, REGIONS, type Route, siteLabel } from '@shared/lib/sites'
-import { Chips, Eyebrow, Input, s as kit } from '@/kit'
+import { FieldRow, Input, MenuPicker, s as kit } from '@/kit'
 import { C, F } from '@/theme'
 
 const DAY = 86_400_000
+const NONE = ''
+const OTHER = '__other'
 const routeOf = (i: InjectionLog): Route => (i.route === 'SubQ' ? 'SubQ' : 'IM')
 
 function dayLabel(d: number): string {
@@ -29,7 +31,7 @@ export function SitePicker({ route, value, injections, onChange }: {
   injections: InjectionLog[]
   onChange: (site: string) => void
 }) {
-  const [more, setMore] = useState(false)
+  const [typing, setTyping] = useState(false)
 
   const rows = useMemo(() => {
     const now = Date.now()
@@ -38,15 +40,12 @@ export function SitePicker({ route, value, injections, onChange }: {
     const seen = new Set(base.map((q) => q.site.toLowerCase()))
     const typed: CatalogSite[] = []
     const bySite = new Map<string, number>()
-    const byGroup = new Map<string, { days: number; site: string }>()
     for (const i of injections) {
       if (!i.site || routeOf(i) !== route) continue
       const site = canonicalSite(i.site)
       const k = site.toLowerCase()
       const d = (now - Date.parse(i.takenAt)) / DAY
       if (!bySite.has(k) || d < bySite.get(k)!) bySite.set(k, d)
-      const g = groupOf(site)
-      if (g && (!byGroup.has(g) || d < byGroup.get(g)!.days)) byGroup.set(g, { days: d, site })
       if (!seen.has(k) && isCustomSite(site)) {
         seen.add(k)
         typed.push(customSite(site))
@@ -55,7 +54,9 @@ export function SitePicker({ route, value, injections, onChange }: {
     typed.sort((a, b) => a.site.localeCompare(b.site))
     const list = [...base, ...typed].map((q) => {
       const exact = bySite.get(q.site.toLowerCase()) ?? Infinity
-      const near = byGroup.get(q.group)
+      // The spot next to it: the most recent other site on the same muscle
+      let near: { days: number; site: string } | undefined
+      for (const [k, d] of bySite) if (k !== q.site.toLowerCase() && groupOf(k) === q.group && (!near || d < near.days)) near = { days: d, site: k }
       let status: Status
       let label: string
       if (exact < 4) [status, label] = ['avoid', `This spot, ${dayLabel(exact)}`]
@@ -63,7 +64,7 @@ export function SitePicker({ route, value, injections, onChange }: {
       else if (near && near.days < 7 && near.site.toLowerCase() !== q.site.toLowerCase())
         [status, label] = ['near', `${siteLabel(near.site)} ${dayLabel(near.days)}`]
       else [status, label] = ['rested', Number.isFinite(exact) ? `Rested, ${dayLabel(exact)}` : 'Rested, never used']
-      return { q, status, label, exact }
+      return { q, status, label, exact, near }
     })
     // Next: the rested rotation site that has waited longest (never used beats any number of days)
     let next: string | undefined
@@ -82,7 +83,7 @@ export function SitePicker({ route, value, injections, onChange }: {
   return (
     <View style={{ gap: 10 }}>
       <View style={p.grid}>
-        {rows.list.map(({ q, status, label }) => {
+        {rows.list.map(({ q, status, label, exact, near }) => {
           const on = picked === q.site
           const next = rows.next === q.site && !on
           return (
@@ -107,31 +108,34 @@ export function SitePicker({ route, value, injections, onChange }: {
                 {q.side && !q.custom ? <Text style={p.side}>{q.side}</Text> : null}
                 {next ? <Text style={p.next}>NEXT</Text> : null}
               </View>
-              <Text style={[p.status, { color: on ? C.fg : status === 'rested' || status === 'near' ? C.muted : INK[status] }]} numberOfLines={2}>
-                {status === 'near' ? `Free, but ${label}` : label}
+              <Text style={[p.status, { color: on ? C.fg : status === 'avoid' || status === 'caution' ? INK[status] : C.muted }]} numberOfLines={1}>
+                This spot: {Number.isFinite(exact) ? dayLabel(exact) : 'never'}
+              </Text>
+              <Text style={[p.status, { color: on ? C.fg : status === 'near' ? INK.near : C.muted }]} numberOfLines={1}>
+                Next to it: {near && near.days < 60 ? dayLabel(near.days) : '–'}
               </Text>
             </Pressable>
           )
         })}
       </View>
-      <Text style={kit.hint}>Green is rested. Amber or red: you used that exact spot, red in the last few days. A triangle: a spot next to it was used.</Text>
+      <Text style={kit.hint}>Green is rested. Amber or red: you used that exact spot, red in the last few days. A triangle: the spot next to it was used this week.</Text>
 
-      {offList && !more ? <Text style={kit.hint}>Selected: <Text style={{ color: C.fg, fontFamily: F.medium }}>{siteLabel(value)}</Text></Text> : null}
-
-      <Pressable onPress={() => setMore((m) => !m)} hitSlop={8} accessibilityRole="button" style={p.more}>
-        <Text style={p.moreText}>{more ? 'Hide other sites' : 'Other site'}</Text>
-        <SymbolView name={more ? 'chevron.up' : 'chevron.down'} tintColor={C.accentInk} size={12} />
-      </Pressable>
-      {more ? (
-        <View style={{ gap: 14 }}>
-          {others.map((r) => (
-            <View key={r.label} style={{ gap: 8 }}>
-              <Eyebrow>{r.label}</Eyebrow>
-              <Chips options={r.sites.map((x) => ({ value: x.site, label: siteLabel(x.site) }))} value={inCatalog ? picked : undefined} onChange={(v) => onChange(v ?? '')} clearable />
-            </View>
-          ))}
-          <Input placeholder="Or type your own, e.g. Calf L" value={offList && !inCatalog ? value : ''} onChangeText={onChange} autoCorrect={false} accessibilityLabel="Custom site" />
-        </View>
+      <FieldRow label="Other site">
+        <MenuPicker
+          value={typing || (offList && !inCatalog) ? OTHER : inCatalog ? picked : NONE}
+          options={[
+            { value: NONE, label: 'None' },
+            ...others.flatMap((r) => r.sites.map((x) => ({ value: x.site, label: `${siteLabel(x.site)} (${r.label.toLowerCase()})` }))),
+            { value: OTHER, label: 'Type your own…' },
+          ]}
+          onChange={(v) => {
+            setTyping(v === OTHER)
+            if (v !== OTHER) onChange(v === NONE ? (inCatalog || offList ? '' : value) : v)
+          }}
+        />
+      </FieldRow>
+      {typing || (offList && !inCatalog) ? (
+        <Input autoFocus={typing && !offList} placeholder="Your own site, e.g. Calf L" value={offList && !inCatalog ? value : ''} onChangeText={onChange} autoCorrect={false} accessibilityLabel="Custom site" />
       ) : null}
     </View>
   )
@@ -150,6 +154,4 @@ const p = StyleSheet.create({
   side: { fontFamily: F.mono, fontSize: 12, color: C.muted },
   status: { fontFamily: F.body, fontSize: 12, lineHeight: 16 },
   next: { marginLeft: 'auto', fontFamily: F.monoSemi, fontSize: 10, letterSpacing: 1.2, color: C.accentInk },
-  more: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
-  moreText: { fontFamily: F.semi, fontSize: 15, color: C.accentInk },
 })

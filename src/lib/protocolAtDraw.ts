@@ -32,11 +32,13 @@ export function isAndrogen(c: Compound): boolean {
 
 // Doses that count as "before the draw". Without a draw time, anything on the
 // draw day counts too; it reads as "same day" rather than a guessed phase.
-function beforeDraw(i: InjectionLog, drawAt: Date, timeKnown: boolean): boolean {
+// drawDay is format(drawAt, 'yyyy-MM-dd'), worked out once by the caller: formatting per dose was the slowest step of
+// building every test on the phone.
+function beforeDraw(i: InjectionLog, drawAt: Date, timeKnown: boolean, drawDay: string): boolean {
   const t = Date.parse(i.takenAt)
   if (!Number.isFinite(t)) return false
   if (t <= drawAt.getTime()) return true
-  return !timeKnown && dayOf(i.takenAt) === format(drawAt, 'yyyy-MM-dd')
+  return !timeKnown && dayOf(i.takenAt) === drawDay
 }
 
 const median = (xs: number[]) => {
@@ -52,9 +54,10 @@ const median = (xs: number[]) => {
 export function protocolAtDraw(drawAt: Date, timeKnown: boolean, compounds: Compound[], injections: InjectionLog[]): DoseTiming[] {
   const byId = new Map(compounds.map((c) => [c.id, c]))
   const out: DoseTiming[] = []
+  const drawDay = format(drawAt, 'yyyy-MM-dd')
   for (const g of compoundGroups(compounds, injections)) {
     const doses = injections
-      .filter((i) => g.ids.includes(i.compoundId) && beforeDraw(i, drawAt, timeKnown))
+      .filter((i) => g.ids.includes(i.compoundId) && beforeDraw(i, drawAt, timeKnown, drawDay))
       .sort((a, b) => a.takenAt.localeCompare(b.takenAt))
     const last = doses[doses.length - 1]
     if (!last) continue
@@ -66,7 +69,7 @@ export function protocolAtDraw(drawAt: Date, timeKnown: boolean, compounds: Comp
     const everyDays = recent.length >= 3 ? Math.round(median(gaps) * 10) / 10 : undefined
 
     let phase: DoseTiming['phase']
-    if (!timeKnown && dayOf(last.takenAt) === format(drawAt, 'yyyy-MM-dd')) phase = 'same-day'
+    if (!timeKnown && dayOf(last.takenAt) === drawDay) phase = 'same-day'
     else if (everyDays) {
       const f = Math.max(0, daysBefore) / everyDays
       phase = f > 1.5 ? 'missed' : f >= 0.75 ? 'trough' : f < 0.35 ? 'near-peak' : 'mid'
