@@ -37,12 +37,12 @@ export async function readSession(env: Env, request: Request): Promise<AuthedUse
 
   const row = await env.DB
     .prepare(
-      `SELECT u.id, u.email, u.is_admin, u.display_name, u.plan, u.plan_kind, u.plan_until, u.onboarded_at, s.expires_at
+      `SELECT u.id, u.email, u.is_admin, u.display_name, u.plan, u.plan_kind, u.plan_until, u.onboarded_at, u.apple_sub, u.has_password, s.expires_at
        FROM sessions s JOIN users u ON s.user_id = u.id
        WHERE s.token = ?`,
     )
     .bind(token)
-    .first<{ id: string; email: string; is_admin: number; display_name: string | null; plan: string | null; plan_kind: string | null; plan_until: number | null; onboarded_at: number | null; expires_at: number }>()
+    .first<{ id: string; email: string; is_admin: number; display_name: string | null; plan: string | null; plan_kind: string | null; plan_until: number | null; onboarded_at: number | null; apple_sub: string | null; has_password: number | null; expires_at: number }>()
 
   if (!row) return null
   if (row.expires_at < Date.now()) {
@@ -63,6 +63,8 @@ export async function readSession(env: Env, request: Request): Promise<AuthedUse
     // or a plan set on the row by hand.
     is_pro: row.is_admin === 1 || (row.plan === 'pro' && (row.plan_until == null || row.plan_until > Date.now())),
     onboarded: row.onboarded_at != null,
+    apple: !!row.apple_sub,
+    has_password: row.has_password !== 0,
   }
 }
 

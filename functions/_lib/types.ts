@@ -11,6 +11,12 @@ export type Env = {
   /** Set only after the custom domain resolves; enables the legacy-host 301. */
   CANONICAL_HOST?: string
   APP_URL?: string // e.g. https://magno.fit (reset links)
+  // Sign in with Apple (functions/_lib/apple.ts). APPLE_BUNDLE_ID defaults to app.magno.ios. The key (Apple
+  // Developer > Keys, with Sign in with Apple) is only needed to revoke a login when an account is deleted.
+  APPLE_BUNDLE_ID?: string
+  APPLE_TEAM_ID?: string
+  APPLE_KEY_ID?: string
+  APPLE_PRIVATE_KEY?: string
   // Transactional email (password resets) via Resend. Dormant until both are set.
   RESEND_API_KEY?: string
   MAIL_FROM?: string // e.g. "Magno <no-reply@example.com>"
@@ -55,6 +61,9 @@ export type AuthedUser = {
   is_pro?: boolean
   // First-run onboarding — true once the account has seen it.
   onboarded?: boolean
+  // Signed in with Apple; has_password false for an account made with Apple and no password set yet
+  apple?: boolean
+  has_password?: boolean
 }
 
 // PagesFunction handler type (matches Cloudflare's @cloudflare/workers-types).

@@ -1,12 +1,15 @@
 import type { PagesFunction, Env } from '../../_lib/types'
+import { revokeToken, verifyIdentityToken } from '../../_lib/apple'
 import { verifyPassword, type HashAlgorithm } from '../../_lib/crypto'
 import { expiredCookie, ipHash, jsonError, jsonOk, requireUser } from '../../_lib/auth'
 import { wrap } from '../../_lib/handler'
 
-// POST /api/auth/delete { password }
+// POST /api/auth/delete { password } or { appleIdentityToken }
 // Permanently deletes the account and every row that belongs to it. The
-// password is re-checked so a borrowed phone can't wipe someone's history.
-// Order: drop file blobs -> delete rows.
+// password is re-checked so a borrowed phone can't wipe someone's history; an
+// account signed in with Apple confirms with Apple instead (a fresh identity
+// token for the same Apple ID). Order: revoke the Apple login -> drop file
+// blobs -> delete rows.
 
 // Every table that carries a user_id. Kept explicit rather than trusting
 // ON DELETE CASCADE so the wipe is complete even if a table was created
@@ -21,27 +24,41 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   const auth = await requireUser(env, request)
   if (auth instanceof Response) return auth
 
-  let body: { password?: string }
+  let body: { password?: string; appleIdentityToken?: string }
   try {
     body = await request.json()
   } catch {
     return jsonError('Invalid request', 400)
   }
-  const password = body.password || ''
-  if (!password) return jsonError('Enter your password to confirm', 400)
 
   const row = await env.DB
-    .prepare('SELECT password_hash, password_salt, iterations, algorithm FROM users WHERE id = ?')
+    .prepare('SELECT password_hash, password_salt, iterations, algorithm, apple_sub, apple_refresh_token FROM users WHERE id = ?')
     .bind(auth.user.id)
-    .first<{ password_hash: string; password_salt: string; iterations: number; algorithm: string }>()
+    .first<{ password_hash: string; password_salt: string; iterations: number; algorithm: string; apple_sub: string | null; apple_refresh_token: string | null }>()
   if (!row) return jsonError('Unauthorized', 401)
 
-  const ok = await verifyPassword((row.algorithm as HashAlgorithm) ?? 'pbkdf2', password, row.password_salt, row.password_hash, row.iterations)
-  if (!ok) return jsonError('Password is incorrect', 401)
+  if (body.appleIdentityToken) {
+    const who = await verifyIdentityToken(env, body.appleIdentityToken)
+    if (!who || !row.apple_sub || who.sub !== row.apple_sub) return jsonError("That Apple ID isn't the one on this account", 401)
+  } else {
+    const password = body.password || ''
+    if (!password) return jsonError('Enter your password to confirm', 400)
+    const ok = await verifyPassword((row.algorithm as HashAlgorithm) ?? 'pbkdf2', password, row.password_salt, row.password_hash, row.iterations)
+    if (!ok) return jsonError('Password is incorrect', 401)
+  }
 
   const userId = auth.user.id
   const now = Date.now()
   const iph = await ipHash(request)
+
+  // 1) The Apple login, so the app leaves the person's Apple ID settings (needs the Sign in with Apple key)
+  if (row.apple_refresh_token) {
+    try {
+      await revokeToken(env, row.apple_refresh_token)
+    } catch (err) {
+      console.warn('[delete] apple revoke failed', userId, err)
+    }
+  }
 
   // 2) File blobs in R2 (when the bucket is bound).
   if (env.FILES) {
