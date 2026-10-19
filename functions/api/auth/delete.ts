@@ -1,10 +1,11 @@
 import type { PagesFunction, Env } from '../../_lib/types'
 import { revokeToken, verifyIdentityToken } from '../../_lib/apple'
+import { verifyGoogleToken } from '../../_lib/google'
 import { verifyPassword, type HashAlgorithm } from '../../_lib/crypto'
 import { expiredCookie, ipHash, jsonError, jsonOk, requireUser } from '../../_lib/auth'
 import { wrap } from '../../_lib/handler'
 
-// POST /api/auth/delete { password } or { appleIdentityToken }
+// POST /api/auth/delete { password } or { appleIdentityToken } or { googleIdToken }
 // Permanently deletes the account and every row that belongs to it. The
 // password is re-checked so a borrowed phone can't wipe someone's history; an
 // account signed in with Apple confirms with Apple instead (a fresh identity
@@ -24,7 +25,7 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   const auth = await requireUser(env, request)
   if (auth instanceof Response) return auth
 
-  let body: { password?: string; appleIdentityToken?: string }
+  let body: { password?: string; appleIdentityToken?: string; googleIdToken?: string }
   try {
     body = await request.json()
   } catch {
@@ -32,14 +33,17 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
   }
 
   const row = await env.DB
-    .prepare('SELECT password_hash, password_salt, iterations, algorithm, apple_sub, apple_refresh_token FROM users WHERE id = ?')
+    .prepare('SELECT password_hash, password_salt, iterations, algorithm, apple_sub, google_sub, apple_refresh_token FROM users WHERE id = ?')
     .bind(auth.user.id)
-    .first<{ password_hash: string; password_salt: string; iterations: number; algorithm: string; apple_sub: string | null; apple_refresh_token: string | null }>()
+    .first<{ password_hash: string; password_salt: string; iterations: number; algorithm: string; apple_sub: string | null; google_sub: string | null; apple_refresh_token: string | null }>()
   if (!row) return jsonError('Unauthorized', 401)
 
   if (body.appleIdentityToken) {
     const who = await verifyIdentityToken(env, body.appleIdentityToken)
     if (!who || !row.apple_sub || who.sub !== row.apple_sub) return jsonError("That Apple ID isn't the one on this account", 401)
+  } else if (body.googleIdToken) {
+    const who = await verifyGoogleToken(env, body.googleIdToken)
+    if (!who || !row.google_sub || who.sub !== row.google_sub) return jsonError("That Google account isn't the one on this account", 401)
   } else {
     const password = body.password || ''
     if (!password) return jsonError('Enter your password to confirm', 400)
