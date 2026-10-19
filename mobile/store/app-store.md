@@ -144,3 +144,10 @@ Magno Pro: a monthly subscription with a one-month free trial, or a one-time lif
 - Both purchases have their review screenshot (`store/iap-review.png`); monthly has the 1-month free intro offer.
 - To submit: version 1.0 > Add for review; in the draft submission add the Magno Pro subscription group and the
   lifetime purchase (the first ones must go with a version), then Submit. Release is manual.
+
+## Submitted (19 Oct 2026, 15:33)
+
+Version 1.0 (build 6) sent to App Review with the lifetime purchase, the monthly subscription and its group
+("4 items"), status Waiting for Review. Apple says up to 48 hours; release is manual, so it goes live only when
+Lucas presses Release. Set on the way: price Free, available in 174 countries (all but mainland China, which needs
+an ICP filing), subscription group display name "Magno Pro" (English UK).
