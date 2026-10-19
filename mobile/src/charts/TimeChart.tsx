@@ -4,7 +4,7 @@
 // axis.
 import { format } from 'date-fns'
 import { useMemo, useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Svg, { Circle, Line, Polyline, Rect, Text as SvgText } from 'react-native-svg'
 import { C, F, usePalette } from '@/theme'
@@ -14,6 +14,8 @@ export type Series = { label: string; color: string; points: Pt[] }
 export type Domain = [number, number]
 
 export const PAD = { l: 34, r: 10, t: 8, b: 20 }
+/** Every chart sits in a card (16 padding) on a page (16 padding): its likely width before layout, so it draws on the first frame */
+export const useCardWidth = () => useWindowDimensions().width - 64
 
 /** Round ticks that frame lo..hi: the first at or below lo, the last at or above hi, three to five in all */
 export function niceTicks(lo: number, hi: number, n = 4): number[] {
@@ -43,7 +45,8 @@ export function TimeChart({ series, domain, band, guides, unit, height = 150, yR
   yRange?: [number, number]
 }) {
   const pal = usePalette()
-  const [w, setW] = useState(0)
+  const cardWidth = useCardWidth()
+  const [w, setW] = useState(cardWidth)
   const [at, setAt] = useState<number | undefined>()
 
   const { y, ticks } = useMemo(() => {
@@ -90,48 +93,46 @@ export function TimeChart({ series, domain, band, guides, unit, height = 150, yR
       </View>
       <GestureDetector gesture={scrub}>
         <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ height }} collapsable={false}>
-          {w ? (
-            <Svg width={w} height={height}>
-              {band && (band.low !== undefined || band.high !== undefined) ? (
-                <Rect
-                  x={PAD.l}
-                  width={iw}
-                  y={y(band.high ?? Math.max(...ticks))}
-                  height={Math.max(0, y(band.low ?? Math.min(...ticks)) - y(band.high ?? Math.max(...ticks)))}
-                  fill={pal.good}
-                  opacity={0.08}
-                />
-              ) : null}
-              {(guides ?? []).map((v) => (
-                <Line key={`g${v}`} x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke={pal.muted} strokeWidth={1} strokeDasharray="3 4" />
-              ))}
-              {ticks.map((v) => (
-                <Line key={v} x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke={pal.line} strokeWidth={StyleSheet.hairlineWidth} />
-              ))}
-              {ticks.map((v) => (
-                <SvgText key={`l${v}`} x={PAD.l - 6} y={y(v) + 3.5} fontSize={10} fontFamily={F.mono} fill={pal.faint} textAnchor="end">{fmtV(v)}</SvgText>
-              ))}
-              {dateTicks(domain).map((t, i, all) => (
-                <SvgText key={t} x={x(t)} y={height - 5} fontSize={10} fontFamily={F.mono} fill={pal.faint} textAnchor={i === 0 ? 'start' : i === all.length - 1 ? 'end' : 'middle'}>
-                  {fmtTick(t, domain)}
-                </SvgText>
-              ))}
-              {series.map((s) =>
-                s.points.length > 1 ? (
-                  <Polyline key={s.label} points={s.points.map((p) => `${x(p.t)},${y(p.v)}`).join(' ')} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-                ) : null,
-              )}
-              {series.map((s) =>
-                s.points.length <= 14 ? s.points.map((p) => <Circle key={`${s.label}${p.t}`} cx={x(p.t)} cy={y(p.v)} r={4} fill={s.color} stroke={pal.card} strokeWidth={2} />) : null,
-              )}
-              {at !== undefined && when !== undefined ? (
-                <>
-                  <Line x1={x(when)} x2={x(when)} y1={PAD.t} y2={height - PAD.b} stroke={pal.muted} strokeWidth={1} />
-                  {series.map((s, i) => (shown[i] ? <Circle key={`h${s.label}`} cx={x(shown[i]!.t)} cy={y(shown[i]!.v)} r={5} fill={s.color} stroke={pal.fg} strokeWidth={2} /> : null))}
-                </>
-              ) : null}
-            </Svg>
-          ) : null}
+          <Svg width={w} height={height}>
+            {band && (band.low !== undefined || band.high !== undefined) ? (
+              <Rect
+                x={PAD.l}
+                width={iw}
+                y={y(band.high ?? Math.max(...ticks))}
+                height={Math.max(0, y(band.low ?? Math.min(...ticks)) - y(band.high ?? Math.max(...ticks)))}
+                fill={pal.good}
+                opacity={0.08}
+              />
+            ) : null}
+            {(guides ?? []).map((v) => (
+              <Line key={`g${v}`} x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke={pal.muted} strokeWidth={1} strokeDasharray="3 4" />
+            ))}
+            {ticks.map((v) => (
+              <Line key={v} x1={PAD.l} x2={w - PAD.r} y1={y(v)} y2={y(v)} stroke={pal.line} strokeWidth={StyleSheet.hairlineWidth} />
+            ))}
+            {ticks.map((v) => (
+              <SvgText key={`l${v}`} x={PAD.l - 6} y={y(v) + 3.5} fontSize={10} fontFamily={F.mono} fill={pal.faint} textAnchor="end">{fmtV(v)}</SvgText>
+            ))}
+            {dateTicks(domain).map((t, i, all) => (
+              <SvgText key={t} x={x(t)} y={height - 5} fontSize={10} fontFamily={F.mono} fill={pal.faint} textAnchor={i === 0 ? 'start' : i === all.length - 1 ? 'end' : 'middle'}>
+                {fmtTick(t, domain)}
+              </SvgText>
+            ))}
+            {series.map((s) =>
+              s.points.length > 1 ? (
+                <Polyline key={s.label} points={s.points.map((p) => `${x(p.t)},${y(p.v)}`).join(' ')} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+              ) : null,
+            )}
+            {series.map((s) =>
+              s.points.length <= 14 ? s.points.map((p) => <Circle key={`${s.label}${p.t}`} cx={x(p.t)} cy={y(p.v)} r={4} fill={s.color} stroke={pal.card} strokeWidth={2} />) : null,
+            )}
+            {at !== undefined && when !== undefined ? (
+              <>
+                <Line x1={x(when)} x2={x(when)} y1={PAD.t} y2={height - PAD.b} stroke={pal.muted} strokeWidth={1} />
+                {series.map((s, i) => (shown[i] ? <Circle key={`h${s.label}`} cx={x(shown[i]!.t)} cy={y(shown[i]!.v)} r={5} fill={s.color} stroke={pal.fg} strokeWidth={2} /> : null))}
+              </>
+            ) : null}
+          </Svg>
         </View>
       </GestureDetector>
     </View>

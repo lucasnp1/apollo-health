@@ -7,97 +7,29 @@
 import { SymbolView } from 'expo-symbols'
 import { useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { type CompoundGroup, compoundGroups, compoundKey, findCompoundByName, groupByCompoundId } from '@shared/lib/compounds'
+import { type CompoundGroup, compoundKey, findCompoundByName, groupByCompoundId } from '@shared/lib/compounds'
 import { type Compound, db, type InjectionLog, type Symptom, type SyringeKey, type Unit } from '@shared/lib/db'
 import { canonicalSite, type Route } from '@shared/lib/sites'
 import { NEGATIVE, POSITIVE, ratingOf, withRating } from '@shared/lib/symptoms'
 import { useCompounds, useInjections } from '@/data/useLog'
-import { Card, Eyebrow, FieldRow, Input, MenuPicker, s as kit, Section, Segmented, When } from '@/kit'
+import { Button, Card, Eyebrow, FieldRow, Input, MenuPicker, s as kit, Section, Segmented, When } from '@/kit'
 import { LogForm, num } from '@/LogForm'
 import { Scale } from '@/logging/Scale'
 import { SitePicker } from '@/logging/SitePicker'
+import { blank, type Line, lineFor, type Mark, NEEDLES, NEW, noteLine, type Prefill, prefillFor, sortedGroups, stripLines, SYRINGES } from '@/logging/injectionDraft'
 import { useDirty, useEditRow } from '@/logging/useEntry'
 import { C, F } from '@/theme'
 import { addCompound, routeOf, unitLabel, usedColours } from '@/log'
 import { isAncillary } from '@/timeline'
 
-const NEW = 'new'
+const NONE = ''
+const OTHER = '__other'
 const UNITS: { value: Unit; label: string }[] = [
   { value: 'mg', label: 'mg' },
   { value: 'mcg', label: 'mcg' },
   { value: 'iu', label: 'IU' },
   { value: 'ml', label: 'mL' },
 ]
-// Names only, to note which syringe you used. Same keys as the web, so its logger picks the same one next time.
-const SYRINGES: { value: SyringeKey; label: string; marks: Mark }[] = [
-  { value: 'u30', label: '30 unit insulin', marks: 'units' },
-  { value: 'u50', label: '50 unit insulin', marks: 'units' },
-  { value: 'u100', label: '100 unit insulin', marks: 'units' },
-  { value: 'ml1', label: '1 mL', marks: 'mL' },
-  { value: 'ml2', label: '2 mL', marks: 'mL' },
-  { value: 'ml3', label: '3 mL', marks: 'mL' },
-]
-type Mark = 'units' | 'mL'
-// The web's needle list (src/lib/dose.ts NEEDLES), copied as plain names: that file must not ship here
-const NEEDLES: Record<Mark, string[]> = {
-  units: ['31G 6 mm', '31G 8 mm', '30G 8 mm', '29G 12.7 mm'],
-  mL: ['30G ½ in (13 mm)', '27G ½ in (13 mm)', '25G ⅝ in (16 mm)', '25G 1 in (25 mm)', '23G 1 in (25 mm)', '23G 1¼ in (32 mm)', '22G 1½ in (38 mm)', '21G 1½ in (38 mm)'],
-}
-
-/** Lines this logger adds under your note, so the web shows them too: "Syringe: …", "Vial: …". */
-const LINE = { Syringe: /^Syringe: (.*)$/m, Vial: /^Vial: (.*)$/m }
-const noteLine = (notes: string | undefined, label: keyof typeof LINE) => notes?.match(LINE[label])?.[1]
-const stripLines = (notes: string | undefined) => (notes ?? '').split('\n').filter((l) => !/^(Syringe|Vial): /.test(l)).join('\n').trim()
-
-/** One compound in the syringe. `pick` is a compound group key, NEW for a typed name, or nothing yet. */
-type Line = { key: string; pick?: string; name: string; unit: Unit; dose: string; drawn: string; vial: string; vialNew?: boolean }
-let seq = 0
-const blank = (): Line => ({ key: `l${++seq}`, name: '', unit: 'mg', dose: '', drawn: '', vial: '' })
-const NONE = ''
-const OTHER = '__other'
-
-type Prefill = { lines: Line[]; syringe?: SyringeKey; marks?: Mark; needle: string }
-
-/** A compound's line as you left it last time on this route: dose and vial. Never a new number. */
-function lineFor(g: CompoundGroup, route: Route, shots: InjectionLog[]): Line {
-  const c = g.canonical
-  const mine = shots.filter((i) => g.ids.includes(i.compoundId))
-  const onRoute = mine.find((i) => routeOf(i) === route && i.dose != null && i.unit === (c.unit ?? 'mg'))
-  const d = onRoute?.dose ?? c.lastDose
-  return { ...blank(), pick: g.key, dose: d !== undefined && d > 0 ? String(d) : '', vial: noteLine(mine[0]?.notes, 'Vial') ?? '' }
-}
-
-/** The last syringe on a route: every compound logged at the most recent moment on it, with its syringe and needle. */
-function prefillFor(route: Route, groups: CompoundGroup[], shots: InjectionLog[]): Prefill {
-  const byId = groupByCompoundId(groups)
-  const last = shots.find((i) => routeOf(i) === route)
-  const stack: CompoundGroup[] = []
-  if (last)
-    for (const i of shots) {
-      if (i.takenAt !== last.takenAt || routeOf(i) !== route) continue
-      const g = byId.get(i.compoundId)
-      if (g && !stack.includes(g)) stack.push(g)
-    }
-  if (!stack.length) {
-    const g = groups.find((x) => x.canonical.defaultRoute === route)
-    if (g) stack.push(g)
-  }
-  const sy = SYRINGES.find((x) => x.value === stack[0]?.canonical.syringe)
-  return {
-    lines: stack.length ? stack.map((g) => lineFor(g, route, shots)) : [blank()],
-    syringe: sy?.value,
-    marks: sy?.marks,
-    needle: last?.needle ?? '',
-  }
-}
-
-/** Most recently used first: one chip per drug (sync can leave duplicate rows). */
-function sortedGroups(compounds: Compound[], shots: InjectionLog[]) {
-  const lastAt = new Map<number, string>()
-  for (const i of shots) if (!lastAt.has(i.compoundId)) lastAt.set(i.compoundId, i.takenAt)
-  const last = (ids: number[]) => ids.map((id) => lastAt.get(id) ?? '').sort().pop() ?? ''
-  return compoundGroups(compounds, shots).sort((a, b) => last(b.ids).localeCompare(last(a.ids)))
-}
 
 export default function LogInjection() {
   const compounds = useCompounds()
@@ -329,10 +261,7 @@ export default function LogInjection() {
           />
         ))}
         {editing ? null : (
-          <Pressable onPress={() => setLines((prev) => [...prev, blank()])} accessibilityRole="button" style={({ pressed }) => [l.add, pressed && { opacity: 0.7 }]}>
-            <SymbolView name="plus" tintColor={C.accentInk} size={14} />
-            <Text style={l.addText}>Add a compound (same syringe)</Text>
-          </Pressable>
+          <Button kind="add" icon="plus" label="Add a compound (same syringe)" onPress={() => setLines((prev) => [...prev, blank()])} />
         )}
       </Section>
 
@@ -498,11 +427,6 @@ function Drawn({ value, onChange, marks, onMarks }: { value: string; onChange: (
 }
 
 const l = StyleSheet.create({
-  add: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 10,
-    borderRadius: 999, borderWidth: 1, borderColor: C.input, borderStyle: 'dashed',
-  },
-  addText: { fontFamily: F.semi, fontSize: 15, color: C.accentInk },
   lineHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   remove: { fontFamily: F.semi, fontSize: 14, color: C.danger },
   fixed: { gap: 4 },

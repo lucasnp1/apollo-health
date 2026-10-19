@@ -4,7 +4,6 @@
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
 import { router, useLocalSearchParams } from 'expo-router'
-import { SymbolView, type SymbolViewProps } from 'expo-symbols'
 import { useEffect, useMemo, useState } from 'react'
 import { ActionSheetIOS, ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -15,7 +14,7 @@ import { withPro } from '@/money/pro'
 import { readReport, readSheet } from '@/labs/read'
 import { exportTestPdf } from '@/report/export'
 import { useTests } from '@/labs/useTests'
-import { Card, Segmented, Widget, PageHeader } from '@/kit'
+import { Button, Card, Link, PageHeader, Segmented, Widget } from '@/kit'
 import { BleedsSection } from '@/labs/Bleeds'
 import { attentionOf, MarkerRow, Tag } from '@/labs/ui'
 import { phaseLabel, testChip, verdictLine } from '@/labs/reads'
@@ -104,10 +103,7 @@ export default function Labs() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 100, gap: 16 }}>
         <PageHeader eyebrow={tests?.length ? `${tests.length} test${tests.length === 1 ? '' : 's'}` : 'Blood tests'} title="Bloods" />
-        <Pressable onPress={add} accessibilityRole="button" style={({ pressed }) => [l.add, pressed && { opacity: 0.8 }]}>
-          <SymbolView name={'plus' as SymbolViewProps['name']} tintColor={C.primaryFg} size={18} />
-          <Text style={l.addText}>Add a blood test</Text>
-        </Pressable>
+        <Button label="Add a blood test" icon="plus" onPress={add} />
         {tests && tests.length ? (
           <>
             <Segmented value={tab} onChange={setTab} options={[{ value: 'latest', label: 'Latest' }, { value: 'tests', label: 'Tests' }, { value: 'markers', label: 'Markers' }]} />
@@ -160,14 +156,10 @@ function Latest({ tests, pro }: { tests: LabTest[]; pro: boolean }) {
           <Text style={l.muted}>{pro ? 'Nothing in this test needs attention.' : 'Nothing in this test is outside the lab range.'}</Text>
         )}
         {attention.length > shown.length ? (
-          <Pressable onPress={() => openTest(t.id)} hitSlop={8}>
-            <Text style={l.link}>Show {attention.length - shown.length} more</Text>
-          </Pressable>
+          <Link label={`Show ${attention.length - shown.length} more`} onPress={() => openTest(t.id)} />
         ) : null}
         {!pro ? (
-          <Pressable onPress={() => router.push({ pathname: '/pro', params: { feature: 'Reading your bloods' } })}>
-            <Text style={l.link}>What Pro reads in a test</Text>
-          </Pressable>
+          <Link label="What Pro reads in a test" onPress={() => router.push({ pathname: '/pro', params: { feature: 'Reading your bloods' } })} />
         ) : null}
       </Widget>
 
@@ -200,13 +192,9 @@ function Latest({ tests, pro }: { tests: LabTest[]; pro: boolean }) {
 
       <View style={{ flexDirection: 'row', gap: 10 }}>
         {tests.length > 1 ? (
-          <Pressable style={l.outline} onPress={() => router.push({ pathname: '/labs/compare', params: { a: String(t.id), b: String(previous?.id ?? tests[1].id) } })}>
-            <Text style={l.outlineText}>Compare with previous</Text>
-          </Pressable>
+          <Button kind="outline" label="Compare with previous" onPress={() => router.push({ pathname: '/labs/compare', params: { a: String(t.id), b: String(previous?.id ?? tests[1].id) } })} />
         ) : null}
-        <Pressable style={l.outline} onPress={() => void exportTestPdf(t.id).catch((e) => Alert.alert("Couldn't make the report", String(e?.message ?? e)))}>
-          <Text style={l.outlineText}>For your doctor</Text>
-        </Pressable>
+        <Button kind="outline" label="For your doctor" onPress={() => void exportTestPdf(t.id).catch((e) => Alert.alert("Couldn't make the report", String(e?.message ?? e)))} />
       </View>
       <BleedsSection />
       <Text style={l.small}>Not medical advice. Flags come from your lab; check anything you act on with your doctor.</Text>
@@ -221,9 +209,7 @@ function Tests({ tests, pro }: { tests: LabTest[]; pro: boolean }) {
   return (
     <>
       {check.length ? (
-        <Pressable onPress={() => setOnly((v) => !v)}>
-          <Text style={l.link}>{only ? 'Show every test' : `${check.length} test${check.length === 1 ? ' needs' : 's need'} a quick check`}</Text>
-        </Pressable>
+        <Link label={only ? 'Show every test' : `${check.length} test${check.length === 1 ? ' needs' : 's need'} a quick check`} onPress={() => setOnly((v) => !v)} />
       ) : null}
       {list.map((t) => {
         const chip = testChip(t, pro)
@@ -283,21 +269,16 @@ function Empty() {
 }
 
 const l = StyleSheet.create({
-  add: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.primary, borderRadius: 12, paddingVertical: 15 },
-  addText: { fontFamily: F.semi, fontSize: 17, color: C.primaryFg },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   title: { flex: 1, fontFamily: F.semi, fontSize: 17, color: C.fg },
   sub: { fontFamily: F.mono, fontSize: 12, color: C.muted },
   warn: { fontFamily: F.medium, fontSize: 13, color: C.warn },
   muted: { fontFamily: F.body, fontSize: 14, color: C.muted, lineHeight: 20 },
-  link: { fontFamily: F.semi, fontSize: 14, color: C.accentInk },
   small: { fontFamily: F.body, fontSize: 12, color: C.muted, lineHeight: 17 },
   mini: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
   miniLabel: { fontFamily: F.medium, fontSize: 15, color: C.fg },
   miniValue: { fontFamily: F.mono, fontSize: 12, color: C.muted },
-  outline: { flex: 1, borderWidth: 1, borderColor: C.input, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  outlineText: { fontFamily: F.semi, fontSize: 14, color: C.fg },
   busy: { ...StyleSheet.absoluteFill, backgroundColor: C.scrim, alignItems: 'center', justifyContent: 'center', gap: 14 },
   busyText: { fontFamily: F.medium, fontSize: 16, color: C.fg },
 })

@@ -1,6 +1,6 @@
 // Export for your doctor: the log for a range as a PDF or one spreadsheet. Only what you logged and what your labs
 // measured, against each lab's own range (the web's ExportSheet).
-import { Stack, useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
 import { compoundGroups } from '@shared/lib/compounds'
 import { useCompounds, useInjections } from '@/data/useLog'
@@ -57,69 +57,66 @@ export default function Export() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ title: 'Export for your doctor' }} />
-      <ScrollView
-        style={{ backgroundColor: C.bg }}
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 28 }}
-      >
-        <Card style={[e.row, { paddingVertical: 8 }]}>
-          <Text style={e.label}>Date range</Text>
-          <RangeMenu value={range} onChange={setRange} />
-        </Card>
+    <ScrollView
+      style={{ backgroundColor: C.bg }}
+      contentInsetAdjustmentBehavior="automatic"
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 48, gap: 28 }}
+    >
+      <Card style={[e.row, { paddingVertical: 8 }]}>
+        <Text style={e.label}>Date range</Text>
+        <RangeMenu value={range} onChange={setRange} />
+      </Card>
 
-        <Section title="Include">
-          <Card style={{ paddingVertical: 4 }}>
-            {ROWS.map((r, i) => {
-              const on = include[r.key]
-              const flip = () => setInclude((p) => ({ ...p, [r.key]: !p[r.key] }))
-              return (
-                <Pressable key={r.key} onPress={flip} accessibilityRole="switch" accessibilityState={{ checked: on }} style={[e.row, i < ROWS.length - 1 && e.sep]}>
-                  <Text style={e.label}>{r.label}</Text>
-                  <Switch value={on} onValueChange={flip} trackColor={{ true: C.primary }} accessibilityElementsHidden />
-                </Pressable>
-              )
-            })}
-          </Card>
-          {group && include.injections ? (
-            <Card style={{ paddingVertical: 4 }}>
-              <Pressable onPress={() => setOnlyGroup((v) => !v)} accessibilityRole="switch" accessibilityState={{ checked: onlyGroup }} style={e.row}>
-                <Text style={[e.label, { flexShrink: 1 }]}>Only {group.name} shots</Text>
-                <Switch value={onlyGroup} onValueChange={setOnlyGroup} trackColor={{ true: C.primary }} accessibilityElementsHidden />
+      <Section title="Include">
+        <Card style={{ paddingVertical: 4 }}>
+          {ROWS.map((r, i) => {
+            const on = include[r.key]
+            const flip = () => setInclude((p) => ({ ...p, [r.key]: !p[r.key] }))
+            return (
+              <Pressable key={r.key} onPress={flip} accessibilityRole="switch" accessibilityState={{ checked: on }} style={[e.row, i < ROWS.length - 1 && e.sep]}>
+                <Text style={e.label}>{r.label}</Text>
+                <Switch value={on} onValueChange={flip} trackColor={{ true: C.primary }} accessibilityElementsHidden />
               </Pressable>
-            </Card>
-          ) : null}
-        </Section>
+            )
+          })}
+        </Card>
+        {group && include.injections ? (
+          <Card style={{ paddingVertical: 4 }}>
+            <Pressable onPress={() => setOnlyGroup((v) => !v)} accessibilityRole="switch" accessibilityState={{ checked: onlyGroup }} style={e.row}>
+              <Text style={[e.label, { flexShrink: 1 }]}>Only {group.name} shots</Text>
+              <Switch value={onlyGroup} onValueChange={setOnlyGroup} trackColor={{ true: C.primary }} accessibilityElementsHidden />
+            </Pressable>
+          </Card>
+        ) : null}
+      </Section>
 
-        <Section title="Your name (optional)" hint="Printed at the top of the PDF. It stays on this phone and is never synced.">
-          <Input value={name} onChangeText={setName} placeholder="Name" autoComplete="name" textContentType="name" returnKeyType="done" />
-        </Section>
+      <Section title="Your name (optional)" hint="Printed at the top of the PDF. It stays on this phone and is never synced.">
+        <Input value={name} onChangeText={setName} placeholder="Name" autoComplete="name" textContentType="name" returnKeyType="done" />
+      </Section>
 
-        <View style={{ gap: 10 }}>
-          <Pressable
-            style={({ pressed }) => [e.primary, (!any || busy) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
-            disabled={!any || !!busy}
-            onPress={() => void run('pdf')}
-            accessibilityRole="button"
-          >
-            {busy === 'pdf' ? <ActivityIndicator color={C.primaryFg} /> : <Text style={e.primaryText}>Create PDF</Text>}
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [e.secondary, (!any || busy) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
-            disabled={!any || !!busy}
-            onPress={() => void run('csv')}
-            accessibilityRole="button"
-          >
-            {busy === 'csv' ? <ActivityIndicator color={C.fg} /> : <Text style={e.secondaryText}>Spreadsheet (CSV)</Text>}
-          </Pressable>
-          <Text style={e.small}>
-            Only what you logged and what your labs measured, against each lab's own range. Doses appear as you typed them. Magno adds no reads.
-          </Text>
-        </View>
-      </ScrollView>
-    </>
+      <View style={{ gap: 10 }}>
+        <Pressable
+          style={({ pressed }) => [e.primary, (!any || busy) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
+          disabled={!any || !!busy}
+          onPress={() => void run('pdf')}
+          accessibilityRole="button"
+        >
+          {busy === 'pdf' ? <ActivityIndicator color={C.primaryFg} /> : <Text style={e.primaryText}>Create PDF</Text>}
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [e.secondary, (!any || busy) && { opacity: 0.5 }, pressed && { opacity: 0.8 }]}
+          disabled={!any || !!busy}
+          onPress={() => void run('csv')}
+          accessibilityRole="button"
+        >
+          {busy === 'csv' ? <ActivityIndicator color={C.fg} /> : <Text style={e.secondaryText}>Spreadsheet (CSV)</Text>}
+        </Pressable>
+        <Text style={e.small}>
+          Only what you logged and what your labs measured, against each lab's own range. Doses appear as you typed them. Magno adds no reads.
+        </Text>
+      </View>
+    </ScrollView>
   )
 }
 

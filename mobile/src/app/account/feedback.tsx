@@ -1,6 +1,6 @@
 // Feedback to the team. Signed in, it's stored with the account email; signed out, it opens an email instead
 // (the endpoint needs an account).
-import { router, Stack } from 'expo-router'
+import { router } from 'expo-router'
 import { useState } from 'react'
 import { Linking, Pressable, ScrollView, StyleSheet, Text } from 'react-native'
 import { mailto, sendFeedback, SUPPORT_EMAIL, useAccount } from '@/account/auth'
@@ -32,32 +32,29 @@ export default function Feedback() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ title: 'Send feedback' }} />
-      <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
-        {sent ? (
-          <>
-            <Text style={f.lead}>Thanks! Every message is read. If it needs a reply, it goes to {acc.status === 'authed' ? acc.user.email : 'your email'}.</Text>
-            <Pressable style={f.primary} onPress={() => router.back()} accessibilityRole="button">
-              <Text style={f.primaryText}>Done</Text>
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <Section
-              title="Message"
-              hint={authed ? 'A bug, an idea, something missing. Your account email is sent with it.' : `You're not signed in, so Send opens an email to ${SUPPORT_EMAIL}.`}
-            >
-              <Input value={message} onChangeText={setMessage} placeholder="What's on your mind?" multiline maxLength={4000} style={{ minHeight: 140, textAlignVertical: 'top' }} autoFocus />
-            </Section>
-            {error ? <Text style={f.error}>{error}</Text> : null}
-            <Pressable onPress={go} disabled={!ok || busy} style={[f.primary, (!ok || busy) && { opacity: 0.45 }]} accessibilityRole="button">
-              <Text style={f.primaryText}>{busy ? 'Sending…' : 'Send'}</Text>
-            </Pressable>
-          </>
-        )}
-      </ScrollView>
-    </>
+    <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+      {sent ? (
+        <>
+          <Text style={f.lead}>Thanks! Every message is read. If it needs a reply, it goes to {acc.status === 'authed' ? acc.user.email : 'your email'}.</Text>
+          <Pressable style={f.primary} onPress={() => router.back()} accessibilityRole="button">
+            <Text style={f.primaryText}>Done</Text>
+          </Pressable>
+        </>
+      ) : (
+        <>
+          <Section
+            title="Message"
+            hint={authed ? 'A bug, an idea, something missing. Your account email is sent with it.' : `You're not signed in, so Send opens an email to ${SUPPORT_EMAIL}.`}
+          >
+            <Input value={message} onChangeText={setMessage} placeholder="What's on your mind?" multiline maxLength={4000} style={{ minHeight: 140, textAlignVertical: 'top' }} autoFocus />
+          </Section>
+          {error ? <Text style={f.error}>{error}</Text> : null}
+          <Pressable onPress={go} disabled={!ok || busy} style={[f.primary, (!ok || busy) && { opacity: 0.45 }]} accessibilityRole="button">
+            <Text style={f.primaryText}>{busy ? 'Sending…' : 'Send'}</Text>
+          </Pressable>
+        </>
+      )}
+    </ScrollView>
   )
 }
 

@@ -13,11 +13,11 @@ import { fmtDay } from '@shared/lib/dates'
 import { countLine } from '@shared/lib/homeInsights'
 import { NEGATIVE, POSITIVE } from '@shared/lib/symptoms'
 import { type HomeInsight, openInsight } from '@/insights/useInsights'
-import { type RangeId, RangeMenu, rangeDomain, Widget } from '@/kit'
+import { Link, type RangeId, RangeMenu, rangeDomain, Widget } from '@/kit'
 import { doseText, ratingMean, weightPoints } from '@/log'
 import { isAncillary } from '@/timeline'
 import { C, F, type Tone, toneHex, usePalette } from '@/theme'
-import { dateTicks, fmtTick, PAD, TimeChart } from './TimeChart'
+import { dateTicks, fmtTick, PAD, TimeChart, useCardWidth } from './TimeChart'
 
 // Checked with the dataviz validator on the dark card (#15171a)
 const SYS = '#f43f5e'
@@ -65,9 +65,7 @@ export function InsightsWidget({ insights }: { insights?: HomeInsight[] }) {
         ))}
       </View>
       {insights.length > 4 ? (
-        <Pressable onPress={() => setAll((a) => !a)} hitSlop={8}>
-          <Text style={w.link}>{all ? 'Show less' : `Show ${insights.length - 4} more`}</Text>
-        </Pressable>
+        <Link label={all ? 'Show less' : `Show ${insights.length - 4} more`} onPress={() => setAll((a) => !a)} />
       ) : null}
     </Widget>
   )
@@ -125,9 +123,7 @@ export function InjectionsWidget({ compounds, injections }: { compounds: Compoun
               <Text key={t} style={w.tick}>{fmtTick(t, domain)}</Text>
             ))}
           </View>
-          <Pressable onPress={all} hitSlop={8} accessibilityRole="link">
-            <Text style={w.link}>See all {total} in Timeline ›</Text>
-          </Pressable>
+          <Link label={`See all ${total} in Timeline ›`} onPress={all} />
         </>
       ) : null}
     </Widget>
@@ -145,7 +141,8 @@ function Lane({ name, color, shots, domain, labels, chart }: {
   chart?: boolean
 }) {
   const pal = usePalette()
-  const [width, setWidth] = useState(0)
+  const cardWidth = useCardWidth()
+  const [width, setWidth] = useState(chart ? cardWidth - (PAD.l - 6) - (PAD.r - 6) : cardWidth)
   const H = labels ? 38 : 22
   const x = (t: number) => 6 + ((t - domain[0]) / (domain[1] - domain[0] || 1)) * (width - 12)
   const lastShot = shots[shots.length - 1]
@@ -159,26 +156,24 @@ function Lane({ name, color, shots, domain, labels, chart }: {
         <Text style={w.laneMeta}>{shots.length} · last {doseText(lastShot, { drew: true })} {format(Date.parse(lastShot.takenAt), 'EEE d MMM')}</Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[{ height: H }, chart && { marginLeft: PAD.l - 6, marginRight: PAD.r - 6 }]}>
-        {width ? (
-          <Svg width={width} height={H}>
-            <Line x1={0} x2={width} y1={H - 8} y2={H - 8} stroke={pal.line} strokeWidth={1} />
-            {shots.map((s) => {
-              const cx = x(Date.parse(s.takenAt))
-              const show = labels && cx - lastLabelX > 34
-              if (show) lastLabelX = cx
-              return (
-                <Fragment key={s.id}>
-                  <Circle cx={cx} cy={H - 8} r={4.5} fill={color} stroke={pal.card} strokeWidth={2} />
-                  {show ? (
-                    <SvgText x={cx} y={H - 18} fontSize={10} fontFamily={F.mono} fill={pal.muted} textAnchor="middle">
-                      {s.dose != null ? String(s.dose) : ''}
-                    </SvgText>
-                  ) : null}
-                </Fragment>
-              )
-            })}
-          </Svg>
-        ) : null}
+        <Svg width={width} height={H}>
+          <Line x1={0} x2={width} y1={H - 8} y2={H - 8} stroke={pal.line} strokeWidth={1} />
+          {shots.map((s) => {
+            const cx = x(Date.parse(s.takenAt))
+            const show = labels && cx - lastLabelX > 34
+            if (show) lastLabelX = cx
+            return (
+              <Fragment key={s.id}>
+                <Circle cx={cx} cy={H - 8} r={4.5} fill={color} stroke={pal.card} strokeWidth={2} />
+                {show ? (
+                  <SvgText x={cx} y={H - 18} fontSize={10} fontFamily={F.mono} fill={pal.muted} textAnchor="middle">
+                    {s.dose != null ? String(s.dose) : ''}
+                  </SvgText>
+                ) : null}
+              </Fragment>
+            )
+          })}
+        </Svg>
       </View>
     </View>
   )
@@ -301,7 +296,6 @@ const w = StyleSheet.create({
   rowTitle: { fontFamily: F.semi, fontSize: 16, color: C.fg, lineHeight: 21 },
   rowSub: { fontFamily: F.body, fontSize: 14, color: C.muted, lineHeight: 19 },
   chev: { fontSize: 22, color: C.faint },
-  link: { fontFamily: F.semi, fontSize: 14, color: C.accentInk },
   tick: { fontFamily: F.mono, fontSize: 10, color: C.faint },
   laneHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot: { width: 8, height: 8, borderRadius: 4 },

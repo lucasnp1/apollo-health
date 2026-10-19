@@ -1,5 +1,5 @@
 // Change the password while signed in. The current one is asked again; every other device is signed out after.
-import { router, Stack } from 'expo-router'
+import { router } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { passwordOk } from '@shared/lib/password'
@@ -51,37 +51,34 @@ export default function ChangePassword() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ title: 'Change password' }} />
-      <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
-        {done ? (
-          <>
-            <Text style={r.lead}>Password changed. Any other phone or browser signed in to this account has been signed out.</Text>
-            <Pressable style={r.primary} onPress={() => router.back()} accessibilityRole="button">
-              <Text style={r.primaryText}>Done</Text>
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <Section title="Current password">
-              <Input value={current} onChangeText={setCurrent} placeholder="Current password" secureTextEntry textContentType="password" autoComplete="current-password" />
-            </Section>
-            <Section title="New password">
-              <Input value={next} onChangeText={setNext} placeholder="New password" secureTextEntry textContentType="newPassword" autoComplete="new-password" />
-              <PasswordRules password={next} />
-            </Section>
-            <Section title="Confirm new password" hint={mismatch ? "The passwords don't match." : undefined}>
-              <Input value={confirm} onChangeText={setConfirm} placeholder="New password again" secureTextEntry textContentType="newPassword" autoComplete="new-password" onSubmitEditing={go} />
-            </Section>
-            {error ? <Text style={r.error}>{error}</Text> : null}
-            <Pressable onPress={go} disabled={!ok || busy} style={[r.primary, (!ok || busy) && { opacity: 0.45 }]} accessibilityRole="button">
-              <Text style={r.primaryText}>{busy ? 'One moment…' : 'Change password'}</Text>
-            </Pressable>
-            <Text style={r.small}>Other phones and browsers signed in to this account will be signed out.</Text>
-          </>
-        )}
-      </ScrollView>
-    </>
+    <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+      {done ? (
+        <>
+          <Text style={r.lead}>Password changed. Any other phone or browser signed in to this account has been signed out.</Text>
+          <Pressable style={r.primary} onPress={() => router.back()} accessibilityRole="button">
+            <Text style={r.primaryText}>Done</Text>
+          </Pressable>
+        </>
+      ) : (
+        <>
+          <Section title="Current password">
+            <Input value={current} onChangeText={setCurrent} placeholder="Current password" secureTextEntry textContentType="password" autoComplete="current-password" />
+          </Section>
+          <Section title="New password">
+            <Input value={next} onChangeText={setNext} placeholder="New password" secureTextEntry textContentType="newPassword" autoComplete="new-password" />
+            <PasswordRules password={next} />
+          </Section>
+          <Section title="Confirm new password" hint={mismatch ? "The passwords don't match." : undefined}>
+            <Input value={confirm} onChangeText={setConfirm} placeholder="New password again" secureTextEntry textContentType="newPassword" autoComplete="new-password" onSubmitEditing={go} />
+          </Section>
+          {error ? <Text style={r.error}>{error}</Text> : null}
+          <Pressable onPress={go} disabled={!ok || busy} style={[r.primary, (!ok || busy) && { opacity: 0.45 }]} accessibilityRole="button">
+            <Text style={r.primaryText}>{busy ? 'One moment…' : 'Change password'}</Text>
+          </Pressable>
+          <Text style={r.small}>Other phones and browsers signed in to this account will be signed out.</Text>
+        </>
+      )}
+    </ScrollView>
   )
 }
 

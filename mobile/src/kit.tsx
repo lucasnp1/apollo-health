@@ -125,6 +125,13 @@ export const s = StyleSheet.create({
   h1: { flexShrink: 1, fontFamily: F.semi, fontSize: 32, letterSpacing: -0.6, color: C.fg },
   pillPrimary: { backgroundColor: C.primary, borderColor: C.primary },
   pillText: { fontFamily: F.semi, fontSize: 14, color: C.fg, textAlign: 'center' },
+  primary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.primary, borderRadius: 12, paddingVertical: 15 },
+  primaryText: { fontFamily: F.semi, fontSize: 17, color: C.primaryFg },
+  outline: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: C.input, borderRadius: 12, paddingVertical: 13 },
+  outlineText: { fontFamily: F.semi, fontSize: 14, color: C.fg },
+  add: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: C.input, borderStyle: 'dashed' },
+  addText: { fontFamily: F.semi, fontSize: 15, color: C.accentInk },
+  link: { fontFamily: F.semi, fontSize: 14, color: C.accentInk },
   when: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 54, paddingVertical: 6, paddingRight: 8, borderRadius: 12 },
   whenLabel: { fontFamily: F.medium, fontSize: 16, color: C.fg },
 })
@@ -215,6 +222,29 @@ export function Pill({ label, onPress, primary, icon }: { label: string; onPress
     <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={({ pressed }) => [s.pill, primary && s.pillPrimary, pressed && { opacity: 0.7 }]}>
       {icon ? <SymbolView name={icon} size={14} tintColor={primary ? pal.primaryFg : pal.fg} /> : null}
       <Text style={[s.pillText, primary && { color: C.primaryFg }]}>{label}</Text>
+    </Pressable>
+  )
+}
+
+/**
+ * A full-size button. `primary` is the screen's one amber action, `outline` a secondary one (several share a row),
+ * `add` a dashed pill that adds another of something.
+ */
+export function Button({ label, onPress, kind = 'primary', icon }: { label: string; onPress: () => void; kind?: 'primary' | 'outline' | 'add'; icon?: SymbolViewProps['name'] }) {
+  const pal = usePalette()
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [s[kind], pressed && { opacity: 0.75 }]}>
+      {icon ? <SymbolView name={icon} size={kind === 'primary' ? 18 : 14} tintColor={kind === 'primary' ? pal.primaryFg : kind === 'add' ? pal.accentInk : pal.fg} /> : null}
+      <Text style={s[`${kind}Text`]}>{label}</Text>
+    </Pressable>
+  )
+}
+
+/** A line of accent text that does something: "Show 3 more", "See all in Timeline ›". */
+export function Link({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={({ pressed }) => pressed && { opacity: 0.7 }}>
+      <Text style={s.link}>{label}</Text>
     </Pressable>
   )
 }

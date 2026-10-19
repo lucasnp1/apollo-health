@@ -1,6 +1,6 @@
 // The Timeline's rows, built from the logged data. Mirrors the web's views/Timeline.tsx "All" feed (titles, subs,
 // statuses), minus labs and files until those land in the app.
-import { differenceInCalendarDays, format, isToday, isYesterday, parseISO } from 'date-fns'
+import { differenceInCalendarDays, format, isToday, isYesterday } from 'date-fns'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '@shared/lib/db'
 import type { LabTest } from '@shared/lib/labTests'
 import { compoundGroups, groupByCompoundId } from '@shared/lib/compounds'
@@ -59,7 +59,7 @@ export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog
       const anc = isAncillary(i)
       const name = c?.name ?? (anc ? 'Ancillary' : 'Injection')
       return {
-        id: `i-${i.id}`, kind: anc ? 'ancillary' : 'injection', table: 'injections', rowId: i.id!, date: parseISO(i.takenAt),
+        id: `i-${i.id}`, kind: anc ? 'ancillary' : 'injection', table: 'injections', rowId: i.id!, date: new Date(i.takenAt),
         title: dose ? `${name} · ${dose}` : name,
         sub: anc ? facts(i.route === 'Oral' ? 'by mouth' : 'other') : facts(i.site, i.route, i.vialAmount && `drew ${i.vialAmount}`, i.needle),
         status: LOGGED, note: i.notes, dot: c?.color, group: c?.key,
@@ -68,7 +68,7 @@ export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog
     ...weights.map((w, n): Event => {
       const delta = n > 0 ? w.weightKg! - weights[n - 1].weightKg! : undefined
       return {
-        id: `w-${w.id}`, kind: 'weight', table: 'bodyMetrics', rowId: w.id!, date: parseISO(w.measuredAt),
+        id: `w-${w.id}`, kind: 'weight', table: 'bodyMetrics', rowId: w.id!, date: new Date(w.measuredAt),
         title: `Weight ${w.weightKg} kg`,
         sub: facts(
           delta === undefined ? 'first entry' : Math.abs(delta) >= 0.05 ? `${arrow(delta)} vs last` : 'no change vs last',
@@ -80,7 +80,7 @@ export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog
     ...d.vitals.map((v): Event => {
       const st = bpStatus(v.systolic, v.diastolic)
       return {
-        id: `v-${v.id}`, kind: 'bp', table: 'vitals', rowId: v.id!, date: parseISO(v.measuredAt),
+        id: `v-${v.id}`, kind: 'bp', table: 'vitals', rowId: v.id!, date: new Date(v.measuredAt),
         title: `Blood pressure ${v.systolic}/${v.diastolic}`,
         sub: facts(v.pulse ? `pulse ${v.pulse}` : undefined, st.label.toLowerCase()),
         status: st.tone === 'good' ? { label: 'In range', tone: 'good' } : st.tone === 'warn' ? { label: 'Monitor', tone: 'warn' } : st,
@@ -100,14 +100,15 @@ export function buildEvents(d: { compounds: Compound[]; injections: InjectionLog
         else if (t !== 'neutral') watch.push(def.label)
       }
       return {
-        id: `s-${s.id}`, kind: 'symptom', table: 'symptoms', rowId: s.id!, date: parseISO(s.recordedAt),
+        id: `s-${s.id}`, kind: 'symptom', table: 'symptoms', rowId: s.id!, date: new Date(s.recordedAt),
         title: 'Check-in', sub: first.join(' · ') || undefined,
         status: watch.length ? { label: `${watch.length} to watch`, tone: 'warn' } : good ? { label: 'Feeling good', tone: 'good' } : LOGGED,
         note: s.notes,
       }
     }),
+    // A bare draw day ("2026-10-19") is local midnight; `new Date` alone would read it as UTC
     ...(d.tests ?? []).map((t): Event => ({
-      id: `e-${t.id}`, kind: 'lab', table: 'test', rowId: t.id, date: parseISO(t.date), dateOnly: true,
+      id: `e-${t.id}`, kind: 'lab', table: 'test', rowId: t.id, date: new Date(t.date.length === 10 ? `${t.date}T00:00` : t.date), dateOnly: true,
       title: t.title,
       sub: facts(t.provider, `${t.counts.total} result${t.counts.total === 1 ? '' : 's'}`),
       status: t.counts.outOfLabRange ? { label: `${t.counts.outOfLabRange} outside range`, tone: 'warn' } : LOGGED,
@@ -131,7 +132,7 @@ export function dayTitle(d: Date, now = new Date()): string {
 export function byDay(events: Event[]): { title: string; data: Event[] }[] {
   const out: { key: string; title: string; data: Event[] }[] = []
   for (const e of events) {
-    const key = format(e.date, 'yyyy-MM-dd')
+    const key = e.date.toDateString()
     const last = out[out.length - 1]
     if (last?.key === key) last.data.push(e)
     else out.push({ key, title: dayTitle(e.date), data: [e] })

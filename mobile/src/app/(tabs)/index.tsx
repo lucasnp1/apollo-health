@@ -3,7 +3,7 @@
 import { format } from 'date-fns'
 import { type Href, router } from 'expo-router'
 import { SymbolView, type SymbolViewProps } from 'expo-symbols'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useMemo } from 'react'
 import { type ColorValue, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Polyline } from 'react-native-svg'
@@ -34,9 +34,6 @@ const LAUNCH: Launch[] = [
 export default function Home() {
   const insets = useSafeAreaInsets()
   const pal = usePalette()
-  // The top of Home draws first; the charts below it a frame later, so the app opens without waiting on them
-  const [below, setBelow] = useState(false)
-  useEffect(() => void requestAnimationFrame(() => setBelow(true)), [])
   const compounds = useCompounds()
   const injections = useInjections()
   const vitals = useVitals()
@@ -141,14 +138,10 @@ export default function Home() {
       </View>
 
       <InsightsWidget insights={insights} />
-      {below ? (
-        <>
       <InjectionsWidget compounds={compounds} injections={injections} />
       <WellbeingWidget symptoms={symptoms} compounds={compounds} injections={injections} />
       <WeightWidget bodyMetrics={bodyMetrics} injections={injections} />
       <PressureWidget vitals={vitals} />
-        </>
-      ) : null}
 
       <Widget
         eyebrow="Latest"
