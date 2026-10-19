@@ -17,6 +17,8 @@ export type Env = {
   APPLE_TEAM_ID?: string
   APPLE_KEY_ID?: string
   APPLE_PRIVATE_KEY?: string
+  // Sign in with Google: the OAuth client IDs whose tokens are accepted (comma separated; the iOS client)
+  GOOGLE_CLIENT_IDS?: string
   // Transactional email (password resets) via Resend. Dormant until both are set.
   RESEND_API_KEY?: string
   MAIL_FROM?: string // e.g. "Magno <no-reply@example.com>"
@@ -63,6 +65,7 @@ export type AuthedUser = {
   onboarded?: boolean
   // Signed in with Apple; has_password false for an account made with Apple and no password set yet
   apple?: boolean
+  google?: boolean
   has_password?: boolean
 }
 

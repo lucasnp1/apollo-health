@@ -2,45 +2,20 @@
 // expiry), and, when the Sign in with Apple key is configured, turn the one-time authorization code into a refresh
 // token so the login can be revoked when the account is deleted (App Review 5.1.1(v)). No SDK: Web Crypto only.
 import type { Env } from './types'
+import { verifyRs256 } from './jwt'
 
 const ISSUER = 'https://appleid.apple.com'
 const bundleId = (env: Env) => env.APPLE_BUNDLE_ID || 'app.magno.ios'
-
-type Jwk = JsonWebKey & { kid: string }
-let keys: { at: number; list: Jwk[] } | undefined
-
-async function appleKeys(force = false): Promise<Jwk[]> {
-  if (!force && keys && Date.now() - keys.at < 3_600_000) return keys.list
-  const res = await fetch(`${ISSUER}/auth/keys`)
-  if (!res.ok) throw new Error(`Apple keys ${res.status}`)
-  keys = { at: Date.now(), list: ((await res.json()) as { keys: Jwk[] }).keys }
-  return keys.list
-}
-
-const b64url = (s: string) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(s.length / 4) * 4, '=')), (c) => c.charCodeAt(0))
-const json = (part: string) => JSON.parse(new TextDecoder().decode(b64url(part)))
 
 export type AppleIdentity = { sub: string; email?: string; emailVerified: boolean }
 
 /** The person in a valid identity token, or null. */
 export async function verifyIdentityToken(env: Env, token: string): Promise<AppleIdentity | null> {
-  const parts = token.split('.')
-  if (parts.length !== 3) return null
-  let header: { kid?: string; alg?: string }
-  let claims: { iss?: string; aud?: string | string[]; exp?: number; sub?: string; email?: string; email_verified?: boolean | string }
-  try {
-    header = json(parts[0])
-    claims = json(parts[1])
-  } catch {
-    return null
-  }
-  if (header.alg !== 'RS256' || !header.kid) return null
-  let jwk = (await appleKeys()).find((k) => k.kid === header.kid)
-  if (!jwk) jwk = (await appleKeys(true)).find((k) => k.kid === header.kid) // Apple rotated its keys
-  if (!jwk) return null
-  const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify'])
-  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64url(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`))
-  if (!ok) return null
+  const claims = await verifyRs256<{ iss?: string; aud?: string | string[]; exp?: number; sub?: string; email?: string; email_verified?: boolean | string }>(
+    token,
+    `${ISSUER}/auth/keys`,
+  )
+  if (!claims) return null
   const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud]
   if (claims.iss !== ISSUER || !aud.includes(bundleId(env)) || !claims.sub || !claims.exp || claims.exp * 1000 < Date.now()) return null
   return {

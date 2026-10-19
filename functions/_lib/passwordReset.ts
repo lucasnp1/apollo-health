@@ -24,7 +24,7 @@ export async function applyNewPasswordAndSignIn(
 
   await env.DB.batch([
     env.DB
-      .prepare(`UPDATE users SET password_hash = ?, password_salt = ?, algorithm = 'argon2id', iterations = 0, updated_at = ? WHERE id = ?`)
+      .prepare(`UPDATE users SET password_hash = ?, password_salt = ?, algorithm = 'argon2id', iterations = 0, has_password = 1, updated_at = ? WHERE id = ?`)
       .bind(hash, serializeSalt(salt), now, user.id),
     ...extra,
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),

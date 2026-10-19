@@ -39,7 +39,7 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
 
   await env.DB.batch([
     env.DB
-      .prepare(`UPDATE users SET password_hash = ?, password_salt = ?, algorithm = 'argon2id', iterations = 0, updated_at = ? WHERE id = ?`)
+      .prepare(`UPDATE users SET password_hash = ?, password_salt = ?, algorithm = 'argon2id', iterations = 0, has_password = 1, updated_at = ? WHERE id = ?`)
       .bind(hash, serializeSalt(salt), now, auth.user.id),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').bind(auth.user.id, keep),
     env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(auth.user.id),
