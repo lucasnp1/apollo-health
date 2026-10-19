@@ -1,5 +1,6 @@
 // One "What needs a look" row, in full: what it's about, the numbers behind it, why it tends to happen on a protocol,
-// and what people usually do. Common practice, not advice; the web's copy (src/lib/homeInsights.ts).
+// The web's copy (src/lib/homeInsights.ts) minus "what people usually do": the iPhone app flags and explains, it never
+// says what to do (decided by Lucas for App Review, 19 Oct 2026).
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -51,18 +52,6 @@ export default function InsightScreen() {
             <Eyebrow>Why it happens on a protocol</Eyebrow>
             {i.causes.map((c) => (
               <Text key={c} style={s.bullet}>•  {c}</Text>
-            ))}
-          </View>
-        ) : null}
-        {i.practices?.length ? (
-          <View style={{ gap: 8 }}>
-            <Eyebrow>What people usually do</Eyebrow>
-            <Text style={s.small}>Common practice on a protocol, not a recommendation. Talk to your doctor.</Text>
-            {i.practices.map((p, n) => (
-              <Text key={p} style={s.bullet}>
-                <Text style={{ fontFamily: F.mono, color: C.accentInk }}>{n + 1}. </Text>
-                {p}
-              </Text>
             ))}
           </View>
         ) : null}

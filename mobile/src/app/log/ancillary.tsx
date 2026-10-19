@@ -3,16 +3,20 @@
 // the compound as category Ancillary. What it was for (a side effect from the check-in list) is a "For:" line under the
 // note, as syringe and vial are; the Wellbeing widget shows these next to the side-effect line.
 import { useMemo, useState } from 'react'
+import { Text, View } from 'react-native'
 import { compoundGroups, findCompoundByName, randomDistinctColor } from '@shared/lib/compounds'
 import { db, type InjectionLog, type Unit } from '@shared/lib/db'
 import { customDefs, NEGATIVE } from '@shared/lib/symptoms'
 import { useCompounds, useInjections, useSymptoms } from '@/data/useLog'
-import { Chips, Input, Section, Segmented, When } from '@/kit'
+import { FieldRow, Input, MenuPicker, s as kit, Section, Segmented, When } from '@/kit'
 import { LogForm, num } from '@/LogForm'
 import { useDirty, useEditRow } from '@/logging/useEntry'
 import { isAncillary } from '@/timeline'
 
 const NEW = '__new'
+const OTHER = '__other'
+// Why people commonly take an ancillary: a side effect or a marker they're managing. Picking one records it, nothing more.
+const REASONS = ['High estradiol', 'Water retention', 'Nipple sensitivity', 'Hair loss', 'Acne', 'High prolactin', 'Blood pressure', 'Cholesterol', 'Liver support', 'Sleep', 'Libido', 'Joint pain', 'Fertility']
 const UNITS: { value: Unit; label: string }[] = [
   { value: 'mg', label: 'mg' },
   { value: 'mcg', label: 'mcg' },
@@ -72,8 +76,14 @@ export default function LogAncillary() {
     return list.sort((a, b) => (used.get(b.id!) ?? 0) - (used.get(a.id!) ?? 0)).map((c) => ({ value: String(c.id), label: c.name, dot: c.color }))
   }, [compounds, injections, id, pick])
 
-  // The side effects you can tick: the built-in ones and any you track yourself
-  const sides = useMemo(() => [...NEGATIVE, ...customDefs(symptoms).filter((d) => d.direction === 'negative')].map((d) => d.label), [symptoms])
+  // What it's for: the common reasons, the side effects you track, and any reason you typed before
+  const [newReason, setNewReason] = useState(false)
+  const reasons = useMemo(() => {
+    const typed = injections.filter(isAncillary).flatMap((i) => splitNote(i.notes).forList)
+    const sides = [...NEGATIVE, ...customDefs(symptoms).filter((d) => d.direction === 'negative')].map((d) => d.label)
+    const all = [...REASONS, ...sides, ...typed, ...forList.filter(() => !newReason)]
+    return [...new Map(all.map((r) => [r.toLowerCase(), r])).values()]
+  }, [injections, symptoms, forList, newReason])
 
   // Picking one you've used brings back its last dose and unit
   function choose(v: string | undefined) {
@@ -126,17 +136,25 @@ export default function LogAncillary() {
       archive={id !== undefined ? { table: 'injections', id } : undefined}
     >
       <Section title="What you took" hint={options.length ? undefined : 'For example anastrozole, cabergoline or finasteride.'}>
-        {options.length && id === undefined ? (
-          <Chips options={[...options, { value: NEW, label: '+ Something else' }]} value={pick} onChange={choose} />
+        {options.length ? (
+          <FieldRow label="Ancillary">
+            {id !== undefined ? (
+              <Text style={kit.whenLabel}>{options.find((o) => o.value === pick)?.label ?? ''}</Text>
+            ) : (
+              <MenuPicker
+                value={pick ?? ''}
+                options={[...(pick ? [] : [{ value: '', label: 'Choose' }]), ...options, { value: NEW, label: 'Something else…' }]}
+                onChange={(v) => v && choose(v)}
+              />
+            )}
+          </FieldRow>
         ) : null}
-        {id !== undefined ? (
-          <Chips options={options.filter((o) => o.value === pick)} value={pick} onChange={() => {}} />
-        ) : pick === NEW || !options.length ? (
+        {id === undefined && (pick === NEW || !options.length) ? (
           <Input
             autoFocus={!options.length || pick === NEW}
             autoCorrect={false}
             autoCapitalize="words"
-            placeholder="Name"
+            placeholder="Name, e.g. Finasteride"
             value={name}
             onChangeText={(t) => {
               setName(t)
@@ -148,16 +166,34 @@ export default function LogAncillary() {
       </Section>
 
       <Section title="Amount" hint="Optional. Saved exactly as you type it.">
-        <Input keyboardType="decimal-pad" placeholder="e.g. 0.5" value={dose} onChangeText={setDose} accessibilityLabel="Amount" />
-        <Chips options={UNITS} value={unit} onChange={(u) => u && setUnit(u)} />
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          <View style={{ flex: 1 }}>
+            <Input keyboardType="decimal-pad" placeholder="e.g. 0.5" value={dose} onChangeText={setDose} accessibilityLabel="Amount" />
+          </View>
+          <FieldRow label="Unit">
+            <MenuPicker value={unit} options={UNITS} onChange={setUnit} />
+          </FieldRow>
+        </View>
       </Section>
 
       <Section title="How">
         <Segmented value={form} onChange={setForm} options={[{ value: 'Oral', label: 'By mouth' }, { value: 'Other', label: 'Other (cream, spray...)' }]} />
       </Section>
 
-      <Section title="Taken for" hint="Optional. The side effects it's meant to help with, so you can see them together on Home.">
-        <MultiChips options={sides} value={forList} onChange={setForList} />
+      <Section title="Taken for" hint="Optional. Shown next to how you've felt on Home.">
+        <FieldRow label="Reason">
+          <MenuPicker
+            value={newReason ? OTHER : (forList[0] ?? '')}
+            options={[{ value: '', label: 'Not noted' }, ...reasons.map((r) => ({ value: r, label: r })), { value: OTHER, label: 'New reason…' }]}
+            onChange={(v) => {
+              setNewReason(v === OTHER)
+              setForList(v && v !== OTHER ? [v] : [])
+            }}
+          />
+        </FieldRow>
+        {newReason ? (
+          <Input autoFocus placeholder="e.g. Hair loss" value={forList[0] ?? ''} onChangeText={(t) => setForList(t.trim() ? [t] : [])} autoCapitalize="sentences" accessibilityLabel="New reason" />
+        ) : null}
       </Section>
 
       <When value={when} onChange={setWhen} />
@@ -166,18 +202,5 @@ export default function LogAncillary() {
         <Input placeholder="Optional" value={notes} onChangeText={setNotes} multiline />
       </Section>
     </LogForm>
-  )
-}
-
-/** Tick any number. */
-function MultiChips({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
-  const all = [...options, ...value.filter((v) => !options.includes(v))]
-  return (
-    <Chips
-      options={all.map((o) => ({ value: o, label: o }))}
-      value={undefined}
-      selected={value}
-      onChange={(o) => o && onChange(value.includes(o) ? value.filter((x) => x !== o) : [...value, o])}
-    />
   )
 }

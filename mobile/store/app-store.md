@@ -20,7 +20,7 @@ in the notes below so he can check them.
 | Copyright | `2026 Lucas Paraizo` | |
 | Support URL | `https://magno.fit` | |
 | Marketing URL | `https://magno.fit` | |
-| Privacy policy URL | `https://magno.fit/privacy.html` | |
+| Privacy policy URL | `https://magno.fit/privacy` | |
 
 Name and subtitle say "protocol", never "TRT" or a drug name (the playbook's copy rule; Apple 1.4.3 and the ad rules
 in references/regulatory-risk.md). "peptide" in keywords is a search word only, never a promise; drop it if review asks.
@@ -37,27 +37,28 @@ LOG IT IN SECONDS
 • Log now or any time before: pick the date and time
 
 YOUR BLOOD TESTS, READABLE
-• Import a lab report from a PDF or a photo. It's read on your iPhone, and you check every value before it's saved
+• Import a lab report from a PDF, a photo or a spreadsheet. It's read on your iPhone, and you check every value before it's saved
 • Or type results in by hand
-• Every result against your lab's own reference range
+• Every result against your lab's own reference range, or a target range you set with your doctor
 • Each marker over time, across all your tests
 
 SEE IT TOGETHER
-• Your doses and your lab results on the same timeline
-• Weight and blood pressure trends
-• Home shows what you logged last and your week at a glance
+• Every shot by compound, with the dose and the day
+• Weight, blood pressure and pulse, from Apple Health or typed in
+• How you've felt, next to the ancillaries you took for side effects
+• Reminders you set yourself, and a clean PDF or spreadsheet for your doctor
 
 YOURS
 • No account needed: everything stays on your iPhone
-• With a free Magno account it's backed up and the same on magno.fit
-• Export everything any time, free
+• With a Magno account it's backed up and the same on your other devices
+• Export everything any time, on every plan
 • Delete your account from the app, any time
 • No ads, no trackers
 
 Magno is a log. It records what you did and what your tests measured. It does not diagnose, treat or prevent any condition, it never works out a dose, and it is not a medical device. Talk to your doctor about your treatment and your results.
 
 MAGNO PRO
-Pro imports blood tests from a PDF or photo and shows what changed since your last test. It comes as a monthly subscription (first month free) or a single lifetime purchase. Pro bought on magno.fit works here when you sign in.
+Pro imports blood tests from a PDF, photo or spreadsheet, explains in plain words which results are outside your lab's range and how related markers sit together, and shows what changed since your last test. It comes as a monthly subscription (first month free) or a single lifetime purchase.
 
 Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period, and are charged to your Apple ID. Manage or cancel them in Settings.
 
@@ -99,15 +100,19 @@ purchases count there too. Then set `extra.billing.live` to `true`. Blocked toda
 - Regulated medical device declaration: **No, not a regulated medical device in any country.** Content rights: no
   third-party content.
 
-## Review notes
+## Review notes (rewritten 19 Oct 2026, build 5)
 
 ```
 Magno is a personal log for people on a hormone or peptide protocol prescribed by their doctor. It records what the user did and what their lab tests measured.
 
-It does not calculate doses: the dose and the amount drawn are two separate fields saved exactly as typed, and nothing is converted or suggested (Guideline 1.4.2). It does not estimate hormone levels or interpret results: lab values are shown as the lab printed them, against the lab's own reference range (1.4.1). It never sells or links to any substance (1.4.3).
+Dosing: Magno never calculates a dose. The dose and the amount drawn are two separate fields saved exactly as typed; nothing is converted or suggested (Guideline 1.4.2).
+
+Lab results: values are shown as the lab printed them, against the lab's own reference range (or a range the user enters from their doctor). Magno Pro adds short explanations: which results are outside the range, how related markers sit together (for example testosterone and estradiol), and why a marker commonly moves on a protocol. It does not diagnose, does not estimate hormone levels, and never tells the user what to take, what to change or when to act; the app states that it is not medical advice (1.4.1). It never sells or links to any substance (1.4.3).
+
+Apple Health: with the user's permission it reads and writes weight and blood pressure only, and never deletes anything in Health.
 
 No account is needed; every feature except backup works signed out. Account deletion: You > Delete account.
-Lab import reads PDFs with PDFKit and photos with Apple's Vision framework, on the device.
+Lab import reads PDFs with PDFKit, photos with Vision and spreadsheets on the device; nothing is uploaded.
 Magno Pro is free for everyone in this version (billing is not live yet).
 ```
 
@@ -126,7 +131,7 @@ Magno Pro is free for everyone in this version (billing is not live yet).
 - [x] TestFlight build 1 uploaded and processed 18 Oct 2026 ("Ready to submit", invite sent); internal group "Me" (Lucas, automatic distribution). Next uploads:
       `mobile/scripts/testflight.sh` (bumps the build number).
 - [ ] Lucas tests build 1 on his iPhone.
-- [ ] Build 2 (18 Oct night) brings the plain-words reads of results back. Before submitting: rewrite the review notes
-      (they say results are not interpreted), recheck the age-rating "Medical info" answer and the description's
-      "It does not interpret" lines.
+- [x] Plain-words reads: from build 5 the app flags and explains but never says what to do ("what people usually do"
+      and retest lines removed, Lucas 19 Oct 2026). Review notes and description rewritten to match; age rating stays
+      "Medical or Treatment Information: Infrequent".
 - [x] Release: manual (set). Review contact: Lucas, same as Liber's. Sign-in required: off.

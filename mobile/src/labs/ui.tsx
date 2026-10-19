@@ -3,7 +3,7 @@
 import { memo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { CORE_KEYS } from '@shared/lib/labRules'
-import { fmtRange, retestLine } from '@shared/lib/labRules'
+import { fmtRange } from '@shared/lib/labRules'
 import { type LabTest, printedValue, prevText, type TestMarker } from '@shared/lib/labTests'
 import { fmtDay } from '@shared/lib/dates'
 import { markerChip } from '@/labs/reads'
@@ -54,8 +54,8 @@ export function attentionOf(t: LabTest, pro: boolean): TestMarker[] {
 }
 
 /**
- * One marker of one test. With `attention` (Pro) it shows Magno's reason and what people usually do instead of the
- * range bar, plus when to retest; otherwise the value against the lab's range and the change since last time.
+ * One marker of one test. With `attention` (Pro) it shows why it was flagged instead of the range bar (never what to
+ * do about it: App Review, 19 Oct 2026); otherwise the value against the lab's range and the change since last time.
  */
 export const MarkerRow = memo(function MarkerRow({ m, pro, attention, printed, onPress, first }: {
   m: TestMarker
@@ -67,7 +67,6 @@ export const MarkerRow = memo(function MarkerRow({ m, pro, attention, printed, o
 }) {
   const chip = markerChip(m, pro)
   const flag = m.labFlag === 'high' ? 'H' : m.labFlag === 'low' ? 'L' : undefined
-  const retest = attention && pro && m.retestBy ? retestLine(m.retestBy, false) : undefined
   const change = pro && m.change ? m.change : undefined
   return (
     <Pressable onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined} style={({ pressed }) => [u.row, !first && u.sep, pressed && { opacity: 0.7 }]}>
@@ -86,8 +85,6 @@ export const MarkerRow = memo(function MarkerRow({ m, pro, attention, printed, o
       {attention && pro ? (
         <>
           {m.reason ? <Text style={u.reason}>{m.reason}</Text> : null}
-          {m.next ? <Text style={u.next}>{m.next}</Text> : null}
-          {retest ? <Text style={[u.meta, retest.overdue && { color: C.warn }]}>{retest.text}</Text> : null}
         </>
       ) : m.value !== undefined ? (
         <RangeBar value={m.value} low={m.low} high={m.high} prev={pro ? m.prev?.value : undefined} />

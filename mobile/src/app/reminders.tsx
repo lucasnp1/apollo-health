@@ -10,6 +10,7 @@ import { C, F, useScheme } from '@/theme'
 
 const LABEL: Record<Kind, { title: string; off: string }> = {
   injection: { title: 'Injections', off: 'A nudge on injection days.' },
+  ancillary: { title: 'Ancillary', off: 'A nudge on the days you take one.' },
   weight: { title: 'Weigh-in', off: 'A nudge to step on the scale.' },
   bp: { title: 'Blood pressure', off: 'A nudge to take a reading.' },
   checkin: { title: 'Check-in', off: 'A nudge to say how you feel.' },
@@ -26,7 +27,7 @@ export default function Reminders() {
   const r = useReminders()
   return (
     <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32, gap: 12 }}>
-      {(['injection', 'weight', 'bp', 'checkin'] as const).map((kind) => {
+      {(['injection', 'ancillary', 'weight', 'bp', 'checkin'] as const).map((kind) => {
         const t = r[kind]
         const interval = kind === 'injection' && r.injection.mode === 'interval'
         return (

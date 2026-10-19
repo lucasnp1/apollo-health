@@ -134,3 +134,17 @@ On `main` (apollo-health), deployed to Pages `magnohq` (magno.fit):
 - Server is_pro now means an admin or a plan set by hand. The iPhone app's Pro = RevenueCat, or that.
 - The web app's code in src/ stays: src/lib is the iPhone app's shared logic. It is simply no longer built or served.
 - People who only kept data in a browser, with no account, can no longer open it (Lucas: no customers on the web).
+
+### 19 Oct 2026: build 5
+
+- **No next steps (App Review, Lucas):** the iPhone app keeps out-of-range flags, the plain-words summary and "why it
+  happens on a protocol", but drops "What people usually do" (insight sheet, test sections, marker screen), each
+  marker's next step and "retest by" line, and the blood-letting "retest around..." nudge. Review notes and the
+  description in App Store Connect were rewritten to say so (saved 19 Oct).
+- Blood-letting crash fixed (React Compiler read `row!.id` while rendering a new entry); the sheet is now where, type,
+  date. Ancillary: one menu each for what you took, unit and "Taken for" (common reasons such as hair loss, plus your
+  side effects and "New reason…"), and ancillary reminders. Wellbeing widget: range menu in the head, no buttons.
+  Pressure widget: average in the title, average pulse under it, pulse as a third line. One PageHeader for Timeline,
+  Bloods and You (button centred on the title), one Pill size. You: Feedback button top right, Delete account at the
+  very bottom. Recovery codes stay: with reset emails off they are the only way back into an account.
+- Onboarding opens on a carousel of the real screens (the website's), assets/onboarding.

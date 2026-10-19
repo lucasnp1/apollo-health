@@ -56,7 +56,6 @@ export default function MarkerScreen() {
           {latest.value !== undefined ? <RangeBar value={latest.value} low={latest.low} high={latest.high} prev={pro ? latest.prev?.value : undefined} /> : null}
           {notLatest ? <Text style={m.warn}>Not in your latest test ({fmtDay(tests[0].date)}).</Text> : null}
           {pro && latest.reason ? <Text style={m.body}>{latest.reason}</Text> : null}
-          {pro && latest.next ? <Text style={m.muted}>{latest.next}</Text> : null}
         </Widget>
 
         {pts.length ? (
@@ -76,18 +75,6 @@ export default function MarkerScreen() {
               <>
                 <Eyebrow>Why it moves on a protocol</Eyebrow>
                 {copy.whyMoves.map((w) => <Text key={w} style={m.bullet}>•  {w}</Text>)}
-              </>
-            ) : null}
-            {pro && copy.practices.length ? (
-              <>
-                <Eyebrow>What people usually do</Eyebrow>
-                <Text style={m.muted}>Common practice on a protocol, not a recommendation. Talk to your doctor.</Text>
-                {copy.practices.map((p, n) => (
-                  <Text key={p} style={m.bullet}>
-                    <Text style={{ color: C.accentInk, fontFamily: F.mono }}>{n + 1}. </Text>
-                    {p}
-                  </Text>
-                ))}
               </>
             ) : null}
           </Widget>

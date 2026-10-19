@@ -1,6 +1,6 @@
 // One blood test as its own report: what it says overall, when it was drawn against your shots, then every section
 // with each result read against the lab's range (and, with Pro, Magno's read: act, watch, expected or fine, why, and
-// what people usually do). The read is informational and says so; it never prescribes.
+// no "what people usually do" on iOS: flags and explanations only, decided 19 Oct 2026). Informational; it never prescribes.
 import { SymbolView } from 'expo-symbols'
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { useMemo, useState } from 'react'
@@ -156,18 +156,6 @@ function Section({ sec, test, markers, pro, findings }: { sec: LabSection; test:
                 <>
                   <Text style={s.readHead}>Why it happens on a protocol</Text>
                   {f.causes.map((c) => <Text key={c} style={s.bullet}>•  {c}</Text>)}
-                </>
-              ) : null}
-              {f.practices.length ? (
-                <>
-                  <Text style={s.readHead}>What people usually do</Text>
-                  <Text style={s.small}>Common practice on a protocol, not a recommendation.</Text>
-                  {f.practices.map((p, n) => (
-                    <Text key={p} style={s.bullet}>
-                      <Text style={{ color: C.accentInk, fontFamily: F.mono }}>{n + 1}. </Text>
-                      {p}
-                    </Text>
-                  ))}
                 </>
               ) : null}
             </View>

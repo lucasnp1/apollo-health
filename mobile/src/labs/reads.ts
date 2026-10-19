@@ -1,6 +1,6 @@
 // How a test and a marker read, in words and a tone: the web's Bloods row builders (src/views/bloods/feed.ts:
 // readChip, flagChip, testChip, verdictLine), minus the web's icons and DOM. Pro gets Magno's read of each marker
-// (act / watch / expected / fine, with a reason and what people usually do); free gets the lab's own flag.
+// (act / watch / expected / fine, with a reason; the app leaves out what people usually do); free gets the lab's own flag.
 import { daysBetween } from '@shared/lib/dates'
 import type { LabTest, TestMarker } from '@shared/lib/labTests'
 import type { Tone } from '@/theme'

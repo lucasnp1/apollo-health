@@ -9,11 +9,11 @@ import { useSyncExternalStore } from 'react'
 import { Alert, AppState, Linking } from 'react-native'
 import { db } from '@shared/lib/db'
 
-export type Kind = 'injection' | 'weight' | 'bp' | 'checkin' | 'bloods'
+export type Kind = 'injection' | 'ancillary' | 'weight' | 'bp' | 'checkin' | 'bloods'
 export type Timed = { on: boolean; time: string; days: number[] }
 export type Injection = Timed & { mode: 'days' | 'interval'; intervalDays: number }
 export type Bloods = { on: boolean; everyWeeks: number }
-export type State = { injection: Injection; weight: Timed; bp: Timed; checkin: Timed; bloods: Bloods }
+export type State = { injection: Injection; ancillary: Timed; weight: Timed; bp: Timed; checkin: Timed; bloods: Bloods }
 
 const KEY = 'magno.reminders'
 const DAY = 86_400_000
@@ -22,6 +22,7 @@ const AHEAD = 8
 
 const fresh = (): State => ({
   injection: { on: false, time: '09:00', days: [1, 4], mode: 'days', intervalDays: 3.5 },
+  ancillary: { on: false, time: '08:30', days: [1, 2, 3, 4, 5, 6, 0] },
   weight: { on: false, time: '08:00', days: [1, 2, 3, 4, 5, 6, 0] },
   bp: { on: false, time: '09:00', days: [1, 2, 3, 4, 5, 6, 0] },
   checkin: { on: false, time: '20:00', days: [0] },
@@ -64,6 +65,7 @@ export async function setReminder<K extends Kind>(kind: K, patch: Partial<State[
 
 const COPY: Record<Kind, { title: string; body: string; url: string }> = {
   injection: { title: 'Injection day', body: 'Time to log your injection in Magno.', url: 'magno://log/injection' },
+  ancillary: { title: 'Ancillary', body: 'Took it? Log it in Magno.', url: 'magno://log/ancillary' },
   weight: { title: 'Weigh-in', body: 'Step on the scale and log it.', url: 'magno://log/weight' },
   bp: { title: 'Blood pressure', body: 'Take a reading and log it.', url: 'magno://log/bp' },
   checkin: { title: 'How are you feeling?', body: 'A quick check-in takes ten seconds.', url: 'magno://log/checkin' },
@@ -88,13 +90,13 @@ export async function rescheduleAll() {
   const at = (identifier: string, kind: Kind, date: Date, body?: string) =>
     Notifications.scheduleNotificationAsync({ identifier, content: content(kind, body), trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date } })
 
-  for (const kind of ['injection', 'weight', 'bp', 'checkin'] as const) {
+  for (const kind of ['injection', 'ancillary', 'weight', 'bp', 'checkin'] as const) {
     const r = state[kind]
     if (!r.on) continue
     const [hour, minute] = hm(r.time)
     if (kind === 'injection' && state.injection.mode === 'interval') {
       const every = state.injection.intervalDays
-      const last = await db.injections.orderBy('takenAt').reverse().filter((i) => !i.archivedAt && !i.deletedAtSync).first()
+      const last = await db.injections.orderBy('takenAt').reverse().filter((i) => !i.archivedAt && !i.deletedAtSync && i.route !== 'Oral' && i.route !== 'Other').first()
       // anchored on the day of the last injection, at the chosen time (nothing logged yet: today)
       const anchor = last ? new Date(last.takenAt) : new Date()
       anchor.setHours(hour, minute, 0, 0)

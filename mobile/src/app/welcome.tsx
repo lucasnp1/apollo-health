@@ -3,13 +3,14 @@
 import * as Haptics from 'expo-haptics'
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { compoundGroups, findCompoundByName, randomDistinctColor } from '@shared/lib/compounds'
 import { db } from '@shared/lib/db'
 import { type Choice, CHOICE_LABEL, setAppearance, useAppearance } from '@/appearance'
 import { useAccount } from '@/account/auth'
-import { useCompounds } from '@/data/useLog'
+import { useCompounds, useInjections } from '@/data/useLog'
+import { isAncillary } from '@/timeline'
 import { enableHealth, healthAvailable, useHealth } from '@/health'
 import { Card, FieldRow, Input, MenuPicker, s as kit, Segmented } from '@/kit'
 import Reminders from './reminders'
@@ -82,37 +83,69 @@ function Page({ title, sub, children }: { title: string; sub: string; children?:
   )
 }
 
+// Real screens, the same ones as magno.fit's "Take a look inside"
+const SLIDES = [
+  { img: require('../../assets/onboarding/home.jpg'), title: 'Everything in one place', sub: 'Shots, bloods, pressure, weight and how you feel, on one home.' },
+  { img: require('../../assets/onboarding/shot.jpg'), title: 'Log a shot in seconds', sub: 'Dose, what you drew, syringe, needle and site, with rotation.' },
+  { img: require('../../assets/onboarding/levels.jpg'), title: 'See every dose', sub: 'Each compound, each shot and its dose, by week or month.' },
+  { img: require('../../assets/onboarding/bloods.jpg'), title: 'Your bloods, readable', sub: 'Import a PDF, photo or spreadsheet. Read on your phone.' },
+  { img: require('../../assets/onboarding/analysis.jpg'), title: 'Every marker over time', sub: 'Against your lab\'s range, or your own target.' },
+  { img: require('../../assets/onboarding/export.jpg'), title: 'Ready for your doctor', sub: 'A clean PDF or spreadsheet of exactly what you choose.' },
+]
+
 function Intro() {
   const acc = useAccount()
+  const { width, height } = useWindowDimensions()
+  const [at, setAt] = useState(0)
+  // The phone shot fills most of the screen, keeping the iPhone's own proportions
+  const shotH = Math.min(height * 0.5, 470)
+  const shotW = shotH * (1320 / 2868)
   return (
-    <Page title="Welcome to Magno" sub="A clean log for your protocol, kept on your phone.">
-      <Card style={{ gap: 14 }}>
-        {[
-          ['Every shot, as you took it', 'Dose, what you drew, syringe, needle and site, with rotation.'],
-          ['Your blood tests, readable', 'Import a PDF, a photo or a spreadsheet. Each result against your lab\'s range.'],
-          ['Weight, pressure and how you feel', 'From Apple Health or typed in, on one timeline.'],
-        ].map(([t, d]) => (
-          <View key={t} style={{ gap: 2 }}>
-            <Text style={w.feature}>{t}</Text>
-            <Text style={kit.hint}>{d}</Text>
+    <View style={{ flex: 1 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 8, gap: 4 }}>
+        <Text style={w.h1}>Welcome to Magno</Text>
+        <Text style={w.sub}>A private log for your protocol, kept on your phone.</Text>
+      </View>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={(e) => setAt(Math.round(e.nativeEvent.contentOffset.x / width))}
+        style={{ flexGrow: 0, marginTop: 18 }}
+      >
+        {SLIDES.map((sl) => (
+          <View key={sl.title} style={{ width, alignItems: 'center', gap: 14 }}>
+            <View style={[w.phone, { width: shotW + 12, height: shotH + 12 }]}>
+              <Image source={sl.img} style={{ width: shotW, height: shotH, borderRadius: 26 }} resizeMode="cover" accessibilityIgnoresInvertColors />
+            </View>
+            <View style={{ alignItems: 'center', gap: 4, paddingHorizontal: 28 }}>
+              <Text style={w.slideTitle}>{sl.title}</Text>
+              <Text style={[w.sub, { textAlign: 'center' }]}>{sl.sub}</Text>
+            </View>
           </View>
         ))}
-      </Card>
-      <Text style={kit.hint}>Magno is a log, not medical advice. It never works out a dose. Talk to your doctor about your treatment.</Text>
-      {acc.status === 'authed' ? (
-        <Text style={kit.hint}>Signed in as {acc.user.email}.</Text>
-      ) : (
-        <Pressable onPress={() => router.push('/account/sign-in')} accessibilityRole="button">
-          <Text style={w.link}>Already use Magno on the web? Sign in</Text>
-        </Pressable>
-      )}
-    </Page>
+      </ScrollView>
+      <View style={w.pager}>
+        {SLIDES.map((sl, n) => <View key={sl.title} style={[w.pagerDot, n === at && { backgroundColor: C.fg, width: 16 }]} />)}
+      </View>
+      <View style={{ paddingHorizontal: 20, gap: 10, marginTop: 'auto', paddingBottom: 8 }}>
+        <Text style={[kit.hint, { textAlign: 'center' }]}>Magno is a log, not medical advice. It never works out a dose.</Text>
+        {acc.status === 'authed' ? (
+          <Text style={[kit.hint, { textAlign: 'center' }]}>Signed in as {acc.user.email}.</Text>
+        ) : (
+          <Pressable onPress={() => router.push('/account/sign-in')} accessibilityRole="button" style={{ alignSelf: 'center' }}>
+            <Text style={w.link}>Already have an account? Sign in</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
   )
 }
 
 /** What you inject: a name and a route each, so the injection sheet knows them from the first shot. */
 function Compounds() {
   const compounds = useCompounds()
+  const shots = useInjections()
   const [name, setName] = useState('')
   const [route, setRoute] = useState<'IM' | 'SubQ'>('IM')
   async function add() {
@@ -125,7 +158,9 @@ function Compounds() {
     })
     setName('')
   }
-  const list = compounds.filter((c) => !c.archived && c.category !== 'Ancillary' && c.category !== 'Supplement')
+  // Anything you've injected, or a compound that isn't filed as an ancillary (hCG is often filed as one but injected)
+  const injected = new Set(shots.filter((i) => !isAncillary(i)).map((i) => i.compoundId))
+  const list = compounds.filter((c) => !c.archived && (injected.has(c.id!) || (c.category !== 'Ancillary' && c.category !== 'Supplement')))
   return (
     <Page title="What do you inject?" sub="Add each compound once. Doses come later, when you log a shot. You can skip this.">
       {list.length ? (
@@ -196,6 +231,10 @@ const w = StyleSheet.create({
   h1: { fontFamily: F.semi, fontSize: 30, letterSpacing: -0.6, color: C.fg },
   sub: { fontFamily: F.body, fontSize: 16, color: C.muted, lineHeight: 22 },
   feature: { fontFamily: F.semi, fontSize: 16, color: C.fg },
+  phone: { borderRadius: 32, padding: 6, backgroundColor: C.card, borderWidth: StyleSheet.hairlineWidth, borderColor: C.line, boxShadow: '0 18px 40px -12px rgba(0,0,0,0.45)' },
+  slideTitle: { fontFamily: F.semi, fontSize: 21, letterSpacing: -0.3, color: C.fg, textAlign: 'center' },
+  pager: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 16 },
+  pagerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.input },
   link: { fontFamily: F.semi, fontSize: 15, color: C.accentInk },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },

@@ -13,7 +13,7 @@ import { fmtDay } from '@shared/lib/dates'
 import { countLine } from '@shared/lib/homeInsights'
 import { NEGATIVE, POSITIVE, ratingOf } from '@shared/lib/symptoms'
 import { type HomeInsight, openInsight } from '@/insights/useInsights'
-import { Pill, type RangeId, RangeMenu, rangeDomain, Widget } from '@/kit'
+import { type RangeId, RangeMenu, rangeDomain, Widget } from '@/kit'
 import { isAncillary, unitLabel } from '@/timeline'
 import { C, F, type Tone, toneHex, usePalette } from '@/theme'
 import { dateTicks, fmtTick, PAD, TimeChart } from './TimeChart'
@@ -23,6 +23,7 @@ const DAY = 86_400_000
 const SYS = '#f43f5e'
 const DIA = '#3b82f6'
 const GOOD = '#10b981'
+const PULSE = '#a78bfa'
 
 function ToneChip({ label, tone }: { label: string; tone: Tone }) {
   const t = toneHex(usePalette(), tone)
@@ -214,7 +215,7 @@ export function WellbeingWidget({ symptoms, compounds, injections }: { symptoms:
       eyebrow="Wellbeing"
       title={symptoms.length ? `${inRange.length} check-in${inRange.length === 1 ? '' : 's'} in this range` : 'How have you been feeling?'}
       sub={lastAt ? `Last check-in ${fmtDay(lastAt)}` : 'Mood, energy, sleep, libido and side effects, in ten seconds.'}
-      action={<Pill label="+ Check in" primary onPress={() => router.push('/log/checkin')} />}
+      action={<RangeMenu value={range} onChange={setRange} />}
     >
       {good.length || watch.length ? (
         <>
@@ -235,17 +236,11 @@ export function WellbeingWidget({ symptoms, compounds, injections }: { symptoms:
               ))}
             </View>
           ) : null}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={w.small}>Averages, 0 to 5.</Text>
-            <RangeMenu value={range} onChange={setRange} />
-          </View>
+          <Text style={w.small}>Averages per check-in, 0 to 5.</Text>
         </>
       ) : symptoms.length ? (
         <Text style={w.empty}>No check-ins in this range.</Text>
       ) : null}
-      <Pressable onPress={() => router.push('/log/ancillary')} hitSlop={8} accessibilityRole="button">
-        <Text style={w.link}>+ Log an ancillary</Text>
-      </Pressable>
     </Widget>
   )
 }
@@ -287,12 +282,11 @@ export function PressureWidget({ vitals }: { vitals: VitalLog[] }) {
   const shown = sorted.filter((v) => Date.parse(v.measuredAt) >= domain[0])
   const avg = (xs: number[]) => Math.round(xs.reduce((a, b) => a + b, 0) / xs.length)
   const pulses = shown.flatMap((v) => (v.pulse ? [v.pulse] : []))
-  const lastV = sorted[sorted.length - 1]
   return (
     <Widget
       eyebrow="Blood pressure"
-      title={shown.length ? `${avg(shown.map((v) => v.systolic))}/${avg(shown.map((v) => v.diastolic))} average${pulses.length ? ` · ${avg(pulses)} bpm` : ''}` : 'No readings in this range'}
-      sub={`Last ${lastV.systolic}/${lastV.diastolic}${lastV.pulse ? `, pulse ${lastV.pulse} bpm` : ''} · ${fmtDay(lastV.measuredAt)}${shown.length ? ` · ${shown.length} in this range` : ''}`}
+      title={shown.length ? `${avg(shown.map((v) => v.systolic))}/${avg(shown.map((v) => v.diastolic))} average` : 'No readings in this range'}
+      sub={pulses.length ? `Pulse ${avg(pulses)} bpm average` : undefined}
       action={<RangeMenu value={range} onChange={setRange} />}
     >
       {shown.length ? (
@@ -300,8 +294,8 @@ export function PressureWidget({ vitals }: { vitals: VitalLog[] }) {
           series={[
             { label: 'Systolic', color: SYS, points: shown.map((v) => ({ t: Date.parse(v.measuredAt), v: v.systolic })) },
             { label: 'Diastolic', color: DIA, points: shown.map((v) => ({ t: Date.parse(v.measuredAt), v: v.diastolic })) },
-          ]}
-          unit="mmHg"
+            { label: 'Pulse', color: PULSE, points: shown.flatMap((v) => (v.pulse ? [{ t: Date.parse(v.measuredAt), v: v.pulse }] : [])) },
+          ].filter((x) => x.points.length)}
           domain={domain}
         />
       ) : null}

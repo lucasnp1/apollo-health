@@ -2,6 +2,7 @@
 import { DatePicker, Host, Picker, Text as SText } from '@expo/ui/swift-ui'
 import { datePickerStyle, pickerStyle, tag, tint } from '@expo/ui/swift-ui/modifiers'
 import * as Haptics from 'expo-haptics'
+import { SymbolView, type SymbolViewProps } from 'expo-symbols'
 import { forwardRef, type ReactNode } from 'react'
 import { Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, View, type ViewStyle } from 'react-native'
 import { C, F, usePalette, useScheme } from '@/theme'
@@ -118,9 +119,12 @@ export const s = StyleSheet.create({
   widgetHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   widgetTitle: { fontFamily: F.semi, fontSize: 19, color: C.fg, letterSpacing: -0.2 },
   widgetSub: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18 },
-  pill: { borderRadius: 999, borderWidth: 1, borderColor: C.input, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.secondary },
+  // One size for every small button: 34 high, text centred both ways
+  pill: { minHeight: 34, minWidth: 34, borderRadius: 999, borderWidth: 1, borderColor: C.input, paddingHorizontal: 14, backgroundColor: C.secondary, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
+  pageRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 6 },
+  h1: { flexShrink: 1, fontFamily: F.semi, fontSize: 32, letterSpacing: -0.6, color: C.fg },
   pillPrimary: { backgroundColor: C.primary, borderColor: C.primary },
-  pillText: { fontFamily: F.semi, fontSize: 13, color: C.fg },
+  pillText: { fontFamily: F.semi, fontSize: 14, color: C.fg, textAlign: 'center' },
   when: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 54, paddingVertical: 6, paddingRight: 8, borderRadius: 12 },
   whenLabel: { fontFamily: F.medium, fontSize: 16, color: C.fg },
 })
@@ -191,10 +195,25 @@ export function Widget({ eyebrow, title, sub, action, children, onPress }: {
   )
 }
 
+/** Every tab's heading: a mono eyebrow, the big title, and one optional button on the title's line, centred on it. */
+export function PageHeader({ eyebrow, title, action }: { eyebrow?: string; title: string; action?: ReactNode }) {
+  return (
+    <View>
+      {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
+      <View style={s.pageRow}>
+        <Text style={s.h1} numberOfLines={1}>{title}</Text>
+        {action}
+      </View>
+    </View>
+  )
+}
+
 /** A small pill button for a widget's head: "3M", "+ Check in". */
-export function Pill({ label, onPress, primary }: { label: string; onPress: () => void; primary?: boolean }) {
+export function Pill({ label, onPress, primary, icon }: { label: string; onPress: () => void; primary?: boolean; icon?: SymbolViewProps['name'] }) {
+  const pal = usePalette()
   return (
     <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={({ pressed }) => [s.pill, primary && s.pillPrimary, pressed && { opacity: 0.7 }]}>
+      {icon ? <SymbolView name={icon} size={14} tintColor={primary ? pal.primaryFg : pal.fg} /> : null}
       <Text style={[s.pillText, primary && { color: C.primaryFg }]}>{label}</Text>
     </Pressable>
   )

@@ -13,7 +13,7 @@ import { db } from '@shared/lib/db'
 import { useTests } from '@/labs/useTests'
 import { dedupeInjections, useCompounds } from '@/data/useLog'
 import { EventRow } from '@/EventRow'
-import { Eyebrow, MenuPicker, Pill, RANGE_LABEL, type RangeId, rangeDomain } from '@/kit'
+import { Eyebrow, MenuPicker, PageHeader, Pill, RANGE_LABEL, type RangeId, rangeDomain } from '@/kit'
 import { buildEvents, byDay, type Event, KIND_LABEL, type Kind } from '@/timeline'
 import { withUndo } from '@/toast'
 import { C, F } from '@/theme'
@@ -127,13 +127,7 @@ export default function Timeline() {
 
   const header = (
     <View style={{ gap: 10, marginBottom: 8 }}>
-      <View style={t.titleRow}>
-        <View>
-          <Eyebrow>{count} entr{count === 1 ? 'y' : 'ies'}</Eyebrow>
-          <Text style={t.h1}>Timeline</Text>
-        </View>
-        {count ? <Pill label="Export" onPress={exportShown} /> : null}
-      </View>
+      <PageHeader eyebrow={`${count} entr${count === 1 ? 'y' : 'ies'}`} title="Timeline" action={count ? <Pill label="Export" icon="square.and.arrow.up" onPress={exportShown} /> : undefined} />
       <View style={t.filters}>
         <MenuPicker value={kind} onChange={(v) => (setKind(v), setCompound(undefined))} options={kinds} />
         {kind === 'injection' && groups.length > 1 ? (
@@ -169,7 +163,6 @@ export default function Timeline() {
 // Each day's rows sit on one card: first row rounds the top, the footer rounds the bottom
 const t = StyleSheet.create({
   h1: { fontFamily: F.semi, fontSize: 32, letterSpacing: -0.6, color: C.fg, marginTop: 6 },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   filters: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 4, marginLeft: -8 },
   day: { marginTop: 22, marginBottom: 8 },
   item: { backgroundColor: C.card, paddingHorizontal: 14, borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth, borderColor: C.line },

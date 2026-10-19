@@ -15,7 +15,7 @@ import { withPro } from '@/money/pro'
 import { readReport, readSheet } from '@/labs/read'
 import { exportTestPdf } from '@/report/export'
 import { useTests } from '@/labs/useTests'
-import { Card, Eyebrow, Segmented, Widget } from '@/kit'
+import { Card, Eyebrow, Segmented, Widget, PageHeader } from '@/kit'
 import { BleedsSection } from '@/labs/Bleeds'
 import { attentionOf, MarkerRow, Tag } from '@/labs/ui'
 import { phaseLabel, testChip, verdictLine } from '@/labs/reads'
@@ -103,10 +103,7 @@ export default function Labs() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 100, gap: 16 }}>
-        <View>
-          <Eyebrow>{tests?.length ? `${tests.length} test${tests.length === 1 ? '' : 's'}` : 'Blood tests'}</Eyebrow>
-          <Text style={l.h1}>Bloods</Text>
-        </View>
+        <PageHeader eyebrow={tests?.length ? `${tests.length} test${tests.length === 1 ? '' : 's'}` : 'Blood tests'} title="Bloods" />
         <Pressable onPress={add} accessibilityRole="button" style={({ pressed }) => [l.add, pressed && { opacity: 0.8 }]}>
           <SymbolView name={'plus' as SymbolViewProps['name']} tintColor={C.primaryFg} size={18} />
           <Text style={l.addText}>Add a blood test</Text>

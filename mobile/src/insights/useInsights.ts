@@ -1,7 +1,8 @@
 // "What needs a look": the web's HomeInsightsCard rules (src/lib/homeInsights.ts, labFindings, wellbeingSummary), run
 // on the phone. Bloods from the newest test, blood pressure read against weight, hematocrit, estradiol and dose
 // changes, blood-letting nudges and check-ins, ranked serious first. Informational, never a prescription: the copy is
-// the web's, which says what people on a protocol usually do and to talk to a doctor.
+// the web's, minus anything that says what to do next ("what people usually do", "retest around..."), which the
+// iPhone app leaves out for App Review (Lucas, 19 Oct 2026).
 import { useEffect, useMemo, useState } from 'react'
 import { AppState } from 'react-native'
 import type { BodyMetric, Compound, InjectionLog, Symptom, VitalLog } from '@shared/lib/db'
@@ -85,7 +86,11 @@ export function useInsights(d: { tests?: LabTest[]; vitals: VitalLog[]; injectio
     )
     const defs = [...ALL_SYMPTOMS, ...customDefs(symptoms)]
     out.push(symptomInsight(wellbeingSummary(symptoms, defs, CAUSES, { labs: {}, recentCompounds: [] }, now)))
-    return rankInsights(out.filter((i): i is HomeInsight => !!i))
+    // No next steps on iOS: a blood-letting nudge says what was logged, not when to retest
+    const plain = out.map((i) =>
+      i?.kind === 'bleed' && /^Retest/.test(i.sub ?? '') ? { ...i, sub: 'Your next hematocrit result will show what it did', chip: 'Logged' } : i,
+    )
+    return rankInsights(plain.filter((i): i is HomeInsight => !!i))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [d.tests, bleeds, d.pro, d.vitals, d.bodyMetrics, d.injections, d.compounds, d.symptoms, now])
 }

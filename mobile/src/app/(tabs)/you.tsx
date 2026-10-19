@@ -11,7 +11,7 @@ import { exportAll } from '@/exportData'
 import { disableHealth, enableHealth, healthAvailable, useHealth } from '@/health'
 import { usePro } from '@/money/pro'
 import { type Choice, CHOICE_LABEL, setAppearance, useAppearance } from '@/appearance'
-import { Card, Eyebrow, MenuPicker } from '@/kit'
+import { Card, Eyebrow, MenuPicker, PageHeader, Pill } from '@/kit'
 import { C, F } from '@/theme'
 
 const toggleHealth = (on: boolean) =>
@@ -33,10 +33,7 @@ export default function You() {
 
   return (
     <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 90, gap: 28 }}>
-      <View>
-        <Eyebrow>Settings</Eyebrow>
-        <Text style={y.h1}>You</Text>
-      </View>
+      <PageHeader eyebrow="Settings" title="You" action={<Pill label="Feedback" icon="bubble.left" onPress={() => router.push('/account/feedback' as never)} />} />
 
       <View style={{ gap: 10 }}>
         <Eyebrow>Account</Eyebrow>
@@ -51,9 +48,8 @@ export default function You() {
               action="Sync now"
             />
             <Row label="Change password" onPress={() => router.push('/account/password' as never)} />
-            <Row label="Recovery codes" onPress={() => router.push('/account/recovery' as never)} />
-            <Row label="Sign out" onPress={out} danger />
-            <Row label="Delete account" onPress={() => router.push('/account/delete')} danger last />
+            <Row label="Recovery codes" value="If you forget your password" onPress={() => router.push('/account/recovery' as never)} />
+            <Row label="Sign out" onPress={out} last />
           </Card>
         ) : (
           <Card style={{ gap: 12 }}>
@@ -87,7 +83,7 @@ export default function You() {
       <View style={{ gap: 10 }}>
         <Eyebrow>Reminders and export</Eyebrow>
         <Card style={{ paddingVertical: 4 }}>
-          <Row label="Reminders" value="Injection, weight, BP, check-in" onPress={() => router.push('/reminders')} />
+          <Row label="Reminders" value="Shots, ancillaries, weight, BP" onPress={() => router.push('/reminders')} />
           <Row label="Export for your doctor" value="PDF or spreadsheet" onPress={() => router.push('/export')} last />
         </Card>
       </View>
@@ -130,6 +126,12 @@ export default function You() {
         </Text>
         <Text style={y.small}>Version {Constants.expoConfig?.version} ({Constants.expoConfig?.ios?.buildNumber})</Text>
       </View>
+
+      {acc.status === 'authed' ? (
+        <Pressable onPress={() => router.push('/account/delete')} accessibilityRole="button" hitSlop={8} style={({ pressed }) => [y.deleteLink, pressed && { opacity: 0.6 }]}>
+          <Text style={y.deleteText}>Delete account</Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   )
 }
@@ -158,4 +160,6 @@ const y = StyleSheet.create({
   label: { fontFamily: F.medium, fontSize: 16, color: C.fg },
   value: { fontFamily: F.body, fontSize: 15, color: C.muted },
   action: { fontFamily: F.semi, fontSize: 13, color: C.accentInk, marginTop: 2 },
+  deleteLink: { alignSelf: 'center', paddingVertical: 8 },
+  deleteText: { fontFamily: F.medium, fontSize: 14, color: C.danger },
 })
