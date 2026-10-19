@@ -48,7 +48,7 @@ export default function You() {
               action="Sync now"
             />
             {acc.user.has_password === false ? (
-              <Row label="Signed in with" value="Apple" />
+              <Row label="Signed in with" value={acc.user.apple ? 'Apple' : 'Google'} />
             ) : (
               <>
                 <Row label="Change password" onPress={() => router.push('/account/password' as never)} />

@@ -58,7 +58,13 @@
       "expo-web-browser",
       "expo-notifications",
       "./plugins/withLocalNotificationsOnly",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.907236277182-0nqqc5tuvv1g34uh0fgs1ff4lfu87s0e"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -71,7 +77,8 @@
       "billing": {
         "live": true,
         "revenuecatIosKey": "appl_zXdvrtNUtkubvbpJdbOfrifyZzE"
-      }
+      },
+      "googleIosClientId": "907236277182-0nqqc5tuvv1g34uh0fgs1ff4lfu87s0e.apps.googleusercontent.com"
     }
   }
 }

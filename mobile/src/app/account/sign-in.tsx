@@ -5,7 +5,7 @@ import { router, Stack } from 'expo-router'
 import { useState } from 'react'
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { passwordOk } from '@shared/lib/password'
-import { mailto, requestReset, resetWithCode, signIn, signInWithApple, signUp } from '@/account/auth'
+import { mailto, requestReset, resetWithCode, signIn, signInWithApple, signInWithGoogle, signUp } from '@/account/auth'
 import { syncNow } from '@/account/sync'
 import { setCodes } from '@/account/codes'
 import { Input, Section, Segmented } from '@/kit'
@@ -59,17 +59,17 @@ export default function SignIn() {
     }
   }
 
-  async function apple() {
+  async function provider(which: 'apple' | 'google') {
     if (busy) return
     setBusy(true)
     setError('')
     try {
-      if (await signInWithApple()) {
+      if (await (which === 'apple' ? signInWithApple() : signInWithGoogle())) {
         void syncNow()
         router.back()
       }
     } catch (e) {
-      setError((e as Error).message || "Couldn't sign in with Apple. Try again.")
+      setError((e as Error).message || "Couldn't sign in. Try again.")
     } finally {
       setBusy(false)
     }
@@ -90,8 +90,12 @@ export default function SignIn() {
               buttonStyle={scheme === 'dark' ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
               cornerRadius={12}
               style={{ height: 50 }}
-              onPress={() => void apple()}
+              onPress={() => void provider('apple')}
             />
+            <Pressable onPress={() => void provider('google')} disabled={busy} accessibilityRole="button" style={({ pressed }) => [s.google, pressed && { opacity: 0.8 }]}>
+              <Text style={s.googleG}>G</Text>
+              <Text style={s.googleText}>Continue with Google</Text>
+            </Pressable>
             <Text style={s.or}>or with your email</Text>
           </View>
         ) : null}
@@ -175,6 +179,10 @@ const s = StyleSheet.create({
   link: { fontFamily: F.semi, fontSize: 15, color: C.accentInk, textAlign: 'center' },
   small: { fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 18 },
   or: { fontFamily: F.medium, fontSize: 13, color: C.muted, textAlign: 'center' },
+  // Google's own look for its button: white, hairline border, the G
+  google: { height: 50, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#dadce0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  googleG: { fontFamily: F.bold, fontSize: 19, color: '#4285F4' },
+  googleText: { fontSize: 19, fontWeight: '500', color: '#1f1f1f' },
 })
 
 const lockedOut = (email: string) =>

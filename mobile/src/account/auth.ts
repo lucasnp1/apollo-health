@@ -2,6 +2,8 @@
 // and syncs it with magno.fit through the web's own sync engine (account/sync.ts). The server's session cookie is
 // kept by iOS's own cookie store, as a browser keeps it. The web's useAuth.ts reads Vite's import.meta.env and wipes
 // data its own way, so this is the app's small version of it over the same endpoints.
+import { GoogleSignin, isSuccessResponse } from '@react-native-google-signin/google-signin'
+import Constants from 'expo-constants'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import { useSyncExternalStore } from 'react'
 import { api, type ApiUser } from '@shared/lib/api'
@@ -87,6 +89,16 @@ export async function signInWithApple(): Promise<boolean> {
   return true
 }
 
+/** Sign in with Google, the same way (account rules on the server, functions/_lib/social.ts). False when cancelled. */
+export async function signInWithGoogle(): Promise<boolean> {
+  GoogleSignin.configure({ iosClientId: Constants.expoConfig?.extra?.googleIosClientId as string })
+  const res = await GoogleSignin.signIn()
+  if (!isSuccessResponse(res) || !res.data.idToken) return false
+  const out = await api.post<{ user: ApiUser }>('/api/auth/google', { idToken: res.data.idToken })
+  await signedIn(out.user)
+  return true
+}
+
 /** Creates the account; the recovery codes are shown once, right after. */
 export async function signUp(email: string, password: string): Promise<string[]> {
   const res = await api.post<{ user: ApiUser; recoveryCodes?: string[] }>('/api/auth/signup', { email: email.trim(), password, source: 'ios' })
@@ -112,6 +124,7 @@ export async function resetWithCode(email: string, code: string, password: strin
 export async function signOut(flush: () => Promise<unknown>) {
   await flush()
   await api.post('/api/auth/logout').catch(() => {})
+  await GoogleSignin.signOut().catch(() => {})
   await wipeAllLocalData()
   set({ status: 'guest' })
 }
@@ -121,6 +134,18 @@ export async function deleteAccount(password: string) {
   await api.post('/api/auth/delete', { password })
   await wipeAllLocalData()
   set({ status: 'guest' })
+}
+
+/** The same, for an account made with Google: Google confirms it's them. False if cancelled. */
+export async function deleteAccountWithGoogle(): Promise<boolean> {
+  GoogleSignin.configure({ iosClientId: Constants.expoConfig?.extra?.googleIosClientId as string })
+  const res = await GoogleSignin.signIn()
+  if (!isSuccessResponse(res) || !res.data.idToken) return false
+  await api.post('/api/auth/delete', { googleIdToken: res.data.idToken })
+  await GoogleSignin.signOut().catch(() => {})
+  await wipeAllLocalData()
+  set({ status: 'guest' })
+  return true
 }
 
 /** The same, for an account signed in with Apple: Apple confirms it's them instead of a password. False if cancelled. */
