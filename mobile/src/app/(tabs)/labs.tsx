@@ -6,7 +6,6 @@ import * as ImagePicker from 'expo-image-picker'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
 import { ActionSheetIOS, ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { fmtDay } from '@shared/lib/dates'
 import { defaultTestName } from '@shared/lib/labTests'
 import { setDraft } from '@/labs/draft'
@@ -14,7 +13,7 @@ import { withPro } from '@/money/pro'
 import { readReport, readSheet } from '@/labs/read'
 import { exportTestPdf } from '@/report/export'
 import { useTests } from '@/labs/useTests'
-import { Button, Card, Link, PageHeader, Segmented, Widget } from '@/kit'
+import { Button, Card, Link, PageHeader, Segmented, Widget, useInsets } from '@/kit'
 import { BleedsSection } from '@/labs/Bleeds'
 import { attentionOf, MarkerRow, Tag } from '@/labs/ui'
 import { phaseLabel, testChip, verdictLine } from '@/labs/reads'
@@ -78,7 +77,7 @@ async function importReport(kind: 'pdf' | 'photo' | 'camera' | 'sheet', busy: (b
 }
 
 export default function Labs() {
-  const insets = useSafeAreaInsets()
+  const insets = useInsets()
   const tests = useTests()
   const pro = usePro()
   const [busy, setBusy] = useState(false)

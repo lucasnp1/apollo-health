@@ -28,9 +28,9 @@ export const noteLine = (notes: string | undefined, label: keyof typeof LINE) =>
 export const stripLines = (notes: string | undefined) => (notes ?? '').split('\n').filter((l) => !/^(Syringe|Vial): /.test(l)).join('\n').trim()
 
 /** One compound in the syringe. `pick` is a compound group key, NEW for a typed name, or nothing yet. */
-export type Line = { key: string; pick?: string; name: string; unit: Unit; dose: string; drawn: string; vial: string; vialNew?: boolean }
+export type Line = { key: string; pick?: string; name: string; unit: Unit; dose: string; vial: string; vialNew?: boolean }
 let seq = 0
-export const blank = (): Line => ({ key: `l${++seq}`, name: '', unit: 'mg', dose: '', drawn: '', vial: '' })
+export const blank = (): Line => ({ key: `l${++seq}`, name: '', unit: 'mg', dose: '', vial: '' })
 
 export type Prefill = { lines: Line[]; syringe?: SyringeKey; marks?: Mark; needle: string }
 

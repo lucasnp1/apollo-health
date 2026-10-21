@@ -1,5 +1,6 @@
 // Home's widgets, one job each, all on the same head (kit Widget): what needs a look (it reads the bloods too, so
-// there's no separate bloods widget), injections, wellbeing with the ancillaries taken for it, weight, blood pressure.
+// there's no separate bloods widget), injections, ancillaries, wellbeing with the ancillaries taken for it lined up
+// under it, weight, blood pressure.
 // Each has its own time range. Nothing here models a level or works out a dose: injections show what was logged
 // (docs/decisions.md).
 import { format } from 'date-fns'
@@ -94,24 +95,32 @@ function useLanes(compounds: Compound[], shots: InjectionLog[], domain: [number,
   )
 }
 
+const DOSES = {
+  injection: { eyebrow: 'Injections', one: 'shot', many: 'shots', last: 'Last shot', none: 'No shots logged', hint: 'Log a shot from Add to your log.' },
+  ancillary: { eyebrow: 'Ancillaries', one: 'dose', many: 'doses', last: 'Last taken', none: '', hint: '' },
+}
+
 /**
- * Every shot logged in the range, per compound: when, and how much. A compound with no shot in the range (stopped, or
- * not pinned lately) doesn't show. Ancillaries taken by mouth are on Wellbeing, not here.
+ * Every dose logged in the range, per compound: when, and how much. Injections and ancillaries (by mouth, creams) each
+ * get one. A compound with nothing in the range (stopped, or not taken lately) doesn't show. Ancillaries only show once
+ * you've logged one.
  */
-export function InjectionsWidget({ compounds, injections }: { compounds: Compound[]; injections: InjectionLog[] }) {
+export function DosesWidget({ kind, compounds, injections }: { kind: keyof typeof DOSES; compounds: Compound[]; injections: InjectionLog[] }) {
   const pal = usePalette()
-  const [range, setRange] = useState<RangeId>('1W')
-  const shots = useMemo(() => injections.filter((i) => !isAncillary(i)), [injections])
+  const copy = DOSES[kind]
+  const [range, setRange] = useState<RangeId>(kind === 'injection' ? '1W' : '1M')
+  const shots = useMemo(() => injections.filter((i) => isAncillary(i) === (kind === 'ancillary')), [injections, kind])
   const domain = rangeDomain(range, shots.map((i) => Date.parse(i.takenAt)))
   const lanes = useLanes(compounds, shots, domain)
   const last = shots[0]
+  if (!last && kind === 'ancillary') return null
   const total = lanes.reduce((n, l) => n + l.shots.length, 0)
-  const all = () => router.navigate({ pathname: '/timeline', params: { kind: 'injection', range, at: String(Date.now()) } })
+  const all = () => router.navigate({ pathname: '/timeline', params: { kind, range, at: String(Date.now()) } })
   return (
     <Widget
-      eyebrow="Injections"
-      title={!last ? 'No shots logged' : total ? `${total} shot${total === 1 ? '' : 's'} ${IN_RANGE[range]}` : `No shots ${IN_RANGE[range]}`}
-      sub={last ? `Last shot ${fmtDay(last.takenAt)}, ${format(Date.parse(last.takenAt), 'HH:mm')}` : 'Log a shot from Add to your log.'}
+      eyebrow={copy.eyebrow}
+      title={!last ? copy.none : total ? `${total} ${total === 1 ? copy.one : copy.many} ${IN_RANGE[range]}` : `No ${copy.many} ${IN_RANGE[range]}`}
+      sub={last ? `${copy.last} ${fmtDay(last.takenAt)}, ${format(Date.parse(last.takenAt), 'HH:mm')}` : copy.hint}
       action={<RangeMenu value={range} onChange={setRange} />}
     >
       {lanes.length ? (
@@ -155,7 +164,7 @@ function Lane({ name, color, shots, domain, labels, chart }: {
       <View style={w.laneHead}>
         <View style={[w.dot, { backgroundColor: color }]} />
         <Text style={w.laneName} numberOfLines={1}>{name}</Text>
-        <Text style={w.laneMeta}>{shots.length} · last {vol(doseText(lastShot, { drew: true }), u)} {format(Date.parse(lastShot.takenAt), 'EEE d MMM')}</Text>
+        <Text style={w.laneMeta}>{shots.length} · last {[vol(doseText(lastShot, { drew: true }), u), format(Date.parse(lastShot.takenAt), 'EEE d MMM')].filter(Boolean).join(' ')}</Text>
       </View>
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={[{ height: H }, chart && { marginLeft: PAD.l - 6, marginRight: PAD.r - 6 }]}>
         <Svg width={width} height={H}>

@@ -4,7 +4,8 @@ import { datePickerStyle, pickerStyle, tag, tint } from '@expo/ui/swift-ui/modif
 import * as Haptics from 'expo-haptics'
 import { SymbolView, type SymbolViewProps } from 'expo-symbols'
 import { forwardRef, type ReactNode } from 'react'
-import { Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, useWindowDimensions, View, type ViewStyle } from 'react-native'
+import { Platform, Pressable, type StyleProp, StyleSheet, Text, TextInput, type TextInputProps, type TextStyle, useWindowDimensions, View, type ViewStyle } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { C, F, usePalette, useScheme } from '@/theme'
 
 // Text follows the iPhone's text size. Body text scales all the way; display text (titles, big numbers) and the mono
@@ -13,6 +14,16 @@ export const TITLE_SCALE = 1.3
 export const LABEL_SCALE = 1.5
 /** The person reads with one of the accessibility text sizes: grids go to one column, label rows stack. */
 export const useBigText = () => useWindowDimensions().fontScale >= 1.35
+
+// On an iPad the app runs in an iPhone-sized window whose close / minimise buttons sit over its top-left corner, and the
+// safe area doesn't include them (App Review, Guideline 4, 21 Oct 2026). The idiom still says phone there; the system
+// name says iPadOS.
+const ON_IPAD = Platform.OS === 'ios' && (Platform.constants as { systemName?: string }).systemName === 'iPadOS'
+/** The safe area, with the top clear of the iPad window's buttons. Screens that draw their own top use this. */
+export function useInsets() {
+  const insets = useSafeAreaInsets()
+  return ON_IPAD ? { ...insets, top: insets.top + 26 } : insets
+}
 
 export function Eyebrow({ children, style }: { children: ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[s.eyebrow, style]} maxFontSizeMultiplier={LABEL_SCALE}>{children}</Text>

@@ -1,7 +1,7 @@
-// Log a shot, exactly as given. Nothing is worked out for you: the dose and what you drew are two separate fields,
-// saved as typed, and the app never converts one into the other, suggests a syringe or marks a draw (Apple 1.4.2
-// treats that as a dosage calculator; decided 18 Oct 2026, docs/decisions.md). The web's maths (src/lib/dose.ts) is
-// kept out of this bundle by metro.config.js. A better way to help with the draw can replace <Drawn> later.
+// Log a shot, exactly as given. Nothing is worked out for you: the dose is saved as typed, in the compound's own unit,
+// and the app never works out what to draw, suggests a syringe or marks a draw (Apple 1.4.2 treats
+// that as a dosage calculator; decided 18 Oct 2026, docs/decisions.md). Without that maths a separate "drawn" amount was
+// a second number to type, so it went (21 Oct 2026): older shots keep theirs. dose.ts stays out (metro.config.js).
 // As on the web: several compounds can share one syringe (one row each, same moment), a check-in can ride along, and
 // opening the logger brings back the last syringe you used on the route. With an `id` param it edits that shot.
 import { SymbolView } from 'expo-symbols'
@@ -16,7 +16,7 @@ import { Button, Card, Eyebrow, FieldRow, Input, MenuPicker, s as kit, Section, 
 import { LogForm, num } from '@/LogForm'
 import { Scale } from '@/logging/Scale'
 import { SitePicker } from '@/logging/SitePicker'
-import { blank, type Line, lineFor, type Mark, NEEDLES, NEW, noteLine, type Prefill, prefillFor, sortedGroups, stripLines, SYRINGES } from '@/logging/injectionDraft'
+import { blank, type Line, lineFor, NEEDLES, NEW, noteLine, type Prefill, prefillFor, sortedGroups, stripLines, SYRINGES } from '@/logging/injectionDraft'
 import { useDirty, useEditRow } from '@/logging/useEntry'
 import { C, F } from '@/theme'
 import { addCompound, routeOf, unitLabel, usedColours } from '@/log'
@@ -47,7 +47,6 @@ export default function LogInjection() {
   })
   const [route, setRoute] = useState<Route>(start.r)
   const [lines, setLines] = useState<Line[]>(start.p.lines)
-  const [marks, setMarks] = useState<Mark>(start.p.marks ?? 'mL')
   const [syringe, setSyringe] = useState<SyringeKey | undefined>(start.p.syringe)
   const [needle, setNeedle] = useState(start.p.needle)
   const [needleOther, setNeedleOther] = useState(false)
@@ -64,7 +63,6 @@ export default function LogInjection() {
   const { id, ready } = useEditRow(
     (rowId) => all.find((r) => r.id === rowId) ?? db.injections.get(rowId),
     (row: InjectionLog) => {
-      const drawn = row.vialAmount?.trim().match(/^([\d.,]+)\s*(units|mL)$/i)
       const sy = SYRINGES.find((x) => x.label === noteLine(row.notes, 'Syringe'))
       const dose = row.dose != null ? String(row.dose) : ''
       loadedDose.current = dose
@@ -74,8 +72,7 @@ export default function LogInjection() {
       if (c) setEditName(c.name)
       else void db.compounds.get(row.compoundId).then((x) => x && setEditName(x.name))
       setRoute(routeOf(row))
-      setLines([{ ...blank(), unit: row.unit, dose, drawn: drawn?.[1] ?? '', vial: noteLine(row.notes, 'Vial') ?? '' }])
-      setMarks(drawn ? (drawn[2].toLowerCase() === 'units' ? 'units' : 'mL') : (sy?.marks ?? 'mL'))
+      setLines([{ ...blank(), unit: row.unit, dose, vial: noteLine(row.notes, 'Vial') ?? '' }])
       setSyringe(sy?.value)
       setNeedle(row.needle ?? '')
       setSite(row.site ?? '')
@@ -84,13 +81,12 @@ export default function LogInjection() {
     },
   )
   const editing = id !== undefined
-  const { dirty } = useDirty({ route, lines: lines.map(({ key: _key, ...rest }) => rest), marks, syringe, needle, site, notes, when, feel }, ready)
+  const { dirty } = useDirty({ route, lines: lines.map(({ key: _key, ...rest }) => rest), syringe, needle, site, notes, when, feel }, ready)
 
   function apply(r: Route, p: Prefill) {
     setRoute(r)
     setLines(p.lines)
     setSyringe(p.syringe)
-    if (p.marks) setMarks(p.marks)
     setNeedle(p.needle)
   }
 
@@ -109,13 +105,10 @@ export default function LogInjection() {
     const g = groups.find((x) => x.key === key)
     if (!g) return update(line.key, { pick: key, ...(key === NEW && { dose: '', vial: '' }) })
     const fresh = lineFor(g, route, injections)
-    update(line.key, { pick: key, dose: fresh.dose, vial: fresh.vial, drawn: '' })
+    update(line.key, { pick: key, dose: fresh.dose, vial: fresh.vial })
     if (lines[0]?.key === line.key) {
       const sy = SYRINGES.find((x) => x.value === g.canonical.syringe)
-      if (sy) {
-        setSyringe(sy.value)
-        setMarks(sy.marks)
-      }
+      if (sy) setSyringe(sy.value)
     }
   }
 
@@ -126,17 +119,16 @@ export default function LogInjection() {
       ? compounds.find((c) => c.id === edit?.compoundId)
       : (g?.canonical ?? (l.pick === NEW && l.name.trim() ? findCompoundByName(compounds, l.name) : undefined))
     const doseN = num(l.dose)
-    const drawnN = num(l.drawn)
     const named = editing || (l.pick === NEW ? !!l.name.trim() : !!g)
-    const bad = (l.dose.trim() && !(doseN > 0)) || (l.drawn.trim() && !(drawnN > 0))
-    const valid = named && (doseN > 0 || drawnN > 0) && !bad
-    const empty = !l.pick && !l.name.trim() && !l.dose.trim() && !l.drawn.trim()
-    return { l, g, compound, doseN, drawnN, valid, empty, unit: editing ? l.unit : (compound?.unit ?? l.unit) }
+    const bad = l.dose.trim() && !(doseN > 0)
+    // An older shot saved with only what was drawn ("25 units") can still be edited without a dose
+    const valid = named && (doseN > 0 || !!edit?.vialAmount) && !bad
+    const empty = !l.pick && !l.name.trim() && !l.dose.trim()
+    return { l, g, compound, doseN, valid, empty, unit: editing ? l.unit : (compound?.unit ?? l.unit) }
   })
   const used = resolved.filter((r) => !r.empty)
   const canSave = used.length > 0 && used.every((r) => r.valid)
   const sy = SYRINGES.find((x) => x.value === syringe)
-  const drawnAs = (r: (typeof resolved)[number]) => (r.drawnN > 0 ? `${r.l.drawn.trim().replace(',', '.')} ${marks}` : undefined)
   const noteFor = (vial: string) => [notes.trim(), sy && `Syringe: ${sy.label}`, vial.trim() && `Vial: ${vial.trim()}`].filter(Boolean).join('\n') || undefined
 
   async function save() {
@@ -151,14 +143,11 @@ export default function LogInjection() {
     }
     if (editing && edit) {
       const r = resolved[0]
-      // A drawn amount the logger can't read (older entries) is kept unless you typed a new one
-      const keepRaw = !!edit.vialAmount && !/^[\d.,]+\s*(units|mL)$/i.test(edit.vialAmount.trim()) && !r.l.drawn.trim()
       await db.injections.update(id!, {
         ...shared,
         dose: r.doseN > 0 ? r.doseN : undefined,
         // An imported dose text wins over the number on the Timeline, so it goes once the dose is changed
         ...(r.l.dose !== loadedDose.current && { rawDose: undefined }),
-        vialAmount: keepRaw ? edit.vialAmount : drawnAs(r),
         notes: noteFor(r.l.vial),
       })
       return
@@ -182,8 +171,6 @@ export default function LogInjection() {
         ...shared,
         ...(r.doseN > 0 && { dose: r.doseN }),
         unit: r.unit,
-        // what you drew, with the marks you read it in: "25 units", "0.25 mL"
-        ...(r.drawnN > 0 && { vialAmount: drawnAs(r) }),
         notes: noteFor(r.l.vial),
       })
     }
@@ -225,7 +212,7 @@ export default function LogInjection() {
     return out
   }, [groups, injections, route, id])
   const several = lines.length > 1
-  const needles = NEEDLES[sy?.marks ?? marks]
+  const needles = NEEDLES[sy?.marks ?? 'mL']
   // Needles you typed before show in the menu too
   const myNeedles = useMemo(() => [...new Set(injections.map((i) => i.needle?.trim()).filter((n): n is string => !!n && !needles.includes(n)))], [injections, needles])
   const needleOptions = [...needles, ...myNeedles]
@@ -254,8 +241,6 @@ export default function LogInjection() {
             fixedName={editing ? editName : undefined}
             card={several}
             first={n === 0}
-            marks={marks}
-            onMarks={setMarks}
             onChoose={(k) => choose(r.l, k)}
             onChange={(patch) => update(r.l.key, patch)}
             onRemove={several ? () => setLines((prev) => prev.filter((x) => x.key !== r.l.key)) : undefined}
@@ -272,9 +257,7 @@ export default function LogInjection() {
             value={syringe ?? NONE}
             options={[{ value: NONE, label: 'Not noted' }, ...SYRINGES.map((x) => ({ value: x.value as string, label: vol(x.label) }))]}
             onChange={(v) => {
-              const next = SYRINGES.find((x) => x.value === v)
-              setSyringe(next?.value)
-              if (next) setMarks(next.marks)
+              setSyringe(SYRINGES.find((x) => x.value === v)?.value)
             }}
           />
         </FieldRow>
@@ -328,7 +311,7 @@ export default function LogInjection() {
 type Resolved = { l: Line; g?: CompoundGroup; compound?: Compound; unit: Unit }
 
 /** One compound in the syringe: which one, the dose as given, what you drew, and its vial. */
-function CompoundLine({ r, options, history, fixedName, card, first, marks, onMarks, onChoose, onChange, onRemove }: {
+function CompoundLine({ r, options, history, fixedName, card, first, onChoose, onChange, onRemove }: {
   r: Resolved
   options: { value: string; label: string }[]
   history?: { last?: string; vials: string[] }
@@ -336,8 +319,6 @@ function CompoundLine({ r, options, history, fixedName, card, first, marks, onMa
   fixedName?: string
   card: boolean
   first: boolean
-  marks: Mark
-  onMarks: (m: Mark) => void
   onChoose: (key: string | undefined) => void
   onChange: (patch: Partial<Line>) => void
   onRemove?: () => void
@@ -394,7 +375,6 @@ function CompoundLine({ r, options, history, fixedName, card, first, marks, onMa
         <Input keyboardType="decimal-pad" placeholder="Amount" suffix={unitLabel(unit)} value={line.dose} onChangeText={(dose) => onChange({ dose })} accessibilityLabel={`Dose in ${unitLabel(unit)}`} />
       </Section>
 
-      <Drawn value={line.drawn} onChange={(drawn) => onChange({ drawn })} marks={marks} onMarks={onMarks} />
 
       <FieldRow label="Vial">
         <MenuPicker
@@ -409,22 +389,6 @@ function CompoundLine({ r, options, history, fixedName, card, first, marks, onMa
     </View>
   )
   return card ? <Card>{body}</Card> : body
-}
-
-/** What you drew into the syringe, in the marks you read: kept apart from the dose, never worked out from it. */
-function Drawn({ value, onChange, marks, onMarks }: { value: string; onChange: (v: string) => void; marks: Mark; onMarks: (m: Mark) => void }) {
-  return (
-    <Section title="Drawn">
-      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-        <View style={{ flex: 1 }}>
-          <Input keyboardType="decimal-pad" placeholder="Optional" value={value} onChangeText={onChange} accessibilityLabel={`Amount drawn in ${marks}`} />
-        </View>
-        <View style={{ width: 150 }}>
-          <Segmented value={marks} onChange={onMarks} options={[{ value: 'units', label: 'units' }, { value: 'mL', label: vol('mL') }]} />
-        </View>
-      </View>
-    </Section>
-  )
 }
 
 const l = StyleSheet.create({

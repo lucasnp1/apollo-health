@@ -7,13 +7,12 @@ import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture
 import { router, useLocalSearchParams } from 'expo-router'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { ActionSheetIOS, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { archiveRow, restoreRow, setExamArchived } from '@shared/lib/archive'
 import { compoundGroups } from '@shared/lib/compounds'
 import { useTests } from '@/labs/useTests'
 import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
 import { EventRow } from '@/EventRow'
-import { Eyebrow, MenuPicker, PageHeader, Pill, RANGE_LABEL, RangeMenu, type RangeId, rangeDomain } from '@/kit'
+import { Eyebrow, MenuPicker, PageHeader, Pill, RANGE_LABEL, RangeMenu, type RangeId, rangeDomain, useInsets } from '@/kit'
 import { buildEvents, byDay, type Event, KIND_LABEL, type Kind } from '@/timeline'
 import { withUndo } from '@/toast'
 import { useUnits } from '@/units'
@@ -103,7 +102,7 @@ const renderSectionFooter = () => <View style={t.foot} />
 const keyExtractor = (e: Event) => e.id
 
 export default function Timeline() {
-  const insets = useSafeAreaInsets()
+  const insets = useInsets()
   const compounds = useCompounds()
   const injections = useInjections()
   const vitals = useVitals()

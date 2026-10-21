@@ -4,14 +4,13 @@ import Constants from 'expo-constants'
 import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import { Alert, type ColorValue, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { signOut, useAccount } from '@/account/auth'
 import { syncNow, useSyncState } from '@/account/sync'
 import { exportAll } from '@/exportData'
 import { disableHealth, enableHealth, healthAvailable, useHealth } from '@/health'
 import { usePro } from '@/money/pro'
 import { type Choice, CHOICE_LABEL, setAppearance, useAppearance } from '@/appearance'
-import { Card, Eyebrow, MenuPicker, PageHeader, Pill } from '@/kit'
+import { Card, Eyebrow, MenuPicker, PageHeader, Pill, useInsets } from '@/kit'
 import { setUnits, useUnits } from '@/units'
 import { C, F } from '@/theme'
 
@@ -19,7 +18,7 @@ const toggleHealth = (on: boolean) =>
   void (on ? enableHealth() : Promise.resolve(disableHealth())).catch((e) => Alert.alert("Couldn't reach Apple Health", String(e?.message ?? e)))
 
 export default function You() {
-  const insets = useSafeAreaInsets()
+  const insets = useInsets()
   const acc = useAccount()
   const sync = useSyncState()
   const pro = usePro()

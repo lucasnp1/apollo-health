@@ -5,7 +5,6 @@ import { SymbolView } from 'expo-symbols'
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { findCompoundByName } from '@shared/lib/compounds'
 import { db, type Unit } from '@shared/lib/db'
 import { type Choice, CHOICE_LABEL, setAppearance, useAppearance } from '@/appearance'
@@ -13,7 +12,7 @@ import { useAccount } from '@/account/auth'
 import { useCompounds, useInjections } from '@/data/useLog'
 import { isAncillary } from '@/timeline'
 import { enableHealth, healthAvailable, useHealth } from '@/health'
-import { Card, FieldRow, Input, MenuPicker, s as kit, Segmented } from '@/kit'
+import { Card, FieldRow, Input, MenuPicker, s as kit, Segmented, useInsets } from '@/kit'
 import Reminders from './reminders'
 import { addCompound, usedColours } from '@/log'
 import { markOnboarded } from '@/onboarding'
@@ -27,7 +26,7 @@ const finish = () => {
 const STEPS = ['welcome', 'compounds', 'health', 'reminders', 'look'] as const
 
 export default function Welcome() {
-  const insets = useSafeAreaInsets()
+  const insets = useInsets()
   const [n, setN] = useState(0)
   const step = STEPS[n]
   const last = n === STEPS.length - 1
@@ -90,12 +89,8 @@ const SLIDES = [
 
 function Intro() {
   const acc = useAccount()
-  const { width, height } = useWindowDimensions()
+  const { width } = useWindowDimensions()
   const [at, setAt] = useState(0)
-  // The phone shot fills most of the screen, keeping the iPhone's own proportions
-  // (0.42 leaves room for the caption under it and the sign-in line, down to the smallest iPhones)
-  const shotH = Math.min(height * 0.42, 440)
-  const shotW = shotH * (1320 / 2868)
   return (
     <View style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 20, paddingTop: 8, gap: 4 }}>
@@ -107,12 +102,13 @@ function Intro() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={(e) => setAt(Math.round(e.nativeEvent.contentOffset.x / width))}
-        style={{ flexGrow: 0, marginTop: 18 }}
+        style={{ flex: 1, marginTop: 18 }}
       >
         {SLIDES.map((sl) => (
-          <View key={sl.title} style={{ width, alignItems: 'center', gap: 14 }}>
-            <View style={[w.phone, { width: shotW + 12, height: shotH + 12 }]}>
-              <Image source={sl.img} style={{ width: shotW, height: shotH, borderRadius: 26 }} resizeMode="cover" accessibilityIgnoresInvertColors />
+          <View key={sl.title} style={{ width, alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+            {/* The phone shot takes whatever height is left once the caption has its lines: any screen, any window */}
+            <View style={[w.phone, { flex: 1, maxHeight: 452, aspectRatio: 1332 / 2880 }]}>
+              <Image source={sl.img} style={{ flex: 1, width: '100%', borderRadius: 26 }} resizeMode="cover" accessibilityIgnoresInvertColors />
             </View>
             <View style={{ alignItems: 'center', gap: 4, paddingHorizontal: 28 }}>
               <Text style={w.slideTitle}>{sl.title}</Text>
@@ -124,7 +120,7 @@ function Intro() {
       <View style={w.pager}>
         {SLIDES.map((sl, n) => <View key={sl.title} style={[w.pagerDot, n === at && { backgroundColor: C.fg, width: 16 }]} />)}
       </View>
-      <View style={{ paddingHorizontal: 20, gap: 10, marginTop: 'auto', paddingBottom: 8 }}>
+      <View style={{ paddingHorizontal: 20, gap: 10, marginTop: 16, paddingBottom: 8 }}>
         <Text style={[kit.hint, { textAlign: 'center' }]}>Magno is a log, not medical advice. It never works out a dose.</Text>
         {acc.status === 'authed' ? (
           <Text style={[kit.hint, { textAlign: 'center' }]}>Signed in as {acc.user.email}.</Text>

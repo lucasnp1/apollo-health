@@ -5,17 +5,16 @@ import { type Href, router } from 'expo-router'
 import { SymbolView, type SymbolViewProps } from 'expo-symbols'
 import { Fragment, useMemo } from 'react'
 import { type ColorValue, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Circle, Polyline } from 'react-native-svg'
 import { ALL_SYMPTOMS, chipTone, customDefs, NEGATIVE, POSITIVE, ratingOf } from '@shared/lib/symptoms'
 import { felt } from '@shared/lib/wellbeingSummary'
 import { useBodyMetrics, useCompounds, useInjections, useSymptoms, useVitals } from '@/data/useLog'
 import { useTests } from '@/labs/useTests'
-import { InjectionsWidget, InsightsWidget, PressureWidget, WeightWidget, WellbeingWidget } from '@/charts/Widgets'
+import { DosesWidget, InsightsWidget, PressureWidget, WeightWidget, WellbeingWidget } from '@/charts/Widgets'
 import { useInsights } from '@/insights/useInsights'
 import { usePro } from '@/money/pro'
 import { EventRow } from '@/EventRow'
-import { Card, Eyebrow, Pill, TITLE_SCALE, useBigText, Widget } from '@/kit'
+import { Card, Eyebrow, Pill, TITLE_SCALE, useBigText, Widget, useInsets } from '@/kit'
 import { showWeight, useUnits } from '@/units'
 import { buildEvents, dayTitle } from '@/timeline'
 import { C, F, type Palette, usePalette } from '@/theme'
@@ -35,7 +34,7 @@ const LAUNCH: Launch[] = [
 export default function Home() {
   const big = useBigText()
   const u = useUnits()
-  const insets = useSafeAreaInsets()
+  const insets = useInsets()
   const pal = usePalette()
   const compounds = useCompounds()
   const injections = useInjections()
@@ -141,7 +140,8 @@ export default function Home() {
       </View>
 
       <InsightsWidget insights={insights} />
-      <InjectionsWidget compounds={compounds} injections={injections} />
+      <DosesWidget kind="injection" compounds={compounds} injections={injections} />
+      <DosesWidget kind="ancillary" compounds={compounds} injections={injections} />
       <WellbeingWidget symptoms={symptoms} compounds={compounds} injections={injections} />
       <WeightWidget bodyMetrics={bodyMetrics} injections={injections} />
       <PressureWidget vitals={vitals} />

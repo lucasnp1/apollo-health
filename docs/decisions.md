@@ -9,12 +9,14 @@ changed by any of this.
 
 Decided by Lucas, 18 Oct 2026, for the iOS app only:
 
-- **Dosing: log, never calculate.** The injection screen saves the dose, what was drawn (units or mL), syringe,
+- **Dosing: log, never calculate.** The injection screen saves the dose, syringe,
   needle, site and vial details exactly as typed. The web's dose <-> draw conversion, syringe advice and draw marks
   (`src/lib/dose.ts`) do not ship: Apple 1.4.2 treats that as a dosage calculator. The vial maths (`src/lib/vials.ts`,
   and `src/lib/injections.ts`, which uses it) is kept out too. `mobile/metro.config.js` fails the build if any of them
-  is imported. Lucas isn't fully happy with this: the "Drawn" field is one component
-  (`mobile/src/app/log/injection.tsx`, `Drawn`) so a better approach can replace it.
+  is imported. **21 Oct 2026 (Lucas):** without the maths, the separate "Drawn: units / mL" field was a second number
+  to type, so it's gone; one Dose field in the compound's own unit (mg, mcg, IU, mL). Older shots keep their "drew ..."
+  text. A draw calculator is not coming back in 1.0 (1.4.2: calculators must come from an approved entity, and the
+  account is an individual's); if ever, as its own update after 1.0 is live.
 - **Levels chart** (phase 4): a timeline of logged doses per compound with real lab results on the same axis, instead
   of the estimated active-levels curve. `src/lib/pk.ts` and its half-life table do not ship (Apple 1.4.1, 1.4.3), also
   enforced by metro.config.js. Lucas wants a better solution later.
