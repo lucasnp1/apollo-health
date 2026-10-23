@@ -47,12 +47,8 @@ npm run dev   # http://127.0.0.1:5173
 
 ## Build & deploy
 
-```bash
-npm run lint
-npm run build
-# Deploys are pushed to Cloudflare Pages via:
-npx wrangler pages deploy dist --project-name=apollo-hq --branch=main
-```
+The server (magno.fit, Pages project `magnohq`: functions/, migrations/, wrangler.toml) lives on `main` only
+(~/apollo-health). This branch is the iPhone app; it has no server code, so nothing here can be deployed to magno.fit.
 
 ## App Store path
 
