@@ -31,4 +31,4 @@ The testosterone to estradiol ratio that forums quote uses ng/dL over pg/mL. Con
 
 ## Timing
 
-Draw at trough, the morning of your next injection, fasted, before training, no alcohol for two days, no sex the night before if prolactin or PSA is on the panel. Book the same slot every time. The first panel is a snapshot; the second, drawn the same way, is where the trend starts.
+Timing changes the numbers. Testosterone, estradiol and hematocrit read differently at peak and at trough; triglycerides and glucose depend on fasting; hard training lifts liver enzymes and CK; alcohol and sex in the day or two before can move estradiol, prolactin and PSA. Drawing the same way each time keeps tests comparable. The first panel is a snapshot; the second, drawn the same way, is where the trend starts.

@@ -254,13 +254,11 @@ function Disclosure({ open, onClick, children }: { open: boolean; onClick: () =>
 }
 
 /**
- * Pro: what this section's numbers mean together, from this test alone, then
- * (collapsed) what people on a protocol usually do. Never in the doctor report.
+ * Pro: what this section's numbers mean together, from this test alone.
+ * Never in the doctor report.
  */
 function SectionRead({ findings }: { findings: Finding[] }) {
   const [open, setOpen] = useState(false)
-  const [practices, setPractices] = useState(false)
-  const all = findings.flatMap((f) => f.practices)
   return (
     <div className="mt-2 border-t border-border/60 pt-1">
       <Disclosure open={open} onClick={() => setOpen(!open)}>Read more</Disclosure>
@@ -281,19 +279,7 @@ function SectionRead({ findings }: { findings: Finding[] }) {
               )}
             </div>
           ))}
-          {all.length > 0 && (
-            <div className="rounded-lg border border-border bg-secondary/50 px-3 py-1">
-              <Disclosure open={practices} onClick={() => setPractices(!practices)}>
-                What people on a protocol usually do · not a recommendation
-              </Disclosure>
-              {practices && (
-                <ul className="feed-note mb-2 list-disc space-y-1 pl-4 text-foreground/85 marker:text-muted-foreground/60">
-                  {all.map((p, i) => <li key={i}>{p}</li>)}
-                </ul>
-              )}
-            </div>
-          )}
-          <p className="feed-facts text-muted-foreground">From this test only. A second opinion for your own reading, not medical advice.</p>
+          <p className="feed-facts text-muted-foreground">From this test only. Not medical advice. Talk to your doctor about your results.</p>
         </div>
       )}
     </div>

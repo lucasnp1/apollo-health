@@ -37,8 +37,6 @@ export type HomeInsight = {
   signalsTitle?: string
   signals: Signal[]
   causes?: string[]
-  /** Common practice on a protocol, not advice. */
-  practices?: string[]
   icon?: LucideIcon
   /** Where a tap goes: a test report, Bloods, or the blood-letting dialog. */
   testId?: number
@@ -88,7 +86,6 @@ export function bpInsight(input: BpInput, now: number): HomeInsight | undefined 
   }]
   const lines: string[] = []
   let notWeight = false
-  const practices = ['Check the readings first: seated for five minutes, arm at heart height, two readings a minute apart, morning and evening for a week.']
 
   const w = windows(input.weights, (x) => x.at, now)
   if (w.recent.length && w.base.length) {
@@ -97,7 +94,6 @@ export function bpInsight(input: BpInput, now: number): HomeInsight | undefined 
     if (d >= 1) {
       lines.push('weight')
       signals.push({ label: 'Weight', value: sign(d, 'kg'), tone: 'warn', text: `Up from ${r1(was)} to ${r1(is)} kg over the same weeks. More body mass is more blood for the heart to push, and pressure usually follows weight.` })
-      practices.push('If it rose with your weight, the weight is the lever: a few kilos down usually takes a few points off.')
     } else {
       notWeight = true
       signals.push(d <= -1
@@ -111,7 +107,6 @@ export function bpInsight(input: BpInput, now: number): HomeInsight | undefined 
   if (input.hct && input.hct.pct >= 50 && fresh(input.hct.date)) {
     lines.push('hematocrit')
     signals.push({ label: 'Hematocrit', value: `${r1(input.hct.pct)}%`, tone: input.hct.pct >= 52 ? 'bad' : 'warn', text: `From your ${fmtDay(input.hct.date)} test. Thicker blood takes more pressure to move.` })
-    practices.push('Bringing hematocrit down with a blood-letting often takes pressure down with it.')
   }
   if (input.e2 && input.e2.pgml > 40 && fresh(input.e2.date)) {
     lines.push('estradiol')
@@ -124,7 +119,6 @@ export function bpInsight(input: BpInput, now: number): HomeInsight | undefined 
       signals.push({ label: 'Testosterone dose', value: `+${pct}%`, tone: 'warn', text: `${r1(input.dose.recent)} mg in the last three weeks against ${r1(input.dose.before)} mg the three before. A bigger dose raises hematocrit, water and pressure.` })
     }
   }
-  practices.push('Less salt and alcohol and more cardio are what people on a protocol try first.', 'Home readings that stay at 140/90 or over are when people see their doctor about it.')
 
   // Kept to two phone lines; "not weight" is spelled out in the sheet.
   const sub = lines.length ? `Lines up with ${list(lines)}` : notWeight ? 'Not weight, and nothing else in your logs yet' : 'Nothing in your logs lines up with it yet'
@@ -139,7 +133,6 @@ export function bpInsight(input: BpInput, now: number): HomeInsight | undefined 
     chip: veryHigh ? 'High' : 'Watch',
     signalsTitle: 'What lines up',
     signals,
-    practices,
   }
 }
 
@@ -174,7 +167,6 @@ export function labInsight(f: Finding, test: { id: number; date: string }, bleed
     signalsTitle: `${f.label}, ${fmtDay(test.date)}`,
     signals: f.markers.map((m) => ({ label: m.label, value: m.display, tone: tone(m.status) })),
     causes: f.causes,
-    practices: f.practices,
     icon: f.icon,
     testId: test.id,
   }

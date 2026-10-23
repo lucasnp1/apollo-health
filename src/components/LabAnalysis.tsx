@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 
 // ── UI ─────────────────────────────────────────────────────────────────────
 const STATUS_CHIP: Record<Status, FeedStatus> = {
-  bad: { label: 'Action', tone: 'bad', icon: TriangleAlert },
+  bad: { label: 'Outside range', tone: 'bad', icon: TriangleAlert },
   warn: { label: 'Watch', tone: 'warn', icon: Clock },
   good: { label: 'Good', tone: 'good', icon: CircleCheck },
   none: { label: 'No data', tone: 'neutral' },
@@ -32,7 +32,7 @@ function markerFacts(markers: MarkerVal[]): FeedFact[] {
 function Disclaimer({ className }: { className?: string }) {
   return (
     <p className={cn('feed-facts rounded-lg border border-primary/25 bg-primary/8 px-3 py-2 text-foreground/80', className)}>
-      <span className="font-semibold text-primary">Not medical advice.</span> Magno reads your numbers the way an experienced TRT user would and lists what people usually do about them. Check anything you act on with your doctor.
+      <span className="font-semibold text-primary">Not medical advice.</span> Magno shows your results against the lab's range and explains them in plain words. Talk to your doctor about your results.
     </p>
   )
 }
@@ -123,19 +123,11 @@ function FindingDetail({ f }: { f: Finding }) {
           </ul>
         </div>
       )}
-      {f.practices.length > 0 && (
-        <div className="rounded-lg border border-primary/25 bg-primary/8 px-3 py-2.5">
-          <p className="eyebrow text-primary">What people usually do · not a recommendation</p>
-          <ul className="feed-note mt-1.5 list-disc space-y-1 pl-4 text-foreground/85 marker:text-primary/60">
-            {f.practices.map((p, i) => <li key={i}>{p}</li>)}
-          </ul>
-        </div>
-      )}
       <p className="feed-facts text-muted-foreground">
         {f.since
           ? `Arrows compare with your test from ${new Date(f.since).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}. `
           : 'One test so far; arrows appear once there is a previous one to compare with. '}
-        Thresholds are TRT-aware, not the lab's generic range.
+        Some sections also use figures commonly quoted for testosterone therapy next to the lab's range.
       </p>
     </div>
   )
@@ -153,7 +145,7 @@ export function LabAnalysisCard({ findings }: { findings: Finding[] }) {
       subtitle="What the numbers mean together"
       action={
         <span className="flex gap-1.5">
-          {actionCount > 0 && <FeedChip status={{ label: `${actionCount} action`, tone: 'bad' }} />}
+          {actionCount > 0 && <FeedChip status={{ label: `${actionCount} outside range`, tone: 'bad' }} />}
           {watchCount > 0 && <FeedChip status={{ label: `${watchCount} watch`, tone: 'warn' }} />}
         </span>
       }
@@ -177,7 +169,7 @@ export function LabAnalysisCard({ findings }: { findings: Finding[] }) {
         ))}
       </FeedList>
       <p className="feed-facts mt-3 text-muted-foreground">
-        Tap a panel for the probable causes and what people usually do. It is a second opinion for your own reading, not medical advice.
+        Tap a panel for what each result is and the probable causes. Not medical advice. Talk to your doctor about your results.
       </p>
     </PanelCard>
   )

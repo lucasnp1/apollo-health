@@ -229,15 +229,6 @@ function InsightSheet({ insight: i, onClose, onOpenTest, onLogBleed }: {
             </section>
           )}
 
-          {!!i.practices?.length && (
-            <section>
-              <h3 className="text-[13px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">What people usually do</h3>
-              <p className="mt-1 text-[13px] text-muted-foreground">Common practice on a protocol, not a recommendation.</p>
-              <ol className="mt-3 flex list-decimal flex-col gap-2.5 pl-5 marker:font-mono marker:text-[13px] marker:text-[var(--accent-ink)]">
-                {i.practices.map((p) => <li key={p} className="pl-1 text-[15px] leading-[1.55] text-foreground/90 text-pretty">{p}</li>)}
-              </ol>
-            </section>
-          )}
         </DialogBody>
         {hasActions && (
           <DialogBar>

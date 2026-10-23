@@ -148,8 +148,8 @@ export function ReadPage() {
   }
 
   // The web app was retired on 19 Oct 2026: both go to the iPhone app
-  const signupHref = 'https://apps.apple.com/app/id6824289899'
-  const appHref = 'https://apps.apple.com/app/id6824289899'
+  const signupHref = 'https://apps.apple.com/app/apple-store/id6824289899?pt=129598658&ct=read&mt=8'
+  const appHref = signupHref
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -168,10 +168,10 @@ export function ReadPage() {
           <p className="eyebrow">Free · no account</p>
           <h1 className="font-display text-[34px] font-semibold leading-[1.05] tracking-[-0.02em] sm:text-[42px]">Read my bloods.</h1>
           <p className="feed-note mt-3 max-w-[560px] text-muted-foreground">
-            Drop a lab PDF, a photo of the printout, or a CSV or Excel export. Magno reads every marker on this device and writes up what the numbers mean together: how they relate, what moves them, and what people usually do about it.
+            Drop a lab PDF, a photo of the printout, or a CSV or Excel export. Magno reads every marker on this device and writes up what each result is, and how related markers sit together.
           </p>
           <p className="feed-facts mt-3 inline-flex items-center gap-1.5 rounded-md bg-muted/60 px-2.5 py-1.5 text-muted-foreground">
-            <Lock className="size-3.5" /> Nothing leaves your browser. The file is read here and forgotten when you close the tab.
+            <Lock className="size-3.5" /> Your file never leaves your browser. It is read here and forgotten when you close the tab.
           </p>
         </section>
 
@@ -241,7 +241,7 @@ export function ReadPage() {
                     Read these results <ArrowRight className="size-4" />
                   </Button>
                   <span className="feed-facts text-muted-foreground">
-                    Read on this device, same as a file. Nothing is sent anywhere.
+                    Read on this device, same as a file. Your results never leave your browser.
                   </span>
                 </div>
               </div>
@@ -341,7 +341,7 @@ export function ReadPage() {
               <p className="eyebrow text-primary">Keep it</p>
               <h2 className="font-display text-[22px] font-semibold leading-tight tracking-[-0.01em]">Save this read and track the next one.</h2>
               <p className="feed-note mt-2 max-w-[560px] text-muted-foreground">
-                In the Magno iPhone app every marker gets its own history, the change since your last test, and the same read on your injections, blood pressure and weight. Free to log; the bloods read is part of Pro, with the first month free.
+                In the Magno iPhone app every marker gets its own history, the change since your last test, next to your injections, blood pressure and weight. Free to log; the bloods read is part of Pro, with the first month free.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild size="lg">
@@ -360,7 +360,7 @@ export function ReadPage() {
         )}
 
         <footer className="feed-facts mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/70 pt-4 text-muted-foreground">
-          <span>Not medical advice. Check anything you act on with your doctor.</span>
+          <span>Not medical advice. Talk to your doctor about your results.</span>
           <a href="/" className="hover:text-foreground">About Magno</a>
           <a href="/privacy" className="hover:text-foreground">Privacy</a>
           <a href="/terms" className="hover:text-foreground">Terms</a>

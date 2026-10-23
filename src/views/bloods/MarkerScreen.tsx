@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, XAxis, YAxis } from 'recharts'
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns'
-import { Lock, Pencil } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type MarkerTarget } from '../../lib/db'
 import { markerSeries, type LabTest, type TestMarker } from '../../lib/labTests'
@@ -21,7 +21,6 @@ import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { usePlan } from '../../lib/plan'
 import { bleedRowProps, useBleeds } from './bleedFeed'
 import { BLEED_MARKERS } from '../../lib/phlebotomy'
 import { changeFact, flagChip, markerChip, phaseLabel, plural, printedValue, SECTION_ICON } from './feed'
@@ -95,7 +94,6 @@ function TargetEditor({ markerKey, target, unit, low, high }: { markerKey: strin
 }
 
 function WhatItIs({ markerKey }: { markerKey: string }) {
-  const { isPro, openUpgrade } = usePlan()
   const [copy, setCopy] = useState<MarkerCopy | null>(null)
   useEffect(() => {
     let live = true
@@ -115,18 +113,6 @@ function WhatItIs({ markerKey }: { markerKey: string }) {
           {copy.whyMoves.map((s, i) => <li key={i}>{deTrt(s)}</li>)}
         </ul>
       </details>
-      {isPro ? (
-        <details className="mt-1 border-t border-border/60 pt-2">
-          <summary className="flex min-h-10 cursor-pointer items-center text-sm font-medium">What people usually do · not a recommendation</summary>
-          <ul className="feed-note mt-1 list-disc space-y-1 pl-5 text-foreground/85 marker:text-muted-foreground/60">
-            {copy.practices.map((s, i) => <li key={i}>{deTrt(s)}</li>)}
-          </ul>
-        </details>
-      ) : (
-        <button type="button" onClick={() => openUpgrade('Bloods read')} className="mt-1 flex min-h-10 w-full items-center gap-2 border-t border-border/60 pt-2 text-left text-sm font-medium text-muted-foreground">
-          <Lock className="size-3.5" /> What people usually do · Pro
-        </button>
-      )}
     </PanelCard>
   )
 }

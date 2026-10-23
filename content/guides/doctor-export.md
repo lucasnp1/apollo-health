@@ -11,7 +11,7 @@ Doctors have ten minutes and a screen that shows one result at a time. If you tu
 
 - **Doses.** Compound, dose, frequency, ester, and any change with the date it happened. This is the part most people cannot reconstruct from memory.
 - **Blood pressure.** A seven-day average at rest beats the single reading taken in the surgery after a walk from the car park.
-- **Every blood marker on one line.** Value, lab range, date, and the change since the previous draw. Testosterone, estradiol, hematocrit and lipids first, since those decide the protocol.
+- **Every blood marker on one line.** Value, lab range, date, and the change since the previous draw. Testosterone, estradiol, hematocrit and lipids first, since those are the ones most often discussed.
 - **Weight.** The trend, not the daily noise.
 - **What you noticed.** Two lines about sleep, mood, libido or joints since the last dose change. Symptoms are half the picture and the half only you can supply.
 
@@ -29,4 +29,4 @@ Open Export, pick a date range and what to include, and share a PDF or a CSV. Do
 
 ## Before the appointment
 
-Draw at trough a week before, so the results are in. Write down the one decision you want made: dose, frequency, a referral, a donation letter. Doctors respond to a clear question backed by a clean trend far better than to a worry backed by a folder.
+Book the blood test early enough that the results are in. Write down the one question you most want answered. A clear question backed by a clean trend gets more out of ten minutes than a worry backed by a folder.

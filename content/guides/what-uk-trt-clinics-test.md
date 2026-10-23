@@ -13,7 +13,7 @@ Two morning testosterone results on separate days, both low, plus LH and FSH to 
 
 ## At six to twelve weeks
 
-Testosterone at trough, to set the dose. Hematocrit, because it starts moving early. Estradiol, if you have symptoms either way. Blood pressure at every visit; on a protocol it is as important as any lab number.
+Testosterone at trough, which clinics use when reviewing the dose. Hematocrit, because it starts moving early. Estradiol, if you have symptoms either way. Blood pressure at every visit; on a protocol it is as important as any lab number.
 
 ## Every three to six months in year one
 
@@ -21,7 +21,7 @@ Testosterone, hematocrit and hemoglobin, estradiol, lipids. PSA at three to twel
 
 ## Yearly after that
 
-The full panel: testosterone and free testosterone, estradiol, hematocrit and hemoglobin, ferritin if you donate, lipids, liver, kidney, PSA, thyroid, glucose or HbA1c. Any change in dose, ester or frequency resets the clock: retest in six to eight weeks.
+The full panel: testosterone and free testosterone, estradiol, hematocrit and hemoglobin, ferritin if you donate, lipids, liver, kidney, PSA, thyroid, glucose or HbA1c. After any change in dose, ester or frequency, clinics usually retest six to eight weeks later.
 
 ## What to ask for if it is not on the form
 

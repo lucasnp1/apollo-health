@@ -12,6 +12,7 @@ const { MARKER_COPY, PANEL_INTRO } = await import('../src/lib/labCopy.ts')
 const SITE = process.env.SITE_ORIGIN ?? 'https://magno.fit'
 const BRAND = 'Magno'
 const PUBLISHED = '2026-09-13'
+const APP_STORE = 'https://apps.apple.com/app/apple-store/id6824289899?pt=129598658&ct=guides&mt=8'
 const today = new Date().toISOString().slice(0, 10)
 const outDir = path.join(root, 'public/guides')
 const contentDir = path.join(root, 'content/guides')
@@ -20,7 +21,6 @@ for (const f of fs.readdirSync(outDir)) if (f.endsWith('.html')) fs.unlinkSync(p
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const slugOf = (key) => key.replace(/_/g, '-')
-const unitText = (u) => (u ? ` ${u}` : '')
 
 // ── Tiny markdown → HTML (headings, paragraphs, lists, bold, italics, links, code)
 function inline(s) {
@@ -91,13 +91,13 @@ function shell({ title, description, canonical, jsonld, body, ogImage = '/og.png
 </head>
 <body>
 <header class="site">
-  <a class="brand" href="/"><img src="/logo-badge.svg" alt="" width="28" height="28" />Magno <span>Health</span></a>
-  <nav><a href="/guides/">Guides</a><a href="/read">Read my bloods</a><a href="https://apps.apple.com/app/id6824289899">Get the iPhone app</a></nav>
+  <a class="brand" href="/"><img src="/logo-badge.svg" alt="" width="28" height="28" />Magno</a>
+  <nav><a href="/guides/">Guides</a><a href="/read">Read my bloods</a><a href="${APP_STORE}">Get the iPhone app</a></nav>
 </header>
 <main>
 ${body}
 <footer>
-  <p>Not medical advice. Magno reads numbers the way an experienced TRT user would and lists what people usually do; check anything you act on with your doctor.</p>
+  <p>Not medical advice. Magno shows your results against the lab's range and explains them in plain words. Talk to your doctor about your results.</p>
   <p><a href="/">${BRAND}</a> · <a href="/guides/">All guides</a> · <a href="/read">Read my bloods</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
 </footer>
 </main>
@@ -106,8 +106,8 @@ ${body}
 `
 }
 
-const disclaimerBox = `<div class="box"><p class="eyebrow">Not medical advice</p><p style="margin:0">This is how experienced TRT users read the number and what they usually do about it. Every decision about your protocol belongs to you and a clinician who knows you.</p></div>`
-const ctaBlock = (ref) => `<div class="card"><p class="eyebrow">Read yours</p><p><strong>Drop your lab PDF or a photo and get every marker read like this, in plain words.</strong> Free, no account, nothing leaves your browser. Track it in the iPhone app to see the change since your last test.</p><p class="cta"><a class="btn primary" href="/read?ref=${ref}">Read my bloods</a><a class="btn ghost" href="https://apps.apple.com/app/id6824289899">Get the iPhone app</a></p></div>`
+const disclaimerBox = `<div class="box"><p class="eyebrow">Not medical advice</p><p style="margin:0">This explains what the number is and why it moves. It is not medical advice; decisions belong to you and your clinician.</p></div>`
+const ctaBlock = (ref) => `<div class="card"><p class="eyebrow">Read yours</p><p><strong>Drop your lab PDF or a photo and get every marker explained in plain words.</strong> Free, no account, your file never leaves your browser. Track it in the iPhone app to see the change since your last test.</p><p class="cta"><a class="btn primary" href="/read?ref=${ref}">Read my bloods</a><a class="btn ghost" href="${APP_STORE}">Get the iPhone app</a></p></div>`
 
 // ── Marker guides
 const metas = allMarkerMeta()
@@ -122,32 +122,23 @@ for (const [key, copy] of Object.entries(MARKER_COPY)) {
   const title = `${meta.label} on TRT: what the number means`
   const description = copy.what.split('. ')[0].slice(0, 155)
   const related = metas.filter((m) => m.panel === meta.panel && m.key !== key && MARKER_COPY[m.key])
-  const opt = meta.optimal
-  const optText = opt
-    ? `${opt.low !== undefined && opt.high !== undefined ? `${opt.low} to ${opt.high}` : opt.high !== undefined ? `under ${opt.high}` : `over ${opt.low}`}${unitText(meta.unit)}`
-    : 'Read against the lab range and the trend'
   const body = `
 <p class="eyebrow">${esc(meta.panel)}</p>
 <h1>${esc(meta.label)} on TRT</h1>
-<p class="standfirst">What the number means, why it moves on a protocol, and what people usually do about it.</p>
+<p class="standfirst">What the number means, why it moves on a protocol, and how it sits with related markers.</p>
 <p class="meta">Updated ${today} · Part of the <a href="/guides/">Magno guides</a></p>
 
 <h2>What it is</h2>
 <p>${esc(copy.what)}</p>
 
 <h2>The range</h2>
-<div class="range">
-  <div class="card"><p class="label">TRT-aware target</p><p class="val">${esc(optText)}</p>${opt?.note ? `<p class="muted" style="margin:6px 0 0;font-size:14px">${esc(opt.note)}</p>` : ''}</div>
-  <div class="card"><p class="label">How to read the lab range</p><p style="margin:0">${esc(copy.range)}</p></div>
-</div>
+<div class="card"><p class="label">How to read the lab range</p><p style="margin:0">${esc(copy.range)}</p></div>
 
 <h2>Why it moves on a protocol</h2>
 <ul>${copy.whyMoves.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
 
-<div class="box"><p class="eyebrow">What people usually do · not a recommendation</p><ul>${copy.practices.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
-
 <h2>How Magno reads it</h2>
-<p>Import the PDF or a photo of the report and Magno finds ${esc(meta.label)} on it, keeps every test on one line, shows the change since the last one, and reads it against TRT-aware thresholds rather than the lab's generic range. The panel it belongs to, ${esc(meta.panel)}, gets a written verdict with the probable causes and what people usually do.</p>
+<p>Magno keeps every test on one line, against your lab's range, with the change since last time. Pro explains it in plain words. <a href="${APP_STORE}">Get Magno for iPhone</a>.</p>
 ${ctaBlock(`guide-${slug}`)}
 
 <h2>Questions people ask</h2>
@@ -197,7 +188,7 @@ const groups = PANEL_ORDER.map((panel) => ({ panel, items: pages.filter((p) => p
 const indexBody = `
 <p class="eyebrow">Guides</p>
 <h1>Your bloods, marker by marker.</h1>
-<p class="standfirst">What each number means on TRT, why it moves on a protocol, and what people usually do about it. Written the way an experienced user explains it, not the way a lab prints it.</p>
+<p class="standfirst">What each number means on TRT, why it moves on a protocol, and how related markers sit together. In plain words, not the way a lab prints it.</p>
 ${ctaBlock('guides')}
 ${longform.length ? `<div class="index-group"><h2>Start here</h2><ul class="index-list">${longform.map((g) => `<li><a href="/guides/${g.slug}">${esc(g.title)}<small>${esc(g.description)}</small></a></li>`).join('')}</ul></div>` : ''}
 ${groups.map((g) => `<div class="index-group"><h2>${esc(g.panel)}</h2><p class="intro">${esc(PANEL_INTRO[g.panel] ?? '')}</p><ul class="index-list">${g.items.map((p) => `<li><a href="/guides/${p.slug}">${esc(p.title)} on TRT<small>${esc(p.description)}</small></a></li>`).join('')}</ul></div>`).join('')}
@@ -205,7 +196,7 @@ ${disclaimerBox}
 `
 fs.writeFileSync(path.join(outDir, 'index.html'), shell({
   title: `TRT blood test guides, marker by marker | ${BRAND}`,
-  description: 'What each blood marker means on TRT, why it moves on a protocol and what people usually do about it. Testosterone, estradiol, hematocrit, lipids, liver, kidney, thyroid and more.',
+  description: 'What each blood marker means on TRT, why it moves on a protocol and how related markers sit together. Testosterone, estradiol, hematocrit, lipids, liver, kidney, thyroid and more.',
   canonical: `${SITE}/guides/`,
   jsonld: [{ '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'TRT blood test guides', url: `${SITE}/guides/`, publisher: { '@type': 'Organization', name: BRAND } }],
   body: indexBody,
@@ -220,6 +211,7 @@ const urls = [
   ...pages.map((p) => ({ loc: p.url, priority: '0.6' })),
   { loc: `${SITE}/privacy`, priority: '0.2' },
   { loc: `${SITE}/terms`, priority: '0.2' },
+  { loc: `${SITE}/status`, priority: '0.1' },
 ]
 fs.writeFileSync(path.join(root, 'public/sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${u.loc}</loc><lastmod>${today}</lastmod><priority>${u.priority}</priority></url>`).join('\n')}\n</urlset>\n`)
 

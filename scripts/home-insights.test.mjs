@@ -45,7 +45,7 @@ assert.equal(bpInsight({ vitals: [bp(1, 160, 100)], weights: [] }, NOW), undefin
 
 // Blood health: a bleed after the test turns it into a retest; none and bad offers to log one.
 {
-  const f = { id: 'blood', label: 'Blood health', status: 'bad', headline: 'Blood is getting thick', markers: [{ label: 'HCT', display: '56%', status: 'bad' }, { label: 'Ferritin', display: '95', status: 'good' }], story: 'Hematocrit is 56%.', causes: [], practices: [] }
+  const f = { id: 'blood', label: 'Blood health', status: 'bad', headline: 'Blood is getting thick', markers: [{ label: 'HCT', display: '56%', status: 'bad' }, { label: 'Ferritin', display: '95', status: 'good' }], story: 'Hematocrit is 56%.', causes: [] }
   const test = { id: 7, date: '2026-10-01' }
   const none = labInsight(f, test, [], '2026-10-06')
   assert.equal(none.logBleed, true)

@@ -3,8 +3,8 @@
  * protocol would and writes it down in sentences. Each section (lipids,
  * hormones, blood count, liver, kidney, blood sugar, thyroid, vitamins,
  * prostate, inflammation) gets a verdict, a short story that ties the numbers
- * together, the probable causes on a protocol, and what people usually do
- * about it. Unit-aware (UK mmol/L and US mg/dL both work). Feed it ONE exam's
+ * together, and the probable causes on a protocol. No next steps: decisions
+ * belong to the user and their clinician. Unit-aware (UK mmol/L and US mg/dL both work). Feed it ONE exam's
  * results: every pairing (ratios, HOMA-IR, the CK pattern) must come from the
  * same draw. Not medical advice; the UI says so.
  */
@@ -36,8 +36,8 @@ export type Finding = {
   story: string
   /** Why this usually happens to someone on a protocol. */
   causes: string[]
-  /** What people on a protocol usually do about it. Common practice, not advice. */
-  practices: string[]
+  /** Retired 19 Oct 2026 with the app's next-step lines; kept optional for older callers. */
+  practices?: string[]
   since?: string
 }
 
@@ -180,7 +180,7 @@ function buildCardio(h: History): Finding {
     const ratio = cholMmol(tc) / cholMmol(hdl)
     ratioStatus = bands(ratio, 3.5, 5)
     markers.push({ label: 'TC/HDL', display: fmt(ratio, 2), status: ratioStatus })
-    bits.push(`Total cholesterol to HDL is ${fmt(ratio, 1)}: ${ratio < 3.5 ? 'under the 3.5 people aim for, which is the single best number in this test' : ratio < 5 ? 'above the 3.5 people aim for but under the 5 risk line' : 'over the 5 risk line, and this ratio predicts heart risk better than LDL alone'}.`)
+    bits.push(`Total cholesterol to HDL is ${fmt(ratio, 1)}: ${ratio < 3.5 ? 'under the 3.5 commonly quoted as a target' : ratio < 5 ? 'above the commonly quoted 3.5 but under 5' : 'over 5, the level commonly quoted as higher risk'}.`)
   }
   let hdlS: Status = 'none'
   let ldlS: Status = 'none'
@@ -189,7 +189,7 @@ function buildCardio(h: History): Finding {
   if (ldl && hdl) {
     const lm = movedText(ldl); const hm = movedText(hdl)
     const pattern = trendOf(ldl)?.dir === 'up' && trendOf(hdl)?.dir === 'down'
-    bits.push(`LDL is ${show(ldl)}${lm ? `, ${lm}` : ''}, and HDL is ${show(hdl)}${hm ? `, ${hm}` : ''}.${pattern ? ' LDL climbing while HDL falls is the classic pattern on testosterone and especially on orals; the ratio gets hit from both ends.' : hdlS === 'warn' && inLab(hdl) ? ' In the lab range, but HDL is on the low side. It is the lipid that androgens hit hardest and it drags the ratio up on its own.' : hdlS !== 'good' ? ' Low HDL is the lipid that androgens hit hardest and it drags the ratio up on its own.' : ''}`)
+    bits.push(`LDL is ${show(ldl)}${lm ? `, ${lm}` : ''}, and HDL is ${show(hdl)}${hm ? `, ${hm}` : ''}.${pattern ? ' LDL climbing while HDL falls is a common pattern on testosterone; the ratio gets hit from both ends.' : hdlS === 'warn' && inLab(hdl) ? ' In the lab range, but HDL is on the low side. It is the lipid that androgens hit hardest and it drags the ratio up on its own.' : hdlS !== 'good' ? ' Low HDL is the lipid that androgens hit hardest and it drags the ratio up on its own.' : ''}`)
   } else if (ldl) {
     bits.push(`LDL is ${show(ldl)}${movedText(ldl) ? `, ${movedText(ldl)}` : ''}.`)
   } else if (hdl) {
@@ -207,25 +207,17 @@ function buildCardio(h: History): Finding {
   if (apob) {
     const s = bands(apobMgdl(apob), 90, 130)
     markers.push(mark('ApoB', apob, s))
-    if (s !== 'good') bits.push(`ApoB ${show(apob)} counts the particles that actually build plaque, so treat it like a high LDL even when LDL looks fine.`)
+    if (s !== 'good') bits.push(`ApoB ${show(apob)} counts the particles that actually build plaque, so it can read high even when LDL looks fine.`)
   }
 
   const status = worst(ratioStatus, hdlS, ldlS, ...markers.map((m) => m.status))
   const headline = status === 'bad' ? 'Lipids are in the risk zone' : status === 'warn' ? 'Lipids are drifting the wrong way' : status === 'good' ? 'Lipids look healthy' : 'No lipid data yet'
   const causes = status === 'good' ? [] : [
     'A higher testosterone dose, or a recent increase. Lipids follow the dose within a few weeks.',
-    'Any oral (Anavar, Winstrol, Dianabol, Superdrol) or a 19-nor such as trenbolone: these crush HDL hardest.',
     'An aromatase inhibitor pushing estradiol low. E2 is what keeps HDL up in men.',
     'A bulk in progress, more saturated fat, alcohol, or simply not much cardio.',
   ]
-  const practices = status === 'good' ? [] : [
-    'Drop or shorten the oral. HDL usually comes back within 6 to 8 weeks of stopping.',
-    'Zone-2 cardio three or four times a week. Lipids respond to it faster than to any supplement.',
-    'Omega-3 fish oil (2 to 4 g of EPA and DHA a day) and soluble fiber from psyllium or oats.',
-    'Citrus bergamot extract is the go-to supplement on a protocol for LDL and the ratio; some use red yeast rice, which works like a mild statin. A doctor can prescribe the real thing if it stays high.',
-    'If an AI has E2 crashed, easing it usually lifts HDL on the next test.',
-  ]
-  return { id: 'cardio', icon: Heart, label: 'Cardiovascular', section: 'Lipids', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(hdl, ldl, tc, tg) }
+  return { id: 'cardio', icon: Heart, label: 'Cardiovascular', section: 'Lipids', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(hdl, ldl, tc, tg) }
 }
 
 // ── 2. Hormone balance ─────────────────────────────────────────────────────
@@ -234,7 +226,6 @@ function buildHormones(h: History): Finding {
   const markers: MarkerVal[] = []
   const bits: string[] = []
   const causes: string[] = []
-  const practices: string[] = []
 
   if (tt) {
     const s = bands(ttNgdl(tt), 700, 400, true)
@@ -253,17 +244,15 @@ function buildHormones(h: History): Finding {
     const v = e2Pgml(e2)
     const s: Status = v >= 20 && v <= 40 ? 'good' : v > 60 || v < 15 ? 'bad' : 'warn'
     markers.push(mark('E2', e2, s))
-    const r = ratio !== undefined ? ` The testosterone to estradiol ratio is ${ratio}: ${ratio >= 15 && ratio <= 30 ? 'right in the 15 to 30 band people aim for, so aromatization is under control' : ratio < 15 ? 'below 15, which means a good share of the testosterone is turning into estradiol' : 'above 30, which means estradiol is being held low relative to the testosterone'}.` : ''
-    const side = v > 40 ? 'on the high side' : v < 20 ? 'on the low side' : ''
+    const r = ratio !== undefined ? ` The testosterone to estradiol ratio is ${ratio}: ${ratio >= 15 && ratio <= 30 ? 'inside the 15 to 30 band commonly quoted on testosterone' : ratio < 15 ? 'below 15, which means a good share of the testosterone is turning into estradiol' : 'above 30, which means estradiol is being held low relative to the testosterone'}.` : ''
+    const side = v > 40 ? 'above' : v < 20 ? 'below' : ''
     bits.push(side && inLab(e2)
-      ? `In the lab range, but estradiol ${show(e2)} is ${side} of where most men feel best${movedText(e2) ? `, ${movedText(e2)}` : ''}.${r}`
-      : `Estradiol is ${show(e2)}${movedText(e2) ? `, ${movedText(e2)}` : ''}, ${side || 'in the range where most men feel best'}.${r}`)
+      ? `In the lab range, but estradiol ${show(e2)} is ${side} the 20 to 40 pg/mL range commonly quoted on testosterone${movedText(e2) ? `, ${movedText(e2)}` : ''}.${r}`
+      : `Estradiol is ${show(e2)}${movedText(e2) ? `, ${movedText(e2)}` : ''}, ${side || 'inside'} the 20 to 40 pg/mL range commonly quoted on testosterone.${r}`)
     if (v > 40) {
       causes.push('A bigger weekly dose or fewer, larger injections: the peaks are what aromatize.', 'Higher body fat, which carries more aromatase.', 'Alcohol in the days before the draw.')
-      practices.push('Split the weekly dose into two or three injections to flatten the peaks; that alone often brings E2 down.', 'Most people treat the symptoms (water, moodiness, sore nipples), not the number. If there are none, they leave it alone.', 'DIM and calcium-D-glucarate are the soft options people try; a low dose of an aromatase inhibitor is the hard one, and crashed E2 feels worse than high E2.')
     } else if (v < 20) {
       causes.push('An aromatase inhibitor that is too strong or too frequent. This is the usual cause by a mile.', 'Very low body fat or a hard diet.')
-      practices.push('Reduce or pause the AI and retest in three to four weeks. Joint pain, flat mood and low libido are the tells of crashed E2.', 'People on a protocol rarely need an AI at all once the dose is split across the week.')
     }
   }
   if (shbg) {
@@ -275,9 +264,8 @@ function buildHormones(h: History): Finding {
       : `SHBG is ${show(shbg)}: ${s === 'good' ? 'in the normal band, so total and free testosterone tell the same story' : `${shbg.value > 50 ? 'high' : 'low'}, so ${why}`}.`)
     if (shbg.value > 50) {
       causes.push('Low insulin and low carbs, thyroid running high, age, or simply genetics.')
-      practices.push('For high SHBG people use boron (10 mg a day) and inject more often; more carbs and a bit more body fat also bring it down.')
     } else if (shbg.value < 20) {
-      causes.push('Insulin resistance, a high dose, or orals; all three push SHBG down.')
+      causes.push('Insulin resistance or a higher dose; both push SHBG down.')
     }
   }
   if (ft) {
@@ -294,15 +282,13 @@ function buildHormones(h: History): Finding {
       bits.push(s === 'warn' && inLab(prl)
         ? `In the lab range, but prolactin ${show(prl)} is a little high. It blunts libido and erections when it climbs.`
         : `Prolactin is ${show(prl)}, ${s === 'bad' ? 'clearly high' : 'a little high'}. It blunts libido and erections when it climbs.`)
-      causes.push('19-nor compounds (nandrolone, trenbolone) push prolactin up.', 'Stress, poor sleep, or an orgasm in the hours before the draw.')
-      practices.push('Retest fasted, rested and without sex the night before. If it holds, people on 19-nors use P5P (vitamin B6) as the soft fix and cabergoline through a doctor as the hard one.')
+      causes.push('Stress, poor sleep, or an orgasm in the hours before the draw.', 'Some medications, and rarely a pituitary cause.')
     }
   }
 
   const status = worst(...markers.map((m) => m.status))
   const headline = status === 'bad' ? 'Hormones are out of balance' : status === 'warn' ? 'One hormone marker is off' : status === 'good' ? 'Hormones sit where someone on a protocol wants them' : 'No hormone data yet'
-  if (status === 'good' && practices.length === 0) practices.push('Nothing to change. Keep the draw at the same point in the injection cycle each time so tests compare like for like.')
-  return { id: 'hormones', icon: Atom, label: 'Hormone balance', section: 'Hormones', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(tt, e2, ft) }
+  return { id: 'hormones', icon: Atom, label: 'Hormone balance', section: 'Hormones', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(tt, e2, ft) }
 }
 
 // ── 3. Blood health ────────────────────────────────────────────────────────
@@ -311,7 +297,6 @@ function buildBlood(h: History): Finding {
   const markers: MarkerVal[] = []
   const bits: string[] = []
   const causes: string[] = []
-  const practices: string[] = []
 
   let pct: number | undefined
   if (hct) {
@@ -320,8 +305,8 @@ function buildBlood(h: History): Finding {
     markers.push(mark('HCT', hct, s, `${fmt(pct, 1)}%`))
     const moved = movedText(hct) ? `, ${movedText(hct)}` : ''
     bits.push(pct >= 50 && pct < 52 && inLab(hct)
-      ? `In the lab range, but hematocrit ${fmt(pct, 1)}% is over the 50% line people on a protocol watch${moved}. A couple more points reaches the 52% action line.`
-      : `Hematocrit is ${fmt(pct, 1)}%${moved}. ${pct >= 52 ? 'Over 52% the blood is thick enough that clot risk goes up, and it is the line where doctors usually order a phlebotomy.' : pct >= 50 ? 'Under the 52% action line but close to it; a couple more points and it becomes a problem.' : 'Under 50%, which is the comfortable zone on testosterone.'}`)
+      ? `In the lab range, but hematocrit ${fmt(pct, 1)}% is over 50%${moved}, close to the 52% line often quoted for testosterone therapy.`
+      : `Hematocrit is ${fmt(pct, 1)}%${moved}. ${pct >= 52 ? 'Over 52% the blood is thicker, which is why it is the number doctors watch most closely on testosterone.' : pct >= 50 ? 'Under the 52% line often quoted for testosterone therapy, but close to it.' : 'Under 50%, which is the comfortable zone on testosterone.'}`)
   }
   if (hgb) {
     // Judged in g/dL, shown in the lab's own unit.
@@ -337,7 +322,6 @@ function buildBlood(h: History): Finding {
     if (v < 30) {
       bits.push(`Ferritin is ${show(ferr)}, low. That is usually the price of repeated donations, and it shows up as flat energy and poor recovery.`)
       causes.push('Donating blood too often to hold hematocrit down.')
-      practices.push('Space donations at least eight weeks apart and take iron with vitamin C between them; do not donate on a low ferritin.')
     } else if (movedText(ferr).startsWith('down')) {
       bits.push(`Ferritin ${show(ferr)} is ${movedText(ferr)}, which fits with a donation in between.`)
     }
@@ -345,7 +329,6 @@ function buildBlood(h: History): Finding {
 
   if (pct !== undefined && pct >= 50) {
     causes.push('Testosterone drives red-cell production, more so at higher doses and with injections that peak high.', 'A draw taken near the injection peak, or slightly dehydrated (hematocrit is a concentration).', 'Sleep apnea, smoking and altitude all add to it.')
-    practices.push(pct >= 52 ? 'Donate blood, or ask for a therapeutic phlebotomy. Most people drop three to four points from one donation.' : 'Retest at trough, well hydrated, before doing anything; a lot of "high" hematocrits are a dry draw day.', 'Drink more water the day before the draw and test at the trough, not the peak.', 'Smaller, more frequent injections lower the peaks that drive it.', 'Grapefruit juice (naringin) and nattokinase circulate as bro-science fixes; neither has solid evidence.')
   }
 
   const status = worst(...markers.map((m) => m.status))
@@ -354,7 +337,7 @@ function buildBlood(h: History): Finding {
   const headline = status === 'bad' ? (dir === 'down' ? 'Blood is thick but coming down' : 'Blood is getting thick')
     : status === 'warn' ? (dir === 'up' ? 'Red-cell count is creeping up' : dir === 'down' ? 'Red-cell count is high but coming down' : 'Red-cell count is near the top')
       : status === 'good' ? 'Blood count is in the safe zone' : 'No blood count data yet'
-  return { id: 'blood', icon: Droplet, label: 'Blood health', section: 'Full blood count', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(hct, hgb) }
+  return { id: 'blood', icon: Droplet, label: 'Blood health', section: 'Full blood count', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(hct, hgb) }
 }
 
 // ── 4. Liver ───────────────────────────────────────────────────────────────
@@ -380,10 +363,8 @@ function buildLiver(h: History): Finding {
   const status: Status = muscleSource ? 'warn' : rawStatus
   const bits: string[] = []
   const causes: string[] = []
-  const practices: string[] = []
   if (muscleSource) {
     bits.push(`${list(up)} ${up.length > 1 ? 'are' : 'is'} up while ${ggt ? 'GGT is normal and ' : ''}CK is high. That pattern usually comes from training rather than the liver; the enzymes leak from sore muscle too.`)
-    practices.push('No hard training for 48 hours before the next draw, so the enzymes mean something.')
   } else if (markers.length > 0) {
     const parts: string[] = []
     if (alt) parts.push(`ALT ${show(alt)} is ${altUp ? `${fmt(alt.value / uln(alt, 40), 1)} times the upper limit` : 'within limits'}${movedText(alt) ? `, ${movedText(alt)}` : ''}`)
@@ -394,13 +375,11 @@ function buildLiver(h: History): Finding {
       bits.push(ggt && !ggtUp
         ? 'GGT is the marker that separates a liver cause from training soreness, and it is normal here, so a hard session in the two days before the draw is the most likely explanation.'
         : 'GGT rising along with ALT points at the liver itself rather than training.')
-      causes.push('Oral 17-alpha-alkylated steroids (Anavar, Winstrol, Dianabol, Superdrol) are the number one cause on a protocol.', 'Heavy training within two days of the draw.', 'Alcohol, high-dose acetaminophen (paracetamol), some fat burners.', 'Fatty liver after a long bulk.')
-      practices.push('Stop or shorten the oral and retest in two to three weeks. Enzymes fall fast once the oral is gone.', 'TUDCA (500 to 1000 mg a day) and NAC (600 to 1200 mg a day) are the standard liver supports people on a protocol use; milk thistle is popular but the weakest of the three.', 'No training for 48 hours before the next draw.')
-      if (rawStatus === 'bad') practices.push('Above three times the upper limit, or with any yellowing or dark urine, people go to a doctor, not a forum.')
+      causes.push('Heavy training within two days of the draw.', 'Alcohol, high-dose acetaminophen (paracetamol), some fat burners.', 'Fatty liver after a long bulk.')
     }
   }
   const headline = muscleSource ? 'Enzymes are up, likely from training' : status === 'bad' ? 'Liver enzymes are well above normal' : status === 'warn' ? 'Mild liver enzyme rise' : status === 'good' ? 'Liver enzymes are normal' : 'No liver data yet'
-  return { id: 'liver', icon: Activity, label: 'Liver', section: 'Liver', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(alt, ast) }
+  return { id: 'liver', icon: Activity, label: 'Liver', section: 'Liver', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(alt, ast) }
 }
 
 // ── 5. Kidney ──────────────────────────────────────────────────────────────
@@ -415,17 +394,15 @@ function buildKidney(h: History): Finding {
   const status = worst(...markers.map((m) => m.status))
   const bits: string[] = []
   const causes: string[] = []
-  const practices: string[] = []
   if (cr) bits.push(`Creatinine is ${show(cr)}${movedText(cr) ? `, ${movedText(cr)}` : ''}${egfr ? `, and the filtration estimate (eGFR) is ${show(egfr)}` : ''}.`)
   else if (egfr) bits.push(`The filtration estimate (eGFR) is ${show(egfr)}.`)
   if (cys) bits.push(`Cystatin C ${show(cys)} is the cleaner test because it ignores muscle mass, and it reads ${bands(cys.value, 1.0, 1.2) === 'good' ? 'normal' : 'high'}.`)
   if (status !== 'good' && status !== 'none') {
     if (cr && !cys) bits.push('Creatinine tracks muscle mass and creatine supplements, so a mild rise in a big, supplemented lifter is often not a kidney problem at all.')
     causes.push('Creatine, which raises creatinine without touching the kidney.', 'More muscle than the formula assumes; eGFR is built for an average build.', 'Dehydration, a high-protein diet, NSAIDs like ibuprofen.', 'Blood pressure running high for months; that is the real kidney risk on a protocol.')
-    practices.push('Retest well hydrated and off creatine for five to seven days.', 'Ask the lab for cystatin C next time; it is not skewed by muscle.', 'Keep blood pressure in check and go easy on NSAIDs; those two protect the kidneys more than anything else.')
   }
   const headline = status === 'bad' ? 'Kidney markers are outside the safe range' : status === 'warn' ? 'Kidney markers are a little off' : status === 'good' ? 'Kidney function looks normal' : 'No kidney data yet'
-  return { id: 'kidney', icon: Filter, label: 'Kidney', section: 'Kidney', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(cr, egfr) }
+  return { id: 'kidney', icon: Filter, label: 'Kidney', section: 'Kidney', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(cr, egfr) }
 }
 
 // ── 6. Metabolic ───────────────────────────────────────────────────────────
@@ -455,18 +432,12 @@ function buildMetabolic(h: History): Finding {
   const status = worst(...markers.map((m) => m.status))
   const causes = status === 'good' || status === 'none' ? [] : [
     'Growth hormone or GH secretagogues (MK-677, ipamorelin, CJC) raise blood sugar directly; this is the most common cause in peptide users.',
-    'A long bulk at a higher body fat, or trenbolone and some orals, which worsen insulin sensitivity.',
+    'A long bulk at a higher body fat, which worsens insulin sensitivity.',
     'Poor sleep and high cortisol.',
     'On testosterone, faster red-cell turnover and recent donations can make HbA1c read lower than reality, so the fasting glucose and insulin matter too.',
   ]
-  const practices = status === 'good' || status === 'none' ? [] : [
-    'Walk after meals, keep lifting, sleep. These move HbA1c within a few months.',
-    'Berberine (500 mg two or three times a day with meals) is the supplement people reach for; it behaves a little like metformin, which a doctor can prescribe.',
-    'Cut the MK-677 or GH dose, or move it to before bed with no carbs.',
-    '25 g or more of fiber a day and fewer refined carbs; chromium and cinnamon get talked up but do little.',
-  ]
   const headline = status === 'bad' ? 'Blood sugar control is off' : status === 'warn' ? 'Early signs of insulin resistance' : status === 'good' ? 'Blood sugar and insulin look healthy' : 'No blood sugar data yet'
-  return { id: 'metabolic', icon: Flame, label: 'Blood sugar', section: 'Blood sugar', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(glu, a1c) }
+  return { id: 'metabolic', icon: Flame, label: 'Blood sugar', section: 'Blood sugar', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(glu, a1c) }
 }
 
 // ── 7. Thyroid ─────────────────────────────────────────────────────────────
@@ -483,9 +454,8 @@ function buildThyroid(h: History): Finding {
   if (ft3) { markers.push(mark('Free T3', ft3, byRange(ft3))); bits.push(`Free T3 ${show(ft3)}, the active hormone, is ${byRange(ft3) === 'good' ? 'in range' : 'out of range'}.`) }
   const status = worst(...markers.map((m) => m.status))
   const causes = status === 'good' || status === 'none' ? [] : ['Hard dieting and low calories; T3 drops first when food is scarce.', 'Fat burners such as clenbuterol, or taking T3 itself.', 'Iodine or selenium running short.', 'Plain hypothyroidism, which has nothing to do with the protocol.']
-  const practices = status === 'good' || status === 'none' ? [] : ['Retest after two or three weeks eating at maintenance; a diet-suppressed thyroid comes back on its own.', 'Selenium (200 mcg) and iodine from food are the usual soft supports.', 'If T3 or a fat burner is in the stack, that is the cause; people talk to a doctor before touching it.']
   const headline = status === 'bad' ? 'Thyroid is clearly off' : status === 'warn' ? 'Thyroid is slightly off' : status === 'good' ? 'Thyroid looks normal' : 'No thyroid data yet'
-  return { id: 'thyroid', icon: Pill, label: 'Thyroid', section: 'Thyroid', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(tsh) }
+  return { id: 'thyroid', icon: Pill, label: 'Thyroid', section: 'Thyroid', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(tsh) }
 }
 
 // ── 8. Vitamins ────────────────────────────────────────────────────────────
@@ -494,27 +464,25 @@ function buildVitamins(h: History): Finding {
   const markers: MarkerVal[] = []
   const bits: string[] = []
   const causes: string[] = []
-  const practices: string[] = []
   if (d) {
     const v = vitdNgml(d)
     const s: Status = v >= 40 && v <= 80 ? 'good' : v < 20 || v > 100 ? 'bad' : 'warn'
     markers.push(mark('Vit D', d, s))
-    bits.push(`${s === 'warn' && inLab(d) ? 'In the lab range, but vitamin D' : 'Vitamin D'} is ${show(d)}${movedText(d) ? `, ${movedText(d)}` : ''}, ${v < 20 ? 'deficient' : v < 40 ? 'short of the 40 ng/mL (100 nmol/L) people aim for' : v > 100 ? 'higher than it needs to be' : 'where people aim for'}.`)
+    bits.push(`${s === 'warn' && inLab(d) ? 'In the lab range, but vitamin D' : 'Vitamin D'} is ${show(d)}${movedText(d) ? `, ${movedText(d)}` : ''}, ${v < 20 ? 'deficient' : v < 40 ? 'under the 40 ng/mL (100 nmol/L) commonly quoted as a target' : v > 100 ? 'above 100 ng/mL, higher than most labs consider needed' : 'in the 40 to 80 ng/mL band commonly quoted as a target'}.`)
     if (v < 40) {
       causes.push('Indoor life, winter, darker skin; and body fat stores it away.')
-      practices.push('D3 at 2000 to 4000 IU a day with K2 and a meal usually gets there in two to three months; retest then.')
-    } else if (v > 100) practices.push('Ease the D3 dose; more is not better past 80 ng/mL.')
+    }
   }
   if (b12) {
     const s = bands(b12Pgml(b12), 400, 200, true)
     markers.push(mark('B12', b12, s))
-    if (s !== 'good') { bits.push(`${s === 'warn' && inLab(b12) ? 'In the lab range, but B12' : 'B12'} ${show(b12)} is ${s === 'bad' ? 'low' : 'on the low side'}; it shows up as tiredness and pins and needles.`); causes.push('A vegetarian diet, metformin, or acid blockers.'); practices.push('Methylcobalamin B12, sublingual or an injection through a doctor.') }
+    if (s !== 'good') { bits.push(`${s === 'warn' && inLab(b12) ? 'In the lab range, but B12' : 'B12'} ${show(b12)} is ${s === 'bad' ? 'low' : 'on the low side'}; it shows up as tiredness and pins and needles.`); causes.push('A vegetarian diet, metformin, or acid blockers.'); }
   }
   if (fol) markers.push(mark('Folate', fol, byRange(fol)))
   const status = worst(...markers.map((m) => m.status))
   const headline = status === 'good' ? 'Vitamin levels look good' : status === 'none' ? 'No vitamin data yet' : 'A vitamin is running short'
-  if (status !== 'good' && status !== 'none' && bits.length === 0) bits.push('A vitamin level is short. Cheap to fix, and it shows up in energy and recovery.')
-  return { id: 'vitamins', icon: Sun, label: 'Vitamins', section: 'Iron & vitamins', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(d, b12) }
+  if (status !== 'good' && status !== 'none' && bits.length === 0) bits.push('A vitamin level is short. It can show up in energy and recovery.')
+  return { id: 'vitamins', icon: Sun, label: 'Vitamins', section: 'Iron & vitamins', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(d, b12) }
 }
 
 // ── 9. Own production (LH, FSH), part of Hormones ──────────────────────────
@@ -530,20 +498,17 @@ function buildHpta(h: History): Finding {
   if (lh) parts.push(`LH ${show(lh)}`)
   if (fsh) parts.push(`FSH ${show(fsh)}`)
   const story = bothSuppressed
-    ? `${list(parts)} are both near zero. That is full suppression of your own production, which is expected on testosterone or a cycle: the brain sees plenty of androgen and stops sending the signal. Not a problem while you are on; it matters when you come off.`
+    ? `${list(parts)} are both near zero. That is full suppression of your own production, which is expected on testosterone: the brain sees plenty of androgen and stops sending the signal.`
     : status === 'bad' && ttLow
-      ? `${list(parts)} are very high while testosterone is below the lab range, so the testes are not answering the signal. Worth an endocrinology visit.`
+      ? `${list(parts)} are very high while testosterone is below the lab range, which means the testes are not answering the signal.`
       : status === 'bad'
-        ? `${list(parts)} are very high. That can happen while your own production restarts after a cycle. Worth showing a doctor if it holds.`
+        ? `${list(parts)} are very high. That can happen while your own production restarts after stopping testosterone.`
       : status === 'good'
-        ? `${list(parts)} are in range, so either you are not suppressed or the axis is recovering after a cycle.`
+        ? `${list(parts)} are in range, so either you are not suppressed or the axis is recovering.`
         : `${list(parts)}: partial suppression, or not enough data to say more.`
-  const causes = bothSuppressed ? ['Any exogenous testosterone or AAS shuts the signal down. This is how the axis works, not a fault.'] : []
-  const practices = bothSuppressed
-    ? ['People who care about fertility or testicle size run HCG (250 to 500 IU two or three times a week) alongside testosterone to keep the testes responsive.', 'Coming off: a PCT of HCG followed by clomiphene or tamoxifen is the common recovery route, done with a doctor.']
-    : []
+  const causes = bothSuppressed ? ['Testosterone from outside the body shuts the signal down. This is how the axis works, not a fault.'] : []
   const headline = bothSuppressed ? 'Own production is switched off, as expected' : status === 'bad' ? (ttLow ? 'The testes are not answering the signal' : 'LH and FSH are high') : status === 'good' ? 'Own production is working' : status === 'none' ? 'No LH or FSH data yet' : 'Partly suppressed'
-  return { id: 'hpta', icon: Atom, label: 'Own production (LH, FSH)', section: 'Hormones', status: bothSuppressed ? 'good' : status, headline, markers, story, causes, practices, since: sinceOf(lh, fsh) }
+  return { id: 'hpta', icon: Atom, label: 'Own production (LH, FSH)', section: 'Hormones', status: bothSuppressed ? 'good' : status, headline, markers, story, causes, since: sinceOf(lh, fsh) }
 }
 
 // ── 10. Prostate ───────────────────────────────────────────────────────────
@@ -552,7 +517,6 @@ function buildProstate(h: History): Finding {
   const markers: MarkerVal[] = []
   const bits: string[] = []
   const causes: string[] = []
-  const practices: string[] = []
   if (psa) {
     let s = bands(psa.value, 2.5, 4)
     const jump = psa.prev !== undefined && daysBetween(psa.prev.date, psa.date) <= 365 && psa.value - psa.prev.value > 1.4
@@ -560,16 +524,15 @@ function buildProstate(h: History): Finding {
     markers.push(mark('PSA', psa, s))
     const moved = movedText(psa) ? `, ${movedText(psa)}` : ''
     bits.push(!jump && s === 'warn' && inLab(psa)
-      ? `In the lab range, but PSA ${show(psa)} is between 2.5 and 4${moved}, where people watch it and retest.`
-      : `PSA is ${show(psa)}${moved}. ${s === 'good' ? 'Under 2.5 is comfortable.' : jump ? 'A rise of more than 1.4 within a year on a protocol is the trigger for a urology check even when the number itself is fine.' : psa.value >= 4 ? 'At 4 or more, people see a urologist.' : 'Between 2.5 and 4 people watch it and retest.'}`)
+      ? `In the lab range, but PSA ${show(psa)} is between 2.5 and 4${moved}.`
+      : `PSA is ${show(psa)}${moved}. ${s === 'good' ? 'Under 2.5 is comfortable.' : jump ? 'It rose more than 1.4 within a year, a change commonly flagged on testosterone even when the number itself is fine.' : psa.value >= 4 ? 'That is at or above 4, the cut-off most labs use.' : 'That is between 2.5 and 4.'}`)
     if (s !== 'good') {
       causes.push('Testosterone itself lifts PSA a little in the first year.', 'Cycling, sex or a prostate infection in the 48 hours before the draw.', 'Age and an enlarged prostate.')
-      practices.push('Retest after 48 hours with no cycling and no ejaculation. If it holds, see a urologist; this is one people do not self-manage.')
     }
   }
   const status = worst(...markers.map((m) => m.status))
-  const headline = status === 'bad' ? 'PSA is high enough to act on' : status === 'warn' ? 'A PSA to watch' : status === 'good' ? 'PSA looks fine' : 'No PSA data yet'
-  return { id: 'prostate', icon: ShieldAlert, label: 'Prostate', section: 'Prostate', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(psa) }
+  const headline = status === 'bad' ? 'PSA is high' : status === 'warn' ? 'A PSA to watch' : status === 'good' ? 'PSA looks fine' : 'No PSA data yet'
+  return { id: 'prostate', icon: ShieldAlert, label: 'Prostate', section: 'Prostate', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(psa) }
 }
 
 // ── 11. Inflammation ───────────────────────────────────────────────────────
@@ -579,24 +542,22 @@ function buildInflammation(h: History): Finding {
   const markers: MarkerVal[] = []
   const bits: string[] = []
   const causes: string[] = []
-  const practices: string[] = []
   if (crp) {
     const s = hs ? bands(crp.value, 1, 3) : byRange(crp) !== 'none' ? byRange(crp) : bands(crp.value, 5, 10)
     markers.push(mark(hs ? 'hs-CRP' : 'CRP', crp, s))
     bits.push(`${hs ? 'hs-CRP' : 'CRP'} ${show(crp)} shows ${s === 'good' ? 'low' : s === 'warn' ? 'mild' : 'high'} background inflammation.`)
     if (s !== 'good') {
       causes.push('Hard training in the days before the draw; CRP spikes after big sessions.', 'An infection, an injury, poor sleep, or extra body fat.')
-      practices.push('Retest after a few easy days. Omega-3, curcumin and better sleep are the usual levers people pull for a stubborn CRP.')
     }
   }
   if (hcy) {
     const s = bands(hcy.value, 10, 15)
     markers.push(mark('Homocysteine', hcy, s))
-    if (s !== 'good') { bits.push(s === 'warn' && inLab(hcy) ? `In the lab range, but homocysteine ${show(hcy)} is on the high side, which adds to cardiovascular risk.` : `Homocysteine ${show(hcy)} is high, which adds to cardiovascular risk.`); practices.push('Methylated B vitamins (folate, B12, B6) bring homocysteine down within weeks.') }
+    if (s !== 'good') { bits.push(s === 'warn' && inLab(hcy) ? `In the lab range, but homocysteine ${show(hcy)} is on the high side, which adds to cardiovascular risk.` : `Homocysteine ${show(hcy)} is high, which adds to cardiovascular risk.`); }
   }
   const status = worst(...markers.map((m) => m.status))
   const headline = status === 'bad' ? 'Inflammation is high' : status === 'warn' ? 'Mild inflammation' : status === 'good' ? 'Inflammation looks low' : 'No inflammation data yet'
-  return { id: 'inflammation', icon: Flame, label: 'Inflammation', section: 'Inflammation', status, headline, markers, story: bits.join(' '), causes, practices, since: sinceOf(crp) }
+  return { id: 'inflammation', icon: Flame, label: 'Inflammation', section: 'Inflammation', status, headline, markers, story: bits.join(' '), causes, since: sinceOf(crp) }
 }
 
 // ── Build all ──────────────────────────────────────────────────────────────
@@ -619,7 +580,7 @@ export function useLabFindings(results: EnrichedResult[], exams: LabExam[], exam
   return useMemo(() => buildFindings(results, exams, examId), [results, exams, examId])
 }
 
-// The written summary at the top of the page: who needs action, what moved, what is fine.
+// The written summary at the top of the page: what is outside range, what moved, what is fine.
 export function summarize(findings: Finding[]): string[] {
   const bad = findings.filter((f) => f.status === 'bad')
   const warn = findings.filter((f) => f.status === 'warn')
@@ -628,7 +589,7 @@ export function summarize(findings: Finding[]): string[] {
   if (findings.length === 0) return out
 
   const first: string[] = []
-  if (bad.length) first.push(`${list(bad.map((f) => f.label))} ${bad.length === 1 ? 'needs' : 'need'} action`)
+  if (bad.length) first.push(`${list(bad.map((f) => f.label))} ${bad.length === 1 ? 'is' : 'are'} outside range`)
   if (warn.length) first.push(`${list(warn.map((f) => f.label.toLowerCase()))} ${warn.length === 1 ? 'is' : 'are'} worth watching`)
   if (good.length) first.push(good.length === findings.length ? 'every section looks fine' : `${good.length === 1 ? good[0].label.toLowerCase() + ' looks' : `${good.length} sections look`} fine`)
   out.push(`${cap(list(first))}.`)
@@ -643,7 +604,7 @@ export function summarize(findings: Finding[]): string[] {
   if (moves.length) out.push(`Since ${since ? `your ${since} test` : 'your last test'}: ${list(moves.map((m) => m.text))}.`)
 
   const heads = [...bad, ...warn].slice(0, 3).map((f) => f.headline.toLowerCase())
-  if (heads.length) out.push(`${cap(list(heads))}. Each section below says why and what people usually do about it.`)
+  if (heads.length) out.push(`${cap(list(heads))}. Each section below says what the numbers are and how they sit together.`)
   return out
 }
 

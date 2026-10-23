@@ -58,10 +58,10 @@ const buckets = $$('#step3-buckets > div')
 const sorting = $('#step3-sorting')
 if (card && buckets.length && sorting && !reduced) {
   const samples = [
-    { who: 'Hematocrit', text: '52.1% ▲ 7% since December. Above the 52% line.', bucket: 2 },
-    { who: 'Estradiol', text: '112 pmol/L, T:E2 ratio 30. Right where it should be.', bucket: 0 },
+    { who: 'Hematocrit', text: '52.1% ▲ 7% since December. Above the lab range.', bucket: 2 },
+    { who: 'Estradiol', text: '112 pmol/L, T:E2 ratio 30. Inside the lab range.', bucket: 0 },
     { who: 'LDL', text: '3.4 mmol/L, up 17% since your last test.', bucket: 1 },
-    { who: 'Blood pressure', text: '134/86 after training. Retake at rest tomorrow.', bucket: 3 },
+    { who: 'Blood pressure', text: '134/86, logged right after training.', bucket: 3 },
   ]
   const active = ['scale-[1.04]', 'border-zinc-900/25', 'bg-zinc-50', 'shadow-[0_8px_18px_-14px_rgba(24,24,27,0.45)]']
   const idle = ['border-zinc-200', 'bg-white', 'shadow-[0_3px_12px_-10px_rgba(24,24,27,0.35)]']
@@ -95,7 +95,7 @@ if (card && buckets.length && sorting && !reduced) {
   setInterval(run, 3600)
 }
 
-// ── Step 04: one action pill lights up at a time ──────────────────────────
+// ── Step 04: one pill lights up at a time ──────────────────────────
 const pills = $$('#step4-pills > span')
 if (pills.length && !reduced) {
   let i = 3
