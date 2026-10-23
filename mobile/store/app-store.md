@@ -13,7 +13,7 @@ in the notes below so he can check them.
 |---|---|---|
 | Name | `Magno: Protocol Log` | 19 / 30 |
 | Subtitle | `Injections, labs and BP` | 23 / 30 |
-| Keywords | `injection,tracker,log,bloodwork,lab,results,blood,pressure,weight,diary,journal,health,shots,peptide` | 99 / 100 |
+| Keywords | `trt,testosterone,hrt,hormone,peptide,tracker,bloodwork,lab,shot,site,rotation,blood,pressure,weight` | 99 / 100 |
 | Promotional text | Every injection, blood test, weight and blood pressure reading in one clean timeline, kept on your phone. | 104 / 170 |
 | Primary category | Health & Fitness | |
 | Secondary category | Medical | |
@@ -23,7 +23,7 @@ in the notes below so he can check them.
 | Privacy policy URL | `https://magno.fit/privacy` | |
 
 Name and subtitle say "protocol", never "TRT" or a drug name (the playbook's copy rule; Apple 1.4.3 and the ad rules
-in references/regulatory-risk.md). "peptide" in keywords is a search word only, never a promise; drop it if review asks.
+in references/regulatory-risk.md). "peptide" in keywords is a search word only, never a promise; drop it if review asks. Keywords never repeat words already in the name or subtitle (Apple indexes those). Version 1.1 (created 23 Oct 2026, Prepare for Submission) carries the new set: trt/hrt/hormone/testosterone/site rotation added; log, injection, results, diary, journal, health, shots dropped. 1.0 kept the old set (keywords lock on release).
 
 ### Description
 
