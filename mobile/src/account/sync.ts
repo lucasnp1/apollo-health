@@ -6,7 +6,7 @@ import { AppState } from 'react-native'
 import { useSyncExternalStore } from 'react'
 import { db } from '@shared/lib/db'
 import { syncAll } from '@shared/lib/sync'
-import { account } from './auth'
+import { account, needsConsent } from './auth'
 
 export type SyncState = { running: boolean; lastAt?: number; error?: string }
 
@@ -21,7 +21,8 @@ export const useSyncState = () => useSyncExternalStore((f) => (subs.add(f), () =
 let running: Promise<void> | undefined
 /** One sync now (or the one already running). Never throws: the error shows in Settings. */
 export function syncNow(): Promise<void> {
-  if (account().status !== 'authed') return Promise.resolve()
+  // nothing leaves the phone until the person has said yes to backing up (the consent screen)
+  if (account().status !== 'authed' || needsConsent(account())) return Promise.resolve()
   running ??= (async () => {
     set({ running: true })
     try {

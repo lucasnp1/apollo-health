@@ -115,12 +115,24 @@ export async function resetWithCode(email: string, code: string, password: strin
  * Sign out, and take this person's data off the phone (it stays in the account): a phone passed to someone else
  * must not show them the last person's health data. What hasn't synced yet goes up first.
  */
-export async function signOut(flush: () => Promise<unknown>) {
-  await flush()
+export async function signOut(flush: () => Promise<unknown>, { keepOnPhone = false } = {}) {
+  // keepOnPhone: the person said no to backing up, so nothing goes up and their log stays here
+  if (!keepOnPhone) await flush()
   await api.post('/api/auth/logout').catch(() => {})
   await GoogleSignin.signOut().catch(() => {})
-  await wipeAllLocalData()
+  if (!keepOnPhone) await wipeAllLocalData()
   set({ status: 'guest' })
+}
+
+/** Signed in but hasn't said yes to backing up their health log yet (an account made before the consent screen, or
+ * a no last time): sync waits and the consent screen opens. */
+export const needsConsent = (a: Account) => a.status === 'authed' && a.user.health_consent === false
+
+/** The explicit yes (GDPR Art. 9): recorded on the server with a time, then the account is read again. */
+export async function giveConsent() {
+  await api.post('/api/auth/consent')
+  const user = await me()
+  if (user) set({ status: 'authed', user })
 }
 
 /** Deletes the account and everything in it on the server, then everything on this phone. Apple 5.1.1(v). */

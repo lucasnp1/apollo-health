@@ -9,7 +9,7 @@ export type Chip = { label: string; tone: Tone }
 
 export function readChip(m: TestMarker): Chip {
   switch (m.read) {
-    case 'act': return { label: 'Act', tone: 'bad' }
+    case 'act': return { label: 'Outside range', tone: 'bad' }
     case 'watch': return { label: 'Watch', tone: 'warn' }
     case 'expected': return { label: 'Expected', tone: 'neutral' }
     case 'fine': return { label: 'Fine', tone: 'good' }

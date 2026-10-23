@@ -15,6 +15,8 @@ export type ApiUser = {
   apple?: boolean
   google?: boolean
   has_password?: boolean
+  // Explicit yes to back the health log up on the server (iPhone app consent screen); false = phone only
+  health_consent?: boolean
 }
 
 class ApiError extends Error {

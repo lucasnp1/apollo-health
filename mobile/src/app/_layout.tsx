@@ -13,7 +13,7 @@ import { StatusBar } from 'expo-status-bar'
 import { useEffect, useState } from 'react'
 import { InteractionManager } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { startAccount, useAccount } from '@/account/auth'
+import { needsConsent, startAccount, useAccount } from '@/account/auth'
 import { billingFollowsAccount, startBilling } from '@/money/pro'
 import { startSync } from '@/account/sync'
 import { loadData } from '@/data/persist'
@@ -78,6 +78,11 @@ export default function Root() {
   const base = scheme === 'light' ? DefaultTheme : DarkTheme
   const theme = { ...base, colors: { ...base.colors, background: pal.bg, card: pal.bg, text: pal.fg, primary: pal.primary, border: pal.line } }
   const ready = fonts && loaded
+  // Signed in without a yes to backing up yet: ask, once per sign-in, before anything syncs
+  const ask = needsConsent(acc)
+  useEffect(() => {
+    if (ready && ask) setTimeout(() => router.push('/account/consent'), 400)
+  }, [ready, ask, who])
   useEffect(() => {
     if (!ready) return
     void SplashScreen.hideAsync()
@@ -109,6 +114,7 @@ export default function Root() {
         <Stack.Screen name="insight" options={{ ...LOG, title: '' }} />
         <Stack.Screen name="account/password" options={{ ...LOG, title: 'Change password' }} />
         <Stack.Screen name="account/recovery" options={{ ...LOG, title: 'Recovery codes' }} />
+        <Stack.Screen name="account/consent" options={{ presentation: 'modal', gestureEnabled: false, contentStyle: { backgroundColor: C.bg } }} />
         <Stack.Screen name="account/feedback" options={{ ...LOG, title: 'Send feedback' }} />
         <Stack.Screen name="log/bleed" options={{ ...LOG, title: 'Blood-letting' }} />
         <Stack.Screen name="archive" options={{ ...PUSH, title: 'Archive', headerBackTitle: 'You' }} />
