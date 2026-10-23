@@ -17,6 +17,10 @@ import { wrap } from '../../_lib/handler'
 // table/migration on the hot path.
 const THROTTLE_WINDOW_MS = 30_000
 const THROTTLE_THRESHOLD = 5
+// Per account too, so guessing one person's password from many IPs stays slow: 10 wrong passwords in 15 minutes
+// pause password logins for that account (Apple/Google sign-in and recovery still work).
+const ACCOUNT_WINDOW_MS = 15 * 60_000
+const ACCOUNT_THRESHOLD = 10
 
 export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env }) => {
   let body: { email?: string; password?: string }
@@ -65,6 +69,16 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
       algorithm: string
     }>()
 
+  if (user) {
+    const fails = await env.DB
+      .prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE user_id = ? AND action = 'login_fail' AND at > ?`)
+      .bind(user.id, now - ACCOUNT_WINDOW_MS)
+      .first<{ n: number }>()
+    if (fails && fails.n >= ACCOUNT_THRESHOLD) {
+      return jsonError('Too many attempts. Try again in 15 minutes.', 429, {}, { 'Retry-After': '900' })
+    }
+  }
+
   // Constant-time-ish: still attempt a verify even on missing user to avoid
   // trivial timing oracle. We use a fixed PBKDF2 verify here intentionally —
   // the timing differs from an Argon2id verify but the attacker can't
@@ -82,7 +96,7 @@ export const onRequestPost: PagesFunction<Env> = wrap<Env>(async ({ request, env
     // Record the failure for throttling. Don't reveal whether email exists.
     await env.DB
       .prepare('INSERT INTO audit_log (user_id, action, meta, ip_hash, at) VALUES (?, ?, ?, ?, ?)')
-      .bind(null, 'login_fail', null, iph, now)
+      .bind(user?.id ?? null, 'login_fail', null, iph, now)
       .run()
     return jsonError('Email or password incorrect', 401)
   }
