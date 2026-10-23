@@ -7,7 +7,7 @@ import { randomToken, uuid } from './crypto'
 import { ipHash, jsonOk, sessionCookie, sessionTtlMs } from './auth'
 
 export type Provider = 'apple' | 'google'
-type Row = { id: string; email: string; is_admin: number; display_name: string | null }
+type Row = { id: string; email: string; is_admin: number; display_name: string | null; has_password?: number | null }
 
 export async function socialSignIn(env: Env, request: Request, provider: Provider, who: { sub: string; email?: string; emailVerified: boolean }) {
   const col = provider === 'apple' ? 'apple_sub' : 'google_sub'
@@ -16,8 +16,19 @@ export async function socialSignIn(env: Env, request: Request, provider: Provide
   let user = await env.DB.prepare(`SELECT id, email, is_admin, display_name FROM users WHERE ${col} = ?`).bind(who.sub).first<Row>()
   let created = false
   if (!user && who.email && who.emailVerified) {
-    user = await env.DB.prepare('SELECT id, email, is_admin, display_name FROM users WHERE email = ?').bind(who.email).first<Row>()
-    if (user) await env.DB.prepare(`UPDATE users SET ${col} = ?, updated_at = ? WHERE id = ?`).bind(who.sub, now, user.id).run()
+    user = await env.DB.prepare('SELECT id, email, is_admin, display_name, has_password FROM users WHERE email = ?').bind(who.email).first<Row>()
+    // A password signup never proves it owns the email, so someone could sign up with another person's address and
+    // wait for them to arrive through Apple or Google. The provider has verified the email; that person owns the account
+    // from here: the password, its recovery codes and reset links, and every session made with them stop working.
+    if (user && user.has_password !== 0)
+      await env.DB.batch([
+        env.DB.prepare(`UPDATE users SET ${col} = ?, password_hash = '', password_salt = '', has_password = 0, updated_at = ? WHERE id = ?`).bind(who.sub, now, user.id),
+        env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
+        env.DB.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(user.id),
+        env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(user.id),
+      ])
+    else if (user) await env.DB.prepare(`UPDATE users SET ${col} = ?, updated_at = ? WHERE id = ?`).bind(who.sub, now, user.id).run()
+    if (user) user = { id: user.id, email: user.email, is_admin: user.is_admin, display_name: user.display_name }
   }
   if (!user) {
     const id = uuid()

@@ -107,12 +107,18 @@ export const onRequestPost: PagesFunction<Env, 'table'> = wrap<Env, 'table'>(asy
     }
     const { columns, placeholders, values, updateSet } = sqlValues
 
+    // ids are global primary keys: an id that belongs to another account must never update that account's row.
+    // The WHERE makes the upsert a no-op then, and RETURNING tells us it was.
     const sql =
       `INSERT INTO ${spec.table} (user_id, ${columns.join(', ')}) ` +
       `VALUES (?, ${placeholders.join(', ')}) ` +
-      `ON CONFLICT(id) DO UPDATE SET ${updateSet}`
+      `ON CONFLICT(id) DO UPDATE SET ${updateSet} WHERE ${spec.table}.user_id = excluded.user_id RETURNING id`
 
-    await env.DB.prepare(sql).bind(auth.user.id, ...values).run()
+    const done = await env.DB.prepare(sql).bind(auth.user.id, ...values).first()
+    if (!done) {
+      conflicts.push({ id, reason: 'not yours' })
+      continue
+    }
     written.push(id)
   }
 
@@ -135,7 +141,8 @@ function buildInsertValues(
     // updated_at is ALWAYS server-stamped; ignore any client-supplied value.
     // created_at is server-stamped too, both on insert and (importantly) NOT
     // overwritten on update — see ON CONFLICT logic below.
-    if (def.col === 'updated_at' || def.col === 'created_at') continue
+    // r2_key is stamped by /api/files/upload only: a client-chosen key could point at another account's blob.
+    if (def.col === 'updated_at' || def.col === 'created_at' || def.col === 'r2_key') continue
     let raw = incoming[clientField]
     if (raw === undefined) raw = null
     if (def.type === 'bool') raw = raw ? 1 : 0
@@ -159,7 +166,7 @@ function buildInsertValues(
 
   if (!columns.includes('id')) return null
 
-  // Ensure the row belongs to the user (insert guards via user_id; update guards via WHERE in ON CONFLICT)
+  // The row belongs to the user: inserts carry user_id, updates are guarded by the WHERE on the ON CONFLICT
   void userId
   return {
     columns,
