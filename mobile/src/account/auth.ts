@@ -178,6 +178,6 @@ export const regenerateCodes = async (password: string) =>
 /** Feedback to the team, stored on the server with the account email. Needs to be signed in. */
 export const sendFeedback = (message: string) => api.post('/api/feedback', { message: message.trim() })
 
-export const SUPPORT_EMAIL = 'hello@theos.studio' // the web app's support address
+export const SUPPORT_EMAIL = 'hello@magno.fit' // forwards to Lucas (Cloudflare Email Routing); we reply within 2 working days
 export const mailto = (subject: string, body = '') =>
   `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`

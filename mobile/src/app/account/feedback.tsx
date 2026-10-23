@@ -35,7 +35,7 @@ export default function Feedback() {
     <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={{ padding: 16, gap: 24 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
       {sent ? (
         <>
-          <Text style={f.lead}>Thanks! Every message is read. If it needs a reply, it goes to {acc.status === 'authed' ? acc.user.email : 'your email'}.</Text>
+          <Text style={f.lead}>Thanks! A person reads every message. If it needs a reply, we write to {acc.status === 'authed' ? acc.user.email : 'your email'} within 2 working days.</Text>
           <Pressable style={f.primary} onPress={() => router.back()} accessibilityRole="button">
             <Text style={f.primaryText}>Done</Text>
           </Pressable>
