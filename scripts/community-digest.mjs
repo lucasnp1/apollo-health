@@ -11,7 +11,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const UA = 'apollo-health-digest/1.0 (community research; hello@theos.studio)'
+const UA = 'apollo-health-digest/1.0 (community research; hello@magno.fit)'
 const SUBS = ['Testosterone', 'trt', 'PEDs', 'Peptides', 'moreplatesmoredates']
 const KEYWORDS = [
   'hematocrit trt', 'haematocrit trt', 'bloods trt', 'blood work trt', 'estradiol trt', 'e2 trt bloods',

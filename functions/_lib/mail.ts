@@ -2,7 +2,7 @@
 //
 // Dormant until the owner adds two Cloudflare Pages secrets:
 //   RESEND_API_KEY  — from resend.com (verify the sending domain first)
-//   MAIL_FROM       — e.g. "Magno <no-reply@theos.studio>"
+//   MAIL_FROM       — e.g. "Magno <no-reply@magno.fit>"
 // While unset, mailConfigured() is false and callers degrade gracefully.
 
 import type { Env } from './types'

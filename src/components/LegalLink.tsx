@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 
-export const SUPPORT_EMAIL = 'hello@theos.studio'
+export const SUPPORT_EMAIL = 'hello@magno.fit'
 
 // Legal pages are static HTML outside the app shell. Open them in a new tab so
 // an installed (standalone) PWA, which has no back button, never gets stuck.
