@@ -37,12 +37,12 @@ export async function readSession(env: Env, request: Request): Promise<AuthedUse
 
   const row = await env.DB
     .prepare(
-      `SELECT u.id, u.email, u.is_admin, u.display_name, u.plan, u.plan_kind, u.plan_until, u.onboarded_at, u.apple_sub, u.google_sub, u.has_password, s.expires_at
+      `SELECT u.id, u.email, u.is_admin, u.display_name, u.plan, u.plan_kind, u.plan_until, u.onboarded_at, u.apple_sub, u.google_sub, u.has_password, u.health_consent_at, s.expires_at
        FROM sessions s JOIN users u ON s.user_id = u.id
        WHERE s.token = ?`,
     )
     .bind(token)
-    .first<{ id: string; email: string; is_admin: number; display_name: string | null; plan: string | null; plan_kind: string | null; plan_until: number | null; onboarded_at: number | null; apple_sub: string | null; google_sub: string | null; has_password: number | null; expires_at: number }>()
+    .first<{ id: string; email: string; is_admin: number; display_name: string | null; plan: string | null; plan_kind: string | null; plan_until: number | null; onboarded_at: number | null; apple_sub: string | null; google_sub: string | null; has_password: number | null; health_consent_at: number | null; expires_at: number }>()
 
   if (!row) return null
   if (row.expires_at < Date.now()) {
@@ -66,6 +66,7 @@ export async function readSession(env: Env, request: Request): Promise<AuthedUse
     apple: !!row.apple_sub,
     google: !!row.google_sub,
     has_password: row.has_password !== 0,
+    health_consent: row.health_consent_at != null,
   }
 }
 
@@ -73,6 +74,12 @@ export async function requireUser(env: Env, request: Request): Promise<{ user: A
   const user = await readSession(env, request)
   if (!user) return jsonError('Unauthorized', 401)
   return { user }
+}
+
+/** Backups need the person's explicit yes (consent.ts). Enforced once CONSENT_REQUIRED=1 is set, i.e. once the
+ * iPhone app that asks for it is out; until then older app versions keep syncing as before. */
+export function consentMissing(env: Env, user: AuthedUser): Response | undefined {
+  if (env.CONSENT_REQUIRED === '1' && !user.health_consent) return jsonError('Agree to back up your log first', 403, { code: 'consent' })
 }
 
 export async function requireAdmin(env: Env, request: Request): Promise<{ user: AuthedUser } | Response> {

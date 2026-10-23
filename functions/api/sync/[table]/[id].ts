@@ -2,7 +2,7 @@
 // For the `files` table also purge the R2 blob so storage doesn't grow forever.
 
 import type { PagesFunction, Env } from '../../../_lib/types'
-import { jsonError, jsonOk, requireUser } from '../../../_lib/auth'
+import { jsonError, jsonOk, consentMissing, requireUser } from '../../../_lib/auth'
 import { TABLES } from '../../../_lib/tables'
 import { wrap } from '../../../_lib/handler'
 
@@ -10,6 +10,8 @@ export const onRequestDelete: PagesFunction<Env, 'table' | 'id'> = wrap<Env, 'ta
   async ({ env, request, params }) => {
     const auth = await requireUser(env, request)
     if (auth instanceof Response) return auth
+  const noConsent = consentMissing(env, auth.user)
+  if (noConsent) return noConsent
     const slug = String(params.table)
     const id = String(params.id)
     const spec = TABLES[slug]

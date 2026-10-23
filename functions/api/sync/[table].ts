@@ -4,13 +4,15 @@
 //   DELETE /api/sync/:table/:id               → handled in [table]/[id].ts
 
 import type { PagesFunction, Env } from '../../_lib/types'
-import { jsonError, jsonOk, requireUser } from '../../_lib/auth'
+import { jsonError, jsonOk, consentMissing, requireUser } from '../../_lib/auth'
 import { TABLES, rowToClient, type TableSpec } from '../../_lib/tables'
 import { wrap } from '../../_lib/handler'
 
 export const onRequestGet: PagesFunction<Env, 'table'> = wrap<Env, 'table'>(async ({ env, request, params }) => {
   const auth = await requireUser(env, request)
   if (auth instanceof Response) return auth
+  const noConsent = consentMissing(env, auth.user)
+  if (noConsent) return noConsent
   const slug = String(params.table)
   const spec = TABLES[slug]
   if (!spec) return jsonError('Unknown table', 404)
@@ -57,6 +59,8 @@ export const onRequestGet: PagesFunction<Env, 'table'> = wrap<Env, 'table'>(asyn
 export const onRequestPost: PagesFunction<Env, 'table'> = wrap<Env, 'table'>(async ({ env, request, params }) => {
   const auth = await requireUser(env, request)
   if (auth instanceof Response) return auth
+  const noConsent = consentMissing(env, auth.user)
+  if (noConsent) return noConsent
   const slug = String(params.table)
   const spec = TABLES[slug]
   if (!spec) return jsonError('Unknown table', 404)

@@ -10,6 +10,8 @@ export type Env = {
   ADMIN_STATS_TOKEN?: string
   /** Set only after the custom domain resolves; enables the legacy-host 301. */
   CANONICAL_HOST?: string
+  // '1' once the app with the consent screen is out: backups then need the person's explicit yes
+  CONSENT_REQUIRED?: string
   APP_URL?: string // e.g. https://magno.fit (reset links)
   // Sign in with Apple (functions/_lib/apple.ts). APPLE_BUNDLE_ID defaults to app.magno.ios. The key (Apple
   // Developer > Keys, with Sign in with Apple) is only needed to revoke a login when an account is deleted.
@@ -67,6 +69,8 @@ export type AuthedUser = {
   apple?: boolean
   google?: boolean
   has_password?: boolean
+  // Explicit consent to store the health log on the server (GDPR Art. 9)
+  health_consent?: boolean
 }
 
 // PagesFunction handler type (matches Cloudflare's @cloudflare/workers-types).
