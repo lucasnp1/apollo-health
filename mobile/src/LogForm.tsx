@@ -7,6 +7,7 @@ import { usePreventRemove } from 'expo-router/react-navigation'
 import { type ReactNode, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { archiveRow, type ArchivableTable, restoreRow } from '@shared/lib/archive'
+import { afterSave } from '@/review'
 import { withUndo } from '@/toast'
 import { C, F } from '@/theme'
 
@@ -48,6 +49,7 @@ export function LogForm({ canSave, onSave, children, dirty = false, title, archi
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       leaving.current = true
       router.back()
+      if (!archive) afterSave()
     } catch (err) {
       // the person chose "Keep editing" in a confirmation the save asked
       if ((err as Error)?.name === 'Cancelled') return setBusy(false)
