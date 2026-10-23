@@ -10,7 +10,7 @@
     "backgroundColor": "#0d0e11",
     "ios": {
       "bundleIdentifier": "app.magno.ios",
-      "buildNumber": "11",
+      "buildNumber": "12",
       "supportsTablet": false,
       "appleTeamId": "69Y8AJD573",
       "config": {
