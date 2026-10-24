@@ -8,17 +8,21 @@
 //   node scripts/community-digest.mjs --json     → JSON on stdout
 //   APOLLO_STATS_TOKEN=... APOLLO_ORIGIN=https://magno.fit  (optional stats section)
 //   REDDIT_FORCE_FALLBACK=1                      → skip search.json, exercise the fallbacks
+//   node scripts/community-digest.mjs --liber    → tmp/digest/liber-YYYY-MM-DD.md (book-collector threads, no stats)
 import fs from 'node:fs'
 import path from 'node:path'
 
 const UA = 'apollo-health-digest/1.0 (community research; hello@magno.fit)'
-const SUBS = ['Testosterone', 'trt', 'PEDs', 'Peptides', 'moreplatesmoredates']
-const KEYWORDS = [
+const args = new Set(process.argv.slice(2))
+// ponytail: Liber borrows this Magno script with a flag rather than its own copy; split it if the two drift apart
+const LIBER = args.has('--liber')
+const MAGNO_SUBS = ['Testosterone', 'trt', 'PEDs', 'Peptides', 'moreplatesmoredates']
+const MAGNO_KEYWORDS = [
   'hematocrit trt', 'haematocrit trt', 'bloods trt', 'blood work trt', 'estradiol trt', 'e2 trt bloods',
   'lab results trt', 'trt tracker app', 'track injections app', 'peptide bloods', 'hba1c trt', 'ldl trt',
   'shbg trt', 'medichecks results', 'first bloods on trt',
 ]
-const REPLY_HINTS = [
+const MAGNO_HINTS = [
   { match: /hematocrit|haematocrit|hct|donat/i, hint: 'Explain the 52% line, trough vs peak draw, hydration, donation spacing and ferritin. If they ask how to keep track, mention the app by name, no link.' },
   { match: /estradiol|e2|aromat|nipple|ai\b|arimidex|anastrozole/i, hint: 'Ratio over absolute number; split dosing before an AI; crashed E2 feels worse than high E2.' },
   { match: /ldl|hdl|cholesterol|lipid/i, hint: 'TC/HDL ratio, orals crush HDL, cardio and fibre first, bergamot as the common supplement, doctor for a statin.' },
@@ -27,9 +31,20 @@ const REPLY_HINTS = [
   { match: /track|log|app|spreadsheet|record/i, hint: 'They are asking for a tool. This is the one place a natural mention fits: "I use <name>, it reads the lab PDF for you". Still no link.' },
   { match: /medichecks|thriva|randox|results|bloods|blood work|labs/i, hint: 'Read the numbers for them in plain words, ratio and trend first. Offer the free reader only if they ask where to get a second opinion.' },
 ]
+const LIBER_SUBS = ['bookshelf', 'BookCollecting', 'books', 'suggestmeabook', 'iosapps']
+const LIBER_KEYWORDS = [
+  'catalog my books', 'catalogue my books', 'book collection app', 'home library app', 'bookshelf app',
+  'goodreads alternative', 'libib alternative', 'track books i own', 'book scanner app', 'storygraph alternative',
+]
+const LIBER_HINTS = [
+  { match: /goodreads|storygraph|libib|bookbuddy|alternative/i, hint: 'Name the other apps fairly first (Libib, StoryGraph, BookBuddy), say what each is best for, then "I built Liber for the books you own as a shelf, free for the first 100". No link unless the sub allows it.' },
+  { match: /catalog|catalogue|scan|barcode|collection|inventory|own/i, hint: 'Answer how to catalogue first (scan barcodes, spreadsheet, Libib). Mention Liber only with "I built this" and the 100-book free limit.' },
+]
+const SUBS = LIBER ? LIBER_SUBS : MAGNO_SUBS
+const KEYWORDS = LIBER ? LIBER_KEYWORDS : MAGNO_KEYWORDS
+const REPLY_HINTS = LIBER ? LIBER_HINTS : MAGNO_HINTS
 const WEEK = 7 * 86_400_000
 
-const args = new Set(process.argv.slice(2))
 const asJson = args.has('--json')
 const forceFallback = process.env.REDDIT_FORCE_FALLBACK === '1'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -105,7 +120,7 @@ async function newInSubs() {
 }
 
 // Feed mode has no search, so single topic words decide what is relevant.
-const TOPICS = ['hematocrit', 'haematocrit', 'estradiol', 'e2 ', 'bloods', 'blood work', 'bloodwork', 'lab results', 'my labs', 'ldl', 'hdl', 'shbg', 'hba1c', 'alt ', 'ferritin', 'prolactin', 'tracker', 'spreadsheet', 'medichecks', 'thriva', 'donat']
+const TOPICS = LIBER ? ['catalog', 'catalogue', 'my collection', 'home library', 'bookshelf app', 'goodreads', 'storygraph', 'libib', 'scan', 'spreadsheet'] : ['hematocrit', 'haematocrit', 'estradiol', 'e2 ', 'bloods', 'blood work', 'bloodwork', 'lab results', 'my labs', 'ldl', 'hdl', 'shbg', 'hba1c', 'alt ', 'ferritin', 'prolactin', 'tracker', 'spreadsheet', 'medichecks', 'thriva', 'donat']
 function keywordHits(t) {
   const hay = ` ${t.title} ${t.text} `.toLowerCase()
   const phrases = KEYWORDS.filter((k) => k.split(' ').every((w) => hay.includes(w)))
@@ -143,21 +158,22 @@ async function main() {
     .map((t) => ({ ...t, keywords: keywordHits(t), hint: REPLY_HINTS.find((h) => h.match.test(`${t.title} ${t.text}`))?.hint ?? 'Answer the question. Mention nothing unless they ask for a tool.' }))
     .sort((a, b) => (b.keywords.length * 3 + Math.log1p(b.comments)) - (a.keywords.length * 3 + Math.log1p(a.comments)))
     .slice(0, 12)
-  const s = await stats()
+  const s = LIBER ? null : await stats()
 
   if (asJson) {
     console.log(JSON.stringify({ generatedAt: new Date().toISOString(), mode, threads, stats: s }, null, 2))
     return
   }
   const day = new Date().toISOString().slice(0, 10)
-  const lines = [`# Community digest · ${day}`, '', `Source: Reddit (${mode === 'search' ? 'search' : 'subreddit feeds'}), last 7 days. Nothing here has been posted.`, '']
+  const lines = [`# ${LIBER ? 'Liber' : 'Magno'} community digest · ${day}`, '', `Source: Reddit (${mode === 'search' ? 'search' : 'subreddit feeds'}), last 7 days. Nothing here has been posted.`, '']
   if (threads.length === 0) lines.push('_No matching threads this week._', '')
   for (const t of threads) {
     const age = Math.max(0, Math.round((Date.now() - t.created) / 86_400_000))
     lines.push(`## ${t.title}`, `r/${t.sub} · ${age}d ago · ${t.score} points · ${t.comments} comments`, t.url, t.keywords.length ? `Matched: ${t.keywords.join(', ')}` : '', t.text ? `> ${t.text}` : '', `Hint: ${t.hint}`, '', 'Draft reply (to write, then post by hand):', '', '', '')
   }
-  lines.push('## Stats', '')
-  if (!s) lines.push('_skipped (set APOLLO_STATS_TOKEN)_')
+  if (!LIBER) lines.push('## Stats', '')
+  if (LIBER) { /* Liber's numbers come from liber-stats, read by the routine itself */ }
+  else if (!s) lines.push('_skipped (set APOLLO_STATS_TOKEN)_')
   else if (s.error) lines.push(`_${s.error}_`)
   else {
     lines.push(`Users: ${s.users.total} total, ${s.users.last7Days} in the last 7 days, ${s.users.withLabPanel} with a lab panel, ${s.users.withInjection} logging injections.`)
@@ -167,7 +183,7 @@ async function main() {
   }
   const dir = path.resolve('tmp/digest')
   fs.mkdirSync(dir, { recursive: true })
-  const file = path.join(dir, `${day}.md`)
+  const file = path.join(dir, `${LIBER ? 'liber-' : ''}${day}.md`)
 
   // Reddit 403s this machine intermittently, and the filename is date-only, so a
   // second run on the same day used to replace a good digest with an empty one
