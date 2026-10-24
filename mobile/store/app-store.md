@@ -66,6 +66,29 @@ Terms: https://magno.fit/terms.html
 Privacy: https://magno.fit/privacy.html
 ```
 
+## Screenshots (redone 24 Oct 2026, go up with the next version after 1.1)
+
+The old set was raw captures with no headline. The new set follows what the big apps share (vault
+`04-Growth/app-store-benchmark.md`; health references Function and Welltory): a mono eyebrow, a headline of five words
+or fewer with the keyword in amber, one plain sub-line (health apps add one), one idea per shot, a big phone that runs
+off the bottom, and a pop-out lifting the detail that proves the headline. Shot 1 is the promise plus honest proof
+chips (PRIVATE · NO ADS · NEVER PRESCRIBES); no ratings or awards to show yet, and none are invented.
+
+1. `01-home`: Your protocol, *in one log.* (stat row lifted out)
+2. `02-trends`: See what your *bloods* are doing. (marker chart lifted out)
+3. `03-results`: Every result, *with its range.*
+4. `04-import`: Drop in a *lab PDF.*
+5. `05-log`: Log a shot *in seconds.*
+6. `06-timeline`: Your whole history, *one timeline.*
+
+`screenshots-6.9/` (1320 x 2868) and `screenshots-6.3/` (1206 x 2622). Raw captures are in `raw/` (the 18 Oct sample-data
+captures); words, pop-outs and order are in `shots.json`; from this folder `node render.mjs shots.json .` renders both
+sizes through `frame.html`. Note: the raw screens show compound names and user-entered doses (the app's own UI, as
+approved on 1.0); captions never name a compound or a dose.
+
+**Next version's text (proposed, goes with the version after 1.1):** subtitle `Injection, Labs & BP Tracker` (28),
+which puts "injection" and "tracker" in an indexed field, so the keyword field can drop `tracker` and add another term.
+
 ## In-app purchases (created 18 Oct 2026; both "Ready to Submit", they go up with the first app version)
 
 | Product ID | Type | Price | Notes |

@@ -1,0 +1,79 @@
+[
+ {
+  "name": "home",
+  "app": "magno",
+  "eyebrow": "PROTOCOL LOG",
+  "t": "Your protocol,\n*in one log.*",
+  "sub": "Shots, bloods, blood pressure, weight and how you feel.",
+  "chips": [
+   "PRIVATE",
+   "NO ADS",
+   "NEVER PRESCRIBES"
+  ],
+  "img": "raw/01-home.png",
+  "top": 870,
+  "pops": [
+   {
+    "x": 34,
+    "y": 1255,
+    "w": 946,
+    "h": 275,
+    "zoom": 1.18
+   }
+  ]
+ },
+ {
+  "name": "trends",
+  "app": "magno",
+  "eyebrow": "TRENDS",
+  "t": "See what your\n*bloods* are doing.",
+  "sub": "Every marker over time, against your lab's range.",
+  "img": "raw/02-trends.png",
+  "top": 770,
+  "pops": [
+   {
+    "x": 34,
+    "y": 549,
+    "w": 946,
+    "h": 370,
+    "zoom": 1.15
+   }
+  ]
+ },
+ {
+  "name": "results",
+  "app": "magno",
+  "eyebrow": "LABS",
+  "t": "Every result,\n*with its range.*",
+  "sub": "And how it moved since your last test.",
+  "img": "raw/04-test.png",
+  "top": 770
+ },
+ {
+  "name": "import",
+  "app": "magno",
+  "eyebrow": "IMPORT",
+  "t": "Drop in a\n*lab PDF.*",
+  "sub": "It's read on your phone, and you check every value before it's saved.",
+  "img": "raw/03-labs.png",
+  "top": 870
+ },
+ {
+  "name": "log",
+  "app": "magno",
+  "eyebrow": "LOG",
+  "t": "Log a shot\n*in seconds.*",
+  "sub": "As you took it: syringe, needle and site, with rotation.",
+  "img": "raw/05-injection.png",
+  "top": 770
+ },
+ {
+  "name": "timeline",
+  "app": "magno",
+  "eyebrow": "TIMELINE",
+  "t": "Your whole history,\n*one timeline.*",
+  "sub": "Export a clean PDF for your doctor.",
+  "img": "raw/06-timeline.png",
+  "top": 770
+ }
+]
